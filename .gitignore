@@ -1,0 +1,4 @@
+*.bin
+*.iso
+zig-out
+.zig-cache
