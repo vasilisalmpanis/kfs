@@ -13,7 +13,7 @@ $(NAME): $(KERNEL)
 	grub-mkrescue -o $(NAME) $(ISO_DIR)
 
 $(KERNEL): $(SRC)
-	zig build
+	zig build # -Doptimize=ReleaseSafe
 
 clean:
 	rm -rf zig-out

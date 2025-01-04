@@ -2,16 +2,17 @@ ENTRY(kernel_main)
 
 SECTIONS {
     . = 0x00200000;
-    .text : {
+    .text : ALIGN(4K) {
+        KEEP(*(.multiboot))
         *(.text*)
     }
-    .rodata : {
+    .rodata : ALIGN(4K) {
         *(.rodata*)
     }
-    .data : {
+    .data : ALIGN(4K) {
         *(.data*)
     }
-    .bss : {
+    .bss : ALIGN(4K) {
         *(.bss*)
         *(COMMON)
     }
