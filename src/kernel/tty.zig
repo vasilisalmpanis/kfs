@@ -1,3 +1,6 @@
+const fmt = @import("std").fmt;
+const Writer = @import("std").io.Writer;
+
 pub const ConsoleColors = enum(u8) {
     Black = 0,
     Blue = 1,
@@ -69,10 +72,10 @@ pub const TTY = struct {
             self._scroll();
     }
 
-    pub fn print(self: *TTY, msg: [*:0]const u8, color: ?u8) void {
-        var idx: usize = 0;
-        while (msg[idx] != 0) : (idx += 1)
-            self.printChar(msg[idx], color);
+    pub fn print(self: *TTY, msg: []const u8, color: ?u8) void {
+        for (msg) |c| {
+            self.printChar(c, color);
+        }
     }
 
     pub fn setColor(self: *TTY, new_color: u8) void {
@@ -86,3 +89,21 @@ pub const TTY = struct {
         return uc | (c << 8);
     }
 };
+
+pub var current_tty: ?*TTY = null;
+pub const writer = Writer(void, error{}, callback){ .context = {} };
+
+fn callback(_: void, string: []const u8) error{}!usize {
+    const color: u8 = vga_entry_color(ConsoleColors.White, ConsoleColors.Black);
+    // Print the string passed to the callback
+    if (current_tty == null) {
+        return string.len;
+    }
+    current_tty.?.print(string, color);
+    return string.len;
+}
+
+pub fn printf(comptime format: []const u8, args: anytype) void {
+    current_tty.?.print("called\n", current_tty.?._terminal_color);
+    fmt.format(writer, format, args) catch unreachable;
+}
