@@ -15,12 +15,10 @@ pub const TTY = struct {
 
     fn _scroll() void {}
 
-    pub fn print(self: TTY, msg: [] const u8) void {
-        var idx: u16 = 0;
-        for (msg) |c| {
-            self._vga[idx] = (0x0f << 8) | @as(u16, c);
-            idx += 1;
-        }
+    pub fn print(self: TTY, msg: [*:0] const u8, len: usize) void {
+        var idx: usize = 0;
+        while (idx < len ) : (idx += 1)
+            self._vga[idx] = (0x0f << 8) | @as(u16, msg[idx]);
     }
 
     pub fn setColor() void {}
