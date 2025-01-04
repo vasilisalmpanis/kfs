@@ -38,7 +38,16 @@ pub const TTY = struct {
     }
 
     fn _scroll(self: *TTY) void {
-        self._y = 0;
+        var i: u16 = 1;
+        while (i < self.height) : (i += 1) {
+            var j: u16 = 0;
+            while (j < self.width) : (j += 1)
+                self._vga[(i - 1) * self.width + j] = self._vga[i * self.width + j];
+        }
+        var j: u16 = 0;
+        while (j < self.width) : (j += 1)
+            self._vga[(self.height - 1) * self.width + j] = 0;
+        self._y = self.height - 1;
     }
 
     fn printChar(self: *TTY, c: u8, color: ?u8) void {
@@ -46,9 +55,8 @@ pub const TTY = struct {
         if (c == '\n') {
             self._y += 1;
             self._x = 0;
-            if (self._y >= self.height) {
+            if (self._y >= self.height)
                 self._scroll();
-            }
             return;
         }
         self._vga[self._y * self.width + self._x] = self.vga_entry(c, final_color);
@@ -57,9 +65,8 @@ pub const TTY = struct {
             self._x = 0;
             self._y += 1;
         }
-        if (self._y >= self.height) {
+        if (self._y >= self.height)
             self._scroll();
-        }
     }
 
     pub fn print(self: *TTY, msg: [*:0]const u8, color: ?u8) void {
