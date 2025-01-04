@@ -21,4 +21,7 @@ clean:
 qemu: $(NAME)
 	qemu-system-i386 -enable-kvm -cdrom $(NAME) -serial stdio
 
-.PHONY: all $(NAME) $(KERNEL) clean qemu
+multimonitor: $(NAME)
+	qemu-system-i386 -enable-kvm -device virtio-vga,max_outputs=2 -cdrom $(NAME) -serial stdio
+
+.PHONY: all $(NAME) $(KERNEL) clean qemu multimonitor
