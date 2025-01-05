@@ -33,36 +33,43 @@ pub const TTY = struct {
     _terminal_color: u8 = 0,
 
     pub fn init(width: u16, height: u16) TTY {
-        return TTY{
+        var tty = TTY{
             .width = width,
             .height = height,
             ._terminal_color = vga_entry_color(ConsoleColors.White, ConsoleColors.Black),
         };
+        tty.clear();
+        return tty;
     }
 
     fn _scroll(self: *TTY) void {
         var i: u16 = 1;
         while (i < self.height) : (i += 1) {
-            var j: u16 = 0;
-            while (j < self.width) : (j += 1)
-                self._vga[(i - 1) * self.width + j] = self._vga[i * self.width + j];
+            const p: u16 = i * self.width;
+            @memcpy(
+                self._vga[p - self.width..p],
+                self._vga[p..p + self.width]
+            );
         }
-        var j: u16 = 0;
-        while (j < self.width) : (j += 1)
-            self._vga[(self.height - 1) * self.width + j] = 0;
+        const p: u16 = i * self.width;
+        @memset(
+            self._vga[p - self.width..p],
+            self.vga_entry(0, self._terminal_color)
+        );
         self._y = self.height - 1;
     }
 
-    fn printChar(self: *TTY, c: u8, color: ?u8) void {
-        const final_color: u8 = color orelse self._terminal_color;
-        if (c == '\n') {
-            self._y += 1;
-            self._x = 0;
-            if (self._y >= self.height)
-                self._scroll();
-            return;
-        }
-        self._vga[self._y * self.width + self._x] = self.vga_entry(c, final_color);
+    pub fn clear(self: *TTY) void {
+        @memset(
+            self._vga[0..self.height * self.width],
+            self.vga_entry(0, self._terminal_color)
+        );
+        self._x = 0;
+        self._y = 0;
+    }
+
+    fn printVga(self: *TTY, vga_item: u16) void {
+        self._vga[self._y * self.width + self._x] = vga_item;
         self._x += 1;
         if (self._x >= self.width) {
             self._x = 0;
@@ -72,10 +79,34 @@ pub const TTY = struct {
             self._scroll();
     }
 
-    pub fn print(self: *TTY, msg: []const u8, color: ?u8) void {
-        for (msg) |c| {
-            self.printChar(c, color);
+    fn printChar(self: *TTY, c: u8, color: ?u8) void {
+        if (c == '\n') {
+            self._y += 1;
+            self._x = 0;
+            if (self._y >= self.height)
+                self._scroll();
+            return;
         }
+        self.printVga(self.vga_entry(
+            c,
+            color orelse self._terminal_color)
+        );
+    }
+
+    pub fn print(self: *TTY, msg: [] const u8, color: ?u8) void {
+        var buf = [_]u16{0} ** 80;
+        const empty = self.vga_entry(0, self._terminal_color);
+        const start = self._y * self.width + self._x;
+        const max_end: u16 = (self._y + 1) * self.width;
+        var end: u16 = start;
+        while (self._vga[end] != empty and end < max_end)
+            end += 1;
+        @memcpy(buf[0..(end - start)], self._vga[start..end]);
+        for (msg) |c|
+            self.printChar(c, color);
+        var i: u16 = 0;
+        while (i < end - start) : (i += 1)
+            self.printVga(buf[i]);
     }
 
     pub fn setColor(self: *TTY, new_color: u8) void {

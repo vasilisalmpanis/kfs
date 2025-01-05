@@ -10,7 +10,7 @@ all: $(NAME)
 
 $(NAME): $(KERNEL)
 	cp $(KERNEL) $(ISO_DIR)/boot/
-	grub-mkrescue -o $(NAME) $(ISO_DIR)
+	grub-mkrescue --compress=xz -o $(NAME) $(ISO_DIR)
 
 $(KERNEL): $(SRC)
 	zig build # -Doptimize=ReleaseSafe
