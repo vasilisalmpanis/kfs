@@ -133,6 +133,6 @@ fn callback(_: void, string: []const u8) error{}!usize {
 }
 
 pub fn printf(comptime format: []const u8, args: anytype) void {
-    current_tty.?.print("called\n", current_tty.?._terminal_color);
+    // current_tty.?.print("called\n", current_tty.?._terminal_color);
     fmt.format(writer, format, args) catch unreachable;
 }
