@@ -1,6 +1,8 @@
 const TTY = @import("tty.zig");
+const interrupts = @import("./interrupts.zig");
 
 export fn kernel_main() noreturn {
+    interrupts.idt_init();
     var tty = TTY.TTY.init(80, 25);
     var color: u8 = TTY.vga_entry_color(TTY.ConsoleColors.Red, TTY.ConsoleColors.Black);
     TTY.current_tty = &tty;

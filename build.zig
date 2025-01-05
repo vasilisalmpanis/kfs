@@ -4,6 +4,7 @@ const builtin = @import("builtin");
 const name = "kfs.bin";
 const linker = "linker.ld";
 const multiboot = "src/arch/x86/boot/multiboot.s";
+const exceptions = "src/arch/x86/exception.s";
 const kernel_src = "src/kernel/main.zig";
 
 const archs = [_]std.Target.Cpu.Arch{
@@ -12,12 +13,8 @@ const archs = [_]std.Target.Cpu.Arch{
 };
 
 pub fn build(b: *std.Build) !void {
-    for (archs) |arch| { 
-        var target: std.Target.Query = .{
-            .cpu_arch = arch,
-            .os_tag = .freestanding,
-            .abi = .none
-        };
+    for (archs) |arch| {
+        var target: std.Target.Query = .{ .cpu_arch = arch, .os_tag = .freestanding, .abi = .none };
         const Features = std.Target.x86.Feature;
         target.cpu_features_sub.addFeature(@intFromEnum(Features.mmx));
         target.cpu_features_sub.addFeature(@intFromEnum(Features.sse));
@@ -39,6 +36,7 @@ pub fn build(b: *std.Build) !void {
         kernel.entry = std.Build.Step.Compile.Entry.disabled;
 
         kernel.addAssemblyFile(b.path(multiboot));
+        kernel.addAssemblyFile(b.path(exceptions));
         kernel.setLinkerScriptPath(b.path(linker));
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
