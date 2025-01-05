@@ -127,10 +127,8 @@ pub const writer = Writer(void, error{}, callback){ .context = {} };
 fn callback(_: void, string: []const u8) error{}!usize {
     const color: u8 = vga_entry_color(ConsoleColors.White, ConsoleColors.Black);
     // Print the string passed to the callback
-    if (current_tty == null) {
-        return string.len;
-    }
-    current_tty.?.print(string, color);
+    if (current_tty) |t|
+        t.print(string, color);
     return string.len;
 }
 

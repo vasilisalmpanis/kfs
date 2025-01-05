@@ -1,3 +1,6 @@
+const tty = @import("tty.zig");
+
+
 const idt_entry_t = packed struct {
     isr_low: u16, // The lower 16 bits of the ISR's address
     kernel_cs: u16, // The GDT segment selector that the CPU will load into CS before calling the ISR
@@ -12,11 +15,17 @@ const idtr_t = packed struct {
     base: u32,
 };
 
-pub export fn exception_handler() noreturn {
+pub export fn exception_handler(
+    exception_number: u32,
+    stack_pointer: usize
+) noreturn {
+    tty.printf(
+        "interrupt {d} {x}\n",
+        .{exception_number, stack_pointer}
+    );
     asm volatile ("cli; hlt");
     while (true) {}
 }
-
 pub var idt: [256]idt_entry_t = undefined;
 
 pub var idtr: idtr_t align(0x10) = undefined;
@@ -24,6 +33,7 @@ pub var idtr: idtr_t align(0x10) = undefined;
 pub var vectors: [IDT_MAX_DESCRIPTORS]bool = undefined;
 
 extern const isr_stub_table: [256]*void;
+
 
 pub fn idt_set_descriptor(vector: u8, isr: *void, flags: u8) void {
     var descriptor: *idt_entry_t = &idt[vector];
@@ -53,4 +63,6 @@ pub fn idt_init() void {
 
     // Set the interrupt flag (enable interrupts)
     asm volatile ("sti");
+    // tty.printf("idt: {any}\n", .{idt});
+    tty.printf("idtr: {any}\n", .{idtr});
 }
