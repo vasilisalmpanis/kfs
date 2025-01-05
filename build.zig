@@ -4,6 +4,7 @@ const builtin = @import("builtin");
 const name = "kfs.bin";
 const linker = "linker.ld";
 const multiboot = "src/arch/x86/boot/multiboot.s";
+const gdt = "src/arch/x86/gdt.s";
 const exceptions = "src/arch/x86/exception.s";
 const kernel_src = "src/kernel/main.zig";
 
@@ -36,6 +37,7 @@ pub fn build(b: *std.Build) !void {
         kernel.entry = std.Build.Step.Compile.Entry.disabled;
 
         kernel.addAssemblyFile(b.path(multiboot));
+        // kernel.addAssemblyFile(b.path(gdt));
         kernel.addAssemblyFile(b.path(exceptions));
         kernel.setLinkerScriptPath(b.path(linker));
         // kernel.setVerboseLink(true);
