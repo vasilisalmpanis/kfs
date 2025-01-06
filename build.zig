@@ -38,7 +38,7 @@ pub fn build(b: *std.Build) !void {
 
         kernel.addAssemblyFile(b.path(multiboot));
         // kernel.addAssemblyFile(b.path(gdt));
-        kernel.addAssemblyFile(b.path(exceptions));
+        // kernel.addAssemblyFile(b.path(exceptions));
         kernel.setLinkerScriptPath(b.path(linker));
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
