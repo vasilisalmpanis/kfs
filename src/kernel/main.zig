@@ -2,6 +2,7 @@ const TTY = @import("tty.zig");
 const interrupts = @import("./interrupts.zig");
 const gdt = @import("gdt.zig");
 const io = @import("io.zig");
+const system = @import("system/system.zig");
 
 export fn kernel_main() noreturn {
     var tty = TTY.TTY.init(80, 25);
@@ -40,9 +41,10 @@ export fn kernel_main() noreturn {
             if (key.len != 0) {
                 if (byte == 0x0E) {
                     TTY.current_tty.?.remove();
+                } else if ( byte == 0x3A) { // CAPSLOCK to reboot (random number)
+                    system.reboot();
                 } else TTY.printf("{s}", .{key});
             }
-
             key_pressed = true;
         } else if (key_pressed) {
             key_pressed = false;
