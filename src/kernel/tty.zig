@@ -25,21 +25,39 @@ pub fn vga_entry_color(fg: ConsoleColors, bg: ConsoleColors) u8 {
 }
 
 pub const TTY = struct {
-    width: u16,
-    height: u16,
+    width: u16 = 80,
+    height: u16 = 25,
     _vga: [*]u16 = @ptrFromInt(0xB8000),
     _x: u16 = 0,
     _y: u16 = 0,
     _terminal_color: u8 = 0,
+    _buffer : [80 * 25] u16,
 
     pub fn init(width: u16, height: u16) TTY {
         var tty = TTY{
             .width = width,
             .height = height,
             ._terminal_color = vga_entry_color(ConsoleColors.White, ConsoleColors.Black),
+            ._buffer = .{0} ** (80 * 25),
         };
         tty.clear();
         return tty;
+    }
+    pub fn move(self: *TTY, direction : u8) void {
+        if (direction == 0x1D) {
+            if (self._x > 0)
+                self._x -= 1;
+        }
+        self.render();
+    }
+
+    pub fn render(self: *TTY) void {
+
+        const current_char : u8  = self.getCharacterFromVgaEntry(self._buffer[self._y * self.width + self._x]); 
+        const current_color : u8  = @truncate(self._buffer[self._y * self.width + self._x] >> 8);
+        @memcpy(self._vga[0..2000], self._buffer[0..2000]);
+        self._vga[self._y * self.width + self._x] = self.vga_entry(current_char , ~current_color); // char + colour
+
     }
 
     fn _scroll(self: *TTY) void {
@@ -47,23 +65,24 @@ pub const TTY = struct {
         while (i < self.height) : (i += 1) {
             const p: u16 = i * self.width;
             @memcpy(
-                self._vga[p - self.width..p],
-                self._vga[p..p + self.width]
+                self._buffer[p - self.width..p],
+                self._buffer[p..p + self.width]
             );
         }
         const p: u16 = i * self.width;
         @memset(
-            self._vga[p - self.width..p],
+            self._buffer[p - self.width..p],
             self.vga_entry(0, self._terminal_color)
         );
         self._y = self.height - 1;
+        self.render();
     }
 
-    fn removeAtIndex(self: *TTY, comptime T: type, buffer: [*]T, index: usize) void {
+    fn removeAtIndex(self: *TTY, comptime T: type, buffer: []T, index: usize) void {
 
         // Move the characters after the index to the left
         var i = index;
-        while (i < 80 * 25) {
+        while (i < 80 * 25 - 1) {
             buffer[i] = buffer[i + 1];
             i += 1;
         }
@@ -76,20 +95,22 @@ pub const TTY = struct {
             return;
         if (self._x > 0)
             self._x -= 1;
-        self.removeAtIndex(u16, self._vga, self._y * self.width + self._x);
+        self.removeAtIndex(u16, &self._buffer, self._y * self.width + self._x);
+        self.render();
     }
 
     pub fn clear(self: *TTY) void {
         @memset(
-            self._vga[0..self.height * self.width],
+            self._buffer[0..self.height * self.width],
             self.vga_entry(0, self._terminal_color)
         );
         self._x = 0;
         self._y = 0;
+        self.render();
     }
 
     fn printVga(self: *TTY, vga_item: u16) void {
-        self._vga[self._y * self.width + self._x] = vga_item;
+        self._buffer[self._y * self.width + self._x] = vga_item;
         self._x += 1;
         if (self._x >= self.width) {
             self._x = 0;
@@ -115,18 +136,19 @@ pub const TTY = struct {
 
     pub fn print(self: *TTY, msg: [] const u8, color: ?u8) void {
         var buf = [_]u16{0} ** 80;
-        const empty = self.vga_entry(0, self._terminal_color);
         const start = self._y * self.width + self._x;
         const max_end: u16 = (self._y + 1) * self.width;
         var end: u16 = start;
-        while (self._vga[end] != empty and end < max_end)
+        while (self.getCharacterFromVgaEntry(self._buffer[end])
+            != 0 and end < max_end)
             end += 1;
-        @memcpy(buf[0..(end - start)], self._vga[start..end]);
+        @memcpy(buf[0..(end - start)], self._buffer[start..end]);
         for (msg) |c|
             self.printChar(c, color);
         var i: u16 = 0;
         while (i < end - start) : (i += 1)
             self.printVga(buf[i]);
+        self.render();
     }
 
     pub fn setColor(self: *TTY, new_color: u8) void {
@@ -139,13 +161,18 @@ pub const TTY = struct {
 
         return uc | (c << 8);
     }
+
+    fn getCharacterFromVgaEntry(self: *TTY, entry: u16) u8 {
+        _ = self;
+        return @intCast(entry & 0xFF);
+    }
 };
 
 pub var current_tty: ?*TTY = null;
 pub const writer = Writer(void, error{}, callback){ .context = {} };
 
 fn callback(_: void, string: []const u8) error{}!usize {
-    const color: u8 = vga_entry_color(ConsoleColors.White, ConsoleColors.Black);
+    const color: u8 = current_tty.?._terminal_color;
     // Print the string passed to the callback
     if (current_tty) |t|
         t.print(string, color);
