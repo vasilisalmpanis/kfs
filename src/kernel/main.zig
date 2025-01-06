@@ -28,12 +28,26 @@ export fn kernel_main() noreturn {
     // tty.print("GDT INITIALIZED..\n", color);
     // interrupts.idt_init();
     // tty.print("IDT INITIALIZED..\n", color);
+    // TTY.printf("keycode {}\n", .{byte});
+    var last_scancode: u8 = 0;
+    var key_pressed: bool = false;
+
     while (true) {
         const byte: u8 = io.inb(0x60);
-        const key: []const u8 = io.scancode_to_key(byte);
-        if (key.len != 0)
-            TTY.printf("{s}", .{key});
+
+        if (byte != last_scancode) {
+            const key: []const u8 = io.scancode_to_key(byte);
+            if (key.len != 0) {
+                if (byte == 0x0E) {
+                    TTY.current_tty.?.remove();
+                } else TTY.printf("{s}", .{key});
+            }
+
+            key_pressed = true;
+        } else if (key_pressed) {
+            key_pressed = false;
+        }
+
+        last_scancode = byte;
     }
-    // TTY.printf("keycode {}\n", .{byte});
-    // }
 }

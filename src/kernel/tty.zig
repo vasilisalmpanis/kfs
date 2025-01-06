@@ -59,6 +59,32 @@ pub const TTY = struct {
         self._y = self.height - 1;
     }
 
+    fn removeAtIndex(self: *TTY, comptime T: type, buffer: [*]T, index: usize) void {
+
+        // Move the characters after the index to the left
+        var i = index;
+        while (i < 80 * 25) {
+            buffer[i] = buffer[i + 1];
+            i += 1;
+        }
+
+        buffer[80 * 25 - 1] = self.vga_entry(0, self._terminal_color);
+    }
+
+    pub fn remove(self: *TTY) void {
+        if (self._x == 0 and self._y == 0)
+            return;
+        if (self._x == 0 and self._y > 0) {
+            self._y -= 1;
+            self._x = self.width - 1;
+        } else if (self._x == 0) {
+            return;
+        } else {
+            self._x -= 1;
+        }
+        self.removeAtIndex(u16, self._vga, self._y * self.width + self._x);
+    }
+
     pub fn clear(self: *TTY) void {
         @memset(
             self._vga[0..self.height * self.width],
