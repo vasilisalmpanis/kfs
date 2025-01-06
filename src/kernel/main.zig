@@ -1,8 +1,10 @@
 const TTY = @import("tty.zig");
 const interrupts = @import("./interrupts.zig");
 const gdt = @import("gdt.zig");
-const io = @import("io.zig");
-const system = @import("system/system.zig");
+const kbd = @import("drivers").kbd;
+const io = @import("arch").io;
+const system = @import("arch").system;
+
 
 export fn kernel_main() noreturn {
     var tty = TTY.TTY.init(80, 25);
@@ -37,7 +39,7 @@ export fn kernel_main() noreturn {
         const byte: u8 = io.inb(0x60);
 
         if (byte != last_scancode) {
-            const key: []const u8 = io.scancode_to_key(byte);
+            const key: []const u8 = kbd.scancode_to_key(byte);
             if (key.len != 0) {
                 if (byte == 0x0E) {
                     TTY.current_tty.?.remove();
