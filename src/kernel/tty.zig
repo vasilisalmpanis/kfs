@@ -74,14 +74,8 @@ pub const TTY = struct {
     pub fn remove(self: *TTY) void {
         if (self._x == 0 and self._y == 0)
             return;
-        if (self._x == 0 and self._y > 0) {
-            self._y -= 1;
-            self._x = self.width - 1;
-        } else if (self._x == 0) {
-            return;
-        } else {
+        if (self._x > 0)
             self._x -= 1;
-        }
         self.removeAtIndex(u16, self._vga, self._y * self.width + self._x);
     }
 
