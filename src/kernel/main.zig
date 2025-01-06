@@ -1,6 +1,7 @@
 const TTY = @import("tty.zig");
 const interrupts = @import("./interrupts.zig");
 const gdt = @import("gdt.zig");
+const io = @import("io.zig");
 
 export fn kernel_main() noreturn {
     var tty = TTY.TTY.init(80, 25);
@@ -23,9 +24,16 @@ export fn kernel_main() noreturn {
     // tty.print("test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test ", null);
     color = TTY.vga_entry_color(TTY.ConsoleColors.Blue, TTY.ConsoleColors.Black);
     tty.print("STARTING..\n", color);
-    gdt.init_gdt();
-    tty.print("GDT INITIALIZED..\n", color);
-    interrupts.idt_init();
-    tty.print("IDT INITIALIZED..\n", color);
-    while (true) {}
+    // gdt.init_gdt();
+    // tty.print("GDT INITIALIZED..\n", color);
+    // interrupts.idt_init();
+    // tty.print("IDT INITIALIZED..\n", color);
+    while (true) {
+        const byte: u8 = io.inb(0x60);
+        const key: []const u8 = io.scancode_to_key(byte);
+        if (key.len != 0)
+            TTY.printf("{s}", .{key});
+    }
+    // TTY.printf("keycode {}\n", .{byte});
+    // }
 }
