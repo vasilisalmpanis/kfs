@@ -30,17 +30,19 @@ export fn kernel_main() noreturn {
         if (byte != last_scancode) {
             const key: []const u8 = kbd.scancode_to_key(byte);
             if (key.len != 0) {
-                if (byte == 0x0E) {
+                if (byte == 0x0E) { // backspace to erase current entry
                     TTY.current_tty.?.remove();
                 } else if ( byte == 0x3A) { // CAPSLOCK to reboot (random number)
                     system.reboot();
                 } else if (byte == 0x1D) {
                     TTY.current_tty.?.move(byte);
-                } else if (byte >= 0x01 and byte < 0x0A) {
+                } else if (byte >= 0x01 and byte < 0x0A) { // Numbers from 0 to 1 to change tty
                     TTY.current_tty = &scrn.tty[byte - 2];
                     TTY.current_tty.?.render();
-                } else if (byte == 0x2A) {
+                } else if (byte == 0x2A) { // Left Shift to print Stack trace
                     trace();
+                } else if (byte == 0x38) { // Left Alt to clear the screen
+                    TTY.current_tty.?.clear();
                 } else TTY.current_tty.?.print(key, null);
             }
             key_pressed = true;
