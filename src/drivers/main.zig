@@ -1,1 +1,1 @@
-pub const kbd = @import("kbd.zig");
+pub const Keyboard = @import("kbd.zig").Keyboard;

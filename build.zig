@@ -14,11 +14,7 @@ const archs = [_]std.Target.Cpu.Arch{
 };
 
 pub fn build(b: *std.Build) !void {
-    const drivers = b.addModule("drivers", .{
-        .root_source_file =  b.path("./src/drivers/main.zig")
-    });
     for (archs) |arch| {
-
         const arch_path = switch (arch) {
             std.Target.Cpu.Arch.x86 => "./src/arch/x86/main.zig",
             else => continue
@@ -27,6 +23,10 @@ pub fn build(b: *std.Build) !void {
         const arch_mod = b.addModule("arch", .{
             .root_source_file =  b.path(arch_path)
         });
+        const drivers = b.addModule("drivers", .{
+            .root_source_file =  b.path("./src/drivers/main.zig")
+        });
+        drivers.addImport("arch", arch_mod);
 
         var target: std.Target.Query = .{ .cpu_arch = arch, .os_tag = .freestanding, .abi = .none };
         const Features = std.Target.x86.Feature;
@@ -48,11 +48,10 @@ pub fn build(b: *std.Build) !void {
         kernel.root_module.stack_check = false;
         kernel.root_module.red_zone = false;
         kernel.entry = std.Build.Step.Compile.Entry.disabled;
-        kernel.root_module.addImport("drivers", drivers);
         kernel.root_module.addImport("arch", arch_mod);
+        kernel.root_module.addImport("drivers", drivers);
+
         kernel.addAssemblyFile(b.path(multiboot));
-        // kernel.addAssemblyFile(b.path(gdt));
-        // kernel.addAssemblyFile(b.path(exceptions));
         kernel.setLinkerScriptPath(b.path(linker));
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
