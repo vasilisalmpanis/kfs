@@ -4,8 +4,6 @@ const builtin = @import("builtin");
 const name = "kfs.bin";
 const linker = "linker.ld";
 const multiboot = "src/arch/x86/boot/multiboot.s";
-const gdt = "src/arch/x86/gdt.s";
-const exceptions = "src/arch/x86/exception.s";
 const kernel_src = "src/kernel/main.zig";
 
 const archs = [_]std.Target.Cpu.Arch{
