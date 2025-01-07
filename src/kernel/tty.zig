@@ -42,9 +42,12 @@ pub const TTY = struct {
     }
 
     pub fn move(self: *TTY, direction : u8) void {
-        if (direction == 0x1D) {
+        if (direction == 0) {
             if (self._x > 0)
                 self._x -= 1;
+        } else {
+            if (self._x < self.width - 1)
+                self._x += 1;
         }
         self.render();
     }
@@ -124,6 +127,12 @@ pub const TTY = struct {
             if (self._y >= self.height)
                 self._scroll();
             return;
+        } else if (c == 8) {
+            self.remove();
+            return ;
+        } else if (c == '\t') {
+            self.print("    ", null);
+            return ;
         }
         self.printVga(self.vga_entry(
             c,
