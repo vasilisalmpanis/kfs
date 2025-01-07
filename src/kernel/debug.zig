@@ -1,4 +1,6 @@
-const tty = @import("tty.zig");
+const printf = @import("printf.zig").printf;
+
+
 const stackframe = struct {
     ebp : ?*stackframe = null,
     eip : u32,
@@ -11,7 +13,6 @@ const stackframe = struct {
     }
 };
 
-
 /// Print the currect stack frames up to a maxFrame 
 /// number specified as argument.
 /// @param maxFrames: maximum amount of frames to trace.
@@ -21,10 +22,10 @@ pub fn TraceStackTrace(maxFrames : u32 ) void {
         : [result] "={ax}" (-> *stackframe),
         : :
     );
-    tty.printf("Stack Trace:\n",.{});
+    printf("Stack Trace:\n",.{});
     var frame : u32 = 0;
     while (frame < maxFrames and @intFromPtr(stk) > 0) : (frame += 1) {
-        tty.printf("  0x{}     \n", .{stk.?.eip});
+        printf("  0x{}     \n", .{stk.?.eip});
         stk = stk.?.ebp;
     }
 
