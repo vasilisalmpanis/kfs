@@ -5,7 +5,12 @@ const kbd = @import("drivers").kbd;
 const io = @import("arch").io;
 const system = @import("arch").system;
 const screen = @import("screen.zig");
+const debug = @import("debug.zig");
 
+
+pub fn trace() void {
+    debug.TraceStackTrace(10);
+}
 
 export fn kernel_main() noreturn {
     var scrn : screen.Screen = screen.Screen.init();
@@ -17,6 +22,7 @@ export fn kernel_main() noreturn {
     }
     var last_scancode: u8 = 0;
     var key_pressed: bool = false;
+
 
     while (true) {
         const byte: u8 = io.inb(0x60);
@@ -33,6 +39,8 @@ export fn kernel_main() noreturn {
                 } else if (byte >= 0x01 and byte < 0x0A) {
                     TTY.current_tty = &scrn.tty[byte - 2];
                     TTY.current_tty.?.render();
+                } else if (byte == 0x2A) {
+                    trace();
                 } else TTY.current_tty.?.print(key, null);
             }
             key_pressed = true;
