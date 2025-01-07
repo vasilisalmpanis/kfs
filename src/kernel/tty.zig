@@ -1,6 +1,3 @@
-const fmt = @import("std").fmt;
-const Writer = @import("std").io.Writer;
-
 pub const ConsoleColors = enum(u8) {
     Black = 0,
     Blue = 1,
@@ -43,6 +40,7 @@ pub const TTY = struct {
         tty.clear();
         return tty;
     }
+
     pub fn move(self: *TTY, direction : u8) void {
         if (direction == 0x1D) {
             if (self._x > 0)
@@ -52,7 +50,6 @@ pub const TTY = struct {
     }
 
     pub fn render(self: *TTY) void {
-
         const current_char : u8  = self.getCharacterFromVgaEntry(self._buffer[self._y * self.width + self._x]); 
         const current_color : u8  = @truncate(self._buffer[self._y * self.width + self._x] >> 8);
         @memcpy(self._vga[0..2000], self._buffer[0..2000]);
@@ -69,7 +66,7 @@ pub const TTY = struct {
                 self._buffer[p..p + self.width]
             );
         }
-        const p: u16 = i * self.width;
+        const p: u16 = self.height * self.width;
         @memset(
             self._buffer[p - self.width..p],
             self.vga_entry(0, self._terminal_color)
@@ -167,19 +164,3 @@ pub const TTY = struct {
         return @intCast(entry & 0xFF);
     }
 };
-
-pub var current_tty: ?*TTY = null;
-pub const writer = Writer(void, error{}, callback){ .context = {} };
-
-fn callback(_: void, string: []const u8) error{}!usize {
-    const color: u8 = current_tty.?._terminal_color;
-    // Print the string passed to the callback
-    if (current_tty) |t|
-        t.print(string, color);
-    return string.len;
-}
-
-pub fn printf(comptime format: []const u8, args: anytype) void {
-    // current_tty.?.print("called\n", current_tty.?._terminal_color);
-    fmt.format(writer, format, args) catch unreachable;
-}
