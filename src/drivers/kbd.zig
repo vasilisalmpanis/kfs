@@ -80,6 +80,39 @@ pub fn scancode_to_char(scancode: u8) u8 {
     return a;
 }
 
+pub fn getShiftedChar(unshifted: u8) u8 {
+    return switch (unshifted) {
+        // Numbers and symbols
+        '1' => '!',
+        '2' => '@',
+        '3' => '#',
+        '4' => '$',
+        '5' => '%',
+        '6' => '^',
+        '7' => '&',
+        '8' => '*',
+        '9' => '(',
+        '0' => ')',
+        '-' => '_',
+        '=' => '+',
+        '[' => '{',
+        ']' => '}',
+        '\\' => '|',
+        ';' => ':',
+        '\'' => '"',
+        ',' => '<',
+        '.' => '>',
+        '/' => '?',
+        '`' => '~',
+
+        // Letters are not changed
+        'a'...'z', 'A'...'Z' => unshifted,
+
+        // Default case (no shifted character)
+        else => 0,
+    };
+}
+
 pub const Keyboard = struct {
     last_scancode: u8,
     key_pressed: bool,
@@ -139,8 +172,11 @@ pub const Keyboard = struct {
                 return .{'S', 0};
             if (self.cntl and char == 'R')
                 return .{'R', 0};
-            if ((self.shift and self.caps) or (!self.shift and !self.caps))
+            if ((self.shift and self.caps) or (!self.shift and !self.caps)) {
                 char = ascii.toLower(char);
+            } else if (self.shift and (char < 'A' or char > 'Z')) {
+                char = getShiftedChar(char);
+            }
             return .{0, char};
         } else if (self.key_pressed) {
             self.key_pressed = false;
