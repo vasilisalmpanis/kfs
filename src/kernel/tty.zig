@@ -1,3 +1,5 @@
+const io = @import("arch").io;
+
 pub const ConsoleColors = enum(u8) {
     Black = 0,
     Blue = 1,
@@ -41,6 +43,15 @@ pub const TTY = struct {
         return tty;
     }
 
+    fn update_cursor(self: *TTY) void {
+        const pos : u16 = self._y * self.width + self._x;
+
+        io.outb(0x3D4, 0x0F);
+        io.outb(0x3D5, @intCast(pos & 0xFF));
+        io.outb(0x3D4, 0x0E);
+        io.outb(0x3D5, @intCast((pos >> 8) & 0xFF));
+    }
+
     pub fn move(self: *TTY, direction : u8) void {
         if (direction == 0) {
             if (self._x > 0)
@@ -53,10 +64,8 @@ pub const TTY = struct {
     }
 
     pub fn render(self: *TTY) void {
-        const current_char : u8  = self.getCharacterFromVgaEntry(self._buffer[self._y * self.width + self._x]); 
-        const current_color : u8  = @truncate(self._buffer[self._y * self.width + self._x] >> 8);
         @memcpy(self._vga[0..2000], self._buffer[0..2000]);
-        self._vga[self._y * self.width + self._x] = self.vga_entry(current_char , ~current_color); // char + colour
+        self.update_cursor();
 
     }
 
