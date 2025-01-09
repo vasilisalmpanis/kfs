@@ -131,6 +131,10 @@ pub const TTY = struct {
 
     fn printChar(self: *TTY, c: u8, color: ?u8) void {
         if (c == '\n') {
+             @memset(
+                self._buffer[self.width * self._y + self._x .. self.width * self._y + self.width],
+                self.vga_entry(0, self._terminal_color)
+            );
             self._y += 1;
             self._x = 0;
             if (self._y >= self.height)
@@ -160,9 +164,13 @@ pub const TTY = struct {
         @memcpy(buf[0..(end - start)], self._buffer[start..end]);
         for (msg) |c|
             self.printChar(c, color);
+        const x = self._x;
+        const y = self._y;
         var i: u16 = 0;
         while (i < end - start) : (i += 1)
             self.printVga(buf[i]);
+        self._x = x;
+        self._y = y;
         self.render();
     }
 
