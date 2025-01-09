@@ -32,13 +32,14 @@ pub fn gdt_set_entry(num: u32, base: u32, limit: u32, access: u8, gran: u8) void
 pub fn gdt_init() void {
     // @memset(gdt_entries[0..5], 0);
     gdt_ptr.limit = (@sizeOf(gdt_entry) * 5) - 1;
-    gdt_ptr.base = @intFromPtr(&gdt_entries);
+    gdt_ptr.base = GDTBASE;
 
     gdt_set_entry(0,0,0,0,0); // Null segment
     gdt_set_entry(1, 0, 0xFFFFFFFF, 0x9A, 0xCF); // code segment
     gdt_set_entry(2, 0, 0xFFFFFFFF, 0x92, 0xCF); // data segment
     gdt_set_entry(3, 0, 0xFFFFFFFF, 0xFA, 0xCF); // stack segment
     gdt_set_entry(4, 0, 0xFFFFFFFF, 0xF2, 0xCF); // userspace code
+    // TODO: memcpy the gdt_entries struct into gdt_ptr.base address
     asm volatile (
         \\lgdt (%edi)
         \\jmp $0x08, $.reload_CS
