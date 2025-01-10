@@ -16,7 +16,6 @@ const gdt_entry = packed struct {
 
 var gdt_ptr : gdtr = undefined;
 
-// var gdt_entries: [5]gdt_entry = undefined;
 pub fn gdt_set_entry(num: u32, base: u32, limit: u32, access: u8, gran: u8) void {
     // load the entry using num as an index into GDTBASE (0x00000800)
     var gdt_temp: *gdt_entry = @ptrFromInt(GDTBASE + (num * @sizeOf(gdt_entry)));
@@ -33,14 +32,16 @@ pub fn gdt_set_entry(num: u32, base: u32, limit: u32, access: u8, gran: u8) void
 
 pub fn gdt_init() void {
     // @memset(gdt_entries[0..5], 0);
-    gdt_ptr.limit = (@sizeOf(gdt_entry) * 5) - 1;
+    gdt_ptr.limit = (@sizeOf(gdt_entry) * 7) - 1;
     gdt_ptr.base = GDTBASE;
 
-    gdt_set_entry(0,0,0,0,0); // Null segment
-    gdt_set_entry(1, 0, 0xFFFFFFFF, 0x9A, 0xCF); // code segment
-    gdt_set_entry(2, 0, 0xFFFFFFFF, 0x92, 0xCF); // data segment
-    gdt_set_entry(3, 0, 0xFFFFFFFF, 0xFA, 0xCF); // stack segment
-    gdt_set_entry(4, 0, 0xFFFFFFFF, 0xF2, 0xCF); // userspace code
+    gdt_set_entry(0,0,0,0,0);                    // Null segment
+    gdt_set_entry(1, 0, 0xFFFFFFFF, 0x9A, 0xCF); // Kernel code
+    gdt_set_entry(2, 0, 0xFFFFFFFF, 0x92, 0xCF); // Kernel data
+    gdt_set_entry(3, 0, 0xFFFFFFFF, 0x96, 0xCF); // kernel stack
+    gdt_set_entry(4, 0, 0xFFFFFFFF, 0xFA, 0xCF); // userspace code
+    gdt_set_entry(5, 0, 0xFFFFFFFF, 0xF2, 0xCF); // userspace data
+    gdt_set_entry(6, 0, 0xFFFFFFFF, 0xF6, 0xCF); // userspace stack
     asm volatile (
         \\lgdt (%edi)
         \\jmp $0x08, $.reload_CS

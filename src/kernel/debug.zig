@@ -19,13 +19,15 @@ const stackframe = struct {
 pub fn TraceStackTrace(maxFrames : u32 ) void {
     var stk : ?*stackframe = 
      asm ("movl %ebp, %[result]"
-        : [result] "={ax}" (-> *stackframe),
+        : [result] "={eax}" (-> *stackframe),
         : :
     );
     printf("Stack Trace:\n",.{});
     var frame : u32 = 0;
     while (frame < maxFrames and @intFromPtr(stk) > 0) : (frame += 1) {
-        printf("  0x{}     \n", .{stk.?.eip});
+        if (stk != null) {
+            printf("  0x{x}     \n", .{ stk.?.eip });
+        }
         stk = stk.?.ebp;
     }
 
