@@ -31,7 +31,7 @@ export fn kernel_main() noreturn {
             'S' => trace(),
             'C' => screen.current_tty.?.clear(),
             'T' => scrn.switch_tty(input[1]),
-            else => if (input[1] != 0) printf("{c}",.{input[1]})
+            else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, null, true)
         }
     }
 }
