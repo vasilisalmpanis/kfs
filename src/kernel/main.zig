@@ -18,8 +18,9 @@ export fn kernel_main() noreturn {
     // printf("GDT INITIALIZED\n", .{});
     inline for (@typeInfo(TTY.ConsoleColors).Enum.fields) |f| {
         const clr: u8 = TTY.vga_entry_color(@field(TTY.ConsoleColors, f.name), TTY.ConsoleColors.Black);
-        screen.current_tty.?.print("42\n", clr);
+        screen.current_tty.?.print("42\n", clr, false);
     }
+    printf("\n", .{});
     var keyboard = Keyboard.init();
 
     while (true) {

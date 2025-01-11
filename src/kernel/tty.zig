@@ -1,4 +1,5 @@
 const io = @import("arch").io;
+const Shell = @import("shell.zig").Shell;
 
 pub const ConsoleColors = enum(u8) {
     Black = 0,
@@ -31,6 +32,7 @@ pub const TTY = struct {
     _y: u16 = 0,
     _terminal_color: u8 = 0,
     _buffer : [80 * 25] u16,
+    shell: *Shell,
 
     pub fn init(width: u16, height: u16) TTY {
         var tty = TTY{
@@ -38,6 +40,7 @@ pub const TTY = struct {
             .height = height,
             ._terminal_color = vga_entry_color(ConsoleColors.White, ConsoleColors.Black),
             ._buffer = .{0} ** (80 * 25),
+            .shell = Shell.init(),
         };
         tty.clear();
         return tty;
@@ -144,7 +147,7 @@ pub const TTY = struct {
             self.remove();
             return ;
         } else if (c == '\t') {
-            self.print("    ", null);
+            self.print("    ", null, false);
             return ;
         }
         self.printVga(self.vga_entry(
@@ -153,7 +156,7 @@ pub const TTY = struct {
         );
     }
 
-    pub fn print(self: *TTY, msg: [] const u8, color: ?u8) void {
+    pub fn print(self: *TTY, msg: [] const u8, color: ?u8, stdin: bool) void {
         var buf = [_]u16{0} ** 80;
         const start = self._y * self.width + self._x;
         const max_end: u16 = (self._y + 1) * self.width;
@@ -172,6 +175,8 @@ pub const TTY = struct {
         self._x = x;
         self._y = y;
         self.render();
+        if (stdin)
+            self.shell.handleInput(msg);
     }
 
     pub fn setColor(self: *TTY, new_color: u8) void {
