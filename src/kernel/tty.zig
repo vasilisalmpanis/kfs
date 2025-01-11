@@ -1,5 +1,6 @@
 const io = @import("arch").io;
 const Shell = @import("shell.zig").Shell;
+const printf = @import("printf.zig").printf;
 
 pub const ConsoleColors = enum(u8) {
     Black = 0,
@@ -19,6 +20,25 @@ pub const ConsoleColors = enum(u8) {
     LightBrown = 14,
     White = 15,
 };
+
+const ft = 
+\\       444444444     222222222222222    
+\\      4::::::::4    2:::::::::::::::22  
+\\     4:::::::::4    2::::::222222:::::2 
+\\    4::::44::::4    2222222     2:::::2 
+\\   4::::4 4::::4                2:::::2 
+\\  4::::4  4::::4                2:::::2 
+\\ 4::::4   4::::4             2222::::2  
+\\4::::444444::::444      22222::::::22   
+\\4::::::::::::::::4    22::::::::222     
+\\4444444444:::::444   2:::::22222        
+\\          4::::4    2:::::2             
+\\          4::::4    2:::::2             
+\\          4::::4    2:::::2       222222
+\\        44::::::44  2::::::2222222:::::2
+\\        4::::::::4  2::::::::::::::::::2
+\\        4444444444  22222222222222222222
+;                        
 
 pub fn vga_entry_color(fg: ConsoleColors, bg: ConsoleColors) u8 {
     return @intFromEnum(fg) | (@intFromEnum(bg) << 4);
@@ -70,6 +90,32 @@ pub const TTY = struct {
         @memcpy(self._vga[0..2000], self._buffer[0..2000]);
         self.update_cursor();
 
+    }
+
+    pub fn print42(self: *TTY) void {
+        const offset_x: u16 = 20;
+        const offset_y: u16 = 5;
+        @memset(
+            self._vga[0..80 * 25],
+            self.vga_entry(
+                ' ',
+                vga_entry_color(ConsoleColors.Cyan, ConsoleColors.DarkGray)
+            )
+        );
+        var x: u16 = offset_x;
+        var y: u16 = offset_y;
+        for (ft) |c| {
+            if (c == '\n') {
+                y += 1;
+                x = offset_x;
+                continue;
+            }
+            self._vga[y * 80 + x] = self.vga_entry(
+                c,
+                vga_entry_color(ConsoleColors.Cyan, ConsoleColors.DarkGray)
+            );
+            x += 1;
+        }
     }
 
     fn _scroll(self: *TTY) void {
@@ -132,6 +178,19 @@ pub const TTY = struct {
             self._scroll();
     }
 
+    fn getCurrentLine(self: *TTY) []u8 {
+        if (self._x == 0)
+            return "";
+        var res: [80]u8 = .{0} ** 80;
+        var i: u16 = 0;
+        for (self._buffer[self._y * self.width..self._y * self.width + self._x]) |vga| {
+            const c: u8 = self.getCharacterFromVgaEntry(vga);
+            res[i] = c;
+            i += 1;
+        }
+        return res[0..i];
+    }
+
     fn printChar(self: *TTY, c: u8, color: ?u8) void {
         if (c == '\n') {
              @memset(
@@ -142,31 +201,37 @@ pub const TTY = struct {
             self._x = 0;
             if (self._y >= self.height)
                 self._scroll();
-            return;
         } else if (c == 8) {
             self.remove();
-            return ;
         } else if (c == '\t') {
             self.print("    ", null, false);
-            return ;
+        } else {
+            self.printVga(self.vga_entry(
+                c,
+                color orelse self._terminal_color)
+            );
         }
-        self.printVga(self.vga_entry(
-            c,
-            color orelse self._terminal_color)
-        );
     }
 
     pub fn print(self: *TTY, msg: [] const u8, color: ?u8, stdin: bool) void {
+        var str: [80]u8 = .{0} ** 80;
+        var len: u8 = 0;
         var buf = [_]u16{0} ** 80;
         const start = self._y * self.width + self._x;
         const max_end: u16 = (self._y + 1) * self.width;
         var end: u16 = start;
-        while (self.getCharacterFromVgaEntry(self._buffer[end])
-            != 0 and end < max_end)
+        while (self.getCharacterFromVgaEntry(self._buffer[end]) != 0 and end < max_end)
             end += 1;
         @memcpy(buf[0..(end - start)], self._buffer[start..end]);
-        for (msg) |c|
+        for (msg) |c| {
+            if (c == '\n' and stdin) {
+                for (self.getCurrentLine()) |cc| {
+                    str[len] = cc;
+                    len += 1;
+                }
+            }
             self.printChar(c, color);
+        }
         const x = self._x;
         const y = self._y;
         var i: u16 = 0;
@@ -175,8 +240,8 @@ pub const TTY = struct {
         self._x = x;
         self._y = y;
         self.render();
-        if (stdin)
-            self.shell.handleInput(msg);
+        if (stdin and str[0] != 0)
+            self.shell.handleInput(str[0..len]);
     }
 
     pub fn setColor(self: *TTY, new_color: u8) void {

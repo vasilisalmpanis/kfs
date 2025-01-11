@@ -31,7 +31,6 @@ pub fn gdt_set_entry(num: u32, base: u32, limit: u32, access: u8, gran: u8) void
 }
 
 pub fn gdt_init() void {
-    // @memset(gdt_entries[0..5], 0);
     gdt_ptr.limit = (@sizeOf(gdt_entry) * 7) - 1;
     gdt_ptr.base = GDTBASE;
 
@@ -57,4 +56,3 @@ pub fn gdt_init() void {
         : "rax"
     );
 }
-

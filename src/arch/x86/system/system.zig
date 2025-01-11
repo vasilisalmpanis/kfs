@@ -19,3 +19,12 @@ pub fn reboot() noreturn {
     }
 }
 
+pub fn halt() noreturn {
+    asm volatile (\\
+        \\ cli
+        \\ hlt
+        \\ loop:
+        \\   jmp loop
+    );
+    while(true) {}
+}
