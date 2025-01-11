@@ -14,9 +14,14 @@ const stackframe = struct {
 };
 
 /// Print the currect stack frames up to a maxFrame 
-/// number specified as argument.
+/// number specified as argument. Save the current
+/// register stake and print it.
 /// @param maxFrames: maximum amount of frames to trace.
-pub fn TraceStackTrace(maxFrames : u32 ) void {
+pub inline fn TraceStackTrace(maxFrames : u32 ) void {
+    var state: RegisterState = RegisterState.init();
+
+    // save the state
+    saveRegisters(&state);
     var stk : ?*stackframe = 
      asm ("movl %ebp, %[result]"
         : [result] "={eax}" (-> *stackframe),
@@ -24,13 +29,16 @@ pub fn TraceStackTrace(maxFrames : u32 ) void {
     );
     printf("Stack Trace:\n",.{});
     var frame : u32 = 0;
+    // unwind the stack
     while (frame < maxFrames and stk != null) : (frame += 1) {
         if (stk != null) {
             printf("  0x{x}     \n", .{ stk.?.eip });
         }
         stk = stk.?.ebp;
     }
-    printRegisters();
+
+    // dump the registers
+    printRegisters(&state);
 }
 
 const RegisterState = struct {
@@ -43,28 +51,19 @@ const RegisterState = struct {
     edi: usize,
     ebp: usize,
     esp: usize,
-    // Segment Registers
-    cs: u16,
-    ds: u16,
-    es: u16,
-    fs: u16,
-    gs: u16,
-    ss: u16,
+
+    eflags: usize,
 
     pub fn init() RegisterState {
         return .{
             .eax = 0, .ebx = 0, .ecx = 0, .edx = 0,
             .esi = 0, .edi = 0, .ebp = 0, .esp = 0,
-            .cs = 0, .ds = 0, .es = 0, .fs = 0, .gs = 0, .ss = 0,
+            .eflags = 0,
         };
     }
 };
 
-pub fn printRegisters() void {
-    var state: RegisterState = RegisterState.init();
-    asm volatile ("xor %eax, %eax":::);
-    saveRegisters(&state);
-    printf("\nCPU: {d} PID: {d}\n", .{0, 0});
+pub inline fn printRegisters(state: *RegisterState) void {
     printf("EIP: {X:0>8} ({X:0>8})\n", .{0, 0});
     
     // General purpose registers
@@ -72,69 +71,65 @@ pub fn printRegisters() void {
         .{state.eax, state.ebx, state.ecx, state.edx});
     printf("ESI: {X:0>8} EDI: {X:0>8} EBP: {X:0>8} ESP: {X:0>8}\n",
         .{state.esi, state.edi, state.ebp, state.esp});
+    printf("EFLAGS: {X:0>8}\n", .{state.eflags});
     
-    // Segment registers
-    printf("CS: {X:0>4} DS: {X:0>4} ES: {X:0>4} FS: {X:0>4} GS: {X:0>4} SS: {X:0>4}\n",
-        .{state.cs, state.ds, state.es, state.fs, state.gs, state.ss});
 }
 
-fn saveRegisters(state: *RegisterState) void {
+inline fn saveRegisters(state: *RegisterState) void {
+    // asm volatile ("movl $1, %eax");
+    var value: usize = 0;
+
     // General Purpose Registers
-    state.eax = asm volatile (
-        \\ mov %%eax, %[value]
-        : [value] "=r" (-> usize),
+    value = asm volatile (
+        \\ # Read EAX
+        : [out] "={eax}" (-> usize)
     );
-    state.ebx = asm volatile (
-        \\ mov %%ebx, %[value]
-        : [value] "=r" (-> usize),
+    state.eax = value;
+
+    // we use eax to pop eflags
+    // from the stack
+    value = asm volatile (
+        \\ pushfd
+        \\ pop %[out]
+        : [out] "={eax}" (-> usize)
+        ::
     );
-    state.ecx = asm volatile (
-        \\ mov %%ecx, %[value]
-        : [value] "=r" (-> usize),
+    state.eflags = value;
+
+    value = asm volatile (
+        \\ # Read EBX
+        : [out] "={ebx}" (-> usize)
     );
-    state.edx = asm volatile (
-        \\ mov %%edx, %[value]
-        : [value] "=r" (-> usize),
+    state.ebx = value;
+    value = asm volatile (
+        \\ # Read ECX
+        : [out] "={ecx}" (-> usize)
     );
-    state.esi = asm volatile (
-        \\ mov %%esi, %[value]
-        : [value] "=r" (-> usize),
+    state.ecx = value;
+    value = asm volatile (
+        \\ # Read EDX
+        : [out] "={edx}" (-> usize)
     );
-    state.edi = asm volatile (
-        \\ mov %%edi, %[value]
-        : [value] "=r" (-> usize),
+    state.edx = value;
+    value = asm volatile (
+        \\ # Read ESI
+        : [out] "={esi}" (-> usize)
     );
-    state.ebp = asm volatile (
-        \\ mov %%ebp, %[value]
-        : [value] "=r" (-> usize),
+    state.esi = value;
+    value = asm volatile (
+        \\ # Read EDI
+        : [out] "={edi}" (-> usize)
     );
-    state.esp = asm volatile (
-        \\ mov %%esp, %[value]
-        : [value] "=r" (-> usize),
+    state.edi = value;
+    value = asm volatile (
+        \\ # Read EBP
+        : [out] "={ebp}" (-> usize)
     );
-    // Segment Registers
-    state.cs = asm volatile (
-        \\ mov %%cs, %[value]
-        : [value] "=r" (-> u16),
+    state.ebp = value;
+    value = asm volatile (
+        \\ # Read ESP
+        : [out] "={esp}" (-> usize)
     );
-    state.ds = asm volatile (
-        \\ mov %%ds, %[value]
-        : [value] "=r" (-> u16),
-    );
-    state.es = asm volatile (
-        \\ mov %%es, %[value]
-        : [value] "=r" (-> u16),
-    );
-    state.fs = asm volatile (
-        \\ mov %%fs, %[value]
-        : [value] "=r" (-> u16),
-    );
-    state.gs = asm volatile (
-        \\ mov %%gs, %[value]
-        : [value] "=r" (-> u16),
-    );
-    state.ss = asm volatile (
-        \\ mov %%ss, %[value]
-        : [value] "=r" (-> u16),
-    );
+    state.esp = value;
+
 }
