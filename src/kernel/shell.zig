@@ -16,11 +16,12 @@ pub const Shell = struct {
         if (mem.eql(u8, input, "help")) {
             printf(\\
                 \\available commands:
-                \\  stack: print stack trace
-                \\  reboot: reboot pc
-                \\  42: print 42
-                \\  [color name]: change input color
-                \\  help: print this message
+                \\  stack: Print the stack trace
+                \\  reboot: Reboot the PC
+                \\  halt: Halt the PC
+                \\  42: Print 42
+                \\  [color name]: Change the input color
+                \\  help: Display this help message
                 \\
                 , .{});
         } else if (mem.eql(u8, input, "stack")) {
