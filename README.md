@@ -1,5 +1,9 @@
-languages:
-- Zig (able to use C functions and headers)
+# KFS
+A minimalistic kernel written in zig.
 
-- Tests
+### Overview
+- x86
+- GDT
+- Shell
+- [Memory](./Memory.md#overview)  
 
