@@ -5,6 +5,7 @@ ISO_DIR = iso
 SRC_DIR = src
 
 SRC = $(shell find $(SRC_DIR) -name '*.zig')
+ASM_SRC = $(shell find $(SRC_DIR) -name '*.s')
 
 all: $(NAME)
 
@@ -12,7 +13,7 @@ $(NAME): $(KERNEL)
 	cp $(KERNEL) $(ISO_DIR)/boot/
 	grub-mkrescue --compress=xz -o $(NAME) $(ISO_DIR)
 
-$(KERNEL): $(SRC)
+$(KERNEL): $(SRC) $(ASM_SRC)
 	zig build # -Doptimize=ReleaseSafe
 
 clean:

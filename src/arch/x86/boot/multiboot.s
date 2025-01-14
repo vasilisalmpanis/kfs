@@ -17,13 +17,17 @@ stack_bottom:
 	.skip 16384 # 16 KiB
 stack_top:
 
+.extern kernel_main
 .section .text
 .global _start
 .type _start, @function
 _start:
-	mov $stack_top, %esp
+	// mov $stack_top, %esp
 	xor %ebp, %ebp  /* 0 the ebp register to allow stack traces */
+	push %ebx
+	push %eax
 	call kernel_main
+
 	cli
 1:	hlt
 	jmp 1b
