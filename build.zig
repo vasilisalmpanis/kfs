@@ -3,7 +3,6 @@ const builtin = @import("builtin");
 
 const name = "kfs.bin";
 const linker = "linker.ld";
-const multiboot = "src/arch/x86/boot/multiboot.s";
 const kernel_src = "src/kernel/main.zig";
 
 const archs = [_]std.Target.Cpu.Arch{
@@ -49,7 +48,6 @@ pub fn build(b: *std.Build) !void {
         kernel.root_module.addImport("arch", arch_mod);
         kernel.root_module.addImport("drivers", drivers);
 
-        kernel.addAssemblyFile(b.path(multiboot));
         kernel.setLinkerScriptPath(b.path(linker));
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
