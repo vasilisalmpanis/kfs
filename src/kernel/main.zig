@@ -15,7 +15,7 @@ pub fn trace() void {
 
 export fn kernel_main(magic: u32, address: u32) noreturn {
     gdt.gdt_init();
-    var scrn : *screen.Screen = screen.Screen.init();
+    var scrn: *screen.Screen = screen.Screen.init();
     inline for (@typeInfo(TTY.ConsoleColors).Enum.fields) |f| {
         const clr: u8 = TTY.vga_entry_color(@field(TTY.ConsoleColors, f.name), TTY.ConsoleColors.Black);
         screen.current_tty.?.print("42\n", clr, false);
