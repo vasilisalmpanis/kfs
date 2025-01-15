@@ -59,3 +59,6 @@ The paging system implements a 4-GiB virtual memory map through a two-level tabl
   * 22-31: Index of page directory
   * 12-21: Index of page table entry
   * 0-11: Page offset
+
+* Enable paging
+* Map kernel to upper half of memory.

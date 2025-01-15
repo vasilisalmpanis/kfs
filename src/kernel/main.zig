@@ -4,6 +4,7 @@ const Keyboard = @import("drivers").Keyboard;
 const system = @import("arch").system;
 const gdt = @import("arch").gdt;
 const multiboot = @import("arch").multiboot;
+const paging = @import("arch").paging;
 const screen = @import("screen.zig");
 const debug = @import("debug.zig");
 const printf = @import("printf.zig").printf;
@@ -15,6 +16,8 @@ pub fn trace() void {
 
 export fn kernel_main(magic: u32, address: u32) noreturn {
     gdt.gdt_init();
+    paging.reset_page_directory();
+    paging.load_page_directory(&paging.page_directory[0]);
     var scrn: *screen.Screen = screen.Screen.init();
     inline for (@typeInfo(TTY.ConsoleColors).Enum.fields) |f| {
         const clr: u8 = TTY.vga_entry_color(@field(TTY.ConsoleColors, f.name), TTY.ConsoleColors.Black);
