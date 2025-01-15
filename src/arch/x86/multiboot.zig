@@ -14,9 +14,9 @@ pub const multiboot_info = packed struct {
     mmap_addr: u32,
 };
 
-pub const multiboot_memory_map = packed struct {
+pub const multiboot_memory_map = struct {
     size: u32,
-    // addr: u64,
-    // len: u64,
-    // type: u32,
+    addr: [2]u32,
+    len: [2]u32,
+    type: u32,
 };
