@@ -11,40 +11,48 @@ pub fn reset_page_directory() void {
 pub fn set_first_page() void {
     var index: u32 = 0;
     while (index < 1024) : (index += 1) {
-        first_page_table[index] = (index * 0x1000) | 1;
+        // Identity map first 4MB
+        first_page_table[index] = (index * 0x1000) | 3;  // Present + R/W
     }
-    page_directory[0] = first_page_table | 1;
+
+    const pt_addr : usize = @intFromPtr(&first_page_table);
+    page_directory[0] = pt_addr | 3;  // Present + R/W
 }
 
 pub fn load_page_directory(ptr: *u32) void {
-    _ = ptr;
-    asm volatile(
-        \\push %ebp
-        \\mov %esp, %ebp
-        \\mov 8(%esp), %eax
-        \\mov %eax, %cr3
-        \\mov %ebp, %esp
-        \\pop %ebp
+    asm volatile (
+        \\mov %[ptr], %%eax
+        \\mov %%eax, %%cr3
+        :
+        : [ptr] "r" (ptr)
+        : "eax"
     );
 }
 
 pub fn enable_paging() void {
     asm volatile (
-        \\push %ebp
-        \\mov %esp, %ebp
-        \\mov %cr0, %eax
-        \\or $0x80000000, %eax
-        \\mov %eax, %cr0
-        \\mov %ebp, %esp
-        \\pop %ebp
+        \\mov %%cr0, %%eax
+        \\or $0x80000000, %%eax
+        \\mov %%eax, %%cr0
+        ::: "eax" 
     );
-    disable_perms();
 }
 
-pub fn disable_perms() !void {
+pub fn disable_perms() void {
     asm volatile (
         \\ mov     %cr0, %eax       
         \\ and     $0xFFFFDFFF, %eax 
         \\ mov     %eax, %cr0         
     );
+}
+
+pub fn verify_paging() void {
+    var cr0: u32 = undefined;
+    asm volatile ("mov %%cr0, %[cr0]"
+        : [cr0] "=r" (cr0)
+    );
+
+    if ((cr0 & (1 << 31)) == 0) {
+        @panic("Paging is not enabled!");
+    }
 }
