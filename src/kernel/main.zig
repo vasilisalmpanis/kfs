@@ -9,19 +9,16 @@ const screen = @import("screen.zig");
 const debug = @import("debug.zig");
 const printf = @import("printf.zig").printf;
 
+extern var initial_page_dir: [1024]u32;
 
 pub fn trace() void {
     debug.TraceStackTrace(10);
 }
 
+// export fn kernel_main() noreturn {
 export fn kernel_main(magic: u32, address: u32) noreturn {
     gdt.gdt_init();
-    var scrn: *screen.Screen = screen.Screen.init();
-    paging.reset_page_directory();
-    paging.set_first_page();
-    paging.load_page_directory(&paging.page_directory[0]);
-    paging.enable_paging();
-    paging.verify_paging(); // panics if paging is not enabled
+    const scrn: *screen.Screen = screen.Screen.init();
     printf("Paging is enabled\n", .{});
     inline for (@typeInfo(TTY.ConsoleColors).Enum.fields) |f| {
         const clr: u8 = TTY.vga_entry_color(@field(TTY.ConsoleColors, f.name), TTY.ConsoleColors.Black);
@@ -38,7 +35,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     var i: u32 = 0;
     while (i < info.mmap_length) : (i += @sizeOf(multiboot.multiboot_memory_map)) {
         const mmap: *multiboot.multiboot_memory_map = @ptrFromInt(info.mmap_addr + i);
-        printf("mmap {}\n", .{mmap});
+        _ = mmap;
+        // printf("mmap {}\n", .{mmap});
     }
     var keyboard = Keyboard.init();
 
