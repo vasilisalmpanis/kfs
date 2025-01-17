@@ -49,6 +49,7 @@ pub fn build(b: *std.Build) !void {
         kernel.root_module.addImport("drivers", drivers);
 
         kernel.setLinkerScriptPath(b.path(linker));
+        kernel.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
 
