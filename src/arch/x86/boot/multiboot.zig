@@ -15,9 +15,14 @@ pub const multiboot_info = packed struct {
 };
 
 pub const multiboot_memory_map = struct {
-    size: u32,
-    addr: [2]u32,
-    len: [2]u32,
+    size: u32,      // Size of the memory_map struct
+    addr: [2]u32,   // Base address
+    len: [2]u32,    // Length in bytes
+    //MULTIBOOT_MEMORY_AVAILABLE              1
+    //MULTIBOOT_MEMORY_RESERVED               2
+    //MULTIBOOT_MEMORY_ACPI_RECLAIMABLE       3
+    //MULTIBOOT_MEMORY_NVS                    4
+    //MULTIBOOT_MEMORY_BADRAM                 5
     type: u32,
 };
 
