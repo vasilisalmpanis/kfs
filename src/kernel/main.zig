@@ -10,50 +10,53 @@ const debug = @import("debug.zig");
 const printf = @import("printf.zig").printf;
 const mm = @import("arch").mm;
 
-extern var initial_page_dir: [1024]u32;
-
-pub fn trace() void {
-    debug.TraceStackTrace(10);
+fn print_mmap(info: *multiboot.multiboot_info, mem: mm.mm) void {
+    printf("RAM available: {d}\n", .{mem.avail});
+    var i: u32 = 0;
+    printf("type\tmem region\t\tsize\n", .{});
+    while (i < info.mmap_length) : (i += @sizeOf(multiboot.multiboot_memory_map)) {
+        const mmap: *multiboot.multiboot_memory_map = @ptrFromInt(info.mmap_addr + i);
+        printf(
+            "{d}\t{x:0>8} {x:0>8}\t{d}\n", .{
+                mmap.type,
+                mmap.addr[0],
+                mmap.addr[0] + (mmap.len[0] - 1),
+                mmap.len[0]
+        });
+    }
 }
 
-// export fn kernel_main() noreturn {
+fn print_42_colors() void {
+    inline for (@typeInfo(TTY.ConsoleColors).Enum.fields) |f| {
+        const clr: u8 = TTY.vga_entry_color(@field(TTY.ConsoleColors, f.name), TTY.ConsoleColors.Black);
+        screen.current_tty.?.print("42\n", clr, false);
+    }
+}
+
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x2BADB002) {
         system.halt();
     }
-    const info: *multiboot.multiboot_info = @ptrFromInt(address);
+    const boot_info: *multiboot.multiboot_info = @ptrFromInt(address);
     gdt.gdt_init();
-    const res = mm.mm_init(info);
-    _ = res;
-    const scrn: *screen.Screen = screen.Screen.init();
-    if ((mm.curr_frame & 0xfff) > 0)
-        printf("Not boundary aligned", .{});
-    printf("current frame {x}", .{mm.curr_frame});
-    // var i: u32 = 0;
-    // while (i < info.mmap_length) : (i += @sizeOf(multiboot.multiboot_memory_map)) {
-    //     const mmap: *multiboot.multiboot_memory_map = @ptrFromInt(info.mmap_addr + i);
-    //     if (mmap.type == 1)
-    //         printf("|{}|\n", .{mmap});
-    // }
-    // printf("result of mm: {} {}\n", .{res, mm.TOTAL_FRAMES});
-    // printf("Paging is enabled\n", .{});
-    // inline for (@typeInfo(TTY.ConsoleColors).Enum.fields) |f| {
-    //     const clr: u8 = TTY.vga_entry_color(@field(TTY.ConsoleColors, f.name), TTY.ConsoleColors.Black);
-    //     screen.current_tty.?.print("42\n", clr, false);
-    // }
+    const mem = mm.mm_init(boot_info);
 
-    // Verify multiboot magic number
+    const scrn: *screen.Screen = screen.Screen.init();
     var keyboard = Keyboard.init();
 
+    printf("{x} {x} {d} {d}\n", .{mem.base, mem.base + mem.avail, mem.avail, (1 << 10) * 4096});
     while (true) {
         const input = keyboard.get_input();
         switch (input[0]) {
             'R' => system.reboot(),
             'M' => screen.current_tty.?.move(input[1]),
-            'S' => trace(),
+            'S' => debug.TraceStackTrace(10),
             'C' => screen.current_tty.?.clear(),
             'T' => scrn.switch_tty(input[1]),
+            'I' => print_mmap(boot_info, mem),
             else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, null, true)
         }
     }
 }
+
+
