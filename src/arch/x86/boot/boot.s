@@ -89,7 +89,9 @@ higher_half:
 .global initial_page_dir
 initial_page_dir:
     .long 0b10000011           # First entry in the page directory
-    .rept 768-1
+    .long 0b10000011           # First entry in the page directory
+    .long 0b10000011           # First entry in the page directory
+    .rept 768-3
     .long 0                    # Fill remaining entries with 0s
     .endr
 

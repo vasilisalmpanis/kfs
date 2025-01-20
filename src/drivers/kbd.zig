@@ -172,6 +172,8 @@ pub const Keyboard = struct {
                 return .{'S', 0};
             if (self.cntl and char == 'R')
                 return .{'R', 0};
+            if (self.cntl and char == 'I')
+                return .{'I', 0};
             if ((self.shift and self.caps) or (!self.shift and !self.caps))
                 char = ascii.toLower(char);
             if (self.shift and (char < 'A' or char > 'Z'))
