@@ -2,6 +2,7 @@ const multiboot_info = @import("../boot/multiboot.zig").multiboot_info;
 const multiboot_memory_map = @import("../boot/multiboot.zig").multiboot_memory_map;
 const assert = @import("std").debug.assert;
 const std = @import("std");
+const buddy = @import("./buddy.zig");
 
 pub const mm = struct {
     avail: u64,
@@ -75,13 +76,11 @@ const page = packed struct {
 
 const pmm = struct {
     order: u8,
-
 };
 
 // pub var TOTAL_FRAMES: u32 = undefined;
 pub var base: u32 = undefined;
 pub var mem_size: u64 = 0;
-const ten_order: u32 = 1 << 10;
 
 // get the first availaanle address and put metadata there
 pub fn mm_init(info: *multiboot_info) mm {
@@ -104,12 +103,10 @@ pub fn mm_init(info: *multiboot_info) mm {
         mem_size = mem_size - (base & 0xfff);
         base = (base & 0xfffff000) + PAGE_SIZE;
     }
-    const ptr : *u8 = @ptrFromInt(0x00c00000);
-    ptr.* = 42;
     // At this point we have page aligned
     // memory base and size. We now need
     // initialize page metadata on this address
-    // for our buddy allocator. 
+    // for our buddy allocator.
     // At this point we need to make sure that the memory we are
     // accesing is mapped inside our virtual address space. !!!
 
@@ -118,6 +115,7 @@ pub fn mm_init(info: *multiboot_info) mm {
     //     ptr.flags = 0;
     //     ptr.ref_count = 0;
     // }
+    _ = buddy.BuddySystem.init(base, mem_size);
     return mm{ .avail = mem_size, .base = base };
 }
 
@@ -136,3 +134,6 @@ pub fn mm_init(info: *multiboot_info) mm {
 // 9 (ORDER - 1) Linked list of Free blocks of order 10
 
 // get page
+
+// INFO about PMM
+// 1. Set aside a region of memory for each block allocated
