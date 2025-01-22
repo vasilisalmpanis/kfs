@@ -47,7 +47,7 @@ pub fn vga_entry_color(fg: ConsoleColors, bg: ConsoleColors) u8 {
 pub const TTY = struct {
     width: u16 = 80,
     height: u16 = 25,
-    _vga: [*]u16 = @ptrFromInt(0xB8000),
+    _vga: [*]u16 = @ptrFromInt(0xC00B8000),
     _x: u16 = 0,
     _y: u16 = 0,
     _terminal_color: u8 = 0,
