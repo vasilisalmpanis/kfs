@@ -9,6 +9,7 @@ const screen = @import("drivers").screen;
 const debug = @import("drivers").debug;
 const printf = @import("drivers").printf;
 const mm = @import("arch").mm;
+const vmm = @import("arch").vmm;
 
 fn print_mmap(info: *multiboot.multiboot_info) void {
     var i: u32 = 0;
@@ -40,15 +41,19 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     gdt.gdt_init();
     const scrn: *screen.Screen = screen.Screen.init();
     var mem = mm.mm_init(boot_info);
-    var i : u32 = 0;
-    while (i < 3) : (i += 1) {
-        var addr = mem.alloc_page();
-        printf("allocated page: {x}\n", .{addr});
-        addr = mem.alloc_page();
-        printf("allocated page: {x}\n", .{addr});
-        printf("freed page: {x}\n", .{addr});
-        mem.free_page(addr);    
-    }
+    var virt: vmm.VMM = vmm.VMM.init(&mem);
+    virt.map_page(0x600000, mem.alloc_page());
+    // var i : u32 = 0;
+    // while (i < 342) : (i += 1) {
+    //     const addr = mem.alloc_page();
+    //     printf("allocated page: {x}\n", .{addr});
+    //     const addr2 = mem.alloc_page();
+    //     printf("allocated page: {x}\n", .{addr2});
+    //     const addr3 = mem.alloc_page();
+    //     printf("allocated page: {x}\n", .{addr3});
+    //     printf("freed page: {x}\n", .{addr});
+    //     mem.free_page(addr);    
+    // }
     var keyboard = Keyboard.init();
 
     while (true) {
