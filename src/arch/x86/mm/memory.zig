@@ -4,6 +4,7 @@ const assert = @import("std").debug.assert;
 const std = @import("std");
 const pmm = @import("./pmm.zig");
 const printf = @import("drivers").printf;
+extern var initial_page_dir: [1024]u32;
 
 pub const PAGE_OFFSET: u32 = 0xC0000000;
 pub const PAGE_SIZE: u32 = 4096;
@@ -48,7 +49,7 @@ pub fn mm_init(info: *multiboot_info) pmm.PMM {
     // memory base and size.
     // At this point we need to make sure that the memory we are
     // accesing is mapped inside our virtual address space. !!!
-
+    initial_page_dir[1023] = @intFromPtr(&initial_page_dir);
     return pmm.PMM.init(base, mem_size);
 }
 

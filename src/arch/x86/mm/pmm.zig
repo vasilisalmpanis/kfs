@@ -13,7 +13,7 @@ const PagesChunk = struct {
 
 pub const PMM = struct {
     free_area: []u32,
-    index: i32,
+    index: u32,
     size: u64, // might be incorrect after occupying for system.
     begin: u32,
     end: u32,
@@ -32,7 +32,7 @@ pub const PMM = struct {
         pmm.begin = ph_addr;
         pmm.end = @intCast((memory_end & 0xfffff000) - PAGE_SIZE);
         while (ph_addr < pmm.end) : (ph_addr += PAGE_SIZE) {
-            pmm.free_area[@intCast(pmm.index)] = ph_addr;
+            pmm.free_area[pmm.index] = ph_addr;
             pmm.index += 1;
         }
         pmm.index -= 1;
@@ -45,15 +45,9 @@ pub const PMM = struct {
     /// Returns:
     ///     physical address : u32
     pub fn alloc_page(self: *PMM) u32 {
-        var pf_addr : u32 = 0;
-        if (self.index == -1)
-            return 0;
-        while(self.free_area[@intCast(self.index)] == 0) : (self.index -= 1) {}
-        if (self.index == -1)
-            return 0;
-        pf_addr = self.free_area[@intCast(self.index)];
-        self.free_area[@intCast(self.index)] = 0;
-        self.index -= 1;
+        const pf_addr = self.free_area[self.index];
+        self.free_area[self.index] = 0;
+        while(self.index > 0 and self.free_area[self.index] == 0) : (self.index -= 1) {}
         return pf_addr;
     }
     /// Free a page.
@@ -74,8 +68,9 @@ pub const PMM = struct {
         // to retrieve an index inside the free_area
         // array and mark the physical address as free.
         const index: u32 = (pfn - self.begin) / PAGE_SIZE;
-        self.free_area[@intCast(index)] = pfn;
-        self.index = @intCast(index);
+        self.free_area[index] = pfn;
+        if (index > self.index)
+            self.index =index;
     }
 };
 // TODO Map memory for the kernel to use in the PMM
