@@ -42,7 +42,12 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     const scrn: *screen.Screen = screen.Screen.init();
     var mem = mm.mm_init(boot_info);
     var virt: vmm.VMM = vmm.VMM.init(&mem);
-    virt.map_page(0x600000, mem.alloc_page());
+    _ = mem.alloc_page();
+    _ = mem.alloc_page();
+    _ = mem.alloc_page();
+    _ = mem.alloc_page();
+    _ = mem.alloc_page();
+    virt.map_page(0xdd000000, mem.alloc_page());
     // var i : u32 = 0;
     // while (i < 342) : (i += 1) {
     //     const addr = mem.alloc_page();
