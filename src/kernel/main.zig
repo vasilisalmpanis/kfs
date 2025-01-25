@@ -16,13 +16,7 @@ fn print_mmap(info: *multiboot.multiboot_info) void {
     printf("type\tmem region\t\tsize\n", .{});
     while (i < info.mmap_length) : (i += @sizeOf(multiboot.multiboot_memory_map)) {
         const mmap: *multiboot.multiboot_memory_map = @ptrFromInt(info.mmap_addr + i);
-        printf(
-            "{d}\t{x:0>8} {x:0>8}\t{d}\n", .{
-                mmap.type,
-                mmap.addr[0],
-                mmap.addr[0] + (mmap.len[0] - 1),
-                mmap.len[0]
-        });
+        printf("{d}\t{x:0>8} {x:0>8}\t{d}\n", .{ mmap.type, mmap.addr[0], mmap.addr[0] + (mmap.len[0] - 1), mmap.len[0] });
     }
 }
 
@@ -47,7 +41,12 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     _ = mem.alloc_page();
     _ = mem.alloc_page();
     _ = mem.alloc_page();
-    virt.map_page(0xdd000000, mem.alloc_page());
+    const virt_addr = 0xdd550000;
+    virt.map_page(virt_addr, mem.alloc_page());
+    const mapped: [*]u8 = @ptrFromInt(virt_addr);
+    @memcpy(mapped[0..8], "working"[0..8]);
+    const test_m: [*]u8 = @ptrFromInt(virt_addr);
+    printf("res: {s}\n", .{test_m[0..8]});
     // var i : u32 = 0;
     // while (i < 342) : (i += 1) {
     //     const addr = mem.alloc_page();
@@ -57,7 +56,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     //     const addr3 = mem.alloc_page();
     //     printf("allocated page: {x}\n", .{addr3});
     //     printf("freed page: {x}\n", .{addr});
-    //     mem.free_page(addr);    
+    //     mem.free_page(addr);
     // }
     var keyboard = Keyboard.init();
 
@@ -70,9 +69,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
             'C' => screen.current_tty.?.clear(),
             'T' => scrn.switch_tty(input[1]),
             'I' => print_mmap(boot_info),
-            else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, null, true)
+            else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, null, true),
         }
     }
 }
-
-

@@ -49,7 +49,7 @@ pub fn mm_init(info: *multiboot_info) pmm.PMM {
     // memory base and size.
     // At this point we need to make sure that the memory we are
     // accesing is mapped inside our virtual address space. !!!
-    initial_page_dir[1023] = @intFromPtr(&initial_page_dir);
+    initial_page_dir[1023] = (@intFromPtr(&initial_page_dir) - PAGE_OFFSET) | 0x3;
     return pmm.PMM.init(base, mem_size);
 }
 
