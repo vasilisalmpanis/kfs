@@ -46,6 +46,12 @@ pub inline fn InvalidatePage(page: usize) void {
     );
 }
 
+const vmem_block = struct {
+    base: u32,
+    size: u32,
+    flags: u32
+};
+
 pub const VMM = struct {
     pmm: *PMM,
 
