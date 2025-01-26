@@ -3,6 +3,8 @@ const multiboot_memory_map = @import("../boot/multiboot.zig").multiboot_memory_m
 const assert = @import("std").debug.assert;
 const std = @import("std");
 const pmm = @import("./pmm.zig");
+const vmm = @import("vmm.zig");
+const heap = @import("./heap.zig");
 const printf = @import("debug").printf;
 extern var initial_page_dir: [1024]u32;
 
@@ -23,8 +25,12 @@ pub fn phys_to_virt(comptime T: type, addr: *T) *T {
 pub var base: u32 = undefined;
 pub var mem_size: u64 = 0;
 
+var phys_memory_manager : pmm.PMM = undefined;
+var virt_memory_manager : vmm.VMM = undefined;
+pub var list_head : heap.FreeList = undefined;
+
 // get the first availaanle address and put metadata there
-pub fn mm_init(info: *multiboot_info) pmm.PMM {
+pub fn mm_init(info: *multiboot_info) void {
     var i: u32 = 0;
 
     // Find the biggest memory region in memory map provided by multiboot
@@ -50,7 +56,13 @@ pub fn mm_init(info: *multiboot_info) pmm.PMM {
     // At this point we need to make sure that the memory we are
     // accesing is mapped inside our virtual address space. !!!
     initial_page_dir[1023] = (@intFromPtr(&initial_page_dir) - PAGE_OFFSET) | 0x3;
-    return pmm.PMM.init(base, mem_size);
+    phys_memory_manager = pmm.PMM.init(base, mem_size);
+    virt_memory_manager = vmm.VMM.init(&phys_memory_manager);
+    list_head = heap.FreeList.init(&phys_memory_manager, &virt_memory_manager);
+    const temp: u32 = list_head.alloc(10);
+    const alloced: [*]u8 = @ptrFromInt(temp);
+    @memset(alloced[0..10], 'a');
+    printf("im here {s}\n", .{alloced[0..10]});
 }
 
 // create page

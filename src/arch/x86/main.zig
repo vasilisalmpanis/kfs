@@ -5,3 +5,4 @@ pub const multiboot = @import("boot/multiboot.zig");
 pub const paging = @import("mm/paging.zig");
 pub const mm = @import("mm/memory.zig");
 pub const vmm = @import("mm/vmm.zig");
+pub const heap = @import("mm/heap.zig");
