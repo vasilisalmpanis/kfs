@@ -3,7 +3,7 @@ const multiboot_memory_map = @import("../boot/multiboot.zig").multiboot_memory_m
 const assert = @import("std").debug.assert;
 const std = @import("std");
 const pmm = @import("./pmm.zig");
-const printf = @import("drivers").printf;
+const printf = @import("debug").printf;
 extern var initial_page_dir: [1024]u32;
 
 pub const PAGE_OFFSET: u32 = 0xC0000000;

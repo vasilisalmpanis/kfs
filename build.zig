@@ -23,8 +23,14 @@ pub fn build(b: *std.Build) !void {
         const drivers_mod = b.addModule("drivers", .{
             .root_source_file =  b.path("./src/drivers/main.zig")
         });
+        const debug_mod = b.addModule("debug", .{
+            .root_source_file =  b.path("./src/debug/main.zig")
+        });
         drivers_mod.addImport("arch", arch_mod);
-        arch_mod.addImport("drivers", drivers_mod);
+        drivers_mod.addImport("debug", debug_mod);
+        arch_mod.addImport("debug", debug_mod);
+        debug_mod.addImport("arch", arch_mod);
+        debug_mod.addImport("drivers", drivers_mod);
 
         var target: std.Target.Query = .{ .cpu_arch = arch, .os_tag = .freestanding, .abi = .none };
         const Features = std.Target.x86.Feature;
@@ -48,6 +54,7 @@ pub fn build(b: *std.Build) !void {
         kernel.entry = std.Build.Step.Compile.Entry.disabled;
         kernel.root_module.addImport("arch", arch_mod);
         kernel.root_module.addImport("drivers", drivers_mod);
+        kernel.root_module.addImport("debug", debug_mod);
 
         kernel.setLinkerScriptPath(b.path(linker));
         kernel.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));

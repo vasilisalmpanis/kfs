@@ -1,4 +1,4 @@
-const screen = @import("./screen.zig");
+const screen = @import("drivers").screen;
 const fmt = @import("std").fmt;
 const Writer = @import("std").io.Writer;
 
