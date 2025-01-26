@@ -1,6 +1,6 @@
 const io = @import("arch").io;
 const Shell = @import("shell.zig").Shell;
-const printf = @import("printf.zig").printf;
+const printf = @import("debug").printf;
 
 pub const ConsoleColors = enum(u8) {
     Black = 0,

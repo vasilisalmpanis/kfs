@@ -1,4 +1,4 @@
-const printf = @import("printf.zig").printf;
+const printf = @import("./printf.zig").printf;
 
 
 const stackframe = struct {
