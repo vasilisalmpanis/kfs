@@ -1,7 +1,7 @@
 const mem = @import("std").mem;
-const debug = @import("debug.zig");
+const debug = @import("debug");
+const printf = @import("debug").printf;
 const system = @import("arch").system;
-const printf = @import("printf.zig").printf;
 const screen = @import("screen.zig");
 const tty = @import("tty.zig");
 

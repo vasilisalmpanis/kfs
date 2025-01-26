@@ -1,5 +1,4 @@
 const tty = @import("tty.zig");
-const t = @import("debug.zig").TraceStackTrace;
 
 pub var current_tty: ?*tty.TTY = null;
 

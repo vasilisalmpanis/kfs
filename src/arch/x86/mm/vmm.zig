@@ -1,4 +1,4 @@
-const printf = @import("drivers").printf;
+const printf = @import("debug").printf;
 const PMM = @import("./pmm.zig").PMM;
 
 const PAGE_PRESENT: u8 = 0x1;
@@ -8,39 +8,6 @@ const PAGE_4MB: u8 = 0x80;
 // extern var initial_page_dir: [1024]u32;
 const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
-fn print_page_dir() void {
-    var index: u32 = 0;
-    printf("idx\t\tvirt\traw\t\tphys\t|pres|write|user|wr-th|cach|acc|dirt|4M|\n", .{});
-    while (index < 1024) : (index += 1) {
-        const entry = initial_page_dir[index];
-        if (entry != 0) {
-            const present = (entry & 1);
-            const writable = (entry & 2);
-            const user_accessible = (entry & 4);
-            const write_through = (entry & (1 << 3));
-            const cache_disabled = (entry & (1 << 4));
-            const accessed = (entry & (1 << 5));
-            const dirty = (entry & (1 << 6));
-            const is_4mb_page = (entry & (1 << 7));
-            const physical_frame = entry & 0xFFFFF000;
-
-            printf("{d: >4}\t{x:0>8}\t{x:0>8}\t{x:0>8}\t|{}|{}|{}|{}|{}|{}|{}|{}|\n", .{
-                index,
-                index << 22,
-                entry,
-                physical_frame,
-                present,
-                writable,
-                user_accessible,
-                write_through,
-                cache_disabled,
-                accessed,
-                dirty,
-                is_4mb_page,
-            });
-        }
-    }
-}
 
 pub fn print_page_table(virtual_addr: u32) void {
     const pd_index = virtual_addr >> 22; // Page directory index

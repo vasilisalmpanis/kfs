@@ -1,4 +1,4 @@
-const printf = @import("drivers").printf;
+const printf = @import("debug").printf;
 
 const std = @import("std");
 const PAGE_SIZE = @import("memory.zig").PAGE_SIZE;
