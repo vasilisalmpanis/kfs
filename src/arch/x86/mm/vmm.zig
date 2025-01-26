@@ -1,5 +1,6 @@
 const printf = @import("debug").printf;
 const PMM = @import("./pmm.zig").PMM;
+const PAGE_OFFSET = @import("memory.zig").PAGE_OFFSET;
 
 const PAGE_PRESENT: u8 = 0x1;
 const PAGE_WRITE: u8 = 0x2;
@@ -65,8 +66,33 @@ pub const VMM = struct {
     // }
 
     // pub fn free(v_addr: u32) void {
+    pub fn page_table_to_addr(self: *VMM, pd_index: u32, pt_index: u32) u32 {
+        _ = self;
+        return ((pd_index << 22) | (pt_index << 12));
+    }
 
-    // }
+    pub fn find_free_addr(self: *VMM) u32 {
+        var pd_idx =  PAGE_OFFSET >> 22;
+        const pd: [*]u32 = @ptrFromInt(0xFFFFF000);
+        var pt: [*]u32 = undefined;
+        while (pd_idx < 1023) : (pd_idx += 1) {
+            var pt_idx: u32 = 0;
+            if (pd[pd_idx] == 0) {
+                return pd_idx << 22;
+            }
+            if ((pd[pd_idx] & PAGE_4MB) != 0) {
+                pt = @ptrFromInt(0xFFC00000);
+                while (pt_idx < 1023) {
+                    pt += (0x400 * pd_idx);
+                    if (pt[pt_idx] == 0) {
+                        return self.page_table_to_addr(pd_idx, pt_idx);
+                    }
+                    pt_idx += 1;
+                }
+            }
+        }
+        return 0xFFFFFFFF;
+    }
 
     pub fn map_page(self: *VMM, virtual_addr: u32, physical_addr: u32) void {
         const pd_idx = virtual_addr >> 22;
@@ -82,7 +108,7 @@ pub const VMM = struct {
             pd[tmp_pd_idx] = PAGE_4MB | PAGE_WRITE | PAGE_PRESENT;
             pt = @ptrFromInt(0xFFC00000);
             pt += (0x400 * pd_idx);
-            @memset(pt[0..1024], 0);
+            @memset(pt[0..1024], 0); // sets the whole PT to 0.
             pd[tmp_pd_idx] = tmp; // restore initial state of temp page dir
         }
         pt = @ptrFromInt(0xFFC00000);

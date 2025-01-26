@@ -22,8 +22,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     const boot_info: *multiboot.multiboot_info = @ptrFromInt(address);
     gdt.gdt_init();
     const scrn: *screen.Screen = screen.Screen.init();
-    var mem = mm.mm_init(boot_info);
-    _ = vmm.VMM.init(&mem);
+    mm.mm_init(boot_info);
+    // Initialize heap or not
+    // Understand where we want to map out heap ex 0F0000000 - 0xE0000000
     var keyboard = Keyboard.init();
 
     while (true) {
