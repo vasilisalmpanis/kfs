@@ -1,5 +1,6 @@
 const printf = @import("./printf.zig").printf;
 const multiboot = @import("arch").multiboot;
+const mm = @import("arch").mm;
 
 const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
@@ -43,5 +44,14 @@ pub fn print_page_dir() void {
                 is_4mb_page,
             });
         }
+    }
+}
+
+pub fn print_free_list() void {
+    var buf = mm.list_head.head;
+    printf("Free List size: {d} pages\n", .{mm.list_head.size});
+    while (buf != null) {
+        printf("{x} - {x} {d}\n", .{@intFromPtr(buf), @intFromPtr(buf) + buf.?.block_size, buf.?.block_size});
+        buf = buf.?.next;
     }
 }

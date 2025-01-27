@@ -6,6 +6,8 @@ const pmm = @import("./pmm.zig");
 const vmm = @import("vmm.zig");
 const heap = @import("./heap.zig");
 const printf = @import("debug").printf;
+const dbg = @import("debug");
+
 extern var initial_page_dir: [1024]u32;
 
 pub const PAGE_OFFSET: u32 = 0xC0000000;
@@ -59,9 +61,21 @@ pub fn mm_init(info: *multiboot_info) void {
     phys_memory_manager = pmm.PMM.init(base, mem_size);
     virt_memory_manager = vmm.VMM.init(&phys_memory_manager);
     list_head = heap.FreeList.init(&phys_memory_manager, &virt_memory_manager);
+
+    // tests
     const temp: u32 = list_head.alloc(10);
+    printf("alloc: {x} - {x} {d}\n", .{temp, temp + 10, 10});
+    const tmp2: u32 = list_head.alloc(5000);
+    printf("alloc: {x} - {x} {d}\n", .{tmp2, tmp2 + 5000, 5000});
+    const tmp3: u32 = list_head.alloc(10);
+    printf("alloc: {x} - {x} {d}\n", .{tmp3, tmp3 + 10, 10});
+    const tmp4: u32 = list_head.alloc(2000);
+    printf("alloc: {x} - {x} {d}\n", .{tmp4, tmp4 + 2000, 2000});
+    const tmp5: u32 = list_head.alloc(3000);
+    printf("alloc: {x} - {x} {d}\n", .{tmp5, tmp5 + 10, 3000});
     const alloced: [*]u8 = @ptrFromInt(temp);
     @memset(alloced[0..10], 'a');
+    dbg.print_free_list();
     printf("im here {s}\n", .{alloced[0..10]});
 }
 
