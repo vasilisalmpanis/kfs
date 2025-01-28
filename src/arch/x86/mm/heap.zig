@@ -27,6 +27,61 @@ pub const FreeList = packed struct {
     vmm: *vmm,
     pmm: *pmm,
 
+    fn list_add_head(self: *FreeList, node: ?*FreeListNode) void {
+        node.?.next = self.head;
+        self.head = node;
+    }
+
+    /// Put new to the left of old
+    fn join(self: *FreeList, new: ?*FreeListNode, old: ?*FreeListNode) bool {
+        const end_addr: u32 = @intFromPtr(new) + new.?.block_size;
+        if (@intFromPtr(new) < @intFromPtr(old)) {
+            if (end_addr != @intFromPtr(old)) {
+                self.list_add_head(new);
+                return true;
+            }
+            new.?.block_size += self.head.?.block_size;
+            new.?.next = old.?.next;
+            self.head = new;
+            return true;
+        }
+        // check for middle
+        // check for right
+        return true;
+    }
+
+    pub fn free(self: *FreeList, addr: u32) void {
+        var header: ?*AllocHeader = undefined;
+        if (addr - @sizeOf(AllocHeader) < 0)
+            return;
+        const mem_max = self.data + self.size * PAGE_SIZE;
+        if (addr < self.data or addr >= mem_max)
+            return;
+        header = @ptrFromInt(addr - @sizeOf(AllocHeader));
+        if (header.?.head != self)
+            return;
+
+        // checks are OK we can iterate through list
+        const block_size = header.?.block_size;
+        const new_node: ?*FreeListNode = @ptrFromInt(addr - @sizeOf(FreeListNode));
+        new_node.?.block_size = block_size;
+        var current: ?*FreeListNode = self.head;
+        if (@intFromPtr(current) > @intFromPtr(header)) {
+            _ = self.join(new_node, self.head);
+            return;
+        }
+        while (@intFromPtr(current) < @intFromPtr(header)) : (current = current.?.next) {
+            if (@intFromPtr(header) < @intFromPtr(current.?.next)) {
+                // just place
+            }
+            if (current.?.next == null) {
+                // place
+                current.?.next = new_node;
+                // set block_size and next to null
+            }
+        }
+    }
+
     pub fn init(phys_mm: *pmm, virt_mm: *vmm) FreeList {
         const start_addr: u32 = virt_mm.find_free_addr();
         // TODO: Handle case where start_addr is 0xFFFFFFFF (no virt address space left)
@@ -155,14 +210,14 @@ pub const FreeList = packed struct {
             updateFreeList(self, prev, buffer);
         }
 
-        return addr;
+        self.initializeHeader(addr, total_size);
+        return addr + @sizeOf(AllocHeader);
     }
 
-    fn initializeHeader(addr: u32, size: u32, head: *FreeList) *AllocHeader {
+    fn initializeHeader(self: *FreeList, addr: u32, size: u32) void {
         var header: *AllocHeader = @ptrFromInt(addr);
         header.block_size = size;
-        header.head = head;
-        return header;
+        header.head = self;
     }
 
     fn handleBlockSplit(
