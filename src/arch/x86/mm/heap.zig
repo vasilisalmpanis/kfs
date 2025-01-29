@@ -105,7 +105,11 @@ pub const FreeList = packed struct {
         var prev = self.head;
         while (buffer) |b| : (buffer = buffer.?.next) {
             if (b.block_size >= total_size) {
-                return self.allocateFromBlock(prev.?, total_size);
+                return self.allocateFromBlock(
+                    prev.?,
+                    b,
+                    total_size
+                );
             }
             if (b.next == null) break;
             prev = buffer;
@@ -122,22 +126,21 @@ pub const FreeList = packed struct {
     fn allocateFromBlock(
         self: *FreeList, 
         prev: *FreeListNode,
+        curr: *FreeListNode,
         total_size: u32
     ) u32 {
-        const is_head: bool = (@intFromPtr(prev) == @intFromPtr(self.head));
-        const free_block: *FreeListNode =
-            if (is_head) prev
-            else prev.next.?;
-        const addr = @intFromPtr(free_block);
-        const free_block_size = free_block.block_size;
-        const next_free = free_block.next;
+        const is_head: bool = (@intFromPtr(prev) == @intFromPtr(curr));
+        const addr = @intFromPtr(curr);
+        const free_block_size = curr.block_size;
+        const next_free = curr.next;
         self.initAllocHeader(addr, total_size);
 
         if (free_block_size > total_size + @sizeOf(FreeListNode)) {
             self.addFreeNode(
                 addr + total_size,
                 free_block_size - total_size,
-                if (is_head) null else prev
+                if (is_head) null else prev,
+                next_free
             );
         } else {
             if (is_head) {
@@ -150,7 +153,7 @@ pub const FreeList = packed struct {
     }
 
     fn initAllocHeader(self: *FreeList, addr: u32, size: u32) void {
-        const header: *AllocHeader = @ptrFromInt(addr);
+        var header: *AllocHeader = @ptrFromInt(addr);
         header.block_size = size;
         header.head = self;
     }
@@ -169,7 +172,8 @@ pub const FreeList = packed struct {
             self.addFreeNode(
                 begin + total_size, 
                 free_size - total_size,
-                last_block
+                last_block,
+                null
             );
         }
         return begin + @sizeOf(AllocHeader);
@@ -191,10 +195,15 @@ pub const FreeList = packed struct {
         return num_pages * PAGE_SIZE;
     }
 
-    fn addFreeNode(self: *FreeList, addr: u32, size: u32, prev: ?*FreeListNode) void {
+    fn addFreeNode(
+        self: *FreeList,
+        addr: u32, size: u32,
+        prev: ?*FreeListNode,
+        next: ?*FreeListNode
+    ) void {
         const new_node: *FreeListNode = @ptrFromInt(addr);
         new_node.block_size = size;
-        new_node.next = if (prev == null) null else prev.?.next;
+        new_node.next = next;
         if (prev == null) {
             self.head = new_node;
         } else {
