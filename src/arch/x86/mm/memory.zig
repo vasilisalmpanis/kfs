@@ -76,12 +76,14 @@ pub fn mm_init(info: *multiboot_info) void {
     // printf("block_size :{d} \n", .{vas.block_size});
     printf("alloc: {x} - {x} {d}\n", .{ tmp5, tmp5 + 3000, 3000 });
     dbg.print_free_list();
-    list_head.free(tmp4);
-    list_head.free(tmp3);
     list_head.free(temp);
+    list_head.free(tmp3);
+    list_head.free(tmp4);
+    list_head.free(tmp2);
+    list_head.free(tmp5);
+    dbg.print_free_list();
     const alloced: [*]u8 = @ptrFromInt(temp);
     @memset(alloced[0..10], 'a');
-    // dbg.print_free_list();
 }
 
 // create page
