@@ -27,6 +27,20 @@ pub const FreeList = packed struct {
     vmm: *vmm,
     pmm: *pmm,
 
+    pub fn init(phys_mm: *pmm, virt_mm: *vmm) FreeList {
+        const start_addr: u32 = virt_mm.find_free_addr();
+        // TODO: Handle case where start_addr is 0xFFFFFFFF (no virt address space left)
+        // NOTE: start using invalid pointers like 0xDEADBEEF 0xCAFEBABE etc
+        return FreeList{
+            .size = 0,
+            .used = 0,
+            .data = start_addr,
+            .head = null,
+            .vmm = virt_mm,
+            .pmm = phys_mm,
+        };
+    }
+
     fn list_add_head(self: *FreeList, node: ?*FreeListNode) void {
         node.?.next = self.head;
         self.head = node;
@@ -82,179 +96,108 @@ pub const FreeList = packed struct {
         }
     }
 
-    pub fn init(phys_mm: *pmm, virt_mm: *vmm) FreeList {
-        const start_addr: u32 = virt_mm.find_free_addr();
-        // TODO: Handle case where start_addr is 0xFFFFFFFF (no virt address space left)
-        // NOTE: start using invalid pointers like 0xDEADBEEF 0xCAFEBABE etc
-        return FreeList{
-            .size = 0,
-            .used = 0,
-            .data = start_addr,
-            .head = null,
-            .vmm = virt_mm,
-            .pmm = phys_mm,
-        };
-    }
-
-    fn expand_free_area(self: *FreeList, size: u32) u32 {
-        const num_pages = calculateRequiredPages(size);
-        const physical = self.pmm.alloc_pages(num_pages);
-        const virtual = self.data + self.size * PAGE_SIZE;
-
-        mapPages(self, virtual, physical, num_pages);
-        self.size += num_pages;
-
-        return num_pages * PAGE_SIZE;
-    }
-
-    fn calculateRequiredPages(size: u32) u32 {
-        var pages = size / PAGE_SIZE;
-        if (size % PAGE_SIZE != 0) {
-            pages += 1;
-        }
-        return pages;
-    }
-
-    fn mapPages(self: *FreeList, virtual: u32, physical: u32, num_pages: u32) void {
-        var idx: u32 = 0;
-        var curr_virtual = virtual;
-        var curr_physical = physical;
-
-        while (idx < num_pages) : (idx += 1) {
-            self.vmm.map_page(curr_virtual, curr_physical);
-            curr_physical += PAGE_SIZE;
-            curr_virtual += PAGE_SIZE;
-        }
-    }
-
-    fn init_block(self: *FreeList, total_size: u32, buffer: ?*FreeListNode) u32 {
-        const begin = self.data + self.size * PAGE_SIZE;
-        const free_size = self.expand_free_area(total_size);
-
-        const chunk = initializeChunk(begin, total_size, self);
-
-        if (canCreateFreeNode(free_size, chunk.block_size)) {
-            const free_node = createFreeNode(begin, chunk.block_size, free_size);
-            linkFreeNode(self, buffer, free_node);
-        }
-
-        return begin;
-    }
-
-    fn initializeChunk(addr: u32, size: u32, head: *FreeList) *AllocHeader {
-        const chunk: *AllocHeader = @ptrFromInt(addr);
-        chunk.block_size = size;
-        chunk.head = head;
-        return chunk;
-    }
-
-    fn canCreateFreeNode(free_size: u32, block_size: u32) bool {
-        return free_size > block_size + @sizeOf(FreeListNode);
-    }
-
-    fn createFreeNode(begin: u32, block_size: u32, free_size: u32) *FreeListNode {
-        const free_node: *FreeListNode = @ptrFromInt(begin + block_size);
-        free_node.block_size = free_size - block_size;
-        free_node.next = null;
-        return free_node;
-    }
-
-    fn linkFreeNode(self: *FreeList, buffer: ?*FreeListNode, free_node: *FreeListNode) void {
-        if (buffer != null) {
-            buffer.?.next = free_node;
-        } else {
-            self.head = free_node;
-        }
-    }
-
-    fn align_size(size: u32) u32 {
-        if (size % 4 != 0) {
-            return size + (4 - size % 4);
-        }
-        return size;
-    }
-
     pub fn alloc(self: *FreeList, size: u32) u32 {
-        const total_size = align_size(size) + @sizeOf(AllocHeader);
-
-        if (findSuitableBlock(self, total_size)) |result|
-            return result;
-
-        return self.init_block(total_size, self.head) + @sizeOf(AllocHeader);
-    }
-
-    fn findSuitableBlock(self: *FreeList, total_size: u32) ?u32 {
-        var buffer: ?*FreeListNode = self.head;
+        // Total size of the block to allocate (including header)
+        const total_size = alignToPtr(size + @sizeOf(AllocHeader));
+        
+        // Try to find existing block (first fit)
+        var buffer = self.head;
         var prev = self.head;
-
-        while (buffer != null) : (buffer = buffer.?.next) {
-            if (buffer.?.block_size >= total_size) {
-                return handleFoundBlock(self, buffer.?, prev, total_size);
+        while (buffer) |b| : (buffer = buffer.?.next) {
+            if (b.block_size >= total_size) {
+                return self.allocateFromBlock(prev.?, total_size);
             }
-
-            if (buffer.?.next == null) break;
+            if (b.next == null) break;
             prev = buffer;
         }
 
-        return null;
+        // Allocate new block if no existing block found
+        return self.allocateNewBlock(total_size, buffer);
     }
 
-    fn handleFoundBlock(self: *FreeList, buffer: *FreeListNode, prev: ?*FreeListNode, total_size: u32) u32 {
-        const block_size = buffer.block_size;
-        const next = buffer.next;
-        const addr: u32 = @intFromPtr(buffer);
+    fn alignToPtr(value: u32) u32 {
+        return if (value % 4 != 0) value + (4 - value % 4) else value;
+    }
 
-        if (block_size > total_size + @sizeOf(FreeListNode)) {
-            handleBlockSplit(self, addr, total_size, block_size, next, prev, buffer);
+    fn allocateFromBlock(
+        self: *FreeList, 
+        prev: *FreeListNode,
+        total_size: u32
+    ) u32 {
+        const is_head: bool = (@intFromPtr(prev) == @intFromPtr(self.head));
+        const free_block: *FreeListNode =
+            if (is_head) prev
+            else prev.next.?;
+        const addr = @intFromPtr(free_block);
+        const free_block_size = free_block.block_size;
+        self.initAllocHeader(addr, total_size);
+
+        if (free_block_size > total_size + @sizeOf(FreeListNode)) {
+            self.addFreeNode(
+                addr + total_size,
+                free_block_size - total_size,
+                if (is_head) null else prev
+            );
         } else {
-            updateFreeList(self, prev, buffer);
+            if (is_head) {
+                self.head = free_block.next;
+            } else {
+                prev.next = free_block.next;
+            }
         }
-
-        self.initializeHeader(addr, total_size);
         return addr + @sizeOf(AllocHeader);
     }
 
-    fn initializeHeader(self: *FreeList, addr: u32, size: u32) void {
-        var header: *AllocHeader = @ptrFromInt(addr);
+    fn initAllocHeader(self: *FreeList, addr: u32, size: u32) void {
+        const header: *AllocHeader = @ptrFromInt(addr);
         header.block_size = size;
         header.head = self;
     }
 
-    fn handleBlockSplit(
-        self: *FreeList,
-        addr: u32,
+    fn allocateNewBlock(
+        self: *FreeList, 
         total_size: u32,
-        block_size: u32,
-        next: ?*FreeListNode,
-        prev: ?*FreeListNode,
-        buffer: *FreeListNode,
-    ) void {
-        const free_header = createSplitFreeNode(addr, total_size, block_size, next);
+        last_block: ?*FreeListNode
+    ) u32 {
+        const begin = self.data + self.size * PAGE_SIZE;
+        const free_size = self.expandMemory(total_size);
+        self.initAllocHeader(begin, total_size);
 
-        if (@intFromPtr(prev) == @intFromPtr(buffer)) {
-            self.head = free_header;
-        } else {
-            prev.?.next = free_header;
+        // If there is a space left for header plus something else add new free node
+        if (free_size > total_size + @sizeOf(FreeListNode)) {
+            self.addFreeNode(
+                begin + total_size, 
+                free_size - total_size,
+                last_block
+            );
         }
+        return begin + @sizeOf(AllocHeader);
     }
 
-    fn createSplitFreeNode(
-        addr: u32,
-        total_size: u32,
-        block_size: u32,
-        next: ?*FreeListNode,
-    ) *FreeListNode {
-        var free_header: *FreeListNode = @ptrFromInt(addr + total_size);
-        free_header.block_size = block_size - total_size;
-        free_header.next = next;
-        return free_header;
+    fn expandMemory(self: *FreeList, size: u32) u32 {
+        var num_pages = size / PAGE_SIZE;
+        if (size % PAGE_SIZE != 0)
+            num_pages += 1;
+        var physical = self.pmm.alloc_pages(num_pages);
+        var virtual = self.data + self.size * PAGE_SIZE;
+        var idx: u32 = 0;
+        while (idx < num_pages): (idx += 1) {
+            self.vmm.map_page(virtual, physical);
+            physical += PAGE_SIZE;
+            virtual += PAGE_SIZE;
+        }
+        self.size += num_pages;
+        return num_pages * PAGE_SIZE;
     }
 
-    fn updateFreeList(self: *FreeList, prev: ?*FreeListNode, buffer: *FreeListNode) void {
-        if (prev) |p| {
-            p.next = buffer.next;
+    fn addFreeNode(self: *FreeList, addr: u32, size: u32, prev: ?*FreeListNode) void {
+        const new_node: *FreeListNode = @ptrFromInt(addr);
+        new_node.block_size = size;
+        new_node.next = if (prev == null) null else prev.?.next;
+        if (prev == null) {
+            self.head = new_node;
         } else {
-            self.head = buffer.next;
+            prev.?.next = new_node;
         }
     }
 };
