@@ -41,27 +41,39 @@ pub const FreeList = packed struct {
         };
     }
 
-    fn list_add_head(self: *FreeList, node: ?*FreeListNode) void {
-        node.?.next = self.head;
-        self.head = node;
-    }
-
-    /// Put new to the left of old
-    fn join(self: *FreeList, new: ?*FreeListNode, old: ?*FreeListNode) bool {
-        const end_addr: u32 = @intFromPtr(new) + new.?.block_size;
+    fn insertNewFreeNode(self: *FreeList, new: *FreeListNode, old: *FreeListNode) void {
+        const end_addr: u32 = @intFromPtr(new) + new.block_size;
+        // New node is before head of free nodes
         if (@intFromPtr(new) < @intFromPtr(old)) {
             if (end_addr != @intFromPtr(old)) {
-                self.list_add_head(new);
-                return true;
+                new.next = self.head;
+                self.head = new;
+                return ;
             }
-            new.?.block_size += self.head.?.block_size;
-            new.?.next = old.?.next;
+            // Merge
+            new.block_size += self.head.?.block_size;
+            new.next = old.next;
             self.head = new;
-            return true;
+            return ;
         }
-        // check for middle
-        // check for right
-        return true;
+        var curr: *FreeListNode = new;
+        // Handle node to the left of new node
+        if (@intFromPtr(old) + old.block_size < @intFromPtr(new)) {
+            new.next = old.next;
+            old.next = new;
+        } else {
+            // Merge
+            old.block_size += new.block_size;
+            curr = old;
+        }
+        // Handle node to the right of new node
+        if (old.next == null)
+            return ;
+        // Merge
+        if (@intFromPtr(curr) + curr.block_size == @intFromPtr(old.next)) {
+            curr.block_size += old.next.?.block_size;
+            curr.next = old.next.?.next;
+        }
     }
 
     pub fn free(self: *FreeList, addr: u32) void {
@@ -77,22 +89,22 @@ pub const FreeList = packed struct {
 
         // checks are OK we can iterate through list
         const block_size = header.?.block_size;
-        const new_node: ?*FreeListNode = @ptrFromInt(addr - @sizeOf(FreeListNode));
-        new_node.?.block_size = block_size;
-        var current: ?*FreeListNode = self.head;
-        if (@intFromPtr(current) > @intFromPtr(header)) {
-            _ = self.join(new_node, self.head);
-            return;
+        // Do not use header variable after this line
+        const new_node: *FreeListNode = @ptrFromInt(addr - @sizeOf(FreeListNode));
+        new_node.block_size = block_size;
+        new_node.next = null;
+        if (self.head == null) {
+            self.head = new_node;
+            return ;
         }
-        while (@intFromPtr(current) < @intFromPtr(header)) : (current = current.?.next) {
-            if (@intFromPtr(header) < @intFromPtr(current.?.next)) {
-                // just place
-            }
-            if (current.?.next == null) {
-                // place
-                current.?.next = new_node;
-                // set block_size and next to null
-            }
+        var current: ?*FreeListNode = self.head;
+        if (@intFromPtr(current) > @intFromPtr(new_node))
+            return self.insertNewFreeNode(new_node, current.?);
+        while (@intFromPtr(current) < @intFromPtr(new_node)) : (current = current.?.next) {
+            if (@intFromPtr(new_node) < @intFromPtr(current.?.next))
+                return self.insertNewFreeNode(new_node, current.?);
+            if (current.?.next == null)
+                return self.insertNewFreeNode(new_node, current.?);
         }
     }
 
