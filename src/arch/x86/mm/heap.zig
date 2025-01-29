@@ -130,6 +130,7 @@ pub const FreeList = packed struct {
             else prev.next.?;
         const addr = @intFromPtr(free_block);
         const free_block_size = free_block.block_size;
+        const next_free = free_block.next;
         self.initAllocHeader(addr, total_size);
 
         if (free_block_size > total_size + @sizeOf(FreeListNode)) {
@@ -140,9 +141,9 @@ pub const FreeList = packed struct {
             );
         } else {
             if (is_head) {
-                self.head = free_block.next;
+                self.head = next_free;
             } else {
-                prev.next = free_block.next;
+                prev.next = next_free;
             }
         }
         return addr + @sizeOf(AllocHeader);
