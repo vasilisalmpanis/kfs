@@ -72,16 +72,16 @@ pub fn mm_init(info: *multiboot_info) void {
     const tmp4: u32 = list_head.alloc(2000);
     printf("alloc: {x} - {x} {d}\n", .{ tmp4, tmp4 + 2000, 2000 });
     const tmp5: u32 = list_head.alloc(3000);
+    // const vas: *heap.AllocHeader = @ptrFromInt(tmp5 - @sizeOf(heap.AllocHeader));
+    // printf("block_size :{d} \n", .{vas.block_size});
     printf("alloc: {x} - {x} {d}\n", .{ tmp5, tmp5 + 3000, 3000 });
-    const vas: *heap.AllocHeader = @ptrFromInt(tmp4 - @sizeOf(heap.AllocHeader));
-    printf("block_size :{d} \n", .{vas.block_size});
     dbg.print_free_list();
     list_head.free(tmp4);
     list_head.free(tmp3);
     list_head.free(temp);
     const alloced: [*]u8 = @ptrFromInt(temp);
     @memset(alloced[0..10], 'a');
-    dbg.print_free_list();
+    // dbg.print_free_list();
 }
 
 // create page
