@@ -1,13 +1,13 @@
 const printf = @import("debug").printf;
 const PMM = @import("./pmm.zig").PMM;
-const PAGE_OFFSET = @import("memory.zig").PAGE_OFFSET;
 
+const PAGE_OFFSET: u32 = 0xC0000000;
 const PAGE_PRESENT: u8 = 0x1;
 const PAGE_WRITE: u8 = 0x2;
 const PAGE_4MB: u8 = 0x80;
 
-// extern var initial_page_dir: [1024]u32;
-const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
+extern var initial_page_dir: [1024]u32;
+// const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
 
 pub fn print_page_table(virtual_addr: u32) void {
@@ -57,6 +57,7 @@ pub const VMM = struct {
     pmm: *PMM,
 
     pub fn init(pmm: *PMM) VMM {
+        initial_page_dir[1023] = (@intFromPtr(&initial_page_dir) - PAGE_OFFSET) | 0x3;
         const vmm = VMM{ .pmm = pmm };
         return vmm;
     }

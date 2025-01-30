@@ -1,4 +1,4 @@
-const mm = @import("memory.zig");
+const mm = @import("init.zig");
 const head = @import("./heap.zig");
 
 /// kmalloc - allocate memory

@@ -4,7 +4,7 @@ const system = @import("arch").system;
 const gdt = @import("arch").gdt;
 const multiboot = @import("arch").multiboot;
 const screen = @import("drivers").screen;
-const mm = @import("arch").mm;
+pub const mm = @import("mm/init.zig");
 const vmm = @import("arch").vmm;
 const dbg = @import("debug");
 
