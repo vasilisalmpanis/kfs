@@ -1,5 +1,5 @@
-const multiboot_info  = @import("arch").multiboot.multiboot_info;
-const multiboot_memory_map  = @import("arch").multiboot.multiboot_memory_map;
+const multiboot_info = @import("arch").multiboot.multiboot_info;
+const multiboot_memory_map = @import("arch").multiboot.multiboot_memory_map;
 const std = @import("std");
 
 const pmm = @import("arch").pmm;
@@ -69,6 +69,10 @@ pub fn mm_init(info: *multiboot_info) void {
     const tmp4: u32 = list_head.alloc(2000);
     printf("alloc: {x} - {x} {d}\n", .{ tmp4, tmp4 + 2000, 2000 });
     const tmp5: u32 = list_head.alloc(3000);
+    // const tmp6 = list_head.alloc(2222);
+    // const tmp7 = list_head.alloc(3333);
+    // const tmp8 = list_head.alloc(4444);
+    // const tmp9 = list_head.alloc(5555);
     // const vas: *heap.AllocHeader = @ptrFromInt(tmp5 - @sizeOf(heap.AllocHeader));
     // printf("block_size :{d} \n", .{vas.block_size});
     printf("alloc: {x} - {x} {d}\n", .{ tmp5, tmp5 + 3000, 3000 });
@@ -78,9 +82,13 @@ pub fn mm_init(info: *multiboot_info) void {
     list_head.free(tmp4);
     list_head.free(tmp2);
     list_head.free(tmp5);
+    // list_head.free(tmp6);
+    // list_head.free(tmp7);
+    // list_head.free(tmp8);
+    // list_head.free(tmp9);
     dbg.print_free_list();
-    const alloced: [*]u8 = @ptrFromInt(temp);
-    @memset(alloced[0..10], 'a');
+    // const alloced: [*]u8 = @ptrFromInt(temp);
+    // @memset(alloced[0..10], 'a');
 }
 
 // create page

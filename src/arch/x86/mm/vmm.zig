@@ -9,7 +9,6 @@ const PAGE_4MB: u8 = 0x80;
 extern var initial_page_dir: [1024]u32;
 // const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
-
 pub fn print_page_table(virtual_addr: u32) void {
     const pd_index = virtual_addr >> 22; // Page directory index
     const page_table_addr = initial_page_dir[pd_index] & 0xFFFFF000;
@@ -73,7 +72,7 @@ pub const VMM = struct {
     }
 
     pub fn find_free_addr(self: *VMM) u32 {
-        var pd_idx =  PAGE_OFFSET >> 22;
+        var pd_idx = PAGE_OFFSET >> 22;
         const pd: [*]u32 = @ptrFromInt(0xFFFFF000);
         var pt: [*]u32 = undefined;
         while (pd_idx < 1023) : (pd_idx += 1) {
@@ -93,6 +92,18 @@ pub const VMM = struct {
             }
         }
         return 0xFFFFFFFF;
+    }
+
+    pub fn unmap_page(self: *VMM, virt: u32) void {
+        const pd_index = virt >> 22;
+        const pt_index = (virt >> 12) & 0x3FF;
+        // const pd: [*]u32 = @ptrFromInt(0xFFFFF000);
+        var pt: [*]u32 = @ptrFromInt(0xFFC00000);
+        var pfn: u32 = undefined;
+        pt += (0x400 * pd_index);
+        pfn = pt[pt_index] & 0xFFFFF000;
+        self.pmm.free_page(pfn);
+        pt[pt_index] = 0;
     }
 
     pub fn map_page(self: *VMM, virtual_addr: u32, physical_addr: u32) void {
