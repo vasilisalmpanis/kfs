@@ -1,14 +1,12 @@
-const multiboot_info = @import("../boot/multiboot.zig").multiboot_info;
-const multiboot_memory_map = @import("../boot/multiboot.zig").multiboot_memory_map;
-const assert = @import("std").debug.assert;
+const multiboot_info  = @import("arch").multiboot.multiboot_info;
+const multiboot_memory_map  = @import("arch").multiboot.multiboot_memory_map;
 const std = @import("std");
-const pmm = @import("./pmm.zig");
-const vmm = @import("vmm.zig");
+
+const pmm = @import("arch").pmm;
+const vmm = @import("arch").vmm;
 const heap = @import("./heap.zig");
 const printf = @import("debug").printf;
 const dbg = @import("debug");
-
-extern var initial_page_dir: [1024]u32;
 
 pub const PAGE_OFFSET: u32 = 0xC0000000;
 pub const PAGE_SIZE: u32 = 4096;
@@ -57,7 +55,6 @@ pub fn mm_init(info: *multiboot_info) void {
     // memory base and size.
     // At this point we need to make sure that the memory we are
     // accesing is mapped inside our virtual address space. !!!
-    initial_page_dir[1023] = (@intFromPtr(&initial_page_dir) - PAGE_OFFSET) | 0x3;
     phys_memory_manager = pmm.PMM.init(base, mem_size);
     virt_memory_manager = vmm.VMM.init(&phys_memory_manager);
     list_head = heap.FreeList.init(&phys_memory_manager, &virt_memory_manager);

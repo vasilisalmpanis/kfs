@@ -1,3 +1,3 @@
 name: debug
 main: main.zig
-dependencies: arch, drivers
+dependencies: arch, drivers, kernel

@@ -1,6 +1,6 @@
 const printf = @import("./printf.zig").printf;
 const multiboot = @import("arch").multiboot;
-const mm = @import("arch").mm;
+const mm = @import("kernel").mm;
 
 const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
