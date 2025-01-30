@@ -1,8 +1,8 @@
-const pmm = @import("./pmm.zig").PMM;
-const vmm = @import("./vmm.zig").VMM;
+const pmm = @import("arch").pmm.PMM;
+const vmm = @import("arch").vmm.VMM;
 const printf = @import("debug").printf;
 const dbg = @import("debug");
-const PAGE_SIZE = @import("./memory.zig").PAGE_SIZE;
+const PAGE_SIZE = @import("./init.zig").PAGE_SIZE;
 
 pub const FreeListNode = packed struct {
     block_size: u32,

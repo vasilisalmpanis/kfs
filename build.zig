@@ -58,6 +58,7 @@ pub fn build(b: *std.Build) !void {
 
         kernel.setLinkerScriptPath(b.path(linker));
         kernel.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));
+        debug_mod.addImport("kernel", &kernel.root_module);
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
 
