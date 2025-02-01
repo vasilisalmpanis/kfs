@@ -5,6 +5,7 @@ const gdt = @import("arch").gdt;
 const multiboot = @import("arch").multiboot;
 const screen = @import("drivers").screen;
 pub const mm = @import("mm/init.zig");
+const kmlc = @import("mm/kmalloc.zig");
 const vmm = @import("arch").vmm;
 const dbg = @import("debug");
 
@@ -23,10 +24,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     gdt.gdt_init();
     const scrn: *screen.Screen = screen.Screen.init();
     mm.mm_init(boot_info);
-    // Initialize heap or not
-    // Understand where we want to map out heap ex 0F0000000 - 0xE0000000
     var keyboard = Keyboard.init();
-
     while (true) {
         const input = keyboard.get_input();
         switch (input[0]) {
@@ -36,9 +34,10 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
             'C' => screen.current_tty.?.clear(),
             'T' => scrn.switch_tty(input[1]),
             'I' => {
-                dbg.print_mmap(boot_info);
-                dbg.print_page_dir();
+                // dbg.print_mmap(boot_info);
+                dbg.walkPageTables();
             },
+            'D' => dbg.run_tests(),
             else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, null, true),
         }
     }

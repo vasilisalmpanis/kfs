@@ -8,6 +8,13 @@ const heap = @import("./heap.zig");
 const printf = @import("debug").printf;
 const dbg = @import("debug");
 
+pub const kmalloc = @import("./kmalloc.zig").kmalloc;
+pub const kfree = @import("./kmalloc.zig").kfree;
+pub const ksize = @import("./kmalloc.zig").ksize;
+pub const vmalloc = @import("./vmalloc.zig").vmalloc;
+pub const vfree = @import("./vmalloc.zig").vfree;
+pub const vsize = @import("./vmalloc.zig").vsize;
+
 pub const PAGE_OFFSET: u32 = 0xC0000000;
 pub const PAGE_SIZE: u32 = 4096;
 
@@ -27,7 +34,8 @@ pub var mem_size: u64 = 0;
 
 var phys_memory_manager: pmm.PMM = undefined;
 var virt_memory_manager: vmm.VMM = undefined;
-pub var list_head: heap.FreeList = undefined;
+pub var kheap: heap.FreeList = undefined;
+pub var vheap: heap.FreeList = undefined;
 
 // get the first availaanle address and put metadata there
 pub fn mm_init(info: *multiboot_info) void {
@@ -50,45 +58,24 @@ pub fn mm_init(info: *multiboot_info) void {
         mem_size = mem_size - (base & 0xfff);
         base = (base & 0xfffff000) + PAGE_SIZE;
     }
-    // printf("kernel_end {x} {x}\n", .{@intFromPtr(&_kernel_start), @intFromPtr(&_kernel_end)});
     // At this point we have page aligned
     // memory base and size.
     // At this point we need to make sure that the memory we are
     // accesing is mapped inside our virtual address space. !!!
     phys_memory_manager = pmm.PMM.init(base, mem_size);
     virt_memory_manager = vmm.VMM.init(&phys_memory_manager);
-    list_head = heap.FreeList.init(&phys_memory_manager, &virt_memory_manager);
-
-    // tests
-    const temp: u32 = list_head.alloc(10);
-    printf("alloc: {x} - {x} {d}\n", .{ temp, temp + 10, 10 });
-    const tmp2: u32 = list_head.alloc(5000);
-    printf("alloc: {x} - {x} {d}\n", .{ tmp2, tmp2 + 5000, 5000 });
-    const tmp3: u32 = list_head.alloc(10);
-    printf("alloc: {x} - {x} {d}\n", .{ tmp3, tmp3 + 10, 10 });
-    const tmp4: u32 = list_head.alloc(2000);
-    printf("alloc: {x} - {x} {d}\n", .{ tmp4, tmp4 + 2000, 2000 });
-    const tmp5: u32 = list_head.alloc(3000);
-    // const tmp6 = list_head.alloc(2222);
-    // const tmp7 = list_head.alloc(3333);
-    // const tmp8 = list_head.alloc(4444);
-    // const tmp9 = list_head.alloc(5555);
-    // const vas: *heap.AllocHeader = @ptrFromInt(tmp5 - @sizeOf(heap.AllocHeader));
-    // printf("block_size :{d} \n", .{vas.block_size});
-    printf("alloc: {x} - {x} {d}\n", .{ tmp5, tmp5 + 3000, 3000 });
-    dbg.print_free_list();
-    list_head.free(temp);
-    list_head.free(tmp3);
-    list_head.free(tmp4);
-    list_head.free(tmp2);
-    list_head.free(tmp5);
-    // list_head.free(tmp6);
-    // list_head.free(tmp7);
-    // list_head.free(tmp8);
-    // list_head.free(tmp9);
-    dbg.print_free_list();
-    // const alloced: [*]u8 = @ptrFromInt(temp);
-    // @memset(alloced[0..10], 'a');
+    kheap = heap.FreeList.init(
+        &phys_memory_manager,
+        &virt_memory_manager,
+        PAGE_OFFSET,
+        0xFFFFF000
+    );
+    vheap = heap.FreeList.init(
+        &phys_memory_manager,
+        &virt_memory_manager,
+        PAGE_OFFSET,
+        0xFFFFF000
+    );
 }
 
 // create page
