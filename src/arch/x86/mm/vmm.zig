@@ -1,43 +1,13 @@
 const printf = @import("debug").printf;
 const PMM = @import("./pmm.zig").PMM;
-
 const PAGE_OFFSET: u32 = 0xC0000000;
 const PAGE_PRESENT: u8 = 0x1;
 const PAGE_WRITE: u8 = 0x2;
+const PAGE_USER: u8 = 0x4;
 const PAGE_4MB: u8 = 0x80;
 
 extern var initial_page_dir: [1024]u32;
 // const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
-
-pub fn print_page_table(virtual_addr: u32) void {
-    const pd_index = virtual_addr >> 22; // Page directory index
-    const page_table_addr = initial_page_dir[pd_index] & 0xFFFFF000;
-
-    if (page_table_addr == 0) {
-        printf("No page table exists for address 0x{x}\n", .{virtual_addr});
-        return;
-    }
-
-    const page_table: [*]u32 = @ptrFromInt(page_table_addr);
-
-    printf("Page Table for Address 0x{x} (Page Directory Index: {d}):\n", .{ virtual_addr, pd_index });
-
-    for (0..1024) |i| {
-        if (page_table[i] != 0) {
-            const flags = page_table[i] & 0xFFF;
-            printf("  Entry {d}: Physical Addr: 0x{x}, Flags:\n", .{ i, page_table[i] & 0xFFFFF000 });
-
-            printf("    Present:       {s}\n", .{if (flags & 1 != 0) "Yes" else "No"});
-            printf("    Writable:      {s}\n", .{if (flags & 2 != 0) "Yes" else "No"});
-            printf("    User/Supervisor: {s}\n", .{if (flags & 4 != 0) "User" else "Supervisor"});
-            printf("    Write-Through:  {s}\n", .{if (flags & 8 != 0) "Enabled" else "Disabled"});
-            printf("    Cache Disabled: {s}\n", .{if (flags & 16 != 0) "Yes" else "No"});
-            printf("    Accessed:      {s}\n", .{if (flags & 32 != 0) "Yes" else "No"});
-            printf("    Dirty:         {s}\n", .{if (flags & 64 != 0) "Yes" else "No"});
-            printf("    Page Size:     {s}\n", .{if (flags & 128 != 0) "4MB" else "4KB"});
-        }
-    }
-}
 
 pub inline fn InvalidatePage(page: usize) void {
     asm volatile ("invlpg (%eax)"
@@ -52,23 +22,93 @@ const vmem_block = struct {
     flags: u32
 };
 
+const PageEntry= packed struct {
+    present: bool,
+    writable: bool,
+    user: bool,
+    write_through: bool,
+    cache_disable: bool,
+    accessed: bool,
+    dirty: bool,
+    huge_page: bool,
+    global: bool,
+    available: u3,
+    address: u20,
+};
+
 pub const VMM = struct {
     pmm: *PMM,
 
     pub fn init(pmm: *PMM) VMM {
-        initial_page_dir[1023] = (@intFromPtr(&initial_page_dir) - PAGE_OFFSET) | 0x3;
+        initial_page_dir[1023] = (@intFromPtr(&initial_page_dir) - PAGE_OFFSET)
+            | PAGE_PRESENT | PAGE_WRITE;
         const vmm = VMM{ .pmm = pmm };
         return vmm;
     }
 
-    // pub fn alloc(size: u32) u32 {
-
-    // }
-
-    // pub fn free(v_addr: u32) void {
     pub fn page_table_to_addr(self: *VMM, pd_index: u32, pt_index: u32) u32 {
         _ = self;
         return ((pd_index << 22) | (pt_index << 12));
+    }
+
+    pub fn find_free_space(
+        self: *VMM,
+        num_pages: u32,
+        from_addr: u32, // Should be 4Mb aligned
+        to_addr: u32, // Should be 4Mb aligned
+        user: bool
+    ) u32 {
+        var addr_to_ret: u32 = from_addr;
+        var pages: u32 = 0;
+        var pd_idx = from_addr >> 22;
+        const max_pd_idx = to_addr >> 22;
+        const pd: [*]PageEntry = @ptrFromInt(0xFFFFF000);
+        while (pd_idx < max_pd_idx): (pd_idx += 1) {
+            if (pd[pd_idx].present and pd[pd_idx].huge_page) {
+                pages = 0;
+                addr_to_ret = self.page_table_to_addr(pd_idx + 1, 0);
+                continue ;
+            }
+            // Empty page dir entry
+            if (!pd[pd_idx].present) {
+                pages += 1024;
+            } else if (pd[pd_idx].present and !pd[pd_idx].huge_page) {
+                // If this page dir entry is not for userspace and we need for userspace => continue
+                if (user and !pd[pd_idx].user) {
+                    pages = 0;
+                    addr_to_ret = self.page_table_to_addr(pd_idx + 1, 0);
+                    continue ;
+                }
+                var pt_idx: u32 = 0;
+                var pt: [*]PageEntry = @ptrFromInt(0xFFC00000);
+                pt += (0x400 * pd_idx);
+                while (pt_idx < 1024) : (pt_idx += 1) {
+                    if (pt[pt_idx].present) {
+                        pages = 0;
+                        if (pt_idx < 1023) {
+                            addr_to_ret = self.page_table_to_addr(
+                                pd_idx,
+                                pt_idx + 1
+                            );
+                        } else {
+                            addr_to_ret = self.page_table_to_addr(
+                                pd_idx + 1,
+                                0
+                            );
+                        }
+                        continue ;
+                    }
+                    pages += 1;
+                    if (pages >= num_pages) {
+                        return addr_to_ret;
+                    }
+                }
+            }
+            if (pages >= num_pages) {
+                return addr_to_ret;
+            }
+        }
+        return 0xFFFFFFFF;
     }
 
     pub fn find_free_addr(self: *VMM) u32 {
@@ -80,10 +120,10 @@ pub const VMM = struct {
             if (pd[pd_idx] == 0) {
                 return pd_idx << 22;
             }
-            if ((pd[pd_idx] & PAGE_4MB) != 0) {
+            if ((pd[pd_idx] & PAGE_4MB) == 0) {
                 pt = @ptrFromInt(0xFFC00000);
+                pt += (0x400 * pd_idx);
                 while (pt_idx < 1023) {
-                    pt += (0x400 * pd_idx);
                     if (pt[pt_idx] == 0) {
                         return self.page_table_to_addr(pd_idx, pt_idx);
                     }
@@ -97,16 +137,20 @@ pub const VMM = struct {
     pub fn unmap_page(self: *VMM, virt: u32) void {
         const pd_index = virt >> 22;
         const pt_index = (virt >> 12) & 0x3FF;
-        // const pd: [*]u32 = @ptrFromInt(0xFFFFF000);
         var pt: [*]u32 = @ptrFromInt(0xFFC00000);
-        var pfn: u32 = undefined;
         pt += (0x400 * pd_index);
-        pfn = pt[pt_index] & 0xFFFFF000;
+        const pfn: u32 = pt[pt_index] & 0xFFFFF000;
         self.pmm.free_page(pfn);
         pt[pt_index] = 0;
+        InvalidatePage(virt);
     }
 
-    pub fn map_page(self: *VMM, virtual_addr: u32, physical_addr: u32) void {
+    pub fn map_page(
+        self: *VMM,
+        virtual_addr: u32,
+        physical_addr: u32,
+        user: bool
+    ) void {
         const pd_idx = virtual_addr >> 22;
         const pt_idx = (virtual_addr >> 12) & 0x3ff;
         const pd: [*]u32 = @ptrFromInt(0xFFFFF000);
@@ -115,7 +159,9 @@ pub const VMM = struct {
         if (pd[pd_idx] == 0) {
             const pt_pfn = self.pmm.alloc_page();
             const tmp_pd_idx = (pt_pfn >> 20) / 4;
-            pd[pd_idx] = pt_pfn | 3; // Present + writable
+            pd[pd_idx] = pt_pfn | PAGE_PRESENT | PAGE_WRITE; // Present + writable
+            if (user)
+                pd[pd_idx] |= PAGE_USER;
             const tmp = pd[tmp_pd_idx];
             pd[tmp_pd_idx] = PAGE_4MB | PAGE_WRITE | PAGE_PRESENT;
             pt = @ptrFromInt(0xFFC00000);
@@ -127,7 +173,9 @@ pub const VMM = struct {
         pt += (0x400 * pd_idx);
         if (pt[pt_idx] != 0)
             return; // Do something
-        pt[pt_idx] = physical_addr | 0x3;
+        pt[pt_idx] = physical_addr | PAGE_PRESENT | PAGE_WRITE;
+        if (user)
+            pt[pt_idx] |= PAGE_USER;
         InvalidatePage(virtual_addr);
     }
 };

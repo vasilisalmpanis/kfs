@@ -4,6 +4,10 @@ const printf = @import("debug").printf;
 const dbg = @import("debug");
 const PAGE_SIZE = @import("./init.zig").PAGE_SIZE;
 
+const AllocationError = error{
+    OutOfMemory,
+};
+
 pub const FreeListNode = packed struct {
     block_size: u32,
     next: ?*FreeListNode,
@@ -15,26 +19,21 @@ pub const AllocHeader = packed struct {
 };
 
 pub const FreeList = packed struct {
-    size: u32,
-    // WARNING: we need to be careful with size since
-    // we use it to calculate begin of virt addr
-    // to map. if we have 3 pages allocated and
-    // the first one is free we would need to
-    // adjust size and data.
-    used: u32,
-    data: u32, // virtual address
+    start_addr: u32,
+    end_addr: u32,
     head: ?*FreeListNode,
     vmm: *vmm,
     pmm: *pmm,
 
-    pub fn init(phys_mm: *pmm, virt_mm: *vmm) FreeList {
-        const start_addr: u32 = virt_mm.find_free_addr();
-        // TODO: Handle case where start_addr is 0xFFFFFFFF (no virt address space left)
-        // NOTE: start using invalid pointers like 0xDEADBEEF 0xCAFEBABE etc
+    pub fn init(
+        phys_mm: *pmm,
+        virt_mm: *vmm,
+        start_addr: u32,
+        end_addr: u32
+    ) FreeList {
         return FreeList{
-            .size = 0,
-            .used = 0,
-            .data = start_addr,
+            .start_addr = start_addr,
+            .end_addr = end_addr,
             .head = null,
             .vmm = virt_mm,
             .pmm = phys_mm,
@@ -86,8 +85,6 @@ pub const FreeList = packed struct {
         self.return_free_pages(curr, prev);
     }
 
-    // 5010
-    // 4096 -> 14
     fn return_free_pages(
         self: *FreeList,
         node: ?*FreeListNode,
@@ -121,12 +118,12 @@ pub const FreeList = packed struct {
             remainder = block_start + node.?.block_size - page_start;
             if (remainder >= PAGE_SIZE) {
                 free_pages = remainder / PAGE_SIZE;
-                if (remainder % PAGE_SIZE < @sizeOf(FreeListNode) and remainder % PAGE_SIZE > 0)
+                if (remainder % PAGE_SIZE < @sizeOf(FreeListNode)
+                    and remainder % PAGE_SIZE > 0)
                     free_pages -= 1;
                 for (0..free_pages) |page| {
                     self.vmm.unmap_page(page_start + page * PAGE_SIZE);
                     returned = true;
-                    self.size -= 1;
                 }
                 if (page_start > block_start and returned) {
                     node.?.block_size = page_start - block_start;
@@ -151,25 +148,29 @@ pub const FreeList = packed struct {
         }
     }
 
-    pub fn free(self: *FreeList, addr: u32) void {
+    fn getAllocHeader(self: *FreeList, addr: u32) ?*AllocHeader {
         var header: ?*AllocHeader = undefined;
-        var prev: ?*FreeListNode = undefined;
         if (addr - @sizeOf(AllocHeader) < 0)
-            return;
-        const mem_max = self.data + self.size * PAGE_SIZE;
-        if (addr < self.data or addr >= mem_max)
-            return;
+            return null;
+        if (addr < self.start_addr or addr >= self.end_addr)
+            return null;
         header = @ptrFromInt(addr - @sizeOf(AllocHeader));
         if (header.?.head != self)
-            return;
+            return null;
+        return header;
+    }
 
+    pub fn free(self: *FreeList, addr: u32) void {
+        var prev: ?*FreeListNode = undefined;
+        const header: ?*AllocHeader = self.getAllocHeader(addr);
+        if (header == null)
+            return;
         // checks are OK we can iterate through list
         const block_size = header.?.block_size;
         // Do not use header variable after this line
         const new_node: *FreeListNode = @ptrFromInt(addr - @sizeOf(FreeListNode));
         new_node.block_size = block_size;
         new_node.next = null;
-        // defer self.return_free_pages();
         if (self.head == null) {
             self.head = new_node;
             self.return_free_pages(new_node, null);
@@ -179,7 +180,9 @@ pub const FreeList = packed struct {
         prev = null;
         if (@intFromPtr(current) > @intFromPtr(new_node))
             return self.insertNewFreeNode(new_node, current.?, prev);
-        while (@intFromPtr(current) < @intFromPtr(new_node)) : (current = current.?.next) {
+        while (
+            @intFromPtr(current) < @intFromPtr(new_node)
+        ) : (current = current.?.next) {
             if (@intFromPtr(new_node) < @intFromPtr(current.?.next))
                 return self.insertNewFreeNode(new_node, current.?, prev);
             if (current.?.next == null)
@@ -188,7 +191,12 @@ pub const FreeList = packed struct {
         }
     }
 
-    pub fn alloc(self: *FreeList, size: u32) u32 {
+    pub fn alloc(
+        self: *FreeList,
+        size: u32,
+        contig: bool,
+        user: bool
+    ) !u32 {
         // Total size of the block to allocate (including header)
         const total_size = alignToPtr(size + @sizeOf(AllocHeader));
 
@@ -204,7 +212,12 @@ pub const FreeList = packed struct {
         }
 
         // Allocate new block if no existing block found
-        return self.allocateNewBlock(total_size, buffer);
+        return try self.allocateNewBlock(
+            total_size,
+            buffer,
+            contig,
+            user
+        );
     }
 
     fn alignToPtr(value: u32) u32 {
@@ -217,7 +230,7 @@ pub const FreeList = packed struct {
         curr: *FreeListNode,
         total_size: u32
     ) u32 {
-        const is_head: bool = (@intFromPtr(prev) == @intFromPtr(curr));
+        const is_head: bool = (@intFromPtr(self.head.?) == @intFromPtr(curr));
         const addr = @intFromPtr(curr);
         const free_block_size = curr.block_size;
         const next_free = curr.next;
@@ -248,32 +261,70 @@ pub const FreeList = packed struct {
     fn allocateNewBlock(
         self: *FreeList,
         total_size: u32,
-        last_block: ?*FreeListNode
-    ) u32 {
-        const begin = self.data + self.size * PAGE_SIZE;
-        const free_size = self.expandMemory(total_size);
+        last_block: ?*FreeListNode,
+        contig: bool,
+        user: bool
+    ) !u32 {
+        var num_pages = total_size / PAGE_SIZE;
+        if (total_size % PAGE_SIZE != 0)
+            num_pages += 1;
+        const begin = self.vmm.find_free_space(
+            num_pages,
+            self.start_addr,
+            self.end_addr,
+            user
+        );
+        if (begin == 0xFFFFFFFF)
+            return AllocationError.OutOfMemory;
+        const free_size = try if (contig)
+            self.expandMemoryContig(num_pages, begin, user)
+        else
+            self.expandMemory(num_pages, begin, user);
         self.initAllocHeader(begin, total_size);
 
         // If there is a space left for header plus something else add new free node
         if (free_size > total_size + @sizeOf(FreeListNode)) {
-            self.addFreeNode(begin + total_size, free_size - total_size, last_block, null);
+            self.addFreeNode(
+                begin + total_size,
+                free_size - total_size,
+                last_block,
+                null
+            );
         }
         return begin + @sizeOf(AllocHeader);
     }
 
-    fn expandMemory(self: *FreeList, size: u32) u32 {
-        var num_pages = size / PAGE_SIZE;
-        if (size % PAGE_SIZE != 0)
-            num_pages += 1;
+    fn expandMemoryContig(self: *FreeList, num_pages: u32, virtual: u32, user: bool) !u32 {
         var physical = self.pmm.alloc_pages(num_pages);
-        var virtual = self.data + self.size * PAGE_SIZE;
-        var idx: u32 = 0;
-        while (idx < num_pages) : (idx += 1) {
-            self.vmm.map_page(virtual, physical);
-            physical += PAGE_SIZE;
-            virtual += PAGE_SIZE;
+        if (physical == 0) {
+            return AllocationError.OutOfMemory;
         }
-        self.size += num_pages;
+        var idx: u32 = 0;
+        var virt_addr = virtual;
+        while (idx < num_pages) : (idx += 1) {
+            self.vmm.map_page(virt_addr, physical, user);
+            physical += PAGE_SIZE;
+            virt_addr += PAGE_SIZE;
+        }
+        return num_pages * PAGE_SIZE;
+    }
+
+    fn expandMemory(self: *FreeList, num_pages: u32, virtual: u32, user: bool) !u32 {
+        var idx: u32 = 0;
+        var virt_addr = virtual;
+        while (idx < num_pages) : (idx += 1) {
+            const physical = self.pmm.alloc_page();
+            if (physical == 0) {
+                // Unmap all the previous mapped pages
+                while (idx > 0) : (idx -= 1) {
+                    virt_addr -= PAGE_SIZE;
+                    self.vmm.unmap_page(virt_addr);
+                }
+                return AllocationError.OutOfMemory;
+            }
+            self.vmm.map_page(virt_addr, physical, user);
+            virt_addr += PAGE_SIZE;
+        }
         return num_pages * PAGE_SIZE;
     }
 
@@ -292,5 +343,12 @@ pub const FreeList = packed struct {
         } else {
             prev.?.next = new_node;
         }
+    }
+
+    pub fn get_size(self: *FreeList, addr: u32) u32 {
+        const header: ?*AllocHeader = self.getAllocHeader(addr);
+        if (header == null)
+            return 0;
+        return header.?.block_size - @sizeOf(AllocHeader);
     }
 };
