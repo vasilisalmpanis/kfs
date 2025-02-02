@@ -1,16 +1,34 @@
 # Declare constants for the multiboot header.
 .set ALIGN,    1<<0             # align loaded modules on page boundaries
 .set MEMINFO,  1<<1             # provide memory map
-.set FLAGS,    ALIGN | MEMINFO  # this is the Multiboot 'flag' field
+.set VIDEO,    1<<2  
+.set FLAGS,    ALIGN | MEMINFO | VIDEO # this is the Multiboot 'flag' field
+
+# Video mode preferences
+.set GRAPHICS_MODE,	1        	# 0 = linear text, 1 = graphics mode
+.set WIDTH,			1920      	# desired width
+.set HEIGHT,		1080      	# desired height
+.set DEPTH,			32       	# desired bits per pixel
+
 .set MAGIC,    0x1BADB002       # 'magic number' lets bootloader find the header
 .set CHECKSUM, -(MAGIC + FLAGS) # checksum of above, to prove we are multiboot
 
 # Declare a multiboot header that marks the program as a kernel.
 .section .multiboot.data, "aw"
-.align 4
-.long MAGIC
-.long FLAGS
-.long CHECKSUM
+	.align 4
+	.long MAGIC
+	.long FLAGS
+	.long CHECKSUM
+	# Video mode fields
+	.long 0                     # header_addr
+	.long 0                     # load_addr
+	.long 0                     # load_end_addr
+	.long 0                     # bss_end_addr
+	.long 0                     # entry_addr
+	.long GRAPHICS_MODE         # indicates graphics mode
+	.long WIDTH
+	.long HEIGHT
+	.long DEPTH
 
 # Allocate the initial stack.
 .section .bootstrap_stack, "aw", @nobits
@@ -31,19 +49,7 @@ boot_page_table1:
 
 # The kernel entry point.
 .section .multiboot.text, "a"
-print:
-    movw $0x0248, 0xB800    # H
-bla:
-	hlt
-	jmp bla
-    ret
 
-print2:
-    movw $0x0248, 0xC03FF000    # H
-bla2:
-	hlt
-	jmp bla
-    ret
 .global _start
 .type _start, @function
 _start:

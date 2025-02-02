@@ -1,5 +1,6 @@
 const TTY = @import("drivers").tty.TTY;
 const Keyboard = @import("drivers").Keyboard;
+const framebuffer = @import("drivers").framebuffer;
 const system = @import("arch").system;
 const gdt = @import("arch").gdt;
 const multiboot = @import("arch").multiboot;
@@ -22,8 +23,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     }
     const boot_info: *multiboot.multiboot_info = @ptrFromInt(address);
     gdt.gdt_init();
-    const scrn: *screen.Screen = screen.Screen.init();
     mm.mm_init(boot_info);
+    const scrn: *screen.Screen = screen.Screen.init(boot_info);
     var keyboard = Keyboard.init();
     while (true) {
         const input = keyboard.get_input();

@@ -33,7 +33,7 @@ pub var base: u32 = undefined;
 pub var mem_size: u64 = 0;
 
 var phys_memory_manager: pmm.PMM = undefined;
-var virt_memory_manager: vmm.VMM = undefined;
+pub var virt_memory_manager: vmm.VMM = undefined;
 pub var kheap: heap.FreeList = undefined;
 pub var vheap: heap.FreeList = undefined;
 

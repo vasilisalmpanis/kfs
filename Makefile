@@ -6,10 +6,11 @@ SRC_DIR = src
 
 SRC = $(shell find $(SRC_DIR) -name '*.zig')
 ASM_SRC = $(shell find $(SRC_DIR) -name '*.s')
+GRUB_CFG = $(ISO_DIR)/boot/grub/grub.cfg
 
 all: $(NAME)
 
-$(NAME): $(KERNEL)
+$(NAME): $(KERNEL) $(GRUB_CFG)
 	cp $(KERNEL) $(ISO_DIR)/boot/
 	grub-mkrescue --compress=xz -o $(NAME) $(ISO_DIR)
 
