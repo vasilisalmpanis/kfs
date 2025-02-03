@@ -50,7 +50,7 @@ pub const TTY = struct {
     }
 
     fn update_cursor(self: *TTY) void {
-        _ = self;
+        scr.framebuffer.cursor(self._x, self._y);
     }
 
     pub fn move(self: *TTY, direction : u8) void {
