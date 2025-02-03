@@ -26,7 +26,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     mm.mm_init(boot_info);
     var scrn: screen.Screen = screen.Screen.init(boot_info);
     screen.current_tty = &scrn.tty[0];
-    dbg.printf("width {d} height {d}\n",.{screen.current_tty.?.width, screen.current_tty.?.height});
     var keyboard = Keyboard.init();
     while (true) {
         const input = keyboard.get_input();
