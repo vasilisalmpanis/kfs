@@ -42,6 +42,15 @@ pub const FrameBuffer = struct {
             }
         }
     }
+
+    pub fn cursor(self: *FrameBuffer, cx: u32, cy: u32) void {
+        const x = cx * 8;
+        const y = cy * 16;
+        for (0..8) |pos| {
+            self.fb_ptr[(y + 14) * (self.fb_info.pitch / 4) + x + pos] = 0x00FFFFFF;
+            self.fb_ptr[(y + 15) * (self.fb_info.pitch / 4) + x + pos] = 0x00FFFFFF;
+        }
+    }
 };
 
 const font = [256][16]u8{
