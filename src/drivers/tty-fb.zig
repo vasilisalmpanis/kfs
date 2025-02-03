@@ -4,35 +4,33 @@ const printf = @import("debug").printf;
 const scr = @import("./screen.zig");
 const mm = @import("kernel").mm;
 
-pub const ConsoleColors = enum(u8) {
-    Black = 0,
-    Blue = 1,
-    Green = 2,
-    Cyan = 3,
-    Red = 4,
-    Magenta = 5,
-    Brown = 6,
-    LightGray = 7,
-    DarkGray = 8,
-    LightBlue = 9,
-    LightGreen = 10,
-    LightCyan = 11,
-    LightRed = 12,
-    LightMagenta = 13,
-    LightBrown = 14,
-    White = 15,
+pub const ConsoleColors = enum(u32) {
+    Black = 0x000000,
+    Blue = 0x0000FF,
+    Green = 0x00FF00,
+    Cyan = 0x00FFFF,
+    Red = 0xFF0000,
+    Magenta = 0xFF00FF,
+    Brown = 0xFFA500,
+    LightGray = 0xD3D3D3,
+    DarkGray = 0xa9a9a9,
+    LightBlue = 0xADD8E6,
+    LightGreen = 0xCFD8D9,
+    LightCyan = 0xE0FFFF,
+    LightRed = 0xFFCCCB,
+    LightMagenta = 0xFF06B5,
+    LightBrown = 0xC4A484,
+    White = 0x00FFFFFF,
 };                       
 
-pub fn vga_entry_color(fg: ConsoleColors, bg: ConsoleColors) u8 {
-    return @intFromEnum(fg) | (@intFromEnum(bg) << 4);
-}
 
 pub const TTY = struct {
     width: u32 = 80,
     height: u32 = 25,
     _x: u32 = 0,
     _y: u32 = 0,
-    _terminal_color: u8 = 0,
+    _bg_colour: u32 = @intFromEnum(ConsoleColors.Black),
+    _fg_colour: u32 = @intFromEnum(ConsoleColors.White),
     _buffer : [*]u8,
     shell: *Shell,
 
@@ -40,7 +38,6 @@ pub const TTY = struct {
         var tty = TTY{
             .width = width,
             .height = height,
-            ._terminal_color = vga_entry_color(ConsoleColors.White, ConsoleColors.Black),
             ._buffer = @ptrFromInt(mm.kmalloc(width * height * @sizeOf(u8))),
             .shell = Shell.init(),
         };
@@ -50,7 +47,7 @@ pub const TTY = struct {
     }
 
     fn update_cursor(self: *TTY) void {
-        scr.framebuffer.cursor(self._x, self._y);
+        scr.framebuffer.cursor(self._x, self._y, self._fg_colour);
     }
 
     pub fn move(self: *TTY, direction : u8) void {
@@ -68,10 +65,11 @@ pub const TTY = struct {
         for (0..self.height) |row| {
             for (0..self.width) |col| {
                 const c = self._buffer[row * self.width + col];
-                scr.framebuffer.putchar(c, col, row);
+                scr.framebuffer.putchar(c, col, row, self._bg_colour, self._fg_colour);
             }
         }
         self.update_cursor();
+        scr.framebuffer.render();
     }
 
     fn _scroll(self: *TTY) void {
@@ -92,17 +90,16 @@ pub const TTY = struct {
         self.render();
     }
 
-    fn removeAtIndex(self: *TTY, comptime T: type, buffer: [*]T, index: usize) void {
+    fn removeAtIndex(self: *TTY, index: usize) void {
 
         // Move the characters after the index to the left
         var i = index;
-        while (i < 80 * 25 - 1) {
-            buffer[i] = buffer[i + 1];
+        while (i < self.height * self.width - 1) {
+            self._buffer[i] = self._buffer[i + 1];
             i += 1;
         }
 
-        buffer[80 * 25 - 1] = 0;
-        _ = self;
+        self._buffer[self.width * self.height - 1] = 0;
     }
 
     pub fn remove(self: *TTY) void {
@@ -110,7 +107,7 @@ pub const TTY = struct {
             return;
         if (self._x > 0)
             self._x -= 1;
-        self.removeAtIndex(u8, self._buffer, self._y * self.width + self._x);
+        self.removeAtIndex(self._y * self.width + self._x);
         self.render();
     }
 
@@ -147,8 +144,7 @@ pub const TTY = struct {
         return res[0..i];
     }
 
-    fn printChar(self: *TTY, c: u8, color: ?u8) void {
-        _ = color;
+    fn printChar(self: *TTY, c: u8) void {
         if (c == '\n') {
              @memset(
                 self._buffer[self.width * self._y + self._x .. self.width * self._y + self.width],
@@ -161,51 +157,49 @@ pub const TTY = struct {
         } else if (c == 8) {
             self.remove();
         } else if (c == '\t') {
-            self.print("    ", null, false);
+            self.print("    ", false);
         } else {
             self.printVga(c);
         }
     }
 
-    pub fn print(self: *TTY, msg: [] const u8, color: ?u8, stdin: bool) void {
+    pub fn print(self: *TTY, msg: [] const u8, stdin: bool) void {
+        var str: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
+        @memset(str[0..self.width], 0);
+        var len: u8 = 0;
+        var buf: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
+        @memset(buf[0..self.width], 0);
+        const start = self._y * self.width + self._x;
+        const max_end: u32 = (self._y + 1) * self.width;
+        var end: u32 = start;
+        while (self._buffer[end] != 0 and end < max_end)
+            end += 1;
+        @memcpy(buf[0..(end - start)], self._buffer[start..end]);
         for (msg) |c| {
-            self.printChar(c, color);
+            if (c == '\n' and stdin) {
+                for (self.getCurrentLine()) |cc| {
+                    str[len] = cc;
+                    len += 1;
+                }
+            }
+            self.printChar(c);
         }
+        const x = self._x;
+        const y = self._y;
+        var i: u16 = 0;
+        while (i < end - start) : (i += 1)
+            self.printVga(buf[i]);
+        self._x = x;
+        self._y = y;
         self.render();
-        _ = stdin;
-
-        // var str: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
-        // var len: u8 = 0;
-        // var buf: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
-        // const start = self._y * self.width + self._x;
-        // const max_end: u32 = (self._y + 1) * self.width;
-        // var end: u32 = start;
-        // while (self._buffer[end] != 0 and end < max_end)
-        //     end += 1;
-        // @memcpy(buf[0..(end - start)], self._buffer[start..end]);
-        // for (msg) |c| {
-        //     if (c == '\n' and stdin) {
-        //         for (self.getCurrentLine()) |cc| {
-        //             str[len] = cc;
-        //             len += 1;
-        //         }
-        //     }
-        //     self.printChar(c, color);
-        // }
-        // const x = self._x;
-        // const y = self._y;
-        // var i: u16 = 0;
-        // while (i < end - start) : (i += 1)
-        //     self.printVga(buf[i]);
-        // self._x = x;
-        // self._y = y;
-        // self.render();
-        // if (stdin and str[0] != 0)
-        //     self.shell.handleInput(str[0..len]);
+        if (stdin and str[0] != 0)
+            self.shell.handleInput(str[0..len]);
+        mm.kfree(@intFromPtr(str));
+        mm.kfree(@intFromPtr(buf));
     }
 
-    pub fn setColor(self: *TTY, new_color: u8) void {
-        self._terminal_color = new_color;
+    pub fn setColor(self: *TTY, fg: u32) void {
+        self._fg_colour = fg;
     }
 
     pub fn vga_entry(self: *TTY, uc: u8, new_color: u8) u16 {

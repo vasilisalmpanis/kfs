@@ -6,6 +6,7 @@ pub const FrameBuffer = struct {
     fb_ptr: [*]u32,
     cwidth: u32,
     cheight: u32,
+    virtual_buffer: [*]u32,
 
     pub fn init(boot_info: *multiboot.multiboot_info) FrameBuffer {
         const fb_info: ?multiboot.FramebufferInfo = multiboot.getFBInfo(boot_info);
@@ -17,15 +18,34 @@ pub const FrameBuffer = struct {
             mm.virt_memory_manager.map_page(addr, addr, false);
             addr += mm.PAGE_SIZE;
         }
-        return FrameBuffer{
+        var fb = FrameBuffer{
             .fb_info = fb_info.?,
             .fb_ptr = @ptrFromInt(fb_info.?.address),
             .cwidth = (fb_info.?.pitch / 4) / 8,
             .cheight = fb_info.?.height / 16,
+            .virtual_buffer = @ptrFromInt(mm.kmalloc(fb_info.?.width * fb_info.?.height * @sizeOf(u32))),
         };
+        fb.clear();
+        return fb;
     }
 
-    pub fn putchar(self: *FrameBuffer, c: u8, cx: u32, cy: u32) void {
+    pub fn render(self: *FrameBuffer) void {
+        const max_index = self.fb_info.height * self.fb_info.width;
+        @memcpy(self.fb_ptr[0..max_index], self.virtual_buffer[0..max_index]);
+    }
+
+    pub fn clear(self: *FrameBuffer) void {
+        @memset(self.virtual_buffer[0..self.fb_info.height * self.fb_info.width], 0);
+    }
+
+    pub fn putchar(
+        self: *FrameBuffer,
+        c: u8,
+        cx: u32,
+        cy: u32,
+        bg: u32,
+        fg: u32,
+    ) void {
         const char_data = font[c];
         const x = cx * 8;
         const y = cy * 16;
@@ -35,20 +55,27 @@ pub const FrameBuffer = struct {
                 const one: u8 = 1;
                 const mask: u8 = one << (7 - b);
                 if (c == 0) {
-                    self.fb_ptr[(row + y) * (self.fb_info.pitch / 4) + b + x] = 0;
+                    self.virtual_buffer[(row + y) * (self.fb_info.pitch / 4) + b + x] = bg;
                 } else if ((char_data[row] & mask) != 0) {
-                    self.fb_ptr[(row + y) * (self.fb_info.pitch / 4) + b + x] = 0x00FFFFFF;
+                    self.virtual_buffer[(row + y) * (self.fb_info.pitch / 4) + b + x] = fg;
+                } else {
+                    self.virtual_buffer[(row + y) * (self.fb_info.pitch / 4) + b + x] = bg;
                 }
             }
         }
     }
 
-    pub fn cursor(self: *FrameBuffer, cx: u32, cy: u32) void {
+    pub fn cursor(
+        self: *FrameBuffer,
+        cx: u32,
+        cy: u32,
+        fg: u32,
+    ) void {
         const x = cx * 8;
         const y = cy * 16;
         for (0..8) |pos| {
-            self.fb_ptr[(y + 14) * (self.fb_info.pitch / 4) + x + pos] = 0x00FFFFFF;
-            self.fb_ptr[(y + 15) * (self.fb_info.pitch / 4) + x + pos] = 0x00FFFFFF;
+            self.virtual_buffer[(y + 14) * (self.fb_info.pitch / 4) + x + pos] = fg;
+            self.virtual_buffer[(y + 15) * (self.fb_info.pitch / 4) + x + pos] = fg;
         }
     }
 };
