@@ -3,7 +3,7 @@ const debug = @import("debug");
 const printf = @import("debug").printf;
 const system = @import("arch").system;
 const screen = @import("screen.zig");
-const tty = @import("tty.zig");
+const tty = @import("tty-fb.zig");
 
 pub const Shell = struct {    
     pub fn init() *Shell {
@@ -31,21 +31,21 @@ pub const Shell = struct {
         } else if (mem.eql(u8, input, "halt")) {
             system.halt();
         } else if (mem.eql(u8, input, "42")) {
-            screen.current_tty.?.print42();
+            // screen.current_tty.?.print42();
         } else if (mem.eql(u8, input, "red")) {
-            screen.current_tty.?.setColor(tty.vga_entry_color(tty.ConsoleColors.Red, tty.ConsoleColors.Black));
+            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Red));
         } else if (mem.eql(u8, input, "green")) {
-            screen.current_tty.?.setColor(tty.vga_entry_color(tty.ConsoleColors.Green, tty.ConsoleColors.Black));
+            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Green));
         } else if (mem.eql(u8, input, "blue")) {
-            screen.current_tty.?.setColor(tty.vga_entry_color(tty.ConsoleColors.Blue, tty.ConsoleColors.Black));
+            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Blue));
         } else if (mem.eql(u8, input, "orange")) {
-            screen.current_tty.?.setColor(tty.vga_entry_color(tty.ConsoleColors.Brown, tty.ConsoleColors.Black));
+            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Brown));
         } else if (mem.eql(u8, input, "magenta")) {
-            screen.current_tty.?.setColor(tty.vga_entry_color(tty.ConsoleColors.Magenta, tty.ConsoleColors.Black));
+            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Magenta));
         } else if (mem.eql(u8, input, "white")) {
-            screen.current_tty.?.setColor(tty.vga_entry_color(tty.ConsoleColors.White, tty.ConsoleColors.Black));
+            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.White));
         } else if (mem.eql(u8, input, "black")) {
-            screen.current_tty.?.setColor(tty.vga_entry_color(tty.ConsoleColors.Black, tty.ConsoleColors.Black));
+            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Black));
         } else {
             printf("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{input});
         }
