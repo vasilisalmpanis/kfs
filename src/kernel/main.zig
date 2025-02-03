@@ -24,7 +24,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     const boot_info: *multiboot.multiboot_info = @ptrFromInt(address);
     gdt.gdt_init();
     mm.mm_init(boot_info);
-    const scrn: *screen.Screen = screen.Screen.init(boot_info);
+    var scrn: screen.Screen = screen.Screen.init(boot_info);
+    screen.current_tty = &scrn.tty[0];
+    dbg.printf("width {d} height {d}\n",.{screen.current_tty.?.width, screen.current_tty.?.height});
     var keyboard = Keyboard.init();
     while (true) {
         const input = keyboard.get_input();
@@ -39,7 +41,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
                 dbg.walkPageTables();
             },
             'D' => dbg.run_tests(),
-            else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, null, true),
+            else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, true),
         }
     }
 }
