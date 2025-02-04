@@ -14,24 +14,31 @@ pub const FrameBuffer = struct {
         const num_pages = (fb_size + 0xFFF) / mm.PAGE_SIZE;
         var i: u32 = 0;
         var addr = fb_info.?.address & 0xFFFFF000;
+        // var virt_addr: u32 = mm.virt_memory_manager.find_free_space(num_pages, mm.PAGE_OFFSET, 0xFFFFF000, false);
+        // const last_addr: u32 = virt_addr;
         while (i < num_pages): (i += 1) {
+            // mm.virt_memory_manager.map_page(virt_addr, addr, false);
             mm.virt_memory_manager.map_page(addr, addr, false);
+            // virt_addr += mm.PAGE_SIZE;
             addr += mm.PAGE_SIZE;
         }
         var fb = FrameBuffer{
             .fb_info = fb_info.?,
+            // .fb_ptr = @ptrFromInt(last_addr),
             .fb_ptr = @ptrFromInt(fb_info.?.address),
             .cwidth = (fb_info.?.pitch / 4) / 8,
             .cheight = fb_info.?.height / 16,
-            .virtual_buffer = @ptrFromInt(mm.kmalloc(fb_info.?.width * fb_info.?.height * @sizeOf(u32))),
-        };
+            // .virtual_buffer = @ptrFromInt(mm.kmalloc(fb_info.?.width * fb_info.?.height * @sizeOf(u32))),
+            .virtual_buffer = @ptrFromInt(fb_info.?.address),
+        }; 
         fb.clear();
         return fb;
     }
 
     pub fn render(self: *FrameBuffer) void {
-        const max_index = self.fb_info.height * self.fb_info.width;
-        @memcpy(self.fb_ptr[0..max_index], self.virtual_buffer[0..max_index]);
+        // const max_index = self.fb_info.height * self.fb_info.width;
+        // @memcpy(self.fb_ptr[0..max_index], self.virtual_buffer[0..max_index]);
+        _ = self;
     }
 
     pub fn clear(self: *FrameBuffer) void {
