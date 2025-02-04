@@ -31,14 +31,15 @@ pub const TTY = struct {
     _y: u32 = 0,
     _bg_colour: u32 = @intFromEnum(ConsoleColors.Black),
     _fg_colour: u32 = @intFromEnum(ConsoleColors.White),
-    _buffer : [*]u8,
+    _buffer : [16080]u8,
     shell: *Shell,
 
     pub fn init(width: u32, height: u32) TTY {
         var tty = TTY{
             .width = width,
             .height = height,
-            ._buffer = @ptrFromInt(mm.kmalloc(width * height * @sizeOf(u8))),
+            // ._buffer = @ptrFromInt(mm.kmalloc(width * height * @sizeOf(u8))),
+            ._buffer = .{0} ** (240 * 67),
             .shell = Shell.init(),
         };
         @memset(tty._buffer[0..width * height], 0);
@@ -135,12 +136,14 @@ pub const TTY = struct {
     fn getCurrentLine(self: *TTY) []u8 {
         if (self._x == 0)
             return "";
-        var res: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
+        // var res: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
+        var res: [240]u8 = .{0} ** (240);
         var i: u16 = 0;
         for (self._buffer[self._y * self.width..self._y * self.width + self._x]) |ch| {
             res[i] = ch;
             i += 1;
         }
+        // mm.kfree(@intFromPtr(res));
         return res[0..i];
     }
 
@@ -164,10 +167,12 @@ pub const TTY = struct {
     }
 
     pub fn print(self: *TTY, msg: [] const u8, stdin: bool) void {
-        var str: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
+        // var str: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
+        var str: [240]u8 = .{0} ** 240;
         @memset(str[0..self.width], 0);
         var len: u8 = 0;
-        var buf: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
+        // var buf: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
+        var buf: [240]u8 = .{0} ** 240;
         @memset(buf[0..self.width], 0);
         const start = self._y * self.width + self._x;
         const max_end: u32 = (self._y + 1) * self.width;
@@ -194,8 +199,8 @@ pub const TTY = struct {
         self.render();
         if (stdin and str[0] != 0)
             self.shell.handleInput(str[0..len]);
-        mm.kfree(@intFromPtr(str));
-        mm.kfree(@intFromPtr(buf));
+        // mm.kfree(@intFromPtr(str));
+        // mm.kfree(@intFromPtr(buf));
     }
 
     pub fn setColor(self: *TTY, fg: u32) void {
