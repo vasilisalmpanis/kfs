@@ -111,6 +111,8 @@ fn print_pe_format(pe: *const PageEntry) void {
 pub fn walkPageTables() void {
     var pd_idx: usize = 0;
     while (pd_idx < 1023) : (pd_idx += 1) {
+        if (pd_idx > 900)
+            continue;
         const pde: *PageEntry = @ptrCast(&initial_page_dir[pd_idx]);
         if (!pde.present) {
             continue;

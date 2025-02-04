@@ -47,19 +47,20 @@ pub const FreeList = packed struct {
         prev: ?*FreeListNode
     ) void {
         const end_addr: u32 = @intFromPtr(new) + new.block_size;
+        var real_prev: ?*FreeListNode = prev;
         // New node is before head of free nodes
         if (@intFromPtr(new) < @intFromPtr(old)) {
             if (end_addr != @intFromPtr(old)) {
                 new.next = self.head;
                 self.head = new;
-                self.return_free_pages(new, null);
+                self.return_free_pages(new, real_prev);
                 return;
             }
             // Merge
             new.block_size += self.head.?.block_size;
             new.next = old.next;
             self.head = new;
-            self.return_free_pages(new, null);
+            self.return_free_pages(new, real_prev);
             return;
         }
         var curr: *FreeListNode = new;
@@ -67,6 +68,7 @@ pub const FreeList = packed struct {
         if (@intFromPtr(old) + old.block_size < @intFromPtr(new)) {
             new.next = old.next;
             old.next = new;
+            real_prev = old;
         } else {
             // Merge
             old.block_size += new.block_size;
@@ -74,15 +76,15 @@ pub const FreeList = packed struct {
         }
         // Handle node to the right of new node
         if (old.next == null) {
-            self.return_free_pages(curr, prev);
+            self.return_free_pages(curr, real_prev);
             return;
         }
         // Merge
-        if (@intFromPtr(curr) + curr.block_size == @intFromPtr(old.next)) {
-            curr.block_size += old.next.?.block_size;
-            curr.next = old.next.?.next;
+        if (@intFromPtr(curr) + curr.block_size == @intFromPtr(curr.next)) {
+            curr.block_size += curr.next.?.block_size;
+            curr.next = curr.next.?.next;
         }
-        self.return_free_pages(curr, prev);
+        self.return_free_pages(curr, real_prev);
     }
 
     fn return_free_pages(
@@ -234,12 +236,16 @@ pub const FreeList = packed struct {
         const addr = @intFromPtr(curr);
         const free_block_size = curr.block_size;
         const next_free = curr.next;
-        self.initAllocHeader(addr, total_size);
+        var block_size = total_size;
+        if (free_block_size - total_size < 8) {
+            block_size += free_block_size - total_size;
+        }
+        self.initAllocHeader(addr, block_size);
 
-        if (free_block_size > total_size + @sizeOf(FreeListNode)) {
+        if (free_block_size > block_size + @sizeOf(FreeListNode)) {
             self.addFreeNode(
-                addr + total_size,
-                free_block_size - total_size,
+                addr + block_size,
+                free_block_size - block_size,
                 if (is_head) null else prev, next_free
             );
         } else {
@@ -266,6 +272,7 @@ pub const FreeList = packed struct {
         user: bool
     ) !u32 {
         var num_pages = total_size / PAGE_SIZE;
+        var block_size = total_size;
         if (total_size % PAGE_SIZE != 0)
             num_pages += 1;
         const begin = self.vmm.find_free_space(
@@ -280,13 +287,15 @@ pub const FreeList = packed struct {
             self.expandMemoryContig(num_pages, begin, user)
         else
             self.expandMemory(num_pages, begin, user);
-        self.initAllocHeader(begin, total_size);
+        if (free_size - total_size < 8)
+            block_size += free_size - total_size;
+        self.initAllocHeader(begin, block_size);
 
         // If there is a space left for header plus something else add new free node
-        if (free_size > total_size + @sizeOf(FreeListNode)) {
+        if (free_size > block_size + @sizeOf(FreeListNode)) {
             self.addFreeNode(
-                begin + total_size,
-                free_size - total_size,
+                begin + block_size,
+                free_size - block_size,
                 last_block,
                 null
             );
