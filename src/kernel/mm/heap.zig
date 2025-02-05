@@ -237,7 +237,7 @@ pub const FreeList = packed struct {
         const free_block_size = curr.block_size;
         const next_free = curr.next;
         var block_size = total_size;
-        if (free_block_size - total_size < 8) {
+        if (free_block_size - total_size <= 8) {
             block_size += free_block_size - total_size;
         }
         self.initAllocHeader(addr, block_size);
@@ -287,7 +287,7 @@ pub const FreeList = packed struct {
             self.expandMemoryContig(num_pages, begin, user)
         else
             self.expandMemory(num_pages, begin, user);
-        if (free_size - total_size < 8)
+        if (free_size - total_size <= 8)
             block_size += free_size - total_size;
         self.initAllocHeader(begin, block_size);
 
@@ -339,9 +339,9 @@ pub const FreeList = packed struct {
 
     fn addFreeNode(
         self: *FreeList,
-        addr: u32, 
-        size: u32, 
-        prev: ?*FreeListNode, 
+        addr: u32,
+        size: u32,
+        prev: ?*FreeListNode,
         next: ?*FreeListNode
     ) void {
         const new_node: *FreeListNode = @ptrFromInt(addr);
