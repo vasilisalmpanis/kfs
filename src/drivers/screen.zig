@@ -7,7 +7,7 @@ pub var current_tty: ?*tty.TTY = null;
 pub var framebuffer: fb.FrameBuffer = undefined;
 
 pub const Screen = struct {
-    tty : [1] tty.TTY = undefined,
+    tty : [10] tty.TTY = undefined,
     frmb: fb.FrameBuffer,
     
     pub fn init(boot_info: *multiboot.multiboot_info) Screen {
@@ -15,7 +15,7 @@ pub const Screen = struct {
         var scr = Screen{
             .frmb = frm,
         };
-        for (0..1) |index| {
+        for (0..10) |index| {
             scr.tty[index] = tty.TTY.init(frm.cwidth, frm.cheight);
         }
         framebuffer = scr.frmb;
