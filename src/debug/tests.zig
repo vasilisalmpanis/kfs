@@ -7,7 +7,7 @@ pub fn run_tests() void {
     // var j: u32 = 0;
 
     printf("Tests are running...\n", .{});
-    var ptr: [*]u8 = @ptrFromInt(mm.kmalloc(128 * 1024));
+    var ptr: [*]u8 = @ptrFromInt(mm.kmalloc(128 * 1024 * 1024));
     @memcpy(ptr[0..5], "12345");
     // const size: u32 = 15000;
     // var arr: [size]u32 = .{0} ** size;
