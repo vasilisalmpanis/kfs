@@ -18,6 +18,7 @@ pub const Shell = struct {
                 \\available commands:
                 \\  stack: Print the stack trace
                 \\  reboot: Reboot the PC
+                \\  shutdown: Power off the PC
                 \\  halt: Halt the PC
                 \\  42: Print 42
                 \\  [color name]: Change the input color
@@ -28,6 +29,8 @@ pub const Shell = struct {
             debug.TraceStackTrace(10);
         } else if (mem.eql(u8, input, "reboot")) {
             system.reboot();
+        } else if (mem.eql(u8, input, "shutdown")) {
+            system.shutdown();
         } else if (mem.eql(u8, input, "halt")) {
             system.halt();
         } else if (mem.eql(u8, input, "42")) {

@@ -9,12 +9,20 @@ pub const mm = @import("mm/init.zig");
 const kmlc = @import("mm/kmalloc.zig");
 const vmm = @import("arch").vmm;
 const dbg = @import("debug");
+const builtin = @import("std").builtin;
+// const panic = @import("./panic.zig").panic;
 
 fn print_42_colors() void {
     inline for (@typeInfo(TTY.ConsoleColors).Enum.fields) |f| {
         const clr: u8 = TTY.vga_entry_color(@field(TTY.ConsoleColors, f.name), TTY.ConsoleColors.Black);
         screen.current_tty.?.print("42\n", clr, false);
     }
+}
+
+pub fn panic(msg: []const u8, stack: ?*builtin.StackTrace, size: ?usize) noreturn {
+    dbg.printf("PANIC: {s}\nsize {?}\nstack: {?}\n", .{msg, size, stack});
+    dbg.TraceStackTrace(20);
+    while (true) {}
 }
 
 export fn kernel_main(magic: u32, address: u32) noreturn {
@@ -43,4 +51,5 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
             else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, true),
         }
     }
+    panic();
 }

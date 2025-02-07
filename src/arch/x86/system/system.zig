@@ -28,3 +28,8 @@ pub fn halt() noreturn {
     );
     while(true) {}
 }
+
+pub fn shutdown() noreturn {
+    _ = io.outw(0x604, 0x2000);
+    while (true) {}
+}
