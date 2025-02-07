@@ -132,20 +132,6 @@ pub const TTY = struct {
             self._scroll();
     }
 
-    fn getCurrentLine(self: *TTY) []u8 {
-        if (self._x == 0)
-            return "";
-        // var res: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
-        var res: [240]u8 = .{0} ** (240);
-        var i: u16 = 0;
-        for (self._buffer[self._y * self.width..self._y * self.width + self._x]) |ch| {
-            res[i] = ch;
-            i += 1;
-        }
-        // mm.kfree(@intFromPtr(res));
-        return res[0..i];
-    }
-
     fn printChar(self: *TTY, c: u8) void {
         if (c == '\n') {
              @memset(
@@ -167,11 +153,11 @@ pub const TTY = struct {
 
     pub fn print(self: *TTY, msg: [] const u8, stdin: bool) void {
         var str: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
-        // var str: [240]u8 = .{0} ** 240;
+        defer mm.kfree(@intFromPtr(str));
         @memset(str[0..self.width], 0);
         var len: u8 = 0;
         var buf: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
-        // var buf: [240]u8 = .{0} ** 240;
+        defer mm.kfree(@intFromPtr(buf));
         @memset(buf[0..self.width], 0);
         const start = self._y * self.width + self._x;
         const max_end: u32 = (self._y + 1) * self.width;
@@ -181,7 +167,10 @@ pub const TTY = struct {
         @memcpy(buf[0..(end - start)], self._buffer[start..end]);
         for (msg) |c| {
             if (c == '\n' and stdin) {
-                for (self.getCurrentLine()) |cc| {
+                var line: []u8 = "";
+                if (self._x > 0)
+                    line = self._buffer[self._y * self.width..self._y * self.width + self._x];
+                for (line) |cc| {
                     str[len] = cc;
                     len += 1;
                 }
@@ -198,8 +187,6 @@ pub const TTY = struct {
         self.render();
         if (stdin and str[0] != 0)
             self.shell.handleInput(str[0..len]);
-        mm.kfree(@intFromPtr(str));
-        mm.kfree(@intFromPtr(buf));
     }
 
     pub fn setColor(self: *TTY, fg: u32) void {
