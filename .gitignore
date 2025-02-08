@@ -3,3 +3,5 @@
 zig-out
 .zig-cache
 .vscode
+load_img.py
+psf2arr*
