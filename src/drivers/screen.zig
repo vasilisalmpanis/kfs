@@ -2,6 +2,7 @@ const tty = @import("tty-fb.zig");
 const fb = @import("./framebuffer.zig");
 const multiboot = @import("arch").multiboot;
 const printf = @import("debug").printf;
+const fonts = @import("./fonts.zig");
 
 pub var current_tty: ?*tty.TTY = null;
 pub var framebuffer: fb.FrameBuffer = undefined;
@@ -11,7 +12,7 @@ pub const Screen = struct {
     frmb: fb.FrameBuffer,
     
     pub fn init(boot_info: *multiboot.multiboot_info) Screen {
-        const frm = fb.FrameBuffer.init(boot_info);
+        const frm = fb.FrameBuffer.init(boot_info, &fonts.VGA16x32);
         var scr = Screen{
             .frmb = frm,
         };
