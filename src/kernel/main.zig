@@ -19,7 +19,27 @@ pub fn panic(
         .{msg, first_trace_addr, stack}
     );
     dbg.TraceStackTrace(20);
+    system.halt();
     while (true) {}
+}
+
+var keyboard: Keyboard = undefined;
+
+pub fn handle_input() void {
+    const input = keyboard.get_input();
+    switch (input[0]) {
+        'R' => system.reboot(),
+        'M' => screen.current_tty.?.move(input[1]),
+        'S' => dbg.TraceStackTrace(10),
+        'C' => screen.current_tty.?.clear(),
+        // 'T' => scrn.switch_tty(input[1]),
+        'I' => {
+            // dbg.print_mmap(boot_info);
+            dbg.walkPageTables();
+        },
+        'D' => dbg.run_tests(),
+        else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, true),
+    }
 }
 
 export fn kernel_main(magic: u32, address: u32) noreturn {
@@ -32,22 +52,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     var scrn: screen.Screen = screen.Screen.init(boot_info);
     screen.current_tty = &scrn.tty[0];
     idt.idt_init();
-    var keyboard = Keyboard.init();
-    while (true) {
-        const input = keyboard.get_input();
-        switch (input[0]) {
-            'R' => system.reboot(),
-            'M' => screen.current_tty.?.move(input[1]),
-            'S' => dbg.TraceStackTrace(10),
-            'C' => screen.current_tty.?.clear(),
-            'T' => scrn.switch_tty(input[1]),
-            'I' => {
-                dbg.print_mmap(boot_info);
-                dbg.walkPageTables();
-            },
-            'D' => dbg.run_tests(),
-            else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, true),
-        }
-    }
+    // dbg.printf("IDT  initialized\n", .{});
+    keyboard = Keyboard.init();
+    while (true) {}
     panic("You shouldn't be here");
 }
