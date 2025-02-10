@@ -5,7 +5,7 @@ const dbg = @import("debug");
 pub const Img = struct {
     width: u32,
     height: u32,
-    data: [*]u32,
+    data: [] const u32,
 };
 
 pub const Font = struct {

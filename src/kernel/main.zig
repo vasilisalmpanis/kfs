@@ -8,6 +8,8 @@ pub const mm = @import("mm/init.zig");
 const dbg = @import("debug");
 const builtin = @import("std").builtin;
 const idt = @import("arch").idt;
+const Serial = @import("drivers").Serial;
+const Logger = @import("debug").Logger;
 
 pub fn panic(
     msg: []const u8,
@@ -24,6 +26,8 @@ pub fn panic(
 }
 
 var keyboard: Keyboard = undefined;
+pub var serial: Serial = undefined;
+pub var logger: Logger = undefined;
 
 pub fn handle_input() void {
     const input = keyboard.get_input();
@@ -46,14 +50,26 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x2BADB002) {
         system.halt();
     }
+    serial = Serial.init();
+    logger = Logger.init(.DEBUG);
+
     const boot_info: *multiboot.multiboot_info = @ptrFromInt(address);
+    logger.INFO("Boot info {}", .{boot_info});
+
     gdt.gdt_init();
+    logger.INFO("GDT initialized", .{});
+
     mm.mm_init(boot_info);
+    logger.INFO("Memory initialized", .{});
+
     var scrn: screen.Screen = screen.Screen.init(boot_info);
     screen.current_tty = &scrn.tty[0];
     idt.idt_init();
-    // dbg.printf("IDT  initialized\n", .{});
+    logger.INFO("IDT initialized", .{});
+
     keyboard = Keyboard.init();
+    logger.INFO("Keyboard initialized", .{});
+    
     while (true) {}
     panic("You shouldn't be here");
 }
