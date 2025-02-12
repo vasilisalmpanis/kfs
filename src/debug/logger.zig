@@ -49,7 +49,10 @@ pub const Logger = struct {
             .ERROR => RED
         };
         const formatted_log = try std.fmt.bufPrint(&buffer, 
-            "{s}[{s}]: " ++ format ++ DEFAULT ++ "\n", 
+            "{s}[{s}]: " ++
+                format ++
+                DEFAULT ++
+                if (format[format.len - 1] == '\n') "" else "\n",
             .{
                 color,
                 @tagName(level)
