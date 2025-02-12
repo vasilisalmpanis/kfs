@@ -32,8 +32,8 @@ pub export fn exception_handler(state: *regs) callconv(.C) void {
 }
 
 pub export fn irq_handler(state: *regs) callconv(.C) void {
-    if (state.int_no == 0x21)
-        krn.handle_input();
+    if (krn.irq.handlers[state.int_no] != null)
+        krn.irq.handlers[state.int_no].?();
     io.outb(0x20, 0x20);
     if (state.int_no >= 40) {
         io.outb(0xA0, 0x20);
@@ -176,17 +176,6 @@ pub export var isr_stub_table: [48]*const ISRHandler align(4) linksection(".data
     break :init table;
 };
 
-pub fn configurePIT(frequency: u32) void {
-    const divisor: u16 = @truncate(1193180 / frequency);
-    
-    // Set command byte
-    io.outb(0x43, 0b00110100); // Command: channel 0, lobyte/hibyte, rate generator
-    
-    // Set frequency divisor
-    io.outb(0x40, @truncate(divisor & 0xFF));
-    io.outb(0x40, @truncate(divisor >> 8));
-}
-
 fn IRQ_clear_mask(IRQ_line: u8) void {
     var IRQline: u8 = IRQ_line;
     var port: u16 = undefined;
@@ -202,6 +191,18 @@ fn IRQ_clear_mask(IRQ_line: u8) void {
     io.outb(port, value & ~(@as(u8, 1) << @truncate(IRQline)));        
 }
 
+pub inline fn PIC_remap() void {
+    io.outb(0x20, 0x11);
+    io.outb(0xA0, 0x11);
+    io.outb(0x21, 0x20);
+    io.outb(0xA1, 0x28);
+    io.outb(0x21, 0x04);
+    io.outb(0xA1, 0x02);
+    io.outb(0x21, 0x01);
+    io.outb(0xA1, 0x01);
+    io.outb(0x21, 0x0);
+    io.outb(0xA1, 0x0);
+}
 
 pub fn idt_init() void {
     idtr.base = &idt[0];
@@ -229,15 +230,6 @@ pub fn idt_init() void {
         :
         : [idt_ptr] "r" (&idtr),
     );
-    io.outb(0x20, 0x11);
-    io.outb(0xA0, 0x11);
-    io.outb(0x21, 0x20);
-    io.outb(0xA1, 0x28);
-    io.outb(0x21, 0x04);
-    io.outb(0xA1, 0x02);
-    io.outb(0x21, 0x01);
-    io.outb(0xA1, 0x01);
-    io.outb(0x21, 0x0);
-    io.outb(0xA1, 0x0);
+    PIC_remap();
     asm volatile ("sti"); // set the interrupt flag
 }
