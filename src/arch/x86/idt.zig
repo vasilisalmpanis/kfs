@@ -5,6 +5,8 @@ const dbg = @import("debug");
 const drv = @import("drivers");
 const krn = @import("kernel");
 const printf = @import("debug").printf;
+const regs = @import("system/cpu.zig").registers_t;
+const dump = @import("system/cpu.zig").printRegisters;
 
 const IDT_MAX_DESCRIPTORS = 48;
 
@@ -24,20 +26,20 @@ const idtr_t = packed struct {
 var idt: [256] idt_entry_t align(0x10) = undefined;
 var idtr: idtr_t = undefined;
 
-pub export fn exception_handler(entry: u8) callconv(.C) void {
-    printf("interrupt: {x}\n", .{entry});
+pub export fn exception_handler(state: *regs) callconv(.C) void {
+    printf("interrupt: {x}\n", .{state.int_no});
     @panic("cpu exception");
 }
 
-pub export fn irq_handler(entry: u8) callconv(.C) void {
-    // if (entry != 0x20)
-    //     printf("irq: {x}\n", .{entry});
-    if (entry == 0x21)
+pub export fn irq_handler(state: *regs) callconv(.C) void {
+    if (state.int_no == 0x21)
         krn.handle_input();
     io.outb(0x20, 0x20);
-    if (entry >= 40) {
+    if (state.int_no >= 40) {
         io.outb(0xA0, 0x20);
     }
+    if (state.int_no >= 48)
+        krn.logger.INFO("Interrupt {d}\n", .{state.int_no});
 }
 
 const ISRHandler = fn () callconv(.C) void;
@@ -65,14 +67,43 @@ fn generateIRQStub(comptime n: u8) []const u8 {
     return 
         stub_name ++
         \\ cli
+        \\ push $0
         \\ push $
         ++ std.fmt.comptimePrint("{d}\n", .{n}) ++
-        \\ call irq_handler
-        \\ add $4, %esp  // Clean up interrupt number
+        push_regs ++
+        \\ lea irq_handler, %eax
+        \\ call *%eax
+        ++ pop_regs ++
+        \\ add $8, %esp  // Clean up interrupt number
         \\ iret
         \\
     ;
 }
+const push_regs: []const u8 =
+\\    pusha
+\\    push %ds
+\\    push %es
+\\    push %fs
+\\    push %gs
+\\    mov $0x10, %ax
+\\    mov %ax, %ds
+\\    mov %ax, %es
+\\    mov %ax, %fs
+\\    mov %ax, %gs
+\\    mov %esp, %eax
+\\    push %eax
+\\
+;
+const pop_regs: []const u8 =
+\\
+\\    pop %eax
+\\    pop %gs
+\\    pop %fs
+\\    pop %es
+\\    pop %ds
+\\    popa
+\\
+;
 
 // Generate assembly for a single ISR stub
 fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
@@ -83,8 +114,11 @@ fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
             \\ cli
             \\ push $
             ++ std.fmt.comptimePrint("{d}\n", .{n}) ++
-            \\ call exception_handler
-            \\ add $4, %esp  // Clean up interrupt number
+            push_regs ++
+            \\ lea exception_handler, %eax
+            \\ call *%eax
+            ++ pop_regs ++
+            \\ add $8, %esp
             \\ iret
             \\
         ;
@@ -92,10 +126,14 @@ fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
         return 
             stub_name ++
             \\ cli
+            \\ push $0
             \\ push $
             ++ std.fmt.comptimePrint("{d}\n", .{n}) ++
-            \\ call exception_handler
-            \\ add $4, %esp  // Clean up interrupt number
+            push_regs ++
+            \\ lea exception_handler, %eax
+            \\ call *%eax
+            ++ pop_regs ++
+            \\ add $8, %esp
             \\ iret
             \\
         ;
