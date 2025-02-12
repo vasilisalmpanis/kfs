@@ -10,6 +10,7 @@ const builtin = @import("std").builtin;
 const idt = @import("arch").idt;
 const Serial = @import("drivers").Serial;
 const Logger = @import("debug").Logger;
+pub const irq = @import("./irq/manage.zig");
 
 pub fn panic(
     msg: []const u8,
@@ -65,6 +66,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     var scrn: screen.Screen = screen.Screen.init(boot_info);
     screen.current_tty = &scrn.tty[0];
     idt.idt_init();
+    irq.register_handler(1, &handle_input);
     logger.INFO("IDT initialized", .{});
 
     keyboard = Keyboard.init();
