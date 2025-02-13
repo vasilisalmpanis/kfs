@@ -25,15 +25,22 @@ const idtr_t = packed struct {
 
 var idt: [256] idt_entry_t align(0x10) = undefined;
 var idtr: idtr_t = undefined;
+const ExceptionHandler = fn (regs: *regs) void;
 
 pub export fn exception_handler(state: *regs) callconv(.C) void {
     printf("interrupt: {x}\n", .{state.int_no});
-    @panic("cpu exception");
+    if (krn.irq.handlers[state.int_no] != null) {
+        const handler: *const ExceptionHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
+        handler(state);
+    }
+    // @panic("cpu exception");
 }
 
 pub export fn irq_handler(state: *regs) callconv(.C) void {
-    if (krn.irq.handlers[state.int_no] != null)
-        krn.irq.handlers[state.int_no].?();
+    if (krn.irq.handlers[state.int_no] != null) {
+        const handler: *const ISRHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
+        handler();
+    }
     io.outb(0x20, 0x20);
     if (state.int_no >= 40) {
         io.outb(0xA0, 0x20);
@@ -54,13 +61,40 @@ pub fn idt_set_descriptor(vector: u8, isr: *const ISRHandler, flags: u8) void {
     descriptor.reserved       = 0;
 }
 
-// Define which interrupts have error codes
-const error_codes = [_]bool{
-    false, false, false, false, false, false, false, false, true,  false,
-    true,  true,  true,  true,  true,  false, false, true,  false, false,
-    false, false, false, false, false, false, false, false, false, false,
-    true,  false
-};
+const ErrorCodes = std.EnumMap(krn.exceptions.Exceptions, bool).init(.{
+    .DivisionError = false,
+    .Debug = false,
+    .NonMaskableInterrupt = false,
+    .Breakpoint = false,
+    .Overflow = false,
+    .BoundRangeExceeded = false,
+    .InvalidOpcode = false,
+    .DeviceNotAvailable = false,
+    .DoubleFault = true,
+    .CoprocessorSegmentOverrun = false,
+    .InvalidTSS = true,
+    .SegmentNotPresent = true,
+    .StackSegmentFault = true,
+    .GeneralProtectionFault = true,
+    .PageFault = true,
+    .Reserved_1 = false,
+    .x87FloatingPointException = false,
+    .AlignmentCheck = true,
+    .MachineCheck = false,
+    .SIMDFloatingPointException = false,
+    .VirtualizationException = false,
+    .ControlProtectionException = true,
+    .Reserved_2 = false,
+    .Reserved_3 = false,
+    .Reserved_4 = false,
+    .Reserved_5 = false,
+    .Reserved_6 = false,
+    .Reserved_7 = false,
+    .HypervisorInjectionException = false,
+    .VMMCommunicationException = true,
+    .SecurityException = true,
+    .Reserved_8 = false,
+});
 
 fn generateIRQStub(comptime n: u8) []const u8 {
     const stub_name = "irq_stub_" ++ std.fmt.comptimePrint("{d}:\n", .{n});
@@ -145,7 +179,11 @@ comptime {
     // Generate assembly for all stubs
     var asm_source: []const u8 = "";
     for (0..32) |i| {
-        asm_source = asm_source ++ generateStub(@intCast(i), error_codes[i]);
+        const except: krn.exceptions.Exceptions = @enumFromInt(i);
+        asm_source = asm_source ++ generateStub(
+            @intCast(i),
+            ErrorCodes.get(except) orelse false
+        );
     }
     for (32..48) |i| {
         asm_source = asm_source ++ generateIRQStub(@intCast(i));
@@ -231,5 +269,6 @@ pub fn idt_init() void {
         : [idt_ptr] "r" (&idtr),
     );
     PIC_remap();
+    krn.exceptions.registerExceptionHandlers();
     asm volatile ("sti"); // set the interrupt flag
 }

@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 
 const name = "kfs.bin";
 const linker = "linker.ld";
-const kernel_src = "src/kernel/main.zig";
+const kernel_src = "src/main.zig";
 
 const archs = [_]std.Target.Cpu.Arch{
     std.Target.Cpu.Arch.x86,
@@ -26,11 +26,24 @@ pub fn build(b: *std.Build) !void {
         const debug_mod = b.addModule("debug", .{
             .root_source_file =  b.path("./src/debug/main.zig")
         });
+        const kernel_mod = b.addModule("kernel", .{
+            .root_source_file =  b.path("./src/kernel/main.zig")
+        });
+
         drivers_mod.addImport("arch", arch_mod);
         drivers_mod.addImport("debug", debug_mod);
+        drivers_mod.addImport("kernel", kernel_mod);
+
         arch_mod.addImport("debug", debug_mod);
+        arch_mod.addImport("kernel", kernel_mod);
+        
         debug_mod.addImport("arch", arch_mod);
         debug_mod.addImport("drivers", drivers_mod);
+        debug_mod.addImport("kernel", kernel_mod);
+
+        kernel_mod.addImport("arch", arch_mod);
+        kernel_mod.addImport("debug", debug_mod);
+        kernel_mod.addImport("drivers", drivers_mod);
 
         var target: std.Target.Query = .{ .cpu_arch = arch, .os_tag = .freestanding, .abi = .none };
         const Features = std.Target.x86.Feature;
@@ -52,15 +65,15 @@ pub fn build(b: *std.Build) !void {
         kernel.root_module.stack_check = false;
         kernel.root_module.red_zone = false;
         kernel.entry = std.Build.Step.Compile.Entry.disabled;
+
         kernel.root_module.addImport("arch", arch_mod);
         kernel.root_module.addImport("drivers", drivers_mod);
         kernel.root_module.addImport("debug", debug_mod);
+        kernel.root_module.addImport("kernel", kernel_mod);
 
         kernel.setLinkerScriptPath(b.path(linker));
         kernel.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));
-        debug_mod.addImport("kernel", &kernel.root_module);
-        drivers_mod.addImport("kernel", &kernel.root_module);
-        arch_mod.addImport("kernel", &kernel.root_module);
+
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
 
