@@ -114,6 +114,7 @@ pub fn getShiftedChar(unshifted: u8) u8 {
 }
 
 pub const Keyboard = struct {
+    buffer: [256]u8,
     last_scancode: u8,
     key_pressed: bool,
     shift: bool,
@@ -125,6 +126,7 @@ pub const Keyboard = struct {
 
     pub fn init() Keyboard {
         return Keyboard{
+            .buffer = .{0} ** 256,
             .last_scancode = 0,
             .key_pressed = false,
             .shift = false,
@@ -135,6 +137,42 @@ pub const Keyboard = struct {
             .right = false,
         };
     }
+
+    inline fn kb_wait() void {
+        for (0..0x10000) |_| {
+            if (io.inb(0x64) & 0x02 == 0)
+                break;
+        }
+    }
+
+    fn send_command(cmd: u8) void {
+        kb_wait();
+        io.outb(0x64, cmd);
+    }
+
+    pub fn keyboard_interrupt() void {
+        var scancode: u8 = undefined;
+        send_command(0xAD);
+        defer send_command(0xAE);
+        if (io.inb(0x64) & 0x01 != 0x01)
+            return ;
+        scancode = io.inb(0x60);
+        switch (scancode) {
+            0xfa, 0xfe  => return,
+            0           => { return; },
+            0xff        => { return; },
+            else        => {}
+        }
+        // handle e0 e1
+        // put to buffer
+    }
+
+    // SIGINT [0x03, 'a', 'b']
+    // buffer -> Ctrl press -> c press -> c release -> ctrl release -> a press, a released, b pressed, b released
+
+    // handler: reads from kbd and adds to buffer
+    // get_input returns
+    // it finds Ctrl C. send a signal to current process
 
     pub fn get_input(self: *Keyboard) [2]u8 {
         const byte: u8 = io.inb(0x60);
