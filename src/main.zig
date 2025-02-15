@@ -1,5 +1,5 @@
 const TTY = @import("drivers").tty.TTY;
-const Keyboard = @import("drivers").Keyboard;
+const keyboard = @import("drivers").keyboard;
 const system = @import("arch").system;
 const gdt = @import("arch").gdt;
 const multiboot = @import("arch").multiboot;
@@ -47,12 +47,16 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     var scrn: screen.Screen = screen.Screen.init(boot_info);
     screen.current_tty = &scrn.tty[0];
     idt.idt_init();
-    irq.register_handler(1, &krn.handle_input);
     krn.logger.INFO("IDT initialized", .{});
-
-    krn.keyboard = Keyboard.init();
-    krn.logger.INFO("Keyboard initialized", .{});
     
-    while (true) {}
+    irq.register_handler(1, &keyboard.keyboard_interrupt);
+    krn.logger.INFO("Keyboard handler added", .{});
+    
+    while (true) {
+        const input = keyboard.keyboard.get_input();
+        if (input.len > 0)
+            screen.current_tty.?.print(input, true);
+        asm volatile ("hlt");
+    }
     panic("You shouldn't be here");
 }
