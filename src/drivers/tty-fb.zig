@@ -3,6 +3,8 @@ const Shell = @import("shell.zig").Shell;
 const printf = @import("debug").printf;
 const scr = @import("./screen.zig");
 const mm = @import("kernel").mm;
+const KeyEvent = @import("./kbd.zig").KeyEvent;
+const CtrlType = @import("./kbd.zig").CtrlType;
 
 pub const ConsoleColors = enum(u32) {
     Black = 0x000000,
@@ -133,21 +135,52 @@ pub const TTY = struct {
     }
 
     fn printChar(self: *TTY, c: u8) void {
-        if (c == '\n') {
-             @memset(
-                self._buffer[self.width * self._y + self._x .. self.width * self._y + self.width],
-                0
-            );
-            self._y += 1;
-            self._x = 0;
-            if (self._y >= self.height)
-                self._scroll();
-        } else if (c == 8) {
-            self.remove();
-        } else if (c == '\t') {
-            self.print("    ", false);
-        } else {
-            self.printVga(c);
+        switch (c) {
+            '\n'    => {
+                @memset(
+                    self._buffer[self.width * self._y + self._x .. self.width * self._y + self.width],
+                    0
+                );
+                self._y += 1;
+                self._x = 0;
+                if (self._y >= self.height)
+                    self._scroll();
+            },
+            8       => self.remove(),
+            12      => self.clear(),
+            '\t'    => self.print("    ", false),
+            else    => self.printVga(c),
+        }
+    }
+
+    fn home(self: *TTY) void {
+        self._x = 0;
+        self.render();
+    }
+
+    fn endline(self: *TTY) void {
+        const row = self._y * self.width;
+        while (self._buffer[row + self._x] != 0 and self._x < self.width - 1)
+            self._x += 1;
+        self.render();
+    }
+
+    pub fn input(self: *TTY, data: [] const KeyEvent) void {
+        var ret: [1]u8 = .{0};
+        for (data) |event| {
+            if (!event.ctl) {
+                ret[0] = event.val;
+                self.print(ret[0..1], true);
+            } else {
+                const ctl: CtrlType = @enumFromInt(event.val);
+                switch (ctl) {
+                    .LEFT => self.move(0),
+                    .RIGHT => self.move(1),
+                    .HOME => self.home(),
+                    .END => self.endline(),
+                    else => {},
+                }
+            } 
         }
     }
 
