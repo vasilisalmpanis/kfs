@@ -133,21 +133,21 @@ pub const TTY = struct {
     }
 
     fn printChar(self: *TTY, c: u8) void {
-        if (c == '\n') {
-             @memset(
-                self._buffer[self.width * self._y + self._x .. self.width * self._y + self.width],
-                0
-            );
-            self._y += 1;
-            self._x = 0;
-            if (self._y >= self.height)
-                self._scroll();
-        } else if (c == 8) {
-            self.remove();
-        } else if (c == '\t') {
-            self.print("    ", false);
-        } else {
-            self.printVga(c);
+        switch (c) {
+            '\n'    => {
+                @memset(
+                    self._buffer[self.width * self._y + self._x .. self.width * self._y + self.width],
+                    0
+                );
+                self._y += 1;
+                self._x = 0;
+                if (self._y >= self.height)
+                    self._scroll();
+            },
+            8       => self.remove(),
+            12      => self.clear(),
+            '\t'    => self.print("    ", false),
+            else    => self.printVga(c),
         }
     }
 
