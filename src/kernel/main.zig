@@ -17,23 +17,23 @@ pub var keyboard: Keyboard = undefined;
 pub var serial: Serial = undefined;
 pub var logger: Logger = undefined;
 
-pub fn handle_input() void {
-    const input = keyboard.get_input();
-    switch (input[0]) {
-        'R' => system.reboot(),
-        'M' => screen.current_tty.?.move(input[1]),
-        'S' => dbg.TraceStackTrace(10),
-        'C' => screen.current_tty.?.clear(),
-        // 'T' => scrn.switch_tty(input[1]),
-        'I' => {
-            // dbg.print_mmap(boot_info);
-            asm volatile(
-                \\ xor %eax, %eax
-                \\ div %eax, %eax
-            );
-            dbg.walkPageTables();
-        },
-        'D' => dbg.run_tests(),
-        else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, true),
-    }
-}
+// pub fn handle_input() void {
+//     const input = keyboard.get_input();
+//     switch (input[0]) {
+//         'R' => system.reboot(),
+//         'M' => screen.current_tty.?.move(input[1]),
+//         'S' => dbg.TraceStackTrace(10),
+//         'C' => screen.current_tty.?.clear(),
+//         // 'T' => scrn.switch_tty(input[1]),
+//         'I' => {
+//             // dbg.print_mmap(boot_info);
+//             asm volatile(
+//                 \\ xor %eax, %eax
+//                 \\ div %eax, %eax
+//             );
+//             dbg.walkPageTables();
+//         },
+//         'D' => dbg.run_tests(),
+//         else => if (input[1] != 0) screen.current_tty.?.print(&.{input[1]}, true),
+//     }
+// }

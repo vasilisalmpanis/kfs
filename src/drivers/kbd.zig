@@ -2,6 +2,7 @@ const io = @import("arch").io;
 const std = @import("std");
 const krn = @import("kernel");
 const keymap_us = @import("./keymaps.zig").keymap_us;
+const keymap_de = @import("./keymaps.zig").keymap_de;
 
 
 pub const ScanCode = enum(u8) {
@@ -27,9 +28,14 @@ pub const ScanCode = enum(u8) {
     K_LLALT = 0x56,
     K_F11 = 0x57,
     K_F12 = 0x58,
+
     K_LMODAL = 0x5b,
     K_RMODAL = 0x5c,
     K_MENU = 0x5d,
+    K_POWER = 0x5e,
+    K_SLEEP = 0x5f,
+
+    K_WAKE = 0x63,
     _,
 };
 
@@ -39,6 +45,23 @@ pub const KeymapEntry = struct {
     ctrl: ?u8 = null,
     alt: ?u8 = null,
 };
+
+pub const KeyEvent = struct {
+    ctl: bool,
+    val: u8,
+};
+
+pub const CtrlType = enum(u8) {
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN,
+    HOME,
+    END,
+    _
+};
+
+var input: [256]KeyEvent = undefined;
 
 pub const Keyboard = struct {
     write_pos: u8 = 0,
@@ -106,7 +129,7 @@ pub const Keyboard = struct {
         return scancode;
     }
 
-    fn get_ascii(self: *Keyboard, scancode: u8) u8 {
+    fn get_keyevent(self: *Keyboard, scancode: u8) ?KeyEvent {
         const release_mask: u8 = 0x80;
         var code = scancode;
         var release: bool = false;
@@ -120,9 +143,15 @@ pub const Keyboard = struct {
             .K_LCTRL                => { self.cntl = if (release) false else true; },
             .K_LSHIFT, .K_RSHIFT    => { self.shift = if (release) false else true; },
             .K_CAPSLOCK             => { self.caps = if (release) self.caps else !self.caps; },
+            .K_LEFT                 => {if (!release) return .{ .ctl = true, .val = @intFromEnum(CtrlType.LEFT) }; },
+            .K_RIGHT                => {if (!release) return .{ .ctl = true, .val = @intFromEnum(CtrlType.RIGHT) }; },
+            .K_UP                   => {if (!release) return .{ .ctl = true, .val = @intFromEnum(CtrlType.UP) }; },
+            .K_DOWN                 => {if (!release) return .{ .ctl = true, .val = @intFromEnum(CtrlType.DOWN) }; },
+            .K_HOME                 => {if (!release) return .{ .ctl = true, .val = @intFromEnum(CtrlType.HOME) }; },
+            .K_END                  => {if (!release) return .{ .ctl = true, .val = @intFromEnum(CtrlType.END) }; },
             else => {
                 if (release)
-                    return 0;
+                    return null;
                 const shiftstate: bool = (self.shift != self.caps);
                 const entry = self.keymap.get(enumcode);
                 if (entry == null) {
@@ -130,39 +159,41 @@ pub const Keyboard = struct {
                         "Unknown scancode: {x} {any}\n",
                         .{code, enumcode}
                     );
-                    return 0;
+                    return null;
                 }
                 if (self.alt and entry.?.alt != null)
-                    return entry.?.alt.?;
+                    return .{ .ctl = false, .val = entry.?.alt.? };
                 if (self.cntl and entry.?.ctrl != null)
-                    return entry.?.ctrl.?;
+                    return .{ .ctl = false, .val = entry.?.ctrl.? };
                 if (shiftstate and entry.?.shift != null
                         and std.ascii.isAlphabetic(entry.?.normal))
-                    return entry.?.shift.?;
+                    return .{ .ctl = false, .val = entry.?.shift.? };
                 if (self.shift and entry.?.shift != null
                         and !std.ascii.isAlphabetic(entry.?.normal))
-                    return entry.?.shift.?;
-                return entry.?.normal;
+                    return .{ .ctl = false, .val = entry.?.shift.? };
+                return .{ .ctl = false, .val = entry.?.normal};
             }
         }
-        return 0;
+        return null;
     }
 
-    pub fn get_input(self: *Keyboard) [] const u8 {
+    pub fn get_input(self: *Keyboard) ?[] const KeyEvent {
+        self.send_command(0xAD); // Disable keyboard
+        defer self.send_command(0xAE); // Enable keyboard
         var scancode = self.get_scancode();
         if (scancode == 0)
-            return "";
-        var input: [256]u8 = .{0} ** 256;
+            return null;
         var pos: u8 = 0;
-        var ascii_ch: u8 = 0;
-        while (scancode != 0) {
-            ascii_ch = self.get_ascii(scancode);
-            if (ascii_ch != 0) {
-                input[pos] = ascii_ch;
+        while (scancode != 0 and pos < 256) {
+            if (self.get_keyevent(scancode)) |key_event| {
+                // krn.logger.DEBUG("event: {}\n", .{key_event});
+                input[pos] = key_event;
                 pos += 1;
             }
             scancode = self.get_scancode();
         }
+        if (pos == 0)
+            return null;
         return input[0..pos];
     }
 };
