@@ -53,9 +53,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("Keyboard handler added", .{});
     
     while (true) {
-        const input = keyboard.keyboard.get_input();
-        if (input.len > 0)
-            screen.current_tty.?.print(input, true);
+        if (keyboard.keyboard.get_input()) |input| {
+            screen.current_tty.?.input(input);
+        }
         asm volatile ("hlt");
     }
     panic("You shouldn't be here");
