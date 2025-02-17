@@ -7,7 +7,6 @@ pub const ISRHandler = anyopaque;
 /// fn (regs: *registers_t) void;
 pub const ExceptionHandler = anyopaque;
 
-
 pub var handlers: [256] ?* const ISRHandler = .{null} ** 256;
 
 pub fn register_handler(irq_num: u32, hndl: *const ISRHandler) void {

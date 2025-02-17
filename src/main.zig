@@ -12,6 +12,7 @@ const Logger = @import("debug").Logger;
 pub const mm = @import("kernel").mm;
 pub const irq = @import("kernel").irq;
 const krn = @import("kernel");
+const syscalls = @import("kernel").syscalls;
 
 
 pub fn panic(
@@ -50,6 +51,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("IDT initialized", .{});
     
     irq.register_handler(1, &keyboard.keyboard_interrupt);
+    syscalls.registerSyscalls();
     krn.logger.INFO("Keyboard handler added", .{});
     
     while (true) {
