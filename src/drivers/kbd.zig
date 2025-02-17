@@ -4,7 +4,6 @@ const krn = @import("kernel");
 const keymap_us = @import("./keymaps.zig").keymap_us;
 const keymap_de = @import("./keymaps.zig").keymap_de;
 
-
 pub const ScanCode = enum(u8) {
     K_ESC = 0x1,
     // Main block    

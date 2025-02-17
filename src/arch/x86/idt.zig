@@ -8,7 +8,7 @@ const printf = @import("debug").printf;
 const regs = @import("system/cpu.zig").registers_t;
 const dump = @import("system/cpu.zig").printRegisters;
 
-const IDT_MAX_DESCRIPTORS = 48;
+const IDT_MAX_DESCRIPTORS = 129;
 
 const idt_entry_t = packed struct {
     isr_low: u16,       // The lower 16 bits of the ISR's address
@@ -37,9 +37,14 @@ pub export fn exception_handler(state: *regs) callconv(.C) void {
 }
 
 pub export fn irq_handler(state: *regs) callconv(.C) void {
-    if (krn.irq.handlers[state.int_no] != null) {
-        const handler: *const ISRHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
-        handler();
+    if (krn.irq.handlers[state.int_no + 32] != null) {
+        if (state.int_no == 0x80) {
+            const handler: *const ExceptionHandler = @ptrCast(krn.irq.handlers[state.int_no + 32].?);
+            handler(state);
+        } else {
+            const handler: *const ISRHandler = @ptrCast(krn.irq.handlers[state.int_no + 32].?);
+            handler();
+        }
     }
     io.outb(0x20, 0x20);
     if (state.int_no >= 40) {
@@ -185,7 +190,7 @@ comptime {
             ErrorCodes.get(except) orelse false
         );
     }
-    for (32..48) |i| {
+    for (32..129) |i| {
         asm_source = asm_source ++ generateIRQStub(@intCast(i));
     }
     // Emit the assembly
@@ -193,8 +198,8 @@ comptime {
 }
 
 // Create the ISR stub table
-pub export var isr_stub_table: [48]*const ISRHandler align(4) linksection(".data") = init: {
-    var table: [48]*const ISRHandler = undefined;
+pub export var isr_stub_table: [129]*const ISRHandler align(4) linksection(".data") = init: {
+    var table: [129]*const ISRHandler = undefined;
     for (0..32) |i| {
         table[i] = @extern(
             *const ISRHandler,
@@ -203,7 +208,7 @@ pub export var isr_stub_table: [48]*const ISRHandler align(4) linksection(".data
             }
         );
     }
-    for (32..48) |i| {
+    for (32..129) |i| {
         table[i] = @extern(
             *const ISRHandler,
             .{
