@@ -13,12 +13,12 @@ const SyscallHandler = fn (
     a5: u32,
 ) i32;
 
-pub fn syscallsManager(state: *regs) i32 {
+pub fn syscallsManager(state: *regs) void {
     printf("syscall {d} fired\n", .{state.eax});
-    if (syscalls[state.eax]) |handler| {
+    if (syscalls[@intCast(state.eax)]) |handler| {
         printf("handler exists\n", .{});
         const hnd: *const SyscallHandler = @ptrCast(handler);
-        return hnd(
+        state.eax = hnd(
             state.ebx,    
             state.ecx,    
             state.edx,    
@@ -26,7 +26,6 @@ pub fn syscallsManager(state: *regs) i32 {
             state.edi,    
         );
     }
-    return 0;
 }
 
 pub fn initSyscalls() void {

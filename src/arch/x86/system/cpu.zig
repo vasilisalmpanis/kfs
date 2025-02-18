@@ -11,7 +11,7 @@ pub const registers_t = packed struct {
     ebx: u32, 
     edx: u32, 
     ecx: u32, 
-    eax: u32,
+    eax: i32,
     int_no: u32, 
     err_code: u32,
     eip: u32, 
