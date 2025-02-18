@@ -26,7 +26,7 @@ const idtr_t = packed struct {
 var idt: [256] idt_entry_t align(0x10) = undefined;
 var idtr: idtr_t = undefined;
 const ExceptionHandler = fn (regs: *regs) void;
-const SyscallHandler = fn (regs: *regs) i32;
+const SyscallHandler = fn (regs: *regs) void;
 
 pub export fn exception_handler(state: *regs) callconv(.C) void {
     printf("interrupt: {x}\n", .{state.int_no});
@@ -37,11 +37,11 @@ pub export fn exception_handler(state: *regs) callconv(.C) void {
     // @panic("cpu exception");
 }
 
-pub export fn irq_handler(state: *regs) callconv(.C) i32 {
+pub export fn irq_handler(state: *regs) callconv(.C) void {
     if (krn.irq.handlers[state.int_no] != null) {
         if (state.int_no == 0x80) {
             const handler: *const SyscallHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
-            return handler(state);
+            handler(state);
         } else {
             const handler: *const ISRHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
             handler();
@@ -53,7 +53,6 @@ pub export fn irq_handler(state: *regs) callconv(.C) i32 {
     }
     if (state.int_no >= 48)
         krn.logger.INFO("Interrupt {d}\n", .{state.int_no});
-    return 0;
 }
 
 const ISRHandler = fn () callconv(.C) void;
@@ -107,17 +106,17 @@ fn generateIRQStub(comptime n: u8) []const u8 {
     const stub_name = "irq_stub_" ++ std.fmt.comptimePrint("{d}:\n", .{n});
     return 
         stub_name ++
-        \\ cli
-        \\ push $0
-        \\ push $
-        ++ std.fmt.comptimePrint("{d}\n", .{n}) ++
-        push_regs ++
-        \\ lea irq_handler, %eax
-        \\ call *%eax
-        ++ pop_regs ++
-        \\ add $8, %esp  // Clean up interrupt number
-        \\ iret
-        \\
+    \\ cli
+    \\ push $0
+    \\ push $
+    ++ std.fmt.comptimePrint("{d}\n", .{n}) ++
+    push_regs ++
+    \\ lea irq_handler, %eax
+    \\ call *%eax
+    ++ pop_regs ++
+    \\ add $8, %esp  // Clean up interrupt number
+    \\ iret
+    \\
     ;
 }
 const push_regs: []const u8 =
