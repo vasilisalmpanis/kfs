@@ -3,20 +3,42 @@ const regs = @import("arch").regs;
 const printf = @import("debug").printf;
 
 
-pub var syscalls: [256] ?* const anyopaque = .{null} ** 60 ++ {
-    &kill,
-} ++ { null } ** (256 - 61);
+pub var syscalls: [256] ?* const anyopaque = .{null} ** 256;
 
-pub fn syscallsManager(state: *regs) void {
-    // TODO
+const SyscallHandler = fn (
+    a1: u32,
+    a2: u32,
+    a3: u32,
+    a4: u32,
+    a5: u32,
+) i32;
+
+pub fn syscallsManager(state: *regs) i32 {
+    printf("syscall {d} fired\n", .{state.eax});
+    if (syscalls[state.eax]) |handler| {
+        printf("handler exists\n", .{});
+        const hnd: *const SyscallHandler = @ptrCast(handler);
+        return hnd(
+            state.ebx,    
+            state.ecx,    
+            state.edx,    
+            state.esi,    
+            state.edi,    
+        );
+    }
+    return 0;
 }
 
-pub fn registerSyscalls() void {
-    register_handler(0x80, &syscallsManager);
+pub fn initSyscalls() void {
+    register_handler(0x80 - 32, &syscallsManager);
 }
 
-// pub fn kill(pid: u32, sig: u32) {
-// }
+pub fn registerSyscall(num: u32, handler: * const anyopaque) void {
+    if (num >= 256)
+        @panic("Wrong syscall number, should be < 256!");
+    syscalls[num] = handler;
+}
+
 
 // 0	read	read(2)	sys_read
 // 1	write	write(2)	sys_write
