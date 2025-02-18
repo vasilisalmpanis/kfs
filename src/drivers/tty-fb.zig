@@ -146,6 +146,7 @@ pub const TTY = struct {
                 if (self._y >= self.height)
                     self._scroll();
             },
+            // 3       => {self._y += 1; self._x = 0;},
             8       => self.remove(),
             12      => self.clear(),
             '\t'    => self.print("    ", false),

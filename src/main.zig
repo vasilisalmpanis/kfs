@@ -29,6 +29,12 @@ pub fn panic(
     while (true) {}
 }
 
+
+pub fn kill(pid: u32, sig: u32) i32 {
+    dbg.printf("pid: {d}, sig: {d}\n", .{pid, sig});
+    return (7);
+}
+
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x2BADB002) {
         system.halt();
@@ -51,12 +57,27 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("IDT initialized", .{});
     
     irq.register_handler(1, &keyboard.keyboard_interrupt);
-    syscalls.registerSyscalls();
     krn.logger.INFO("Keyboard handler added", .{});
+    syscalls.initSyscalls();
+    syscalls.registerSyscall(62, @ptrCast(&kill));
     
     while (true) {
         if (keyboard.keyboard.get_input()) |input| {
             screen.current_tty.?.input(input);
+            // asm volatile(
+            //     \\ mov $62, %eax
+            //     \\ mov $55, %ebx
+            //     \\ mov $66, %ecx
+            //     \\ mov $3, %edx
+            //     \\ mov $4, %esi
+            //     \\ mov $5, %edi
+            //     \\ int $0x80
+            //     \\
+            //     \\ mov %eax, %ebx
+            //     \\ mov $62, %eax
+            //     \\ int $0x80
+            //     \\ mov $9, %eax
+            // );
         }
         asm volatile ("hlt");
     }
