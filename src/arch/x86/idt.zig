@@ -130,7 +130,7 @@ const push_regs: []const u8 =
 \\    mov %ax, %es
 \\    mov %ax, %fs
 \\    mov %ax, %gs
-\\    mov %esp, %eax
+\\    mov %esp, %eax # Pointer to CPU struct
 \\    push %eax
 \\
 ;
