@@ -6,13 +6,34 @@ const PAGE_WRITE: u8 = 0x2;
 const PAGE_USER: u8 = 0x4;
 const PAGE_4MB: u8 = 0x80;
 
-extern var initial_page_dir: [1024]u32;
+pub extern var initial_page_dir: [1024]u32;
 // const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
 pub inline fn InvalidatePage(page: usize) void {
     asm volatile ("invlpg (%eax)"
         :
         : [pg] "{eax}" (page),
+    );
+}
+
+pub inline fn getCR0() u32 {
+    return asm volatile (
+        \\mov %cr0, %[value]
+        : [value] "={eax}" (-> u32),
+    );
+}
+
+pub inline fn getCR2() u32 {
+    return asm volatile (
+        \\mov %cr2, %[value]
+        : [value] "={eax}" (-> u32),
+    );
+}
+
+pub inline fn getCR3() u32 {
+    return asm volatile (
+        \\mov %cr3, %[value]
+        : [value] "={eax}" (-> u32),
     );
 }
 
