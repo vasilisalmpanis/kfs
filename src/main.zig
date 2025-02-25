@@ -29,7 +29,6 @@ pub fn panic(
     while (true) {}
 }
 
-
 pub fn kill(_: u32, _: u32) i32 {
     return (0);
 }
