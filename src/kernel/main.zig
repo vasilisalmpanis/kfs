@@ -13,6 +13,7 @@ const Logger = @import("debug").Logger;
 pub const irq = @import("./irq/manage.zig");
 pub const exceptions = @import("./irq/exceptions.zig");
 pub const syscalls = @import("./irq/syscalls.zig");
+pub const list = @import("./utils/list.zig");
 
 pub var keyboard: Keyboard = undefined;
 pub var serial: Serial = undefined;

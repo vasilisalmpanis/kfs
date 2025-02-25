@@ -1,5 +1,5 @@
 
-const list_head = struct {
+pub const list_head = struct {
     next: ?*list_head,
     prev: ?*list_head,
 };
@@ -16,7 +16,9 @@ pub fn list_add(new: *list_head, head: *list_head) void {
     head.next = new;
     new.prev = head;
     new.next = next;
-    next.?.prev = new;
+    if (next) |nxt| {
+        nxt.prev = new;
+    }
 }
 
 pub fn list_add_tail(new: *list_head, head: *list_head) void {
@@ -41,7 +43,17 @@ pub fn list_empty(list: *list_head) bool {
     return list.next == list;
 }
 
+pub fn list_map(
+    comptime T: type,
+    head: *list_head, f: fn (arg: *T) void,
+    comptime member: [] const u8
+) void {
+    var buf: ?*list_head = head;
+    while (buf != null) : (buf = buf.?.next) {
+        f(container_of(T, @intFromPtr(buf.?), member));
+    }
+}
+
 pub fn list_entry(comptime T: type, ptr: u32, comptime member: []const u8) *T {
     return container_of(T, ptr, member);
 }
-
