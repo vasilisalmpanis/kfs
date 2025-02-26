@@ -1,5 +1,5 @@
 
-pub const list_head = struct {
+pub const list_head = packed struct {
     next: ?*list_head,
     prev: ?*list_head,
 };
