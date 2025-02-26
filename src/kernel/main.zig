@@ -14,6 +14,9 @@ pub const irq = @import("./irq/manage.zig");
 pub const exceptions = @import("./irq/exceptions.zig");
 pub const syscalls = @import("./irq/syscalls.zig");
 pub const list = @import("./utils/list.zig");
+pub const kthread_create = @import("./sched/kthread.zig").kthread_create;
+pub const task = @import("./sched/task.zig");
+
 
 pub var keyboard: Keyboard = undefined;
 pub var serial: Serial = undefined;

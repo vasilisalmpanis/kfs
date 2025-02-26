@@ -1,5 +1,6 @@
 const mm = @import("init.zig");
 
+// TODO: Fix Alignment for memery returned to 16
 /// kmalloc - allocate memory
 /// size:
 ///     how many bytes of memory are required.
