@@ -11,11 +11,15 @@ const AllocationError = error{
 pub const FreeListNode = packed struct {
     block_size: u32,
     next: ?*FreeListNode,
+    unused_1: u32 = 0,
+    unused_2: u32 = 0,
 };
 
 pub const AllocHeader = packed struct {
     block_size: u32,
     head: ?*FreeList,
+    unused_1: u32 = 0,
+    unused_2: u32 = 0,
 };
 
 pub const FreeList = packed struct {
@@ -24,12 +28,14 @@ pub const FreeList = packed struct {
     head: ?*FreeListNode,
     vmm: *vmm,
     pmm: *pmm,
+    alignement: u8 = 16,
 
     pub fn init(
         phys_mm: *pmm,
         virt_mm: *vmm,
         start_addr: u32,
-        end_addr: u32
+        end_addr: u32,
+        alignement: u8,
     ) FreeList {
         return FreeList{
             .start_addr = start_addr,
@@ -37,6 +43,7 @@ pub const FreeList = packed struct {
             .head = null,
             .vmm = virt_mm,
             .pmm = phys_mm,
+            .alignement = alignement,
         };
     }
 
@@ -200,7 +207,7 @@ pub const FreeList = packed struct {
         user: bool
     ) !u32 {
         // Total size of the block to allocate (including header)
-        const total_size = alignToPtr(size + @sizeOf(AllocHeader));
+        const total_size = self.alignToPtr(size + @sizeOf(AllocHeader));
 
         // Try to find existing block (first fit)
         var buffer = self.head;
@@ -222,8 +229,12 @@ pub const FreeList = packed struct {
         );
     }
 
-    fn alignToPtr(value: u32) u32 {
-        return if (value % 4 != 0) value + (4 - value % 4) else value;
+    fn alignToPtr(self: *FreeList, value: u32) u32 {
+        return
+            if (value % self.alignement != 0)
+                value + (self.alignement - value % self.alignement)
+            else
+                value;
     }
 
     fn allocateFromBlock(
@@ -237,7 +248,7 @@ pub const FreeList = packed struct {
         const free_block_size = curr.block_size;
         const next_free = curr.next;
         var block_size = total_size;
-        if (free_block_size - total_size <= 8) {
+        if (free_block_size - total_size <= self.alignement) {
             block_size += free_block_size - total_size;
         }
         self.initAllocHeader(addr, block_size);
@@ -287,7 +298,7 @@ pub const FreeList = packed struct {
             self.expandMemoryContig(num_pages, begin, user)
         else
             self.expandMemory(num_pages, begin, user);
-        if (free_size - total_size <= 8)
+        if (free_size - total_size <= self.alignement)
             block_size += free_size - total_size;
         self.initAllocHeader(begin, block_size);
 

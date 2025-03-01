@@ -68,13 +68,15 @@ pub fn mm_init(info: *multiboot_info) void {
         &phys_memory_manager,
         &virt_memory_manager,
         PAGE_OFFSET,
-        0xFFFFF000
+        0xFFFFF000,
+        16
     );
     vheap = heap.FreeList.init(
         &phys_memory_manager,
         &virt_memory_manager,
         PAGE_OFFSET,
-        0xFFFFF000
+        0xFFFFF000,
+        16
     );
 }
 

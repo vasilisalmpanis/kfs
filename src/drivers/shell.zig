@@ -35,6 +35,8 @@ pub const Shell = struct {
             system.halt();
         } else if (mem.eql(u8, input, "42")) {
             // screen.current_tty.?.print42();
+        } else if (mem.eql(u8, input, "test")) {
+            debug.run_tests();
         } else if (mem.eql(u8, input, "red")) {
             screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Red));
         } else if (mem.eql(u8, input, "green")) {
