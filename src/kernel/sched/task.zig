@@ -130,7 +130,7 @@ pub const task_struct align(8) = struct {
         self.parent = tmp.parent;
         self.children = tmp.children;
         self.siblings = tmp.siblings;
-        self.signals = tmp.signals;
+        // self.signals = tmp.signals;
         self.uid = tmp.uid;
         self.gid = tmp.gid;
     }
