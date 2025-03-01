@@ -16,6 +16,7 @@ pub const syscalls = @import("./irq/syscalls.zig");
 pub const list = @import("./utils/list.zig");
 pub const kthread_create = @import("./sched/kthread.zig").kthread_create;
 pub const task = @import("./sched/task.zig");
+pub const sched = @import("./sched/scheduler.zig");
 
 
 pub var keyboard: Keyboard = undefined;
