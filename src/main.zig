@@ -10,9 +10,12 @@ const idt = @import("arch").idt;
 const Serial = @import("drivers").Serial;
 const Logger = @import("debug").Logger;
 pub const mm = @import("kernel").mm;
+pub const vmm = @import("arch").vmm;
 pub const irq = @import("kernel").irq;
 const krn = @import("kernel");
 const syscalls = @import("kernel").syscalls;
+
+extern const stack_top: u32;
 
 
 pub fn panic(
@@ -71,7 +74,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();
     syscalls.registerSyscall(62, @ptrCast(&kill));
-    krn.task.initial_task.setup();
+    krn.task.initial_task.setup(@intFromPtr(&vmm.initial_page_dir), @intFromPtr(&stack_top));
     _ = krn.kthread_create(@ptrCast(&kthread1));
     _ = krn.kthread_create(@ptrCast(&kthread2));
     while (true) {

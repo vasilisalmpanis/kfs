@@ -74,8 +74,6 @@ pub const tss_struct = packed struct {
     }
 };
 
-extern const stack_top: u32;
-
 pub const task_struct align(8) = struct {
     pid:            u32,
     stack_top:      u32,
@@ -90,10 +88,10 @@ pub const task_struct align(8) = struct {
     f:              u32,
     state:          task_state,
 
-    pub fn init(virt: u32, uid: u16, gid: u16) task_struct {
+    pub fn init(virt: u32, task_stack_top: u32, uid: u16, gid: u16) task_struct {
         return task_struct{
             .pid = 0,
-            .stack_top = 0,
+            .stack_top = task_stack_top,
             .virtual_space = virt,
             .state = task_state.STOPPED,
             .children = .{
@@ -113,16 +111,18 @@ pub const task_struct align(8) = struct {
         };
     }
 
-    pub fn setup(self: *task_struct) void {
+    pub fn setup(self: *task_struct, virt: u32, task_stack_top: u32) void {
         self.siblings.next = &self.siblings;
         self.siblings.prev = &self.siblings;
         self.children.next = &self.children;
         self.children.prev = &self.children;
         self.parent = self;
+        self.stack_top = task_stack_top;
+        self.virtual_space = virt;
     }
 
-    pub fn init_self(self: *task_struct, virt: u32, uid: u16, gid: u16) void {
-        const tmp = task_struct.init(virt, uid, gid);
+    pub fn init_self(self: *task_struct, virt: u32, task_stack_top: u32, uid: u16, gid: u16) void {
+        const tmp = task_struct.init(virt, task_stack_top, uid, gid);
         self.pid = tmp.pid;
         self.stack_top = tmp.stack_top;
         self.virtual_space = tmp.virtual_space;
@@ -142,5 +142,5 @@ pub const task_struct align(8) = struct {
 //     0   // gid
 // );
 //
-pub var initial_task = task_struct.init(0, 0, 0);
+pub var initial_task = task_struct.init(0, 0, 0, 0);
 pub var current = &initial_task;
