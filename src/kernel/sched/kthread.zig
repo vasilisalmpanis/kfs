@@ -27,7 +27,12 @@ pub fn kthread_create(f: *const anyopaque) u32 {
         km.kfree(addr);
         return 0;
     }
-    new_task.init_self(@intFromPtr(&vmm.initial_page_dir), stack + STACK_SIZE - 8, 0, 0); // TODO: change this something more clear
+    new_task.init_self(
+        @intFromPtr(&vmm.initial_page_dir),
+        stack + STACK_SIZE - 8,
+        0,
+        0
+    ); // TODO: change this something more clear
     new_task.tss.eip = @intFromPtr(f);
     setup_stack(stack + STACK_SIZE, f);
     new_task.parent = tsk.current;
@@ -38,7 +43,7 @@ pub fn kthread_create(f: *const anyopaque) u32 {
             km.kfree(addr);
             return 0;
         }
-        lst.list_add_tail(
+        lst.list_add(
             &new_task.siblings,
             tsk.current.children.next.?
         );

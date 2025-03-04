@@ -1,5 +1,8 @@
 const vmm = @import("arch").vmm;
 const lst = @import("../utils/list.zig");
+
+var pid: u32 = 0;
+
 const task_state = enum(u8) {
     RUNNING,
     UNINTERRUPTIBLE_SLEEP,
@@ -119,6 +122,8 @@ pub const task_struct align(8) = struct {
         self.parent = self;
         self.stack_top = task_stack_top;
         self.virtual_space = virt;
+        self.pid = pid;
+        pid += 1;
     }
 
     pub fn init_self(self: *task_struct, virt: u32, task_stack_top: u32, uid: u16, gid: u16) void {
@@ -127,12 +132,16 @@ pub const task_struct align(8) = struct {
         self.stack_top = tmp.stack_top;
         self.virtual_space = tmp.virtual_space;
         self.state = tmp.state;
-        self.parent = tmp.parent;
-        self.children = tmp.children;
-        self.siblings = tmp.siblings;
+        self.siblings.next = &self.siblings;
+        self.siblings.prev = &self.siblings;
+        self.children.next = &self.children;
+        self.children.prev = &self.children;
+        self.parent = self;
         // self.signals = tmp.signals;
         self.uid = tmp.uid;
         self.gid = tmp.gid;
+        self.pid = pid;
+        pid += 1;
     }
 };
 

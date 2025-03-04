@@ -39,12 +39,14 @@ pub fn kill(_: u32, _: u32) i32 {
 pub fn kthread1() void {
     while (true) {
         dbg.printf("1\n", .{});
+        // krn.timer_handler();
     }
 }
 
 pub fn kthread2() void {
     while (true) {
         dbg.printf("2\n", .{});
+        // krn.timer_handler();
     }
 }
 
