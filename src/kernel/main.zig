@@ -17,6 +17,8 @@ pub const list = @import("./utils/list.zig");
 pub const kthread_create = @import("./sched/kthread.zig").kthread_create;
 pub const task = @import("./sched/task.zig");
 pub const sched = @import("./sched/scheduler.zig");
+pub const timer_handler = @import("./sched/scheduler.zig").timer_handler;
+pub const switch_to = @import("./sched/scheduler.zig").switch_to;
 
 
 pub var keyboard: Keyboard = undefined;
