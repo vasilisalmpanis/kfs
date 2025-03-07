@@ -1,5 +1,6 @@
 const vmm = @import("arch").vmm;
 const lst = @import("../utils/list.zig");
+const regs = @import("arch").regs;
 
 var pid: u32 = 0;
 
@@ -79,77 +80,49 @@ pub const tss_struct = packed struct {
 
 pub const task_struct align(8) = struct {
     pid:            u32,
-    stack_top:      u32,
     virtual_space:  u32,
-    parent:         ?*task_struct,
-    children:       lst.list_head,
-    siblings:       lst.list_head,
-    // signals:        [8]u8,
     uid:            u16,
     gid:            u16,
-    tss:            tss_struct,
-    f:              u32,
     state:          task_state,
+    regs:           regs,
+    next:            ?*task_struct,
 
-    pub fn init(virt: u32, task_stack_top: u32, uid: u16, gid: u16) task_struct {
+    pub fn init(virt: u32, uid: u16, gid: u16) task_struct {
         return task_struct{
             .pid = 0,
-            .stack_top = task_stack_top,
             .virtual_space = virt,
             .state = task_state.STOPPED,
-            .children = .{
-                .next = null,
-                .prev = null,
-            },
-            .siblings = .{
-                .next = null,
-                .prev = null,
-            },
-            .parent = null,
-            // .signals = .{0} ** 10,
             .uid = uid,
             .gid = gid,
-            .tss = tss_struct.init(),
-            .f   = 0,
+            .regs = regs.init(),
+            .next = null,
         };
     }
 
     pub fn setup(self: *task_struct, virt: u32, task_stack_top: u32) void {
-        self.siblings.next = &self.siblings;
-        self.siblings.prev = &self.siblings;
-        self.children.next = &self.children;
-        self.children.prev = &self.children;
-        self.parent = self;
-        self.stack_top = task_stack_top;
         self.virtual_space = virt;
         self.pid = pid;
+        self.regs.esp = task_stack_top;
         pid += 1;
     }
 
     pub fn init_self(self: *task_struct, virt: u32, task_stack_top: u32, uid: u16, gid: u16) void {
-        const tmp = task_struct.init(virt, task_stack_top, uid, gid);
+        const tmp = task_struct.init(virt, uid, gid);
+        var curr: *task_struct = current;
         self.pid = tmp.pid;
-        self.stack_top = tmp.stack_top;
+        self.regs.esp = task_stack_top;
         self.virtual_space = tmp.virtual_space;
         self.state = tmp.state;
-        self.siblings.next = &self.siblings;
-        self.siblings.prev = &self.siblings;
-        self.children.next = &self.children;
-        self.children.prev = &self.children;
-        self.parent = self;
-        // self.signals = tmp.signals;
         self.uid = tmp.uid;
         self.gid = tmp.gid;
         self.pid = pid;
+        while (curr.next != null) {
+            curr = curr.next.?;
+        }
+        curr.next = self;
         pid += 1;
     }
 };
 
-// const initial_task = task_struct.init(
-//     @as(u32, @intFromPtr(vmm.initial_page_dir)),
-//     0,  // uid
-//     0   // gid
-// );
-//
-pub var initial_task = task_struct.init(0, 0, 0, 0);
+pub var initial_task = task_struct.init(0, 0, 0);
 pub var current = &initial_task;
