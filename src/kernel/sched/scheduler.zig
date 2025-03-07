@@ -1,47 +1,24 @@
 const tsk = @import("./task.zig");
 const dbg = @import("debug");
 const lst = @import("../utils/list.zig");
+const regs = @import("arch").regs;
 
-
-pub fn switch_to(from: *tsk.task_struct, to: *tsk.task_struct) callconv(.C) void {
+pub fn switch_to(from: *tsk.task_struct, to: *tsk.task_struct, state: *regs) *regs {
+    from.regs = state.*;
+    from.regs.esp = @intFromPtr(state);
     tsk.current = to;
-    _ = from;
+    return @ptrFromInt(to.regs.esp);
 }
 
-pub fn timer_handler() void {
-    dbg.printf("timer\n", .{});
-    if (
-        tsk.current.children.next != null
-        and tsk.current.children.next != &tsk.current.children
-    ) {
-        if (tsk.current.children.next) |curr_ptr| {
-            const addr: u32 = @intFromPtr(curr_ptr);
-            const curr = lst.container_of(
-                tsk.task_struct,
-                addr,
-                "siblings"
-            );
-            if (true or false) {
-                if (curr.siblings.next) |next_ptr| {
-                    const addr_next: u32 = @intFromPtr(next_ptr);
-                    const next = lst.container_of(
-                        tsk.task_struct,
-                        addr_next,
-                        "siblings"
-                    );
-                    switch_to(curr, next);
-                }
-            }
-        }
-    } else {
-        if (tsk.current.siblings.next) |next_ptr| {
-            const addr_next: u32 = @intFromPtr(next_ptr);
-            const next = lst.container_of(
-                tsk.task_struct,
-                addr_next,
-                "siblings"
-            );
-            switch_to(tsk.current, next);
-        }
+pub fn timer_handler(state: *regs) *regs {
+    var new_state: *regs = state;
+    if (tsk.initial_task.next == null) {
+        return new_state;
     }
+    if (tsk.current.next == null) {
+        new_state = switch_to(tsk.current, &tsk.initial_task, state);
+    } else {
+        new_state = switch_to(tsk.current, tsk.current.next.?, state);
+    }
+    return new_state;
 }
