@@ -32,24 +32,6 @@ pub fn panic(
     while (true) {}
 }
 
-pub fn kill(_: u32, _: u32) i32 {
-    return (0);
-}
-
-pub fn kthread1() void {
-    while (true) {
-        dbg.printf("1\n", .{});
-        // krn.timer_handler();
-    }
-}
-
-pub fn kthread2() void {
-    while (true) {
-        dbg.printf("2\n", .{});
-        // krn.timer_handler();
-    }
-}
-
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x2BADB002) {
         system.halt();
@@ -75,10 +57,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     irq.register_handler(0, &krn.sched.timer_handler);
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();
-    syscalls.registerSyscall(62, @ptrCast(&kill));
     krn.task.initial_task.setup(@intFromPtr(&vmm.initial_page_dir), @intFromPtr(&stack_top));
-    _ = krn.kthread_create(@ptrCast(&kthread1));
-    _ = krn.kthread_create(@ptrCast(&kthread2));
     while (true) {
         if (keyboard.keyboard.get_input()) |input| {
             screen.current_tty.?.input(input);
