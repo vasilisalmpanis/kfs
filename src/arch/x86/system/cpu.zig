@@ -1,5 +1,5 @@
 const krn = @import("kernel");
-pub const registers_t = packed struct {
+pub const registers_t = struct {
     gs: u32, 
     fs: u32,
     es: u32,
