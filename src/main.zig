@@ -32,6 +32,14 @@ pub fn panic(
     while (true) {}
 }
 
+pub fn tty_thread() void {
+    while (true) {
+        if (keyboard.keyboard.get_input()) |input| {
+            screen.current_tty.?.input(input);
+        }
+    }
+}
+
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x2BADB002) {
         system.halt();
@@ -58,10 +66,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();
     krn.task.initial_task.setup(@intFromPtr(&vmm.initial_page_dir), @intFromPtr(&stack_top));
+    _ = krn.kthread_create(&tty_thread);
     while (true) {
-        if (keyboard.keyboard.get_input()) |input| {
-            screen.current_tty.?.input(input);
-        }
         asm volatile ("hlt");
     }
     panic("You shouldn't be here");
