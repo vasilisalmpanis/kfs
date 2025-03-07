@@ -111,8 +111,12 @@ fn generateIRQStub(comptime n: u8) []const u8 {
     \\ push $
     ++ std.fmt.comptimePrint("{d}\n", .{n}) ++
     push_regs ++
+    \\ mov %esp, %eax # Pointer to CPU struct
+    \\ push %eax
     \\ lea irq_handler, %eax
     \\ call *%eax
+    \\ add $4, %esp
+    \\ mov %eax, %esp
     ++ pop_regs ++
     \\ add $8, %esp  // Clean up interrupt number
     \\ iret
@@ -130,13 +134,10 @@ const push_regs: []const u8 =
 \\    mov %ax, %es
 \\    mov %ax, %fs
 \\    mov %ax, %gs
-\\    mov %esp, %eax # Pointer to CPU struct
-\\    push %eax
 \\
 ;
 const pop_regs: []const u8 =
 \\
-\\    pop %eax
 \\    pop %gs
 \\    pop %fs
 \\    pop %es
@@ -155,8 +156,11 @@ fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
             \\ push $
             ++ std.fmt.comptimePrint("{d}\n", .{n}) ++
             push_regs ++
+            \\ mov %esp, %eax # Pointer to CPU struct
+            \\ push %eax
             \\ lea exception_handler, %eax
             \\ call *%eax
+            \\ add $4, %esp
             ++ pop_regs ++
             \\ add $8, %esp
             \\ iret
@@ -170,8 +174,11 @@ fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
             \\ push $
             ++ std.fmt.comptimePrint("{d}\n", .{n}) ++
             push_regs ++
+            \\ mov %esp, %eax # Pointer to CPU struct
+            \\ push %eax
             \\ lea exception_handler, %eax
             \\ call *%eax
+            \\ add $4, %esp
             ++ pop_regs ++
             \\ add $8, %esp
             \\ iret
