@@ -4,8 +4,9 @@ const printf = @import("debug").printf;
 const system = @import("arch").system;
 const screen = @import("screen.zig");
 const tty = @import("tty-fb.zig");
+const krn = @import("kernel");
 
-pub const Shell = struct {    
+pub const Shell = struct {
     pub fn init() *Shell {
         var shell = Shell{};
         return &shell;
@@ -14,7 +15,8 @@ pub const Shell = struct {
     pub fn handleInput(self: *Shell, input: []const u8) void {
         _ = self;
         if (mem.eql(u8, input, "help")) {
-            printf(\\
+            printf(
+                \\
                 \\available commands:
                 \\  stack: Print the stack trace
                 \\  reboot: Reboot the PC
@@ -24,11 +26,15 @@ pub const Shell = struct {
                 \\  [color name]: Change the input color
                 \\  help: Display this help message
                 \\
-                , .{});
+            , .{});
         } else if (mem.eql(u8, input, "stack")) {
             debug.TraceStackTrace(10);
         } else if (mem.eql(u8, input, "ps")) {
             debug.ps();
+        } else if (mem.eql(u8, input, "jiffies")) {
+            debug.printf("{d}\n", .{krn.jiffies.jiffies});
+        } else if (mem.eql(u8, input, "uptime")) {
+            debug.printf("{d}\n", .{krn.pit.get_seconds_from_start()});
         } else if (mem.eql(u8, input, "reboot")) {
             system.reboot();
         } else if (mem.eql(u8, input, "shutdown")) {

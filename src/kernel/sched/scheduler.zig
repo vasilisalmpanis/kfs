@@ -4,6 +4,7 @@ const lst = @import("../utils/list.zig");
 const regs = @import("arch").regs;
 const km = @import("../mm/kmalloc.zig");
 
+
 pub fn switch_to(from: *tsk.task_struct, to: *tsk.task_struct, state: *regs) *regs {
     from.regs = state.*;
     from.regs.esp = @intFromPtr(state);
@@ -23,13 +24,13 @@ fn cleanup_stopped_tasks() void {
             } else {
                 @panic("Attempt to stop initial task!");
             }
-            continue ;
+            continue;
         }
         prev = buf;
     }
 }
 
-pub fn timer_handler(state: *regs) *regs {
+pub fn schedule(state: *regs) *regs {
     var new_state: *regs = state;
     if (tsk.initial_task.next == null) {
         return new_state;
