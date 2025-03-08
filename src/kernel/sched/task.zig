@@ -85,16 +85,18 @@ pub const task_struct align(8) = struct {
     gid:            u16,
     state:          task_state,
     regs:           regs,
-    next:            ?*task_struct,
+    stack_bottom:   u32,
+    next:           ?*task_struct,
 
     pub fn init(virt: u32, uid: u16, gid: u16) task_struct {
         return task_struct{
             .pid = 0,
             .virtual_space = virt,
-            .state = task_state.STOPPED,
+            .state = task_state.RUNNING,
             .uid = uid,
             .gid = gid,
             .regs = regs.init(),
+            .stack_bottom = 0,
             .next = null,
         };
     }
@@ -106,7 +108,14 @@ pub const task_struct align(8) = struct {
         pid += 1;
     }
 
-    pub fn init_self(self: *task_struct, virt: u32, task_stack_top: u32, uid: u16, gid: u16) void {
+    pub fn init_self(
+        self: *task_struct,
+        virt: u32,
+        task_stack_top: u32,
+        stack_bottom: u32,
+        uid: u16,
+        gid: u16
+    ) void {
         const tmp = task_struct.init(virt, uid, gid);
         var curr: *task_struct = current;
         self.pid = tmp.pid;
@@ -116,11 +125,12 @@ pub const task_struct align(8) = struct {
         self.uid = tmp.uid;
         self.gid = tmp.gid;
         self.pid = pid;
+        pid += 1;
+        self.stack_bottom = stack_bottom;
         while (curr.next != null) {
             curr = curr.next.?;
         }
         curr.next = self;
-        pid += 1;
     }
 };
 

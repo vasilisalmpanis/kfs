@@ -27,6 +27,8 @@ pub const Shell = struct {
                 , .{});
         } else if (mem.eql(u8, input, "stack")) {
             debug.TraceStackTrace(10);
+        } else if (mem.eql(u8, input, "ps")) {
+            debug.ps();
         } else if (mem.eql(u8, input, "reboot")) {
             system.reboot();
         } else if (mem.eql(u8, input, "shutdown")) {

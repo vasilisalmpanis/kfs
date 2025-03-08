@@ -66,7 +66,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();
     krn.task.initial_task.setup(@intFromPtr(&vmm.initial_page_dir), @intFromPtr(&stack_top));
-    _ = krn.kthread_create(&tty_thread);
+    _ = krn.kthread_create(&tty_thread, null);
     while (true) {
         asm volatile ("hlt");
     }

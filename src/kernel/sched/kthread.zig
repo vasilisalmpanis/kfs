@@ -7,8 +7,20 @@ const regs = @import("arch").regs;
 
 const STACK_SIZE: u32 = 4096 * 2;
 
-pub fn setup_stack(stack_top: u32, f: *const anyopaque) u32 {
+const ThreadHandler = *const fn (arg: *anyopaque) void;
+
+fn thread_wrapper(thread_handler: ThreadHandler, arg: *anyopaque) noreturn {
+    thread_handler(arg);
+    tsk.current.state = .STOPPED;
+    while (true) {}
+}
+
+pub fn setup_stack(stack_top: u32, f: *const anyopaque, arg: ?*const anyopaque) u32 {
     var stack_ptr: [*]u32 = @ptrFromInt(stack_top - @sizeOf(regs));
+    var th_arg: usize = 0;
+    if (arg) |a| {
+        th_arg = @intFromPtr(a);
+    }
     stack_ptr[0] = 0x10;
     stack_ptr[1] = 0x10;
     stack_ptr[2] = 0x10;
@@ -18,12 +30,12 @@ pub fn setup_stack(stack_top: u32, f: *const anyopaque) u32 {
     stack_ptr[6] = 0;
     stack_ptr[7] = 0;
     stack_ptr[8] = 0;
-    stack_ptr[9] = 0;
-    stack_ptr[10] = 0;
+    stack_ptr[9] = th_arg;           // edx
+    stack_ptr[10] = @intFromPtr(f);  // ecx
     stack_ptr[11] = 0;
     stack_ptr[12] = 0;              // int code
     stack_ptr[13] = 0;              // error code
-    stack_ptr[14] = @intFromPtr(f); // eip
+    stack_ptr[14] = @intFromPtr(&thread_wrapper); // eip
     stack_ptr[15] = 0x8;            // cs
     stack_ptr[16] = 0x202;          // eflags
     stack_ptr[17] = 0x0;            // useresp
@@ -31,7 +43,7 @@ pub fn setup_stack(stack_top: u32, f: *const anyopaque) u32 {
     return @intFromPtr(stack_ptr);
 }
 
-pub fn kthread_create(f: *const anyopaque) u32 {
+pub fn kthread_create(f: *const anyopaque, arg: ?*const anyopaque) u32 {
     const addr = km.kmalloc(@sizeOf(tsk.task_struct));
     var stack: u32 = undefined;
     if (addr == 0)
@@ -44,10 +56,15 @@ pub fn kthread_create(f: *const anyopaque) u32 {
         km.kfree(addr);
         return 0;
     }
-    const stack_top: u32 = setup_stack(stack + STACK_SIZE, f);
+    const stack_top: u32 = setup_stack(
+        stack + STACK_SIZE,
+        f,
+        arg
+    );
     new_task.init_self(
         @intFromPtr(&vmm.initial_page_dir),
         stack_top,
+        stack,
         0,
         0
     ); // TODO: change this something more clear
