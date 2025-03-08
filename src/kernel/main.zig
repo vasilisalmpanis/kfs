@@ -1,5 +1,6 @@
 const TTY = @import("drivers").tty.TTY;
 const Keyboard = @import("drivers").Keyboard;
+const PIT = @import("drivers").pit.PIT;
 const system = @import("arch").system;
 const gdt = @import("arch").gdt;
 const multiboot = @import("arch").multiboot;
@@ -17,11 +18,12 @@ pub const list = @import("./utils/list.zig");
 pub const kthread_create = @import("./sched/kthread.zig").kthread_create;
 pub const task = @import("./sched/task.zig");
 pub const sched = @import("./sched/scheduler.zig");
-pub const timer_handler = @import("./sched/scheduler.zig").timer_handler;
+pub const timer_handler = @import("./time/jiffies.zig").timer_handler;
 pub const switch_to = @import("./sched/scheduler.zig").switch_to;
-
+pub const jiffies = @import("./time/jiffies.zig");
 
 pub var keyboard: Keyboard = undefined;
+pub var pit: PIT = undefined;
 pub var serial: Serial = undefined;
 pub var logger: Logger = undefined;
 

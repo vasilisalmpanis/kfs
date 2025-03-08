@@ -26,7 +26,6 @@ var idt: [256] idt_entry_t align(0x10) = undefined;
 var idtr: idtr_t = undefined;
 const ExceptionHandler = fn (regs: *regs) void;
 const SyscallHandler = fn (regs: *regs) void;
-const TimerHandler = fn (regs: *regs) *regs;
 
 pub export fn exception_handler(state: *regs) callconv(.C) void {
     printf("interrupt: {x}\n", .{state.int_no});
@@ -43,12 +42,12 @@ pub export fn irq_handler(state: *regs) callconv(.C) *regs {
         if (state.int_no == 0x80) {
             const handler: *const SyscallHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
             handler(state);
-        } else if (state.int_no == 0x20) {
-            const handler: *const TimerHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
-            new_state = handler(state);
         } else {
             const handler: *const ISRHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
             handler();
+            if (state.int_no == 0x20) {
+                new_state = krn.sched.schedule(state);
+            }
         }
     }
     io.outb(0x20, 0x20);
