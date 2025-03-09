@@ -7,18 +7,23 @@ SRC_DIR = src
 SRC = $(shell find $(SRC_DIR) -name '*.zig')
 ASM_SRC = $(shell find $(SRC_DIR) -name '*.s')
 GRUB_CFG = $(ISO_DIR)/boot/grub/grub.cfg
+MKRESCUE = grub-mkrescue
 
 all: $(NAME)
 
 $(NAME): $(KERNEL) $(GRUB_CFG)
 	cp $(KERNEL) $(ISO_DIR)/boot/
-	grub-mkrescue --compress=xz -o $(NAME) $(ISO_DIR)
+	$(MKRESCUE) --compress=xz -o $(NAME) $(ISO_DIR)
 
 $(KERNEL): $(SRC) $(ASM_SRC)
 	zig build # -Doptimize=ReleaseSafe
 
 clean:
-	rm -rf zig-out
+	rm -rf zig-out $(ISO_DIR)/boot/kfs.bin
+
+fclean: clean
+	rm -rf $(NAME)
+	rm -rf .zig-cache
 
 qemu: $(NAME)
 	qemu-system-i386 -enable-kvm -cdrom $(NAME) -serial stdio
