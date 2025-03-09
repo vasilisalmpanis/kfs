@@ -45,7 +45,7 @@ pub const registers_t = struct {
     }
 
     pub fn dump(self: *registers_t) void {
-        krn.logger.INFO("EIP: {X:0>8} ({X:0>8})\n", .{ self.eip, 0 });
+        krn.logger.INFO("EIP: {X:0>8}\n", .{ self.eip});
 
         krn.logger.INFO("EAX: {X:0>8} EBX: {X:0>8} ECX: {X:0>8} EDX: {X:0>8}\n", .{ self.eax, self.ebx, self.ecx, self.edx });
         krn.logger.INFO("ESI: {X:0>8} EDI: {X:0>8} EBP: {X:0>8} ESP: {X:0>8}\n", .{ self.esi, self.edi, self.ebp, self.esp });

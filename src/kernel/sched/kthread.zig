@@ -30,16 +30,16 @@ pub fn setup_stack(stack_top: u32, f: *const anyopaque, arg: ?*const anyopaque) 
     stack_ptr[6] = 0;
     stack_ptr[7] = 0;
     stack_ptr[8] = 0;
-    stack_ptr[9] = th_arg;           // edx
-    stack_ptr[10] = @intFromPtr(f);  // ecx
-    stack_ptr[11] = 0;
+    stack_ptr[9] = @intFromPtr(f);  // edx
+    stack_ptr[10] = 0;              // ecx
+    stack_ptr[11] = 0;              // eax
     stack_ptr[12] = 0;              // int code
     stack_ptr[13] = 0;              // error code
     stack_ptr[14] = @intFromPtr(&thread_wrapper); // eip
     stack_ptr[15] = 0x8;            // cs
     stack_ptr[16] = 0x202;          // eflags
     stack_ptr[17] = 0x0;            // useresp
-    stack_ptr[18] = 0x10;           // ss
+    stack_ptr[18] = th_arg;         // ss
     return @intFromPtr(stack_ptr);
 }
 
@@ -67,6 +67,6 @@ pub fn kthread_create(f: *const anyopaque, arg: ?*const anyopaque) u32 {
         stack,
         0,
         0
-    ); // TODO: change this something more clear
+    );
     return new_task.pid;
 }

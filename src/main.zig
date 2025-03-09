@@ -64,11 +64,12 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("IDT initialized", .{});
     
     irq.register_handler(1, &keyboard.keyboard_interrupt);
-    irq.register_handler(0, &krn.timer_handler);
     krn.logger.INFO("Keyboard handler added", .{});
-    syscalls.initSyscalls();
     krn.task.initial_task.setup(@intFromPtr(&vmm.initial_page_dir), @intFromPtr(&stack_top));
+    irq.register_handler(0, &krn.timer_handler);
+    syscalls.initSyscalls();
     _ = krn.kthread_create(&tty_thread, null);
+    krn.logger.INFO("TTY thread started", .{});
     while (true) {
         asm volatile ("hlt");
     }

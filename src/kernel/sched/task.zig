@@ -78,7 +78,7 @@ pub const tss_struct = packed struct {
     }
 };
 
-pub const task_struct align(8) = struct {
+pub const task_struct = struct {
     pid:            u32,
     virtual_space:  u32,
     uid:            u16,

@@ -71,7 +71,7 @@ pub fn build(b: *std.Build) !void {
         kernel.root_module.addImport("debug", debug_mod);
         kernel.root_module.addImport("kernel", kernel_mod);
 
-        kernel.setLinkerScriptPath(b.path(linker));
+        kernel.setLinkerScript(b.path(linker));
         kernel.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));
 
         // kernel.setVerboseLink(true);
