@@ -16,11 +16,12 @@ fn cleanup_stopped_tasks() void {
     var buf: ?*tsk.task_struct = &tsk.initial_task;
     var prev: ?*tsk.task_struct = null;
     while (buf != null) : (buf = buf.?.next) {
-        if (buf.?.state == .STOPPED and buf.? != tsk.current) {
+        if (buf.?.state == .STOPPED and buf.? != tsk.current and buf.?.refcount == 0) {
             if (prev != null) {
                 prev.?.next = buf.?.next;
                 km.kfree(buf.?.stack_bottom);
                 km.kfree(@intFromPtr(buf));
+                buf = prev;
             } else {
                 @panic("Attempt to stop initial task!");
             }
