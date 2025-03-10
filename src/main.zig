@@ -33,12 +33,13 @@ pub fn panic(
     while (true) {}
 }
 
-pub fn tty_thread() void {
-    while (true) {
+pub fn tty_thread(_: ?*const anyopaque) i32 {
+    while (krn.task.current.should_stop != true) {
         if (keyboard.keyboard.get_input()) |input| {
             screen.current_tty.?.input(input);
         }
     }
+    return 0;
 }
 
 export fn kernel_main(magic: u32, address: u32) noreturn {
@@ -68,7 +69,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.task.initial_task.setup(@intFromPtr(&vmm.initial_page_dir), @intFromPtr(&stack_top));
     irq.register_handler(0, &krn.timer_handler);
     syscalls.initSyscalls();
-    _ = krn.kthread_create(&tty_thread, null);
+    _ = krn.kthread_create(&tty_thread, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
     while (true) {
         asm volatile ("hlt");

@@ -16,6 +16,7 @@ pub const exceptions = @import("./irq/exceptions.zig");
 pub const syscalls = @import("./irq/syscalls.zig");
 pub const list = @import("./utils/list.zig");
 pub const kthread_create = @import("./sched/kthread.zig").kthread_create;
+pub const kthread_stop = @import("./sched/kthread.zig").kthread_stop;
 pub const task = @import("./sched/task.zig");
 pub const sched = @import("./sched/scheduler.zig");
 pub const timer_handler = @import("./time/jiffies.zig").timer_handler;
