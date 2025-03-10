@@ -12,6 +12,10 @@ const task_state = enum(u8) {
     ZOMBIE,
 };
 
+const task_type = enum(u8) {
+    KTHREAD,
+    PROCESS,
+};
 // Task is the basic unit of scheduling
 // both threads and processes are tasks
 // and threads share 
@@ -78,6 +82,9 @@ pub const tss_struct = packed struct {
     }
 };
 
+// task_struct
+// Anyone using this struct must get refcount
+// and put it when no longer needed.
 pub const task_struct = struct {
     pid:            u32,
     virtual_space:  u32,
@@ -87,8 +94,16 @@ pub const task_struct = struct {
     regs:           regs,
     stack_bottom:   u32,
     next:           ?*task_struct,
+    type:           task_type,
+    refcount:       u32 = 0,
 
-    pub fn init(virt: u32, uid: u16, gid: u16) task_struct {
+    // only for kthreads
+    threadfn:       ?*const fn (arg: ?*const anyopaque) i32 = null,
+    arg:            ?*const anyopaque = null,
+    result:         i32 = 0,
+    should_stop:    bool = false,
+
+    pub fn init(virt: u32, uid: u16, gid: u16, tp: task_type) task_struct {
         return task_struct{
             .pid = 0,
             .virtual_space = virt,
@@ -98,6 +113,7 @@ pub const task_struct = struct {
             .regs = regs.init(),
             .stack_bottom = 0,
             .next = null,
+            .type = tp,
         };
     }
 
@@ -114,9 +130,10 @@ pub const task_struct = struct {
         task_stack_top: u32,
         stack_bottom: u32,
         uid: u16,
-        gid: u16
+        gid: u16,
+        tp: task_type
     ) void {
-        const tmp = task_struct.init(virt, uid, gid);
+        const tmp = task_struct.init(virt, uid, gid, tp);
         var curr: *task_struct = current;
         self.pid = tmp.pid;
         self.regs.esp = task_stack_top;
@@ -134,5 +151,5 @@ pub const task_struct = struct {
     }
 };
 
-pub var initial_task = task_struct.init(0, 0, 0);
+pub var initial_task = task_struct.init(0, 0, 0, .KTHREAD);
 pub var current = &initial_task;
