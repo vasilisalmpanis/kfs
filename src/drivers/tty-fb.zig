@@ -5,6 +5,7 @@ const scr = @import("./screen.zig");
 const mm = @import("kernel").mm;
 const KeyEvent = @import("./kbd.zig").KeyEvent;
 const CtrlType = @import("./kbd.zig").CtrlType;
+const krn = @import("kernel");
 
 pub const ConsoleColors = enum(u32) {
     Black = 0x000000,
@@ -23,8 +24,63 @@ pub const ConsoleColors = enum(u32) {
     LightMagenta = 0xFF06B5,
     LightBrown = 0xC4A484,
     White = 0x00FFFFFF,
-};                       
+};
 
+pub const DirtyRect = struct {
+    x1: u32,
+    y1: u32,
+    x2: u32,
+    y2: u32,
+    
+    pub fn init(x1: u32, y1: u32, x2: u32, y2: u32) DirtyRect {
+        return DirtyRect{
+            .x1 = x1,
+            .y1 = y1,
+            .x2 = x2,
+            .y2 = y2,
+        };
+    }
+    
+    pub fn fullScreen(width: u32, height: u32) DirtyRect {
+        return DirtyRect{
+            .x1 = 0,
+            .y1 = 0,
+            .x2 = width - 1,
+            .y2 = height - 1,
+        };
+    }
+    
+    pub fn singleChar(x: u32, y: u32) DirtyRect {
+        return DirtyRect{
+            .x1 = x,
+            .y1 = y,
+            .x2 = x,
+            .y2 = y,
+        };
+    }
+    
+    pub fn line(y: u32, x1: u32, x2: u32) DirtyRect {
+        return DirtyRect{
+            .x1 = x1,
+            .y1 = y,
+            .x2 = x2,
+            .y2 = y,
+        };
+    }
+    
+    pub fn merge(self: DirtyRect, other: DirtyRect) DirtyRect {
+        return DirtyRect{
+            .x1 = @min(self.x1, other.x1),
+            .y1 = @min(self.y1, other.y1),
+            .x2 = @max(self.x2, other.x2),
+            .y2 = @max(self.y2, other.y2),
+        };
+    }
+    
+    pub fn isEmpty(self: DirtyRect) bool {
+        return self.x1 > self.x2 or self.y1 > self.y2;
+    }
+};
 
 pub const TTY = struct {
     width: u32 = 80,
@@ -34,6 +90,11 @@ pub const TTY = struct {
     _bg_colour: u32 = @intFromEnum(ConsoleColors.Black),
     _fg_colour: u32 = @intFromEnum(ConsoleColors.White),
     _buffer : [*]u8,
+    _prev_buffer : [*]u8,
+    _prev_x: u32 = 0,
+    _prev_y: u32 = 0,
+    _dirty_rect: DirtyRect = DirtyRect.init(0, 0, 0, 0),
+    _has_dirty_rect: bool = false,
     shell: *Shell,
 
     pub fn init(width: u32, height: u32) TTY {
@@ -41,9 +102,11 @@ pub const TTY = struct {
             .width = width,
             .height = height,
             ._buffer = @ptrFromInt(mm.kmalloc(width * height * @sizeOf(u8))),
+            ._prev_buffer = @ptrFromInt(mm.kmalloc(width * height * @sizeOf(u8))),
             .shell = Shell.init(),
         };
         @memset(tty._buffer[0..width * height], 0);
+        @memset(tty._prev_buffer[0..width * height], 0);
         tty.clear();
         return tty;
     }
@@ -52,7 +115,13 @@ pub const TTY = struct {
         scr.framebuffer.cursor(self._x, self._y, self._fg_colour);
     }
 
+    fn save_cursor(self: *TTY) void {
+        self._prev_x = self._x;
+        self._prev_y = self._y;
+    }
+
     pub fn move(self: *TTY, direction : u8) void {
+        self.save_cursor();
         if (direction == 0) {
             if (self._x > 0)
                 self._x -= 1;
@@ -63,15 +132,36 @@ pub const TTY = struct {
         self.render();
     }
 
+    fn cursor_updated(self: *TTY) bool {
+        return (self._x != self._prev_x or self._y != self._prev_y);
+    }
+
     pub fn render(self: *TTY) void {
-        for (0..self.height) |row| {
-            for (0..self.width) |col| {
-                const c = self._buffer[row * self.width + col];
-                scr.framebuffer.putchar(c, col, row, self._bg_colour, self._fg_colour);
+        if (!self.cursor_updated() and !self._has_dirty_rect)
+            return ;
+        if (self._has_dirty_rect) {
+            const x1 = self._dirty_rect.x1;
+            const y1 = self._dirty_rect.y1;
+            const x2 = @min(self._dirty_rect.x2, self.width - 1);
+            const y2 = @min(self._dirty_rect.y2, self.height - 1);
+
+            for (y1..(y2 + 1)) |row| {
+                for (x1..(x2 + 1)) |col| {
+                    const c = self._buffer[row * self.width + col];
+                    if (c != self._prev_buffer[row * self.width + col]) {
+                        scr.framebuffer.putchar(c, col, row, self._bg_colour, self._fg_colour);
+                        self._prev_buffer[row * self.width + col] = c;
+                    }
+                }
             }
         }
-        self.update_cursor();
+        if (self.cursor_updated()) {
+            const c = self._buffer[self._prev_y * self.width + self._prev_x];
+            scr.framebuffer.putchar(c, self._prev_x, self._prev_y, self._bg_colour, self._fg_colour);
+            self.update_cursor();
+        }
         scr.framebuffer.render();
+        self._has_dirty_rect = false;
     }
 
     fn _scroll(self: *TTY) void {
@@ -88,8 +178,9 @@ pub const TTY = struct {
             self._buffer[p - self.width..p],
             0
         );
+        self.save_cursor();
         self._y = self.height - 1;
-        self.render();
+        self.markDirty(DirtyRect.fullScreen(self.width, self.height));
     }
 
     fn removeAtIndex(self: *TTY, index: usize) void {
@@ -100,15 +191,16 @@ pub const TTY = struct {
             self._buffer[i] = self._buffer[i + 1];
             i += 1;
         }
-
-        self._buffer[self.width * self.height - 1] = 0;
+        self._buffer[i] = 0;
     }
 
     pub fn remove(self: *TTY) void {
         if (self._x == 0 and self._y == 0)
             return;
+        self.save_cursor();
         if (self._x > 0)
             self._x -= 1;
+        self.markDirty(DirtyRect.init(self._x, self._y, self.width - 1, self._y));
         self.removeAtIndex(self._y * self.width + self._x);
         self.render();
     }
@@ -118,13 +210,32 @@ pub const TTY = struct {
             self._buffer[0..self.height * self.width],
             0
         );
+        self.save_cursor();
         self._x = 0;
         self._y = 0;
+        self.markDirty(DirtyRect.fullScreen(
+            self.width,
+            self.height
+        ));
         self.render();
+    }
+
+    fn markDirty(self: *TTY, rect: DirtyRect) void {
+        if (self._has_dirty_rect) {
+            self._dirty_rect = self._dirty_rect.merge(rect);
+        } else {
+            self._dirty_rect = rect;
+            self._has_dirty_rect = true;
+        }
+    }
+    
+    fn markCellDirty(self: *TTY, x: u32, y: u32) void {
+        self.markDirty(DirtyRect.singleChar(x, y));
     }
 
     fn printVga(self: *TTY, ch: u8) void {
         self._buffer[self._y * self.width + self._x] = ch;
+        self.markCellDirty(self._x, self._y);
         self._x += 1;
         if (self._x >= self.width) {
             self._x = 0;
@@ -155,14 +266,18 @@ pub const TTY = struct {
     }
 
     fn home(self: *TTY) void {
+        self.markDirty(DirtyRect.init(0, self._y, self._x, self._y));
+        self.save_cursor();
         self._x = 0;
         self.render();
     }
 
     fn endline(self: *TTY) void {
+        self.save_cursor();
         const row = self._y * self.width;
         while (self._buffer[row + self._x] != 0 and self._x < self.width - 1)
             self._x += 1;
+        self.markDirty(DirtyRect.init(0, self._y, self._x, self._y));
         self.render();
     }
 
@@ -213,6 +328,7 @@ pub const TTY = struct {
         }
         const x = self._x;
         const y = self._y;
+        self.save_cursor();
         var i: u16 = 0;
         while (i < end - start) : (i += 1)
             self.printVga(buf[i]);
