@@ -42,17 +42,6 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
     return 0;
 }
 
-fn test_thread(arg: ?*const anyopaque) i32 {
-    var res: i32 = 0;
-    while (!krn.task.current.should_stop) {
-        const cnt: *i32 = @ptrCast(@constCast(@alignCast(arg)));
-        res *= cnt.*;
-        // if (cnt.* == 5)
-        //     krn.logger.DEBUG("thread: {any}\n", .{cnt.*});
-    }
-    return res;
-}
-
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x2BADB002) {
         system.halt();
@@ -82,27 +71,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     syscalls.initSyscalls();
     _ = krn.kthread_create(&tty_thread, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
-
-    const arg1: u32 = 1;
-    _ = krn.kthread_create(&test_thread, &arg1) catch null;
-    const arg2: u32 = 2;
-    _ = krn.kthread_create(&test_thread, &arg2) catch null;
-    const arg3: u32 = 3;
-    _ = krn.kthread_create(&test_thread, &arg3) catch null;
-    const arg4: u32 = 4;
-    _ = krn.kthread_create(&test_thread, &arg4) catch null;
-    const arg5: u32 = 5;
-    _ = krn.kthread_create(&test_thread, &arg5) catch null;
-    const arg11: u32 = 11;
-    _ = krn.kthread_create(&test_thread, &arg11) catch null;
-    const arg12: u32 = 12;
-    _ = krn.kthread_create(&test_thread, &arg12) catch null;
-    const arg13: u32 = 13;
-    _ = krn.kthread_create(&test_thread, &arg13) catch null;
-    const arg14: u32 = 14;
-    _ = krn.kthread_create(&test_thread, &arg14) catch null;
-    const arg15: u32 = 15;
-    _ = krn.kthread_create(&test_thread, &arg15) catch null;
     while (true) {
         asm volatile ("hlt");
     }
