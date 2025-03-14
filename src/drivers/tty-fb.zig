@@ -137,8 +137,6 @@ pub const TTY = struct {
     }
 
     pub fn render(self: *TTY) void {
-        if (!self.cursor_updated() and !self._has_dirty_rect)
-            return ;
         if (self._has_dirty_rect) {
             const x1 = self._dirty_rect.x1;
             const y1 = self._dirty_rect.y1;
@@ -155,11 +153,9 @@ pub const TTY = struct {
                 }
             }
         }
-        if (self.cursor_updated()) {
-            const c = self._buffer[self._prev_y * self.width + self._prev_x];
-            scr.framebuffer.putchar(c, self._prev_x, self._prev_y, self._bg_colour, self._fg_colour);
-            self.update_cursor();
-        }
+        const c = self._buffer[self._prev_y * self.width + self._prev_x];
+        scr.framebuffer.putchar(c, self._prev_x, self._prev_y, self._bg_colour, self._fg_colour);
+        self.update_cursor();
         scr.framebuffer.render();
         self._has_dirty_rect = false;
     }
@@ -178,8 +174,12 @@ pub const TTY = struct {
             self._buffer[p - self.width..p],
             0
         );
-        self.save_cursor();
+        @memset(
+            self._prev_buffer[p - self.width..p],
+            1
+        );
         self._y = self.height - 1;
+        self.save_cursor();
         self.markDirty(DirtyRect.fullScreen(self.width, self.height));
     }
 
@@ -252,6 +252,7 @@ pub const TTY = struct {
                     self._buffer[self.width * self._y + self._x .. self.width * self._y + self.width],
                     0
                 );
+                self.markDirty(DirtyRect.line(self._y, self._x, self.width));
                 self._y += 1;
                 self._x = 0;
                 if (self._y >= self.height)
@@ -324,11 +325,11 @@ pub const TTY = struct {
                     len += 1;
                 }
             }
+            self.save_cursor();
             self.printChar(c);
         }
         const x = self._x;
         const y = self._y;
-        self.save_cursor();
         var i: u16 = 0;
         while (i < end - start) : (i += 1)
             self.printVga(buf[i]);
