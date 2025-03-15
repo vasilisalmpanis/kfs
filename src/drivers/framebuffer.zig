@@ -65,6 +65,17 @@ pub const FrameBuffer = struct {
         @memset(self.virtual_buffer[0 .. self.fb_info.height * self.fb_info.width], 0);
     }
 
+    fn clear_char(self: *FrameBuffer, cx: u32, cy: u32, bg: u32) void {
+        const x = cx * self.font.width;
+        const y = cy * self.font.height;
+        const width = (self.fb_info.pitch / 4);
+        var pos = y * width + x;
+        for (0..self.font.height) |_| {
+            @memset(self.virtual_buffer[pos..pos + self.font.width], bg);
+            pos += width;
+        }
+    }
+
     pub fn putchar(
         self: *FrameBuffer,
         c: u8,
@@ -73,23 +84,24 @@ pub const FrameBuffer = struct {
         bg: u32,
         fg: u32,
     ) void {
+        if (c == 0) return self.clear_char(cx, cy, bg);
         const char_data = self.font.data[c];
         const x = cx * self.font.width;
         const y = cy * self.font.height;
+        const one: u16 = 1;
+        const offset: u4 = @intCast(self.font.width - 1);
+        const width = (self.fb_info.pitch / 4);
+        var pos = y * width + x;
         for (0..self.font.height) |row| {
             for (0..self.font.width) |bit| {
-                const b: u4 = @intCast(bit);
-                const one: u16 = 1;
-                const offset: u4 = @intCast(self.font.width - 1);
-                const mask: u16 = one << (offset - b);
-                if (c == 0) {
-                    self.virtual_buffer[(row + y) * (self.fb_info.pitch / 4) + b + x] = bg;
-                } else if ((char_data[row] & mask) != 0) {
-                    self.virtual_buffer[(row + y) * (self.fb_info.pitch / 4) + b + x] = fg;
+                const mask: u16 = one << (offset - @as(u4, @intCast(bit)));
+                if ((char_data[row] & mask) != 0) {
+                    self.virtual_buffer[pos + bit] = fg;
                 } else {
-                    self.virtual_buffer[(row + y) * (self.fb_info.pitch / 4) + b + x] = bg;
+                    self.virtual_buffer[pos + bit] = bg;
                 }
             }
+            pos += width;
         }
     }
 
@@ -101,10 +113,11 @@ pub const FrameBuffer = struct {
     ) void {
         const x = cx * self.font.width;
         const y = cy * self.font.height;
-        for (0..self.font.width) |pos| {
-            self.virtual_buffer[(y + self.font.height - 2) * (self.fb_info.pitch / 4) + x + pos] = fg;
-            self.virtual_buffer[(y + self.font.height - 1) * (self.fb_info.pitch / 4) + x + pos] = fg;
-        }
+        const width = (self.fb_info.pitch / 4);
+        const line1 = (y + self.font.height - 2) * width  + x;
+        const line2 = line1 + width;
+        @memset(self.virtual_buffer[line1..(line1 + self.font.width)], fg);
+        @memset(self.virtual_buffer[line2..(line2 + self.font.width)], fg);
     }
 
     pub fn putPixel(

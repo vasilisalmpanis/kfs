@@ -13,5 +13,12 @@ fn callback(_: void, string: []const u8) error{}!usize {
 }
 
 pub fn printf(comptime format: []const u8, args: anytype) void {
-    fmt.format(writer, format, args) catch unreachable;
+    if (screen.current_tty) |t| {
+        var buf: [2000]u8 = undefined;
+        const str = fmt.bufPrint(&buf, format, args) catch {
+            return ;
+        };
+        t.print(str, false);
+    }
+    // fmt.format(writer, format, args) catch unreachable;
 }

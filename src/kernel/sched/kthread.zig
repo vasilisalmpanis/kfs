@@ -5,7 +5,7 @@ const printf = @import("debug").printf;
 const vmm = @import("arch").vmm;
 const regs = @import("arch").regs;
 
-const STACK_SIZE: u32 = 4096 * 2;
+const STACK_SIZE: u32 = 4096 * 40;
 
 const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
