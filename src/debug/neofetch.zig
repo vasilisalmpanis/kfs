@@ -88,7 +88,7 @@ pub fn neofetch(tty: *TTY, boot_info: *multiboot.multiboot_info) void {
         task_count += 1;
     }
     
-    const uptime_seconds = krn.pit.get_seconds_from_start();
+    const uptime_seconds = krn.get_seconds_from_start();
     const uptime_hours = uptime_seconds / 3600;
     const uptime_minutes = (uptime_seconds % 3600) / 60;
     const uptime_secs = uptime_seconds % 60;

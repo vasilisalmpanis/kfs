@@ -107,3 +107,4 @@ pub fn kthread_stop(thread: *tsk.task_struct) i32 {
     thread.refcount -= 1;
     return result;
 }
+

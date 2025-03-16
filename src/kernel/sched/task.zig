@@ -1,13 +1,14 @@
 const vmm = @import("arch").vmm;
 const lst = @import("../utils/list.zig");
 const regs = @import("arch").regs;
+const current_ms = @import("../time/jiffies.zig").current_ms;
 
 var pid: u32 = 0;
 
 const task_state = enum(u8) {
     RUNNING,
-    UNINTERRUPTIBLE_SLEEP,
-    INTERRUPTIBLE_SLEEP,
+    UNINTERRUPTIBLE_SLEEP,  // Sleep the whole duration
+    INTERRUPTIBLE_SLEEP,    // IO finished? wake up
     STOPPED,
     ZOMBIE,
 };
@@ -96,6 +97,7 @@ pub const task_struct = struct {
     next:           ?*task_struct,
     type:           task_type,
     refcount:       u32 = 0,
+    wakeup_time:    usize = 0,
 
     // only for kthreads
     threadfn:       ?*const fn (arg: ?*const anyopaque) i32 = null,
@@ -150,6 +152,13 @@ pub const task_struct = struct {
         curr.next = self;
     }
 };
+
+pub fn sleep(millis: usize) void {
+    if (current == &initial_task)
+        return ;
+    current.wakeup_time = current_ms() + millis;
+    current.state = .UNINTERRUPTIBLE_SLEEP;
+}
 
 pub var initial_task = task_struct.init(0, 0, 0, .KTHREAD);
 pub var current = &initial_task;

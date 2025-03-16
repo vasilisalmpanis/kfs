@@ -4,6 +4,7 @@ const lst = @import("../utils/list.zig");
 const regs = @import("arch").regs;
 const km = @import("../mm/kmalloc.zig");
 const kthread_free_stack = @import("./kthread.zig").kthread_free_stack;
+const current_ms = @import("../time/jiffies.zig").current_ms;
 
 
 pub fn switch_to(from: *tsk.task_struct, to: *tsk.task_struct, state: *regs) *regs {
@@ -13,7 +14,7 @@ pub fn switch_to(from: *tsk.task_struct, to: *tsk.task_struct, state: *regs) *re
     return @ptrFromInt(to.regs.esp);
 }
 
-fn cleanup_stopped_tasks() void {
+fn process_tasks() void {
     var buf: ?*tsk.task_struct = &tsk.initial_task;
     var prev: ?*tsk.task_struct = null;
     while (buf != null) : (buf = buf.?.next) {
@@ -28,20 +29,28 @@ fn cleanup_stopped_tasks() void {
             }
             continue;
         }
+        if (buf.?.state == .UNINTERRUPTIBLE_SLEEP and current_ms() >= buf.?.wakeup_time) {
+            buf.?.state = .RUNNING;
+        }
         prev = buf;
     }
 }
 
+fn find_next_task() *tsk.task_struct {
+    if (tsk.current.next == null)
+        return &tsk.initial_task;
+    var curr: ?*tsk.task_struct = tsk.current;
+    while (curr.?.next != null) : (curr = curr.?.next) {
+        if (curr.?.next.?.state == .RUNNING)
+            return curr.?.next.?;
+    }
+    return &tsk.initial_task;
+}
+
 pub fn schedule(state: *regs) *regs {
-    var new_state: *regs = state;
     if (tsk.initial_task.next == null) {
-        return new_state;
+        return state;
     }
-    cleanup_stopped_tasks();
-    if (tsk.current.next == null) {
-        new_state = switch_to(tsk.current, &tsk.initial_task, state);
-    } else {
-        new_state = switch_to(tsk.current, tsk.current.next.?, state);
-    }
-    return new_state;
+    process_tasks();
+    return switch_to(tsk.current, find_next_task(), state);
 }

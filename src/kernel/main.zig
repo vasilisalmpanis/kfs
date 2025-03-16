@@ -21,6 +21,11 @@ pub const task = @import("./sched/task.zig");
 pub const sched = @import("./sched/scheduler.zig");
 pub const timer_handler = @import("./time/jiffies.zig").timer_handler;
 pub const switch_to = @import("./sched/scheduler.zig").switch_to;
+pub const sleep = @import("./sched/task.zig").sleep;
+
+
+pub const get_seconds_from_start = @import("./time/jiffies.zig").get_seconds_from_start;
+pub const current_ms = @import("./time/jiffies.zig").current_ms;
 pub const jiffies = @import("./time/jiffies.zig");
 
 pub var keyboard: Keyboard = undefined;
