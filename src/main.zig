@@ -50,6 +50,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger = Logger.init(.DEBUG);
 
     const boot_info: *multiboot.multiboot_info = @ptrFromInt(address);
+    krn.boot_info = boot_info;
     krn.logger.INFO("Boot info {}", .{boot_info});
 
     gdt.gdt_init();

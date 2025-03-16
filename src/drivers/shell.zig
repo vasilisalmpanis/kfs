@@ -29,6 +29,8 @@ pub const Shell = struct {
             , .{});
         } else if (mem.eql(u8, input, "stack")) {
             debug.TraceStackTrace(10);
+        } else if (mem.eql(u8, input, "neofetch")) {
+            debug.neofetch(screen.current_tty.?, krn.boot_info);
         } else if (mem.eql(u8, input, "ps")) {
             debug.ps();
         } else if (mem.eql(u8, input, "jiffies")) {

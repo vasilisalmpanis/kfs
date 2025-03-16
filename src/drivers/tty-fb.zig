@@ -91,6 +91,8 @@ pub const TTY = struct {
     _fg_colour: u32 = @intFromEnum(ConsoleColors.White),
     _buffer : [*]u8,
     _prev_buffer : [*]u8,
+    _line: [*]u8,
+    _input_len: u32 = 0,
     _prev_x: u32 = 0,
     _prev_y: u32 = 0,
     _dirty_rect: DirtyRect = DirtyRect.init(0, 0, 0, 0),
@@ -103,6 +105,7 @@ pub const TTY = struct {
             .height = height,
             ._buffer = @ptrFromInt(mm.kmalloc(width * height * @sizeOf(u8))),
             ._prev_buffer = @ptrFromInt(mm.kmalloc(width * height * @sizeOf(u8))),
+            ._line = @ptrFromInt(mm.kmalloc(width * @sizeOf(u8))),
             .shell = Shell.init(),
         };
         @memset(tty._buffer[0..width * height], 0);
@@ -111,7 +114,7 @@ pub const TTY = struct {
         return tty;
     }
 
-    fn update_cursor(self: *TTY) void {
+    fn render_cursor(self: *TTY) void {
         scr.framebuffer.cursor(self._x, self._y, self._fg_colour);
     }
 
@@ -120,13 +123,16 @@ pub const TTY = struct {
         self._prev_y = self._y;
     }
 
-    pub fn move(self: *TTY, direction : u8) void {
+    fn move(self: *TTY, direction : u8) void {
         self.save_cursor();
         if (direction == 0) {
             if (self._x > 0)
                 self._x -= 1;
         } else {
-            if (self._x < self.width - 1)
+            if (
+                self._x < self.width - 1
+                and self._buffer[self._y * self.width + self._x] != 0
+            )
                 self._x += 1;
         }
         self.render();
@@ -137,6 +143,8 @@ pub const TTY = struct {
     }
 
     pub fn render(self: *TTY) void {
+        if (!self._has_dirty_rect and !self.cursor_updated())
+            return ;
         if (self._has_dirty_rect) {
             const x1 = self._dirty_rect.x1;
             const y1 = self._dirty_rect.y1;
@@ -147,15 +155,25 @@ pub const TTY = struct {
                 for (x1..(x2 + 1)) |col| {
                     const c = self._buffer[row * self.width + col];
                     if (c != self._prev_buffer[row * self.width + col]) {
-                        scr.framebuffer.putchar(c, col, row, self._bg_colour, self._fg_colour);
+                        scr.framebuffer.putchar(
+                            c,
+                            col, row,
+                            self._bg_colour,
+                            self._fg_colour
+                        );
                         self._prev_buffer[row * self.width + col] = c;
                     }
                 }
             }
         }
         const c = self._buffer[self._prev_y * self.width + self._prev_x];
-        scr.framebuffer.putchar(c, self._prev_x, self._prev_y, self._bg_colour, self._fg_colour);
-        self.update_cursor();
+        scr.framebuffer.putchar(
+            c,
+            self._prev_x, self._prev_y,
+            self._bg_colour,
+            self._fg_colour
+        );
+        self.render_cursor();
         scr.framebuffer.render();
         self._has_dirty_rect = false;
     }
@@ -183,29 +201,7 @@ pub const TTY = struct {
         self.markDirty(DirtyRect.fullScreen(self.width, self.height));
     }
 
-    fn removeAtIndex(self: *TTY, index: usize) void {
-
-        // Move the characters after the index to the left
-        var i = index;
-        while (i < self.height * self.width - 1) {
-            self._buffer[i] = self._buffer[i + 1];
-            i += 1;
-        }
-        self._buffer[i] = 0;
-    }
-
-    pub fn remove(self: *TTY) void {
-        if (self._x == 0 and self._y == 0)
-            return;
-        self.save_cursor();
-        if (self._x > 0)
-            self._x -= 1;
-        self.markDirty(DirtyRect.init(self._x, self._y, self.width - 1, self._y));
-        self.removeAtIndex(self._y * self.width + self._x);
-        self.render();
-    }
-
-    pub fn clear(self: *TTY) void {
+    fn clear(self: *TTY) void {
         @memset(
             self._buffer[0..self.height * self.width],
             0
@@ -248,20 +244,15 @@ pub const TTY = struct {
     fn printChar(self: *TTY, c: u8) void {
         switch (c) {
             '\n'    => {
-                @memset(
-                    self._buffer[self.width * self._y + self._x .. self.width * self._y + self.width],
-                    0
-                );
-                self.markDirty(DirtyRect.line(self._y, self._x, self.width));
                 self._y += 1;
                 self._x = 0;
                 if (self._y >= self.height)
                     self._scroll();
             },
             // 3       => {self._y += 1; self._x = 0;},
-            8       => self.remove(),
+            8       => self.removeAtCursor(),
             12      => self.clear(),
-            '\t'    => self.print("    ", false),
+            '\t'    => self.print("    "),
             else    => self.printVga(c),
         }
     }
@@ -282,12 +273,84 @@ pub const TTY = struct {
         self.render();
     }
 
+    fn shiftBufferRight(self: *TTY) void {
+        var i = self._input_len;
+        const pos = self._y * self.width;
+        while (i > self._x): (i -= 1) {
+            self._buffer[pos + i] = self._buffer[pos + i - 1];
+        }
+    }
+
+    fn shiftBufferLeft(self: *TTY) void {
+        var i = self._x;
+        const pos = self._y * self.width;
+        while (i < self._input_len -| 1): (i += 1) {
+            self._buffer[pos + i] = self._buffer[pos + i + 1];
+        }
+        self._buffer[pos + self._input_len -| 1] = 0;
+    }
+
+    fn insertAtCursor(self: *TTY, c: u8) void {
+        if (self._x < self.width - 1) {
+            self.shiftBufferRight();
+            self._buffer[self._y * self.width + self._x] = c;
+            self._input_len += 1;
+            self.markDirty(
+                DirtyRect.init(
+                    self._x,
+                    self._y,
+                    self._input_len,
+                    self._y
+                )
+            );
+            self.save_cursor();
+            self._x += 1;
+            self.render();
+        }
+    }
+
+    fn removeAtCursor(self: *TTY) void {
+        if (self._x > 0) {
+            self.save_cursor();
+            self._x -= 1;
+            self.shiftBufferLeft();
+            self.markDirty(
+                DirtyRect.init(
+                    self._x,
+                    self._y,
+                    self._input_len,
+                    self._y
+                )
+            );
+            self._input_len -= 1;
+            self.render();
+        }
+    }
+
+    fn processEnter(self: *TTY) void {
+        const pos = self._y * self.width;
+        @memcpy(
+            self._line[0..self._input_len],
+            self._buffer[pos..pos+self._input_len]
+        );
+        const line: [] const u8 = self._line[0..self._input_len];
+        self._input_len = 0;
+        self.save_cursor();
+        self.printChar('\n');
+        self.render();
+        if (line.len > 0)
+            self.shell.handleInput(line);
+    }
+
     pub fn input(self: *TTY, data: [] const KeyEvent) void {
-        var ret: [1]u8 = .{0};
         for (data) |event| {
             if (!event.ctl) {
-                ret[0] = event.val;
-                self.print(ret[0..1], true);
+                switch (event.val) {
+                    '\n' => self.processEnter(),
+                    12 => self.clear(),
+                    8 => self.removeAtCursor(),
+                    else => self.insertAtCursor(event.val), 
+                }
             } else {
                 const ctl: CtrlType = @enumFromInt(event.val);
                 switch (ctl) {
@@ -297,62 +360,19 @@ pub const TTY = struct {
                     .END => self.endline(),
                     else => {},
                 }
-            } 
+            }
         }
     }
 
-    pub fn print(self: *TTY, msg: [] const u8, stdin: bool) void {
-        var str: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
-        defer mm.kfree(@intFromPtr(str));
-        @memset(str[0..self.width], 0);
-        var len: u8 = 0;
-        var buf: [*]u8 = @ptrFromInt(mm.kmalloc(self.width * @sizeOf(u8)));
-        defer mm.kfree(@intFromPtr(buf));
-        @memset(buf[0..self.width], 0);
-        const start = self._y * self.width + self._x;
-        const max_end: u32 = (self._y + 1) * self.width;
-        var end: u32 = start;
-        while (self._buffer[end] != 0 and end < max_end)
-            end += 1;
-        @memcpy(buf[0..(end - start)], self._buffer[start..end]);
+    pub fn print(self: *TTY, msg: [] const u8) void {
+        self.save_cursor();
         for (msg) |c| {
-            if (c == '\n' and stdin) {
-                var line: []u8 = "";
-                if (self._x > 0)
-                    line = self._buffer[self._y * self.width..self._y * self.width + self._x];
-                for (line) |cc| {
-                    str[len] = cc;
-                    len += 1;
-                }
-            }
-            self.save_cursor();
             self.printChar(c);
         }
-        const x = self._x;
-        const y = self._y;
-        var i: u16 = 0;
-        while (i < end - start) : (i += 1)
-            self.printVga(buf[i]);
-        self._x = x;
-        self._y = y;
         self.render();
-        if (stdin and str[0] != 0)
-            self.shell.handleInput(str[0..len]);
     }
 
     pub fn setColor(self: *TTY, fg: u32) void {
         self._fg_colour = fg;
-    }
-
-    pub fn vga_entry(self: *TTY, uc: u8, new_color: u8) u16 {
-        _ = self;
-        const c: u16 = new_color;
-
-        return uc | (c << 8);
-    }
-
-    fn getCharacterFromVgaEntry(self: *TTY, entry: u16) u8 {
-        _ = self;
-        return @intCast(entry & 0xFF);
     }
 };
