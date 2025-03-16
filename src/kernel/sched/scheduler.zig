@@ -3,6 +3,7 @@ const dbg = @import("debug");
 const lst = @import("../utils/list.zig");
 const regs = @import("arch").regs;
 const km = @import("../mm/kmalloc.zig");
+const kthread_free_stack = @import("./kthread.zig").kthread_free_stack;
 
 
 pub fn switch_to(from: *tsk.task_struct, to: *tsk.task_struct, state: *regs) *regs {
@@ -19,7 +20,7 @@ fn cleanup_stopped_tasks() void {
         if (buf.?.state == .STOPPED and buf.? != tsk.current and buf.?.refcount == 0) {
             if (prev != null) {
                 prev.?.next = buf.?.next;
-                km.kfree(buf.?.stack_bottom);
+                kthread_free_stack(buf.?.stack_bottom);
                 km.kfree(@intFromPtr(buf));
                 buf = prev;
             } else {

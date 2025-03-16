@@ -33,3 +33,24 @@ pub fn shutdown() noreturn {
     _ = io.outw(0x604, 0x2000);
     while (true) {}
 }
+
+pub fn enableWriteProtect() void {
+    // Set the WP bit (bit 16) in CR0
+    asm volatile (
+        \\mov %%cr0, %%eax
+        \\or $0x10000, %%eax    # Set WP bit (bit 16)
+        \\mov %%eax, %%cr0
+        ::: "eax", "memory"
+    );
+}
+
+pub fn disableWriteProtect() void {
+    // Clear the WP bit (bit 16) in CR0
+    asm volatile (
+        \\mov %%cr0, %%eax
+        \\and $0xFFFEFFFF, %%eax    # Clear WP bit (bit 16)
+        \\mov %%eax, %%cr0
+        ::: "eax", "memory"
+    );
+}
+

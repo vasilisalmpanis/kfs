@@ -1,6 +1,7 @@
 const multiboot_info = @import("arch").multiboot.multiboot_info;
 const multiboot_memory_map = @import("arch").multiboot.multiboot_memory_map;
 const std = @import("std");
+const arch = @import("arch");
 
 const pmm = @import("arch").pmm;
 const vmm = @import("arch").vmm;
@@ -16,7 +17,7 @@ pub const vfree = @import("./vmalloc.zig").vfree;
 pub const vsize = @import("./vmalloc.zig").vsize;
 
 pub const PAGE_OFFSET: u32 = 0xC0000000;
-pub const PAGE_SIZE: u32 = 4096;
+pub const PAGE_SIZE: u32 = arch.PAGE_SIZE;
 
 extern const _kernel_end: u32;
 extern const _kernel_start: u32;

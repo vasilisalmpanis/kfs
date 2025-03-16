@@ -1,10 +1,24 @@
 const printf = @import("debug").printf;
 const PMM = @import("./pmm.zig").PMM;
+const krn = @import("kernel");
 const PAGE_OFFSET: u32 = 0xC0000000;
 const PAGE_PRESENT: u8 = 0x1;
 const PAGE_WRITE: u8 = 0x2;
 const PAGE_USER: u8 = 0x4;
 const PAGE_4MB: u8 = 0x80;
+
+pub const paging_flags = packed struct {
+    present: bool       = true,
+    writable: bool      = true,
+    user: bool          = false,
+    write_through: bool = false,
+    cache_disable: bool = false,
+    accessed: bool      = false,
+    dirty: bool         = false,
+    huge_page: bool     = false,
+    global: bool        = false,
+    available: u3       = 0x000, // available for us to use
+};
 
 pub extern var initial_page_dir: [1024]u32;
 // const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
@@ -170,7 +184,7 @@ pub const VMM = struct {
         self: *VMM,
         virtual_addr: u32,
         physical_addr: u32,
-        user: bool
+        flags: paging_flags
     ) void {
         const pd_idx = virtual_addr >> 22;
         const pt_idx = (virtual_addr >> 12) & 0x3ff;
@@ -180,9 +194,7 @@ pub const VMM = struct {
         if (pd[pd_idx] == 0) {
             const pt_pfn = self.pmm.alloc_page();
             const tmp_pd_idx = (pt_pfn >> 20) / 4;
-            pd[pd_idx] = pt_pfn | PAGE_PRESENT | PAGE_WRITE; // Present + writable
-            if (user)
-                pd[pd_idx] |= PAGE_USER;
+            pd[pd_idx] = pt_pfn | @as(u12, @bitCast(flags)) | PAGE_WRITE;
             const tmp = pd[tmp_pd_idx];
             pd[tmp_pd_idx] = PAGE_4MB | PAGE_WRITE | PAGE_PRESENT;
             pt = @ptrFromInt(0xFFC00000);
@@ -195,17 +207,8 @@ pub const VMM = struct {
         if (pt[pt_idx] != 0)
             return; // Do something
         pt[pt_idx] = physical_addr | PAGE_PRESENT | PAGE_WRITE;
-        if (user)
-            pt[pt_idx] |= PAGE_USER;
+        const new_flags = @as(u12, @bitCast(flags));
+        pt[pt_idx] = physical_addr | new_flags;
         InvalidatePage(virtual_addr);
     }
 };
-
-// Page Directory Entry Structure
-// |00000000|00R00000|000PAAAG|PDAPPURP|
-
-// Virtual addr: 0xdd000000
-// |11011101|00000000|00000000|00000000|
-// PDE Index: 0xdd000000 >> 22 = 884
-// PTE Index: (0xdd000000 >> 12) & 0x3ff = 0
-// Page offset: 0xdd000000 & 0xfff = 0

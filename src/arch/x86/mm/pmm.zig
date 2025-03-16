@@ -1,10 +1,7 @@
 const printf = @import("debug").printf;
-
 const std = @import("std");
-const PAGE_SIZE = 4096;
 
-const MAX_ORDER: usize = 10;
-const MAX_ORDER_SIZE: u32 = 1 << 10;
+pub const PAGE_SIZE = 4096;
 
 const PagesChunk = struct {
     map: *u32,

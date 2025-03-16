@@ -39,8 +39,8 @@ pub const FrameBuffer = struct {
         );
         const first_addr: u32 = virt_addr;
         while (i < num_pages) : (i += 1) {
-            mm.virt_memory_manager.map_page(virt_addr, addr, false);
-            mm.virt_memory_manager.map_page(addr, addr, false);
+            mm.virt_memory_manager.map_page(virt_addr, addr, .{});
+            mm.virt_memory_manager.map_page(addr, addr, .{});
             virt_addr += mm.PAGE_SIZE;
             addr += mm.PAGE_SIZE;
         }
