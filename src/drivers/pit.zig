@@ -1,14 +1,13 @@
 const io = @import("arch").io;
 const krn = @import("kernel");
 
+pub var HZ: u32 = 1000;
+
 pub const PIT = struct {
     clock_freq: u32 = 1193182,
-    frequency: u32,
 
     pub fn init(frequency: u32) PIT {
-        var pit = PIT{
-            .frequency = frequency,
-        };
+        var pit = PIT{};
         pit.set_frequency(frequency);
         return pit;
     }
@@ -40,14 +39,13 @@ pub const PIT = struct {
     }
 
     pub fn set_frequency(self: *PIT, frequency: u32) void {
-        self.frequency = frequency;
+        HZ = frequency;
         const divider = self.calculate_divider(frequency);
         io.outb(0x43, 0b00110100);
         io.outb(0x40, @truncate(divider & 0xFF));
         io.outb(0x40, @truncate(divider >> 8));
     }
 
-    pub fn get_seconds_from_start(self: *PIT) u32 {
-        return (krn.jiffies.jiffies / self.frequency);
-    }
+
 };
+
