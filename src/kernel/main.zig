@@ -27,6 +27,7 @@ pub var keyboard: Keyboard = undefined;
 pub var pit: PIT = undefined;
 pub var serial: Serial = undefined;
 pub var logger: Logger = undefined;
+pub var boot_info: *multiboot.multiboot_info = undefined;
 
 // pub fn handle_input() void {
 //     const input = keyboard.get_input();

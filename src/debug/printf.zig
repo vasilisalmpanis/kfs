@@ -8,7 +8,7 @@ pub const writer = Writer(void, error{}, callback){ .context = {} };
 fn callback(_: void, string: []const u8) error{}!usize {
     // Print the string passed to the callback
     if (screen.current_tty) |t|
-        t.print(string, false);
+        t.print(string);
     return string.len;
 }
 
@@ -18,7 +18,7 @@ pub fn printf(comptime format: []const u8, args: anytype) void {
         const str = fmt.bufPrint(&buf, format, args) catch {
             return ;
         };
-        t.print(str, false);
+        t.print(str);
     }
     // fmt.format(writer, format, args) catch unreachable;
 }
