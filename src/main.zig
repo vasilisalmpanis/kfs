@@ -64,7 +64,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.pit = PIT.init(1000);
     idt.idt_init();
     krn.logger.INFO("IDT initialized", .{});
-    
+    system.enableWriteProtect();
+
     irq.register_handler(1, &keyboard.keyboard_interrupt);
     krn.logger.INFO("Keyboard handler added", .{});
     krn.task.initial_task.setup(@intFromPtr(&vmm.initial_page_dir), @intFromPtr(&stack_top));

@@ -1,11 +1,14 @@
 const km = @import("../mm/kmalloc.zig");
 const tsk = @import("./task.zig");
-const lst = @import("../utils/list.zig");
 const printf = @import("debug").printf;
 const vmm = @import("arch").vmm;
+const mm_init = @import("../mm/init.zig");
 const regs = @import("arch").regs;
 
-const STACK_SIZE: u32 = 4096 * 40;
+
+const PAGE_SIZE = @import("arch").PAGE_SIZE;
+const STACK_PAGES = 3;
+const STACK_SIZE: u32 = (STACK_PAGES - 1) * PAGE_SIZE;
 
 const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
@@ -39,6 +42,33 @@ pub fn setup_stack(stack_top: u32) u32 {
     return @intFromPtr(stack_ptr);
 }
 
+pub fn kthread_stack_alloc(num_of_pages: u32) u32 {
+    const stack: u32 = mm_init.virt_memory_manager.find_free_space(num_of_pages, 0xB0000000, 0xFFFFF000, false);
+    for (0..num_of_pages) |index| {
+        const page: u32 = mm_init.virt_memory_manager.pmm.alloc_page();
+        if (page == 0) {
+            for (0..index) |idx| {
+                mm_init.virt_memory_manager.unmap_page(stack + idx * PAGE_SIZE);
+            }
+        }
+        mm_init.virt_memory_manager.map_page(stack + index * PAGE_SIZE,
+            page,
+            .{.writable = index != 0}
+        );
+    }
+    return stack + PAGE_SIZE;
+}
+
+pub fn kthread_free_stack(addr: u32) void {
+    var page: u32 = addr - PAGE_SIZE; // RO page
+    mm_init.virt_memory_manager.unmap_page(page);
+    page += PAGE_SIZE;
+    mm_init.virt_memory_manager.unmap_page(page);
+    page += PAGE_SIZE;
+    mm_init.virt_memory_manager.unmap_page(page);
+    page += PAGE_SIZE;
+}
+
 pub fn kthread_create(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.task_struct {
     const addr = km.kmalloc(@sizeOf(tsk.task_struct));
     var stack: u32 = undefined;
@@ -47,7 +77,7 @@ pub fn kthread_create(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.task_struc
     const new_task: *tsk.task_struct = @ptrFromInt(
         addr
     );
-    stack = km.kmalloc(STACK_SIZE);
+    stack = kthread_stack_alloc(STACK_PAGES);
     if (stack == 0) {
         km.kfree(addr);
         return error.MemoryAllocation;

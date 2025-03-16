@@ -322,7 +322,7 @@ pub const FreeList = packed struct {
         var idx: u32 = 0;
         var virt_addr = virtual;
         while (idx < num_pages) : (idx += 1) {
-            self.vmm.map_page(virt_addr, physical, user);
+            self.vmm.map_page(virt_addr, physical, .{.user = user});
             physical += PAGE_SIZE;
             virt_addr += PAGE_SIZE;
         }
@@ -342,7 +342,7 @@ pub const FreeList = packed struct {
                 }
                 return AllocationError.OutOfMemory;
             }
-            self.vmm.map_page(virt_addr, physical, user);
+            self.vmm.map_page(virt_addr, physical, .{.user = user});
             virt_addr += PAGE_SIZE;
         }
         return num_pages * PAGE_SIZE;
