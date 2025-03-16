@@ -22,7 +22,9 @@ pub const Shell = struct {
                 \\  reboot: Reboot the PC
                 \\  shutdown: Power off the PC
                 \\  halt: Halt the PC
-                \\  42: Print 42
+                \\  uptime: Show uptime in seconds
+                \\  ps: Show tasks
+                \\  neofetch: Show system info
                 \\  [color name]: Change the input color
                 \\  help: Display this help message
                 \\
@@ -43,8 +45,6 @@ pub const Shell = struct {
             system.shutdown();
         } else if (mem.eql(u8, input, "halt")) {
             system.halt();
-        } else if (mem.eql(u8, input, "42")) {
-            // screen.current_tty.?.print42();
         } else if (mem.eql(u8, input, "test")) {
             debug.run_tests();
         } else if (mem.eql(u8, input, "red")) {
