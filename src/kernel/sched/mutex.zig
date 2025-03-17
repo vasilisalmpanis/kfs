@@ -1,6 +1,7 @@
 const atomic = @import("std").atomic;
 const logger = @import("../main.zig");
 const tsk = @import("./task.zig");
+const reschedule = @import("./scheduler.zig").reschedule;
 
 pub const Mutex = struct {
     locked: atomic.Value(bool) = atomic.Value(bool).init(false),
@@ -11,8 +12,12 @@ pub const Mutex = struct {
 
     pub fn lock(self: *Mutex) void {
         while (self.locked.swap(true, .acquire)) {
-            // atomic.spinLoopHint();
+            reschedule();
         }
+    }
+
+    pub fn trylock(self: *Mutex) void {
+        return !self.locked.swap(true, .acquire);
     }
 
     pub fn unlock(self: *Mutex) void {
