@@ -2,6 +2,7 @@ const vmm = @import("arch").vmm;
 const lst = @import("../utils/list.zig");
 const regs = @import("arch").regs;
 const current_ms = @import("../time/jiffies.zig").current_ms;
+const reschedule = @import("./scheduler.zig").reschedule;
 
 var pid: u32 = 0;
 
@@ -158,6 +159,7 @@ pub fn sleep(millis: usize) void {
         return ;
     current.wakeup_time = current_ms() + millis;
     current.state = .UNINTERRUPTIBLE_SLEEP;
+    reschedule();
 }
 
 pub var initial_task = task_struct.init(0, 0, 0, .KTHREAD);

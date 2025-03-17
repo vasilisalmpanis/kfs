@@ -54,8 +54,6 @@ pub export fn irq_handler(state: *regs) callconv(.C) *regs {
     if (state.int_no >= 40) {
         io.outb(0xA0, 0x20);
     }
-    if (state.int_no >= 48)
-        krn.logger.INFO("Interrupt {d}\n", .{state.int_no});
     return new_state;
 }
 

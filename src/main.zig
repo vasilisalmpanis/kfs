@@ -42,40 +42,6 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
     return 0;
 }
 
-var mtx = krn.Mutex.init();
-var shared: u32 = 10;
-
-fn test_thread(_: ?*const anyopaque) i32 {
-    var i: u32 = 0;
-    while (!krn.task.current.should_stop) {
-        mtx.lock();
-        var tmp: u32 = shared; // 10
-        tmp += 1; // 11
-        shared = tmp; // 11
-        tmp = shared; // 11
-        tmp -= 1; // 10
-        shared = tmp; // 10
-        mtx.unlock();
-        i += 1;
-        // krn.logger.INFO("remains: {d}\n", .{10000000 - i});
-        if (i == 10000000)
-            return 0;
-    }
-    return 0;
-}
-
-fn output_thread(_: ?*const anyopaque) i32 {
-    while (!krn.task.current.should_stop) {
-        krn.sleep(8000);
-        mtx.lock();
-        dbg.printf("shared: {d}\n", .{shared});
-        mtx.unlock();
-    }
-    return 0;
-}
-
-var value: u32 = 0;
-
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x2BADB002) {
         system.halt();
@@ -102,23 +68,13 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     irq.register_handler(1, &keyboard.keyboard_interrupt);
     krn.logger.INFO("Keyboard handler added", .{});
-    krn.task.initial_task.setup(@intFromPtr(&vmm.initial_page_dir), @intFromPtr(&stack_top));
+    krn.task.initial_task.setup(
+        @intFromPtr(&vmm.initial_page_dir),
+        @intFromPtr(&stack_top)
+    );
     irq.register_handler(0, &krn.timer_handler);
     syscalls.initSyscalls();
     _ = krn.kthread_create(&tty_thread, null) catch null;
-    const arg1: u32 = 2000;
-    _ = krn.kthread_create(&test_thread, &arg1) catch null;
-    const arg2: u32 = 3000;
-    _ = krn.kthread_create(&test_thread, &arg2) catch null;
-    _ = krn.kthread_create(&test_thread, &arg2) catch null;
-    _ = krn.kthread_create(&test_thread, &arg2) catch null;
-    _ = krn.kthread_create(&test_thread, &arg2) catch null;
-    _ = krn.kthread_create(&test_thread, &arg2) catch null;
-    _ = krn.kthread_create(&test_thread, &arg2) catch null;
-    _ = krn.kthread_create(&test_thread, &arg2) catch null;
-    _ = krn.kthread_create(&test_thread, &arg2) catch null;
-
-    _ = krn.kthread_create(&output_thread, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
     while (true) {
         asm volatile ("hlt");
