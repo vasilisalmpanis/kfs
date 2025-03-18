@@ -5,6 +5,7 @@ const regs = @import("arch").regs;
 const km = @import("../mm/kmalloc.zig");
 const kthread_free_stack = @import("./kthread.zig").kthread_free_stack;
 const current_ms = @import("../time/jiffies.zig").current_ms;
+const arch_reschedule = @import("arch").arch_reschedule;
 
 
 pub fn switch_to(from: *tsk.task_struct, to: *tsk.task_struct, state: *regs) *regs {
@@ -56,38 +57,5 @@ pub export fn schedule(state: *regs) *regs {
 }
 
 pub fn reschedule() void {
-    asm volatile(
-        \\ pushf                # EFLAGS (current flags)
-        \\ cli
-        \\ push $0x8            # CS (kernel code segment)
-        \\ push $return_point
-        \\ push $0
-        \\ push $16
-        \\ pusha
-        \\ push %ds
-        \\ push %es
-        \\ push %fs
-        \\ push %gs
-        \\ mov $0x10, %ax
-        \\ mov %ax, %ds
-        \\ mov %ax, %es
-        \\ mov %ax, %fs
-        \\ mov %ax, %gs
-        \\ mov %esp, %eax       # Pointer to CPU struct
-        \\ push %eax
-        \\ lea schedule, %eax
-        \\ call *%eax
-        \\ add $4, %esp
-        \\ mov %eax, %esp
-        \\ pop %gs
-        \\ pop %fs
-        \\ pop %es
-        \\ pop %ds
-        \\ popa
-        \\ add $8, %esp         # Clean up interrupt number
-        \\ iret
-        \\ return_point:
-        \\ nop
-        \\
-    );
+    arch_reschedule();
 }

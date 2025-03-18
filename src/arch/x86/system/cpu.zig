@@ -1,4 +1,8 @@
 const krn = @import("kernel");
+const KERNEL_CODE_SEGMENT = @import("../idt.zig").KERNEL_CODE_SEGMENT;
+const KERNEL_DATA_SEGMENT = @import("../idt.zig").KERNEL_DATA_SEGMENT;
+
+
 pub const registers_t = struct {
     gs: u32, 
     fs: u32,
@@ -22,10 +26,10 @@ pub const registers_t = struct {
 
     pub fn init() registers_t {
         return registers_t{
-            .gs = 0x10,
-            .fs = 0x10,
-            .es = 0x10,
-            .ds = 0x10,
+            .gs = KERNEL_DATA_SEGMENT,
+            .fs = KERNEL_DATA_SEGMENT,
+            .es = KERNEL_DATA_SEGMENT,
+            .ds = KERNEL_DATA_SEGMENT,
             .edi = 0,
             .esi = 0,
             .ebp = 0,
@@ -37,7 +41,7 @@ pub const registers_t = struct {
             .int_no = 0,
             .err_code = 0,
             .eip = 0,
-            .cs = 0x8,
+            .cs = KERNEL_CODE_SEGMENT,
             .eflags = 0,
             .useresp = 0,
             .ss = 0,
@@ -58,3 +62,68 @@ pub const registers_t = struct {
         krn.logger.INFO("ss {X:0>8}\n", .{self.ss});
     }
 };
+
+pub fn setup_stack(stack_top: u32, eip: u32) u32 {
+    var stack_ptr: [*]u32 = @ptrFromInt(stack_top - @sizeOf(registers_t));
+    stack_ptr[0] = KERNEL_DATA_SEGMENT;
+    stack_ptr[1] = KERNEL_DATA_SEGMENT;
+    stack_ptr[2] = KERNEL_DATA_SEGMENT;
+    stack_ptr[3] = KERNEL_DATA_SEGMENT;            // segments
+    stack_ptr[4] = 0;               // GPR
+    stack_ptr[5] = 0;
+    stack_ptr[6] = 0;
+    stack_ptr[7] = 0;
+    stack_ptr[8] = 0;
+    stack_ptr[9] = 0;               // edx
+    stack_ptr[10] = 0;              // ecx
+    stack_ptr[11] = 0;              // eax
+    stack_ptr[12] = 0;              // int code
+    stack_ptr[13] = 0;              // error code
+    stack_ptr[14] = eip;            // eip
+    stack_ptr[15] = KERNEL_CODE_SEGMENT;            // cs
+    stack_ptr[16] = 0x202;          // eflags
+    stack_ptr[17] = 0x0;            // useresp
+    stack_ptr[18] = KERNEL_DATA_SEGMENT;           // ss
+    return @intFromPtr(stack_ptr);
+}
+
+pub inline fn arch_reschedule() void {
+    asm volatile(
+        \\ pushf
+        \\ cli
+        \\ push %[code_seg]     # CS (kernel code segment)
+        \\ push $return_point
+        \\ push $0
+        \\ push $16
+        \\ pusha
+        \\ push %%ds
+        \\ push %%es
+        \\ push %%fs
+        \\ push %%gs
+        \\ mov %[data_seg], %%ax
+        \\ mov %%ax, %%ds
+        \\ mov %%ax, %%es
+        \\ mov %%ax, %%fs
+        \\ mov %%ax, %%gs
+        \\ mov %%esp, %%eax
+        \\ push %%eax
+        \\ lea schedule, %%eax
+        \\ call *%%eax
+        \\ add $4, %%esp
+        \\ mov %%eax, %%esp
+        \\ pop %%gs
+        \\ pop %%fs
+        \\ pop %%es
+        \\ pop %%ds
+        \\ popa
+        \\ add $8, %%esp
+        \\ iret
+        \\ return_point:
+        \\ nop
+        \\
+        :
+        : [code_seg] "i" (KERNEL_CODE_SEGMENT),
+          [data_seg] "i" (KERNEL_DATA_SEGMENT)
+        : "memory"
+    );
+}
