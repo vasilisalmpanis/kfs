@@ -7,4 +7,5 @@ pub const walkPageTables = @import("./mm.zig").walkPageTables;
 pub const run_tests = @import("./tests.zig").run_tests;
 pub const Logger = @import("./logger.zig").Logger;
 pub const ps = @import("./tasks.zig").ps;
+pub const ps_tree = @import("./tasks.zig").ps_tree;
 pub const neofetch = @import("./neofetch.zig").neofetch;
