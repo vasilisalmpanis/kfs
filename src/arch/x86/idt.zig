@@ -35,14 +35,14 @@ pub export fn irq_handler(state: *regs) callconv(.C) *regs {
         } else {
             const handler: *const ISRHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
             handler();
-            if (state.int_no == TIMER_INTERRUPT) {
-                new_state = krn.sched.schedule(state);
-            }
         }
     }
     io.outb(0x20, 0x20);
     if (state.int_no >= 40) {
         io.outb(0xA0, 0x20);
+    }
+    if (state.int_no == TIMER_INTERRUPT) {
+        new_state = krn.sched.schedule(state);
     }
     return new_state;
 }
