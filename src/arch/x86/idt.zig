@@ -7,7 +7,7 @@ const printf = @import("debug").printf;
 const regs = @import("system/cpu.zig").registers_t;
 
 pub const IDT_MAX_DESCRIPTORS   = 256;
-pub const CPU_EXPECTIONS_COUNT  = 32;
+pub const CPU_EXCEPTION_COUNT   = 32;
 
 pub const SYSCALL_INTERRUPT = 0x80;
 pub const TIMER_INTERRUPT   = 0x20;
@@ -153,14 +153,14 @@ fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
 comptime {
     // Generate assembly for all stubs
     var asm_source: []const u8 = "";
-    for (0..CPU_EXPECTIONS_COUNT) |i| {
+    for (0..CPU_EXCEPTION_COUNT) |i| {
         const except: krn.exceptions.Exceptions = @enumFromInt(i);
         asm_source = asm_source ++ generateStub(
             @intCast(i),
             ErrorCodes.get(except) orelse false
         );
     }
-    for (CPU_EXPECTIONS_COUNT..IDT_MAX_DESCRIPTORS) |i| {
+    for (CPU_EXCEPTION_COUNT..IDT_MAX_DESCRIPTORS) |i| {
         asm_source = asm_source ++ generateIRQStub(@intCast(i));
     }
     // Emit the assembly
@@ -170,7 +170,7 @@ comptime {
 // Create the ISR stub table
 pub export var isr_stub_table: [IDT_MAX_DESCRIPTORS]*const ISRHandler align(4) linksection(".data") = init: {
     var table: [IDT_MAX_DESCRIPTORS]*const ISRHandler = undefined;
-    for (0..CPU_EXPECTIONS_COUNT) |i| {
+    for (0..CPU_EXCEPTION_COUNT) |i| {
         table[i] = @extern(
             *const ISRHandler,
             .{
@@ -178,7 +178,7 @@ pub export var isr_stub_table: [IDT_MAX_DESCRIPTORS]*const ISRHandler align(4) l
             }
         );
     }
-    for (CPU_EXPECTIONS_COUNT..IDT_MAX_DESCRIPTORS) |i| {
+    for (CPU_EXCEPTION_COUNT..IDT_MAX_DESCRIPTORS) |i| {
         table[i] = @extern(
             *const ISRHandler,
             .{

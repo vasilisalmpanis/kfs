@@ -30,7 +30,7 @@ pub fn syscallsManager(state: *arch.regs) void {
 
 pub fn initSyscalls() void {
     register_handler(
-        arch.SYSCALL_INTERRUPT - arch.CPU_EXPECTIONS_COUNT,
+        arch.SYSCALL_INTERRUPT - arch.CPU_EXCEPTION_COUNT,
         &syscallsManager
     );
 }
