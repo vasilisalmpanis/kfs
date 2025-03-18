@@ -95,6 +95,9 @@ pub const task_struct = struct {
     state:          task_state,
     regs:           regs,
     stack_bottom:   u32,
+    children:       lst.list_head,
+    siblings:       lst.list_head,
+    parent:         ?*task_struct,
     next:           ?*task_struct,
     type:           task_type,
     refcount:       u32 = 0,
@@ -115,6 +118,9 @@ pub const task_struct = struct {
             .gid = gid,
             .regs = regs.init(),
             .stack_bottom = 0,
+            .children = .{ .prev = null , .next = null},
+            .siblings = .{ .prev = null , .next = null},
+            .parent = null,
             .next = null,
             .type = tp,
         };
@@ -124,6 +130,9 @@ pub const task_struct = struct {
         self.virtual_space = virt;
         self.pid = pid;
         self.regs.esp = task_stack_top;
+        self.parent = self;
+        self.children = .{.prev = &self.children, .next = &self.children};
+        self.siblings = .{.prev = &self.siblings, .next = &self.siblings};
         pid += 1;
     }
 
@@ -151,6 +160,13 @@ pub const task_struct = struct {
             curr = curr.next.?;
         }
         curr.next = self;
+
+        // tree logic
+        self.siblings = .{.prev = &self.siblings, .next = &self.siblings};
+        self.children = .{.prev = &self.children, .next = &self.children};
+        curr.children.next = &self.siblings;
+        curr.children.prev = &self.siblings;
+        self.parent = curr;
     }
 };
 

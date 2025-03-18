@@ -35,6 +35,8 @@ pub const Shell = struct {
             debug.neofetch(screen.current_tty.?, krn.boot_info);
         } else if (mem.eql(u8, input, "ps")) {
             debug.ps();
+        } else if (mem.eql(u8, input, "ps_tree")) {
+            debug.ps_tree(&krn.task.initial_task);
         } else if (mem.eql(u8, input, "jiffies")) {
             debug.printf("{d}\n", .{krn.jiffies.jiffies});
         } else if (mem.eql(u8, input, "uptime")) {
