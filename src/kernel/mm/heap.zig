@@ -1,5 +1,6 @@
 const pmm = @import("arch").pmm.PMM;
 const vmm = @import("arch").vmm.VMM;
+const Mutex = @import("../sched/mutex.zig").Mutex;
 const printf = @import("debug").printf;
 const dbg = @import("debug");
 const PAGE_SIZE = @import("./init.zig").PAGE_SIZE;
@@ -22,13 +23,14 @@ pub const AllocHeader = packed struct {
     unused_2: u32 = 0,
 };
 
-pub const FreeList = packed struct {
+pub const FreeList = struct {
     start_addr: u32,
     end_addr: u32,
     head: ?*FreeListNode,
     vmm: *vmm,
     pmm: *pmm,
     alignement: u8 = 16,
+    mtx: Mutex,
 
     pub fn init(
         phys_mm: *pmm,
@@ -44,6 +46,7 @@ pub const FreeList = packed struct {
             .vmm = virt_mm,
             .pmm = phys_mm,
             .alignement = alignement,
+            .mtx = Mutex.init(),
         };
     }
 
@@ -171,6 +174,8 @@ pub const FreeList = packed struct {
 
     pub fn free(self: *FreeList, addr: u32) void {
         var prev: ?*FreeListNode = undefined;
+        self.mtx.lock();
+        defer self.mtx.unlock();
         const header: ?*AllocHeader = self.getAllocHeader(addr);
         if (header == null)
             return;
@@ -209,6 +214,8 @@ pub const FreeList = packed struct {
         // Total size of the block to allocate (including header)
         const total_size = self.alignToPtr(size + @sizeOf(AllocHeader));
 
+        self.mtx.lock();
+        defer self.mtx.unlock();
         // Try to find existing block (first fit)
         var buffer = self.head;
         var prev = self.head;

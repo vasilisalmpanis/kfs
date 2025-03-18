@@ -21,5 +21,6 @@ pub const Mutex = struct {
 
     pub fn unlock(self: *Mutex) void {
         self.locked.store(false, .release);
+        reschedule();
     }
 };
