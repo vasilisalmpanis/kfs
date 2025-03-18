@@ -1,9 +1,7 @@
+const arch = @import("arch");
 const register_handler = @import("./manage.zig").register_handler;
-const regs = @import("arch").regs;
-const printf = @import("debug").printf;
 
-
-pub var syscalls: [256] ?* const anyopaque = .{null} ** 256;
+pub var syscalls: [arch.IDT_MAX_DESCRIPTORS] ?* const anyopaque = .{null} ** arch.IDT_MAX_DESCRIPTORS;
 
 const SyscallHandler = fn (
     a1: u32,
@@ -13,8 +11,8 @@ const SyscallHandler = fn (
     a5: u32,
 ) i32;
 
-pub fn syscallsManager(state: *regs) void {
-    if (state.eax < 0 or state.eax >= 256) {
+pub fn syscallsManager(state: *arch.regs) void {
+    if (state.eax < 0 or state.eax >= arch.IDT_MAX_DESCRIPTORS) {
         state.eax = -1;
         return;
     }
@@ -31,12 +29,15 @@ pub fn syscallsManager(state: *regs) void {
 }
 
 pub fn initSyscalls() void {
-    register_handler(0x80 - 32, &syscallsManager);
+    register_handler(
+        arch.SYSCALL_INTERRUPT - arch.CPU_EXPECTIONS_COUNT,
+        &syscallsManager
+    );
 }
 
 pub fn registerSyscall(num: u32, handler: * const anyopaque) void {
-    if (num >= 256)
-        @panic("Wrong syscall number, should be < 256!");
+    if (num >= arch.IDT_MAX_DESCRIPTORS)
+        @panic("Wrong syscall number, should be < arch.IDT_MAX_DESCRIPTORS!");
     syscalls[num] = handler;
 }
 

@@ -1,5 +1,4 @@
 const atomic = @import("std").atomic;
-const logger = @import("../main.zig");
 const tsk = @import("./task.zig");
 const reschedule = @import("./scheduler.zig").reschedule;
 
