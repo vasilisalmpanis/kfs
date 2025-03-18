@@ -1,4 +1,5 @@
 const screen = @import("drivers").screen;
+const kernel = @import("kernel");
 const fmt = @import("std").fmt;
 const Writer = @import("std").io.Writer;
 
@@ -12,12 +13,16 @@ fn callback(_: void, string: []const u8) error{}!usize {
     return string.len;
 }
 
+var mtx = kernel.Mutex.init();
+
 pub fn printf(comptime format: []const u8, args: anytype) void {
     if (screen.current_tty) |t| {
         var buf: [2000]u8 = undefined;
         const str = fmt.bufPrint(&buf, format, args) catch {
             return ;
         };
+        mtx.lock();
+        defer mtx.unlock();
         t.print(str);
     }
     // fmt.format(writer, format, args) catch unreachable;
