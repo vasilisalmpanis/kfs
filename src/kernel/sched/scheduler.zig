@@ -23,6 +23,7 @@ fn process_tasks() void {
             if (prev != null) {
                 prev.?.next = buf.?.next;
                 kthread_free_stack(buf.?.stack_bottom);
+                buf.?.remove_self();
                 km.kfree(@intFromPtr(buf));
                 buf = prev;
             } else {
