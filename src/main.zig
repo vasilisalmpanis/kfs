@@ -42,6 +42,24 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
     return 0;
 }
 
+pub fn temp2(_: ?*const anyopaque) i32 {
+    // while (krn.task.current.should_stop != true) {
+    //     asm volatile ("nop;");
+    // }
+    return 0;
+}
+
+
+pub fn temp(_: ?*const anyopaque) i32 {
+    _ = krn.kthread_create(&temp2, null) catch null;
+    _ = krn.kthread_create(&temp2, null) catch null;
+    _ = krn.kthread_create(&temp2, null) catch null;
+    while (krn.task.current.should_stop != true) {
+        asm volatile ("nop;");
+    }
+    return 0;
+}
+
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x2BADB002) {
         system.halt();
@@ -75,6 +93,11 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     irq.register_handler(0, &krn.timer_handler);
     syscalls.initSyscalls();
     _ = krn.kthread_create(&tty_thread, null) catch null;
+    _ = krn.kthread_create(&temp, null) catch null;
+    _ = krn.kthread_create(&temp, null) catch null;
+    _ = krn.kthread_create(&temp, null) catch null;
+    _ = krn.kthread_create(&temp, null) catch null;
+    _ = krn.kthread_create(&temp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
     while (true) {
         asm volatile ("hlt");

@@ -36,7 +36,7 @@ pub const Shell = struct {
         } else if (mem.eql(u8, input, "ps")) {
             debug.ps();
         } else if (mem.eql(u8, input, "ps_tree")) {
-            debug.ps_tree(&krn.task.initial_task);
+            debug.ps_tree(&krn.task.initial_task, 0);
         } else if (mem.eql(u8, input, "jiffies")) {
             debug.printf("{d}\n", .{krn.jiffies.jiffies});
         } else if (mem.eql(u8, input, "uptime")) {
