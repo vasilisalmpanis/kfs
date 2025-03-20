@@ -130,11 +130,12 @@ pub const task_struct = struct {
     pub fn setup(self: *task_struct, virt: u32, task_stack_top: u32) void {
         self.virtual_space = virt;
         self.pid = pid;
+        pid += 1;
         self.regs.esp = task_stack_top;
         self.parent = self;
         self.children = .{.prev = &self.children, .next = &self.children};
         self.siblings = .{.prev = &self.siblings, .next = &self.siblings};
-        pid += 1;
+        self.next = null;
     }
 
     pub fn init_self(
@@ -147,7 +148,6 @@ pub const task_struct = struct {
         tp: task_type
     ) void {
         const tmp = task_struct.init(virt, uid, gid, tp);
-        var cursor: *task_struct = current;
         self.pid = tmp.pid;
         self.regs.esp = task_stack_top;
         self.virtual_space = tmp.virtual_space;
@@ -156,7 +156,9 @@ pub const task_struct = struct {
         self.gid = tmp.gid;
         self.pid = pid;
         pid += 1;
+        self.next = null;
         self.stack_bottom = stack_bottom;
+        var cursor: *task_struct = current;
         while (cursor.next != null) {
             cursor = cursor.next.?;
         }

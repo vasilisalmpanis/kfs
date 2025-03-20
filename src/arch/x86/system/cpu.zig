@@ -87,8 +87,28 @@ pub fn setup_stack(stack_top: u32, eip: u32) u32 {
     return @intFromPtr(stack_ptr);
 }
 
+pub inline fn getEflags() u32 {
+    return asm volatile (
+        \\ pushf
+        \\ pop %%eax
+        \\ mov %eax, %[value]
+        : [value] "={eax}" (-> u32),
+    );
+}
+
+pub fn are_int_enabled() bool {
+    const eflags = getEflags();
+    if (eflags & (1<<9) == (1<<9))
+        return true;
+    return false;
+}
+
 pub inline fn arch_reschedule() void {
     asm volatile(
+        \\ pushf
+        \\ pop %%eax            # Pop into EAX
+        \\ test $0x200, %%eax   # Test bit 9 (IF)
+        \\ jz return_point      # Jump if interrupts are disabled
         \\ pushf
         \\ cli
         \\ push %[code_seg]     # CS (kernel code segment)

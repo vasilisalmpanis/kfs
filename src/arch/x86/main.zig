@@ -6,6 +6,7 @@ pub const vmm = @import("mm/vmm.zig");
 pub const pmm = @import("mm/pmm.zig");
 pub const idt = @import("idt.zig");
 pub const regs = @import("system/cpu.zig").registers_t;
+pub const cpu = @import("system/cpu.zig");
 pub const arch_reschedule = @import("system/cpu.zig").arch_reschedule;
 pub const setup_stack = @import("system/cpu.zig").setup_stack;
 
