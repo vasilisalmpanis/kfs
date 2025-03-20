@@ -15,6 +15,8 @@ pub const vmm = @import("arch").vmm;
 pub const irq = @import("kernel").irq;
 const krn = @import("kernel");
 const syscalls = @import("kernel").syscalls;
+const std = @import("std");
+const cpu = @import("arch").cpu;
 
 extern const stack_top: u32;
 
@@ -46,11 +48,13 @@ pub fn temp2(_: ?*const anyopaque) i32 {
     // while (krn.task.current.should_stop != true) {
     //     asm volatile ("nop;");
     // }
+    dbg.printf("dies: {d}\n", .{krn.task.current.pid});
     return 0;
 }
 
 
 pub fn temp(_: ?*const anyopaque) i32 {
+    _ = krn.kthread_create(&temp2, null) catch null;
     _ = krn.kthread_create(&temp2, null) catch null;
     _ = krn.kthread_create(&temp2, null) catch null;
     _ = krn.kthread_create(&temp2, null) catch null;
@@ -93,12 +97,14 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     irq.register_handler(0, &krn.timer_handler);
     syscalls.initSyscalls();
     _ = krn.kthread_create(&tty_thread, null) catch null;
-    _ = krn.kthread_create(&temp, null) catch null;
-    _ = krn.kthread_create(&temp, null) catch null;
-    _ = krn.kthread_create(&temp, null) catch null;
-    _ = krn.kthread_create(&temp, null) catch null;
-    _ = krn.kthread_create(&temp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
+
+    _ = krn.kthread_create(&temp, null) catch null;
+    _ = krn.kthread_create(&temp, null) catch null;
+    _ = krn.kthread_create(&temp, null) catch null;
+    _ = krn.kthread_create(&temp, null) catch null;
+    _ = krn.kthread_create(&temp, null) catch null;
+
     while (true) {
         asm volatile ("hlt");
     }
