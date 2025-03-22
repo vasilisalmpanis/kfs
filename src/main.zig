@@ -45,9 +45,9 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
 }
 
 pub fn temp2(_: ?*const anyopaque) i32 {
-    // while (krn.task.current.should_stop != true) {
-    //     asm volatile ("nop;");
-    // }
+    while (krn.task.current.should_stop != true) {
+        asm volatile ("nop;");
+    }
     dbg.printf("dies: {d}\n", .{krn.task.current.pid});
     return 0;
 }

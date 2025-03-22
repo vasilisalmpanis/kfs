@@ -1,32 +1,33 @@
 const tsk = @import("kernel").task;
-const lst = @import("kernel").list;
+const printf_len = @import("./printf.zig").printf_len;
 const printf = @import("./printf.zig").printf;
 
 pub fn ps() void {
-    var buf: *lst.list_head = &tsk.initial_task.next;
-    while (buf.next != &tsk.initial_task.next) : (buf = buf.next.?) {
-        const task: *tsk.task_struct = lst.list_entry(tsk.task_struct, @intFromPtr(buf), "next");
+    var it = tsk.initial_task.list.iterator();
+    while (it.next()) |i| {
+        const task = i.curr.entry(tsk.task_struct, "list");
         printf("{d}: {any}\n", .{task.pid, task.state});
     }
-    const task: *tsk.task_struct = lst.list_entry(tsk.task_struct, @intFromPtr(buf), "next");
-    printf("{d}: {any}\n", .{task.pid, task.state});
     printf("stopped tasks {any}\n", .{tsk.stopped_tasks});
 }
 
-pub fn ps_tree(task: *tsk.task_struct, level: u32) void {
-    for (0..level) |_| {
-        printf(" ", .{});
+pub fn ps_tree(task: *tsk.task_struct, level: u32, last_child: bool) void {
+    const len = printf_len("{d} ", .{task.pid});
+    if (!task.children.is_single()) {
+        var it = task.children.next.?.iterator();
+        while (it.next()) |i| {
+            ps_tree(
+                i.curr.entry(tsk.task_struct, "siblings"),
+                level + len,
+                i.is_last()
+            );
+        }
     }
-    printf("{d}\n", .{task.pid});
-    if (task.children.next != &task.children) {
-        const child: *tsk.task_struct = lst.list_entry(tsk.task_struct, @intFromPtr(task.children.next), "siblings");
-        if (child == &tsk.initial_task)
-            return ;
-        ps_tree(child, level + 1);
-        var sibling = child.siblings.next;
-        while (sibling != &child.siblings) : (sibling = sibling.?.next) {
-            const buf = lst.list_entry(tsk.task_struct, @intFromPtr(sibling), "siblings");
-            ps_tree(buf, level + 1);
+    if (!last_child) {
+        printf("\n", .{});
+        for (0..level) |_| {
+            printf(" ", .{});
         }
     }
 }
+

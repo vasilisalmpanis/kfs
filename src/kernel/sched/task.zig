@@ -91,39 +91,33 @@ pub const tss_struct = packed struct {
 // and put it when no longer needed.
 pub const task_struct = struct {
     pid:            u32,
+    type:           task_type,
     virtual_space:  u32,
     uid:            u16,
     gid:            u16,
-    state:          task_state,
-    regs:           regs,
     stack_bottom:   u32,
-    children:       lst.list_head,
-    siblings:       lst.list_head,
-    parent:         ?*task_struct,
-    next:           lst.list_head,
-    type:           task_type,
-    refcount:       u32 = 0,
-    wakeup_time:    usize = 0,
+    state:          task_state      = task_state.RUNNING,
+    regs:           regs            = regs.init(),
+    children:       lst.ListHead    = lst.ListHead.init(),
+    siblings:       lst.ListHead    = lst.ListHead.init(),
+    parent:         ?*task_struct   = null,
+    list:           lst.ListHead    = lst.ListHead.init(),
+    refcount:       u32             = 0,
+    wakeup_time:    usize           = 0,
 
     // only for kthreads
     threadfn:       ?*const fn (arg: ?*const anyopaque) i32 = null,
-    arg:            ?*const anyopaque = null,
-    result:         i32 = 0,
-    should_stop:    bool = false,
+    arg:            ?*const anyopaque                       = null,
+    result:         i32                                     = 0,
+    should_stop:    bool                                    = false,
 
     pub fn init(virt: u32, uid: u16, gid: u16, tp: task_type) task_struct {
         return task_struct{
             .pid = 0,
             .virtual_space = virt,
-            .state = task_state.RUNNING,
             .uid = uid,
             .gid = gid,
-            .regs = regs.init(),
             .stack_bottom = 0,
-            .children = .{ .prev = null , .next = null},
-            .siblings = .{ .prev = null , .next = null},
-            .parent = null,
-            .next = .{ .prev = null, .next = null },
             .type = tp,
         };
     }
@@ -134,9 +128,9 @@ pub const task_struct = struct {
         pid += 1;
         self.regs.esp = task_stack_top;
         self.parent = self;
-        self.children = .{.prev = &self.children, .next = &self.children};
-        self.siblings = .{.prev = &self.siblings, .next = &self.siblings};
-        self.next = .{ .prev = &self.next, .next = &self.next };
+        self.children.setup();
+        self.siblings.setup();
+        self.list.setup();
     }
 
     pub fn init_self(
@@ -158,20 +152,20 @@ pub const task_struct = struct {
         self.gid = tmp.gid;
         self.pid = pid;
         pid += 1;
-        self.next = .{ .prev = &self.next, .next = &self.next };
+        self.list.setup();
         self.stack_bottom = stack_bottom;
-        lst.list_add_tail(&self.next, &current.next);
+        current.list.add_tail(&self.list);
 
         // tree logic
-        self.siblings = .{.prev = &self.siblings, .next = &self.siblings};
-        self.children = .{.prev = &self.children, .next = &self.children};
+        self.siblings.setup();
+        self.children.setup();
         current.add_child(self);
         tasks_mutex.unlock();
     }
 
     pub fn add_child(parent: *task_struct, child: *task_struct) void {
         if (parent.children.next.? != &parent.children) {
-            lst.list_add(&child.siblings, parent.children.next.?);
+            parent.children.next.?.add(&child.siblings);
         } else {
             parent.children.next = &child.siblings;
             parent.children.prev = &child.siblings;
@@ -186,40 +180,31 @@ pub const task_struct = struct {
         if (self == &initial_task)
             return ;
 
-        if (self.siblings.next.? != &self.siblings) {
+        if (!self.siblings.is_single()) {
             parent.children.next = self.siblings.next;
             parent.children.prev = self.siblings.prev;
-            const prev_sibling: *lst.list_head = self.siblings.prev.?;
-            const next_sibling: *lst.list_head = self.siblings.next.?;
-            prev_sibling.next = next_sibling;
-            next_sibling.prev = prev_sibling;
+            self.siblings.del();
         } else {
             parent.children.next = &parent.children;
             parent.children.prev = &parent.children;
             // if we are child of initial_task we already removed ourselfs from the list
         }
 
-        if (self.children.next.? != &self.children) {
-            const first_child: *lst.list_head = self.children.next.?;
-            const first_child_next: *lst.list_head = self.children.next.?.next.?;
-            var cursor: *lst.list_head = first_child;
-            var task: *task_struct = undefined;
+        if (!self.children.is_single()) {
+            const first_child: *lst.ListHead = self.children.next.?;
+            const first_child_next: *lst.ListHead = self.children.next.?.next.?;
 
-            while (cursor.next.? != first_child) {
-               task = lst.container_of(task_struct, @intFromPtr(cursor), "siblings");
-               task.state = .ZOMBIE; 
-               cursor = cursor.next.?;
+            var it = first_child.iterator();
+            while (it.next()) |i| {
+                i.curr.entry(task_struct, "siblings").*.state = .ZOMBIE;
             }
-            task = lst.container_of(task_struct, @intFromPtr(cursor), "siblings");
-            task.state = .ZOMBIE;
-            // initial task
             
-            if (initial_task.children.next.? == &initial_task.children) {
+            if (initial_task.children.is_single()) {
                 initial_task.children.next = first_child;
                 initial_task.children.prev = first_child;
             } else {
-                const child: *lst.list_head = initial_task.children.next.?;
-                const child_prev: *lst.list_head = initial_task.children.next.?.prev.?;
+                const child: *lst.ListHead = initial_task.children.next.?;
+                const child_prev: *lst.ListHead = initial_task.children.next.?.prev.?;
                 child.prev = first_child;
                 first_child.next = child;
                 child_prev.next = first_child_next;
@@ -240,4 +225,4 @@ pub fn sleep(millis: usize) void {
 pub var initial_task = task_struct.init(0, 0, 0, .KTHREAD);
 pub var current = &initial_task;
 pub var tasks_mutex: mutex = mutex.init();
-pub var stopped_tasks: ?*lst.list_head = null;
+pub var stopped_tasks: ?*lst.ListHead = null;
