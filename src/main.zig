@@ -84,16 +84,16 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     var scrn: screen.Screen = screen.Screen.init(boot_info);
     screen.current_tty = &scrn.tty[0];
     krn.pit = PIT.init(1000);
+    krn.task.initial_task.setup(
+        @intFromPtr(&vmm.initial_page_dir),
+        @intFromPtr(&stack_top)
+    );
     idt.idt_init();
     krn.logger.INFO("IDT initialized", .{});
     system.enableWriteProtect();
 
     irq.register_handler(1, &keyboard.keyboard_interrupt);
     krn.logger.INFO("Keyboard handler added", .{});
-    krn.task.initial_task.setup(
-        @intFromPtr(&vmm.initial_page_dir),
-        @intFromPtr(&stack_top)
-    );
     irq.register_handler(0, &krn.timer_handler);
     syscalls.initSyscalls();
     _ = krn.kthread_create(&tty_thread, null) catch null;

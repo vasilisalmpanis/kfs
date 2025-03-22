@@ -4,7 +4,6 @@ pub const list_head = packed struct {
     prev: ?*list_head,
 };
 
-// danger
 pub fn container_of(comptime T: type, ptr: u32, comptime member: []const u8) *T {
     const offset = @offsetOf(T, member);
     const result: *T = @ptrFromInt(ptr - offset);
@@ -57,3 +56,4 @@ pub fn list_map(
 pub fn list_entry(comptime T: type, ptr: u32, comptime member: []const u8) *T {
     return container_of(T, ptr, member);
 }
+

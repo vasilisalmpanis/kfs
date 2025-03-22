@@ -5,6 +5,7 @@ const tsk = @import("kernel").task;
 const TTY = @import("drivers").tty.TTY;
 const ConsoleColors = @import("drivers").tty.ConsoleColors;
 const krn = @import("kernel");
+const lst = krn.list;
 
 const os_logo = [_][]const u8{
     "  _  _    ___  ",
@@ -82,9 +83,9 @@ pub fn neofetch(tty: *TTY, boot_info: *multiboot.multiboot_info) void {
         }
     }
     
-    var task_count: u32 = 0;
-    var task_ptr: ?*tsk.task_struct = &tsk.initial_task;
-    while (task_ptr) |curr| : (task_ptr = curr.next) {
+    var task_count: u32 = 1;
+    var buf: *lst.list_head = &tsk.initial_task.next;
+    while (buf.next != &tsk.initial_task.next) : (buf = buf.next.?) {
         task_count += 1;
     }
     
