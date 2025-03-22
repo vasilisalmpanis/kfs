@@ -3,6 +3,7 @@ const tsk = @import("./task.zig");
 const printf = @import("debug").printf;
 const mm_init = @import("../mm/init.zig");
 const arch = @import("arch");
+const lst = @import("../main.zig").list;
 
 
 const PAGE_SIZE = @import("arch").PAGE_SIZE;
@@ -13,7 +14,18 @@ const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
 fn thread_wrapper() noreturn {
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
+    tsk.tasks_mutex.lock();
+    tsk.current.next.prev.?.next = tsk.current.next.next.?;
+    tsk.current.next.next.?.prev = tsk.current.next.prev.?;
+    if (tsk.stopped_tasks == null) {
+       tsk.stopped_tasks = &tsk.current.next;
+       tsk.stopped_tasks.?.next = tsk.stopped_tasks.?;
+       tsk.stopped_tasks.?.prev = tsk.stopped_tasks.?;
+    } else {
+       lst.list_add_tail(&tsk.current.next, tsk.stopped_tasks.?);
+    }
     tsk.current.state = .STOPPED;
+    tsk.tasks_mutex.unlock();
     while (true) {}
 }
 

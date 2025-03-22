@@ -100,7 +100,7 @@ pub const task_struct = struct {
     children:       lst.list_head,
     siblings:       lst.list_head,
     parent:         ?*task_struct,
-    next:           ?*task_struct,
+    next:           lst.list_head,
     type:           task_type,
     refcount:       u32 = 0,
     wakeup_time:    usize = 0,
@@ -123,7 +123,7 @@ pub const task_struct = struct {
             .children = .{ .prev = null , .next = null},
             .siblings = .{ .prev = null , .next = null},
             .parent = null,
-            .next = null,
+            .next = .{ .prev = null, .next = null },
             .type = tp,
         };
     }
@@ -136,7 +136,7 @@ pub const task_struct = struct {
         self.parent = self;
         self.children = .{.prev = &self.children, .next = &self.children};
         self.siblings = .{.prev = &self.siblings, .next = &self.siblings};
-        self.next = null;
+        self.next = .{ .prev = &self.next, .next = &self.next };
     }
 
     pub fn init_self(
@@ -148,6 +148,7 @@ pub const task_struct = struct {
         gid: u16,
         tp: task_type
     ) void {
+        tasks_mutex.lock();
         const tmp = task_struct.init(virt, uid, gid, tp);
         self.pid = tmp.pid;
         self.regs.esp = task_stack_top;
@@ -157,14 +158,9 @@ pub const task_struct = struct {
         self.gid = tmp.gid;
         self.pid = pid;
         pid += 1;
-        self.next = null;
+        self.next = .{ .prev = &self.next, .next = &self.next };
         self.stack_bottom = stack_bottom;
-        var cursor: *task_struct = current;
-        tasks_mutex.lock();
-        while (cursor.next != null) {
-            cursor = cursor.next.?;
-        }
-        cursor.next = self;
+        lst.list_add_tail(&self.next, &current.next);
 
         // tree logic
         self.siblings = .{.prev = &self.siblings, .next = &self.siblings};
@@ -243,3 +239,5 @@ pub fn sleep(millis: usize) void {
 
 pub var initial_task = task_struct.init(0, 0, 0, .KTHREAD);
 pub var current = &initial_task;
+pub var tasks_mutex: mutex = mutex.init();
+pub var stopped_tasks: ?*lst.list_head = null;
