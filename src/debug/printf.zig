@@ -27,3 +27,18 @@ pub fn printf(comptime format: []const u8, args: anytype) void {
     }
     // fmt.format(writer, format, args) catch unreachable;
 }
+
+pub fn printf_len(comptime format: []const u8, args: anytype) u32 {
+    if (screen.current_tty) |t| {
+        var buf: [2000]u8 = undefined;
+        const str = fmt.bufPrint(&buf, format, args) catch {
+            return 0;
+        };
+        mtx.lock();
+        defer mtx.unlock();
+        t.print(str);
+        return str.len;
+    }
+    return 0;
+    // fmt.format(writer, format, args) catch unreachable;
+}
