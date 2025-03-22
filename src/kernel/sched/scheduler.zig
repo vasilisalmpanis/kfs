@@ -16,44 +16,52 @@ pub fn switch_to(from: *tsk.task_struct, to: *tsk.task_struct, state: *regs) *re
 }
 
 fn process_tasks() void {
-    var buf: ?*tsk.task_struct = &tsk.initial_task;
-    var prev: ?*tsk.task_struct = null;
+    var buf: ?*lst.list_head = tsk.stopped_tasks;
+    if (buf == null)
+        return;
     if (!tsk.tasks_mutex.trylock())
         return;
-    while (buf != null) : (buf = buf.?.next) {
-        if (buf.?.state == .STOPPED and buf.? != tsk.current and buf.?.refcount == 0) {
-            if (prev != null) {
-                prev.?.next = buf.?.next;
-                kthread_free_stack(buf.?.stack_bottom);
-                buf.?.remove_self();
-                km.kfree(@intFromPtr(buf));
-                buf = prev;
-            } else {
-                @panic("Attempt to stop initial task!");
-            }
-            continue;
+    defer tsk.tasks_mutex.unlock();
+    while (true) : (buf = buf.?.next) {
+        const task: *tsk.task_struct = lst.list_entry(tsk.task_struct, @intFromPtr(buf.?), "next");
+        const next: ?*lst.list_head = buf.?.next.?;
+        if (task == tsk.current or task.refcount != 0)
+            break;
+        lst.list_del(buf.?);
+        tsk.stopped_tasks = next;
+        task.remove_self();
+        if (next == tsk.stopped_tasks) {
+            tsk.stopped_tasks = null;
         }
-        if (buf.?.state == .UNINTERRUPTIBLE_SLEEP and current_ms() >= buf.?.wakeup_time) {
-            buf.?.state = .RUNNING;
+        kthread_free_stack(task.stack_bottom);
+        km.kfree(@intFromPtr(task));
+        if (tsk.stopped_tasks == null) {
+            break;
         }
-        prev = buf;
     }
-    tsk.tasks_mutex.unlock();
 }
 
 fn find_next_task() *tsk.task_struct {
-    if (tsk.current.next == null)
+    if (tsk.current.next.next == &tsk.current.next)
         return &tsk.initial_task;
-    var curr: ?*tsk.task_struct = tsk.current;
-    while (curr.?.next != null) : (curr = curr.?.next) {
-        if (curr.?.next.?.state == .RUNNING)
-            return curr.?.next.?;
+    if (!tsk.tasks_mutex.trylock())
+        return tsk.current;
+    defer tsk.tasks_mutex.unlock();
+    var curr: *lst.list_head = tsk.current.next.next.?;
+    while (curr.next != &tsk.current.next) {
+        const task: *tsk.task_struct = lst.list_entry(tsk.task_struct, @intFromPtr(curr), "next");
+        if (task.state == .UNINTERRUPTIBLE_SLEEP and current_ms() >= task.wakeup_time)
+            task.state = .RUNNING;
+        if (task.state == .RUNNING or task.state == .ZOMBIE) {
+            return task;
+        }
+        curr = curr.next.?;
     }
     return &tsk.initial_task;
 }
 
 pub export fn schedule(state: *regs) *regs {
-    if (tsk.initial_task.next == null) {
+    if (tsk.initial_task.next.next == &tsk.initial_task.next) {
         return state;
     }
     process_tasks();

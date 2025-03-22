@@ -3,11 +3,16 @@ const lst = @import("kernel").list;
 const printf = @import("./printf.zig").printf;
 
 pub fn ps() void {
-    var buf: ?*tsk.task_struct = &tsk.initial_task;
-    while (buf) |curr| : (buf = buf.?.next) {
-        printf("{d}: {any}\n", .{curr.pid, curr.state});
+    var buf: *lst.list_head = &tsk.initial_task.next;
+    while (buf.next != &tsk.initial_task.next) : (buf = buf.next.?) {
+        const task: *tsk.task_struct = lst.list_entry(tsk.task_struct, @intFromPtr(buf), "next");
+        printf("{d}: {any}\n", .{task.pid, task.state});
     }
+    const task: *tsk.task_struct = lst.list_entry(tsk.task_struct, @intFromPtr(buf), "next");
+    printf("{d}: {any}\n", .{task.pid, task.state});
+    printf("stopped tasks {any}\n", .{tsk.stopped_tasks});
 }
+
 pub fn ps_tree(task: *tsk.task_struct, level: u32) void {
     for (0..level) |_| {
         printf(" ", .{});
