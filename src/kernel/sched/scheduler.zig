@@ -18,6 +18,8 @@ pub fn switch_to(from: *tsk.task_struct, to: *tsk.task_struct, state: *regs) *re
 fn process_tasks() void {
     var buf: ?*tsk.task_struct = &tsk.initial_task;
     var prev: ?*tsk.task_struct = null;
+    if (!tsk.tasks_mutex.trylock())
+        return;
     while (buf != null) : (buf = buf.?.next) {
         if (buf.?.state == .STOPPED and buf.? != tsk.current and buf.?.refcount == 0) {
             if (prev != null) {
@@ -36,6 +38,7 @@ fn process_tasks() void {
         }
         prev = buf;
     }
+    tsk.tasks_mutex.unlock();
 }
 
 fn find_next_task() *tsk.task_struct {
