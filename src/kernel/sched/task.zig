@@ -4,6 +4,7 @@ const regs = @import("arch").regs;
 const current_ms = @import("../time/jiffies.zig").current_ms;
 const reschedule = @import("./scheduler.zig").reschedule;
 const printf = @import("debug").printf;
+const mutex = @import("./mutex.zig").Mutex;
 
 var pid: u32 = 0;
 
@@ -159,6 +160,7 @@ pub const task_struct = struct {
         self.next = null;
         self.stack_bottom = stack_bottom;
         var cursor: *task_struct = current;
+        tasks_mutex.lock();
         while (cursor.next != null) {
             cursor = cursor.next.?;
         }
@@ -168,6 +170,7 @@ pub const task_struct = struct {
         self.siblings = .{.prev = &self.siblings, .next = &self.siblings};
         self.children = .{.prev = &self.children, .next = &self.children};
         current.add_child(self);
+        tasks_mutex.unlock();
     }
 
     pub fn add_child(parent: *task_struct, child: *task_struct) void {
@@ -203,12 +206,13 @@ pub const task_struct = struct {
         if (self.children.next.? != &self.children) {
             const first_child: *lst.list_head = self.children.next.?;
             const first_child_next: *lst.list_head = self.children.next.?.next.?;
-            const cursor: *lst.list_head = first_child;
+            var cursor: *lst.list_head = first_child;
             var task: *task_struct = undefined;
 
             while (cursor.next.? != first_child) {
                task = lst.container_of(task_struct, @intFromPtr(cursor), "siblings");
                task.state = .ZOMBIE; 
+               cursor = cursor.next.?;
             }
             task = lst.container_of(task_struct, @intFromPtr(cursor), "siblings");
             task.state = .ZOMBIE;

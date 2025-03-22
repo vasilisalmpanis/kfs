@@ -15,7 +15,7 @@ pub const Mutex = struct {
         }
     }
 
-    pub fn trylock(self: *Mutex) void {
+    pub fn trylock(self: *Mutex) bool {
         return !self.locked.swap(true, .acquire);
     }
 
