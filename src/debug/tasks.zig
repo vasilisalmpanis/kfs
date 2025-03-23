@@ -1,6 +1,8 @@
 const tsk = @import("kernel").task;
 const printf_len = @import("./printf.zig").printf_len;
 const printf = @import("./printf.zig").printf;
+const writer = @import("./printf.zig").writer;
+const fmt = @import("std").fmt;
 
 pub fn ps() void {
     var it = tsk.initial_task.list.iterator();
@@ -13,21 +15,25 @@ pub fn ps() void {
 
 pub fn ps_tree(task: *tsk.task_struct, level: u32, last_child: bool) void {
     const len = printf_len("{d} ", .{task.pid});
-    if (!task.children.is_single()) {
-        var it = task.children.next.?.iterator();
+    if (task.tree.has_children()) {
+        var it = task.tree.child.?.siblings_iterator();
         while (it.next()) |i| {
             ps_tree(
-                i.curr.entry(tsk.task_struct, "siblings"),
+                i.curr.entry(tsk.task_struct, "tree"),
                 level + len,
                 i.is_last()
             );
         }
     }
     if (!last_child) {
-        printf("\n", .{});
-        for (0..level) |_| {
-            printf(" ", .{});
-        }
+        fmt.formatText(
+            "\n",
+            "s",
+            .{
+                .width = level + 1,
+                .alignment = .left
+            },
+            writer
+        ) catch {};
     }
 }
-

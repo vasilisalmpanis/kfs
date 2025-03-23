@@ -1,5 +1,6 @@
 const vmm = @import("arch").vmm;
 const lst = @import("../utils/list.zig");
+const tree = @import("../utils/tree.zig");
 const regs = @import("arch").regs;
 const current_ms = @import("../time/jiffies.zig").current_ms;
 const reschedule = @import("./scheduler.zig").reschedule;
@@ -98,9 +99,7 @@ pub const task_struct = struct {
     stack_bottom:   u32,
     state:          task_state      = task_state.RUNNING,
     regs:           regs            = regs.init(),
-    children:       lst.ListHead    = lst.ListHead.init(),
-    siblings:       lst.ListHead    = lst.ListHead.init(),
-    parent:         ?*task_struct   = null,
+    tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
     refcount:       u32             = 0,
     wakeup_time:    usize           = 0,
@@ -127,9 +126,7 @@ pub const task_struct = struct {
         self.pid = pid;
         pid += 1;
         self.regs.esp = task_stack_top;
-        self.parent = self;
-        self.children.setup();
-        self.siblings.setup();
+        self.tree.setup();
         self.list.setup();
     }
 
@@ -157,60 +154,9 @@ pub const task_struct = struct {
         current.list.add_tail(&self.list);
 
         // tree logic
-        self.siblings.setup();
-        self.children.setup();
-        current.add_child(self);
+        self.tree.setup();
+        current.tree.add_child(&self.tree);
         tasks_mutex.unlock();
-    }
-
-    pub fn add_child(parent: *task_struct, child: *task_struct) void {
-        if (parent.children.next.? != &parent.children) {
-            parent.children.next.?.add(&child.siblings);
-        } else {
-            parent.children.next = &child.siblings;
-            parent.children.prev = &child.siblings;
-        }
-        child.parent = parent;
-    }
-
-    /// Should only be called in scheduler.
-    pub fn remove_self(self: *task_struct) void {
-        const parent: *task_struct = self.parent.?;
-
-        if (self == &initial_task)
-            return ;
-
-        if (!self.siblings.is_single()) {
-            parent.children.next = self.siblings.next;
-            parent.children.prev = self.siblings.prev;
-            self.siblings.del();
-        } else {
-            parent.children.next = &parent.children;
-            parent.children.prev = &parent.children;
-            // if we are child of initial_task we already removed ourselfs from the list
-        }
-
-        if (!self.children.is_single()) {
-            const first_child: *lst.ListHead = self.children.next.?;
-            const first_child_next: *lst.ListHead = self.children.next.?.next.?;
-
-            var it = first_child.iterator();
-            while (it.next()) |i| {
-                i.curr.entry(task_struct, "siblings").*.state = .ZOMBIE;
-            }
-            
-            if (initial_task.children.is_single()) {
-                initial_task.children.next = first_child;
-                initial_task.children.prev = first_child;
-            } else {
-                const child: *lst.ListHead = initial_task.children.next.?;
-                const child_prev: *lst.ListHead = initial_task.children.next.?.prev.?;
-                child.prev = first_child;
-                first_child.next = child;
-                child_prev.next = first_child_next;
-                first_child_next.prev = child_prev;
-            }
-        }
     }
 };
 
