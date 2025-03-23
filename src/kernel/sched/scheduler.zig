@@ -28,7 +28,13 @@ fn process_tasks() void {
             break;
         buf.?.del();
         tsk.stopped_tasks = next;
-        task.remove_self();
+        if (task.tree.has_children()) {
+            var it = task.tree.child.?.siblings_iterator();
+            while (it.next()) |i| {
+                i.curr.entry(tsk.task_struct, "tree").*.state = .ZOMBIE;
+            }
+        }
+        task.tree.del();
         if (next == tsk.stopped_tasks) {
             tsk.stopped_tasks = null;
         }
