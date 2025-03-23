@@ -1,6 +1,6 @@
-const regs_t = @import("arch").regs;
+const Regs = @import("arch").Regs;
 const std = @import("std");
-const register_exception_handler = @import("./manage.zig").register_exception_handler;
+const registerExceptionHandler = @import("./manage.zig").registerExceptionHandler;
 
 pub const Exceptions = enum {
     DivisionError,
@@ -39,167 +39,167 @@ pub const Exceptions = enum {
     // FPUErrorInterrupt,
 };
 
-fn hDivisionError(regs: *regs_t) void {
+fn hDivisionError(regs: *Regs) void {
     _ = regs;
     @panic("Division by zero");
 }
 
-fn hDebug(regs: *regs_t) void {
+fn hDebug(regs: *Regs) void {
     _ = regs;
     @panic("Debug");
 }
 
-pub fn hNonMaskableInterrupt(regs: *regs_t) void {
+pub fn hNonMaskableInterrupt(regs: *Regs) void {
     _ = regs;
     @panic("hNonMaskableInterrupt");
 }
 
-pub fn hBreakpoint(regs: *regs_t) void {
+pub fn hBreakpoint(regs: *Regs) void {
     _ = regs;
 }
 
-pub fn hOverflow(regs: *regs_t) void {
+pub fn hOverflow(regs: *Regs) void {
     _ = regs;
 }
 
-pub fn hBoundRangeExceeded(regs: *regs_t) void {
+pub fn hBoundRangeExceeded(regs: *Regs) void {
     _ = regs;
     @panic("hBoundRangeExceeded");
 }
 
-pub fn hInvalidOpcode(regs: *regs_t) void {
+pub fn hInvalidOpcode(regs: *Regs) void {
     _ = regs;
     @panic("hInvalidOpcode");
 }
 
-pub fn hDeviceNotAvailable(regs: *regs_t) void {
+pub fn hDeviceNotAvailable(regs: *Regs) void {
     _ = regs;
     @panic("hDeviceNotAvailable");
 }
 
-pub fn hDoubleFault(regs: *regs_t) void {
+pub fn hDoubleFault(regs: *Regs) void {
     _ = regs;
     @panic("hDoubleFault");
 }
 
-pub fn hCoprocessorSegmentOverrun(regs: *regs_t) void {
+pub fn hCoprocessorSegmentOverrun(regs: *Regs) void {
     _ = regs;
     @panic("hCoprocessorSegmentOverrun");
 }
 
-pub fn hInvalidTSS(regs: *regs_t) void {
+pub fn hInvalidTSS(regs: *Regs) void {
     _ = regs;
     @panic("hInvalidTSS");
 }
 
-pub fn hSegmentNotPresent(regs: *regs_t) void {
+pub fn hSegmentNotPresent(regs: *Regs) void {
     _ = regs;
     @panic("hSegmentNotPresent");
 }
 
-pub fn hStackSegmentFault(regs: *regs_t) void {
+pub fn hStackSegmentFault(regs: *Regs) void {
     _ = regs;
     @panic("hStackSegmentFault");
 }
 
-pub fn hGeneralProtectionFault(regs: *regs_t) void {
+pub fn hGeneralProtectionFault(regs: *Regs) void {
     _ = regs;
     @panic("hGeneralProtectionFault");
 }
 
-pub fn hPageFault(regs: *regs_t) void {
+pub fn hPageFault(regs: *Regs) void {
     _ = regs;
     @panic("hPageFault");
 }
 
-pub fn hReserved_1(regs: *regs_t) void {
+pub fn hReserved_1(regs: *Regs) void {
     _ = regs;
     @panic("hReserved_1");
 }
 
-pub fn hx87FloatingPointException(regs: *regs_t) void {
+pub fn hx87FloatingPointException(regs: *Regs) void {
     _ = regs;
     @panic("hx87FloatingPointException");
 }
 
-pub fn hAlignmentCheck(regs: *regs_t) void {
+pub fn hAlignmentCheck(regs: *Regs) void {
     _ = regs;
     @panic("hAlignmentCheck");
 }
 
-pub fn hMachineCheck(regs: *regs_t) void {
+pub fn hMachineCheck(regs: *Regs) void {
     _ = regs;
     @panic("hMachineCheck");
 }
 
-pub fn hSIMDFloatingPointException(regs: *regs_t) void {
+pub fn hSIMDFloatingPointException(regs: *Regs) void {
     _ = regs;
     @panic("hSIMDFloatingPointException");
 }
 
-pub fn hVirtualizationException(regs: *regs_t) void {
+pub fn hVirtualizationException(regs: *Regs) void {
     _ = regs;
     @panic("hVirtualizationException");
 }
 
-pub fn hControlProtectionException(regs: *regs_t) void {
+pub fn hControlProtectionException(regs: *Regs) void {
     _ = regs;
     @panic("hControlProtectionException");
 }
 
-pub fn hReserved_2(regs: *regs_t) void {
+pub fn hReserved_2(regs: *Regs) void {
     _ = regs;
     @panic("hReserved_2");
 }
 
-pub fn hReserved_3(regs: *regs_t) void {
+pub fn hReserved_3(regs: *Regs) void {
     _ = regs;
     @panic("hReserved_3");
 }
 
-pub fn hReserved_4(regs: *regs_t) void {
+pub fn hReserved_4(regs: *Regs) void {
     _ = regs;
     @panic("hReserved_4");
 }
 
-pub fn hReserved_5(regs: *regs_t) void {
+pub fn hReserved_5(regs: *Regs) void {
     _ = regs;
     @panic("hReserved_5");
 }
 
-pub fn hReserved_6(regs: *regs_t) void {
+pub fn hReserved_6(regs: *Regs) void {
     _ = regs;
     @panic("hReserved_6");
 }
 
-pub fn hReserved_7(regs: *regs_t) void {
+pub fn hReserved_7(regs: *Regs) void {
     _ = regs;
     @panic("hReserved_7");
 }
 
-pub fn hHypervisorInjectionException(regs: *regs_t) void {
+pub fn hHypervisorInjectionException(regs: *Regs) void {
     _ = regs;
     @panic("hHypervisorInjectionException");
 }
 
-pub fn hVMMCommunicationException(regs: *regs_t) void {
+pub fn hVMMCommunicationException(regs: *Regs) void {
     _ = regs;
     @panic("hVMMCommunicationException");
 }
 
-pub fn hSecurityException(regs: *regs_t) void {
+pub fn hSecurityException(regs: *Regs) void {
     _ = regs;
     @panic("hSecurityException");
 }
 
-pub fn hReserved_8(regs: *regs_t) void {
+pub fn hReserved_8(regs: *Regs) void {
     _ = regs;
     @panic("hReserved_8");
 }
 
 const ExceptionHandlers = std.EnumMap(
     Exceptions,
-    *const fn (regs: *regs_t) void
+    *const fn (regs: *Regs) void
 ).init(.{
     .DivisionError                  = &hDivisionError,
     .Debug                          = &hDebug,
@@ -237,7 +237,7 @@ const ExceptionHandlers = std.EnumMap(
 
 pub fn registerExceptionHandlers() void {
     for (0..ExceptionHandlers.count()) |idx| {
-        register_exception_handler(
+        registerExceptionHandler(
             idx,
             @ptrCast(ExceptionHandlers.get(@enumFromInt(idx)))
         );

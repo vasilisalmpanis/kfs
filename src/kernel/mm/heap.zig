@@ -63,14 +63,14 @@ pub const FreeList = struct {
             if (end_addr != @intFromPtr(old)) {
                 new.next = self.head;
                 self.head = new;
-                self.return_free_pages(new, real_prev);
+                self.returnFreePages(new, real_prev);
                 return;
             }
             // Merge
             new.block_size += self.head.?.block_size;
             new.next = old.next;
             self.head = new;
-            self.return_free_pages(new, real_prev);
+            self.returnFreePages(new, real_prev);
             return;
         }
         var curr: *FreeListNode = new;
@@ -86,7 +86,7 @@ pub const FreeList = struct {
         }
         // Handle node to the right of new node
         if (old.next == null) {
-            self.return_free_pages(curr, real_prev);
+            self.returnFreePages(curr, real_prev);
             return;
         }
         // Merge
@@ -94,10 +94,10 @@ pub const FreeList = struct {
             curr.block_size += curr.next.?.block_size;
             curr.next = curr.next.?.next;
         }
-        self.return_free_pages(curr, real_prev);
+        self.returnFreePages(curr, real_prev);
     }
 
-    fn return_free_pages(
+    fn returnFreePages(
         self: *FreeList,
         node: ?*FreeListNode,
         prev: ?*FreeListNode
@@ -134,7 +134,7 @@ pub const FreeList = struct {
                     and remainder % PAGE_SIZE > 0)
                     free_pages -= 1;
                 for (0..free_pages) |page| {
-                    self.vmm.unmap_page(page_start + page * PAGE_SIZE);
+                    self.vmm.unmapPage(page_start + page * PAGE_SIZE);
                     returned = true;
                 }
                 if (page_start > block_start and returned) {
@@ -187,7 +187,7 @@ pub const FreeList = struct {
         new_node.next = null;
         if (self.head == null) {
             self.head = new_node;
-            self.return_free_pages(new_node, null);
+            self.returnFreePages(new_node, null);
             return;
         }
         var current: ?*FreeListNode = self.head;
@@ -293,7 +293,7 @@ pub const FreeList = struct {
         var block_size = total_size;
         if (total_size % PAGE_SIZE != 0)
             num_pages += 1;
-        const begin = self.vmm.find_free_space(
+        const begin = self.vmm.findFreeSpace(
             num_pages,
             self.start_addr,
             self.end_addr,
@@ -322,14 +322,14 @@ pub const FreeList = struct {
     }
 
     fn expandMemoryContig(self: *FreeList, num_pages: u32, virtual: u32, user: bool) !u32 {
-        var physical = self.pmm.alloc_pages(num_pages);
+        var physical = self.pmm.allocPages(num_pages);
         if (physical == 0) {
             return AllocationError.OutOfMemory;
         }
         var idx: u32 = 0;
         var virt_addr = virtual;
         while (idx < num_pages) : (idx += 1) {
-            self.vmm.map_page(virt_addr, physical, .{.user = user});
+            self.vmm.mapPage(virt_addr, physical, .{.user = user});
             physical += PAGE_SIZE;
             virt_addr += PAGE_SIZE;
         }
@@ -340,16 +340,16 @@ pub const FreeList = struct {
         var idx: u32 = 0;
         var virt_addr = virtual;
         while (idx < num_pages) : (idx += 1) {
-            const physical = self.pmm.alloc_page();
+            const physical = self.pmm.allocPage();
             if (physical == 0) {
                 // Unmap all the previous mapped pages
                 while (idx > 0) : (idx -= 1) {
                     virt_addr -= PAGE_SIZE;
-                    self.vmm.unmap_page(virt_addr);
+                    self.vmm.unmapPage(virt_addr);
                 }
                 return AllocationError.OutOfMemory;
             }
-            self.vmm.map_page(virt_addr, physical, .{.user = user});
+            self.vmm.mapPage(virt_addr, physical, .{.user = user});
             virt_addr += PAGE_SIZE;
         }
         return num_pages * PAGE_SIZE;
@@ -372,7 +372,7 @@ pub const FreeList = struct {
         }
     }
 
-    pub fn get_size(self: *FreeList, addr: u32) u32 {
+    pub fn getSize(self: *FreeList, addr: u32) u32 {
         const header: ?*AllocHeader = self.getAllocHeader(addr);
         if (header == null)
             return 0;

@@ -1,7 +1,7 @@
 const km = @import("../mm/kmalloc.zig");
 const tsk = @import("./task.zig");
 const printf = @import("debug").printf;
-const mm_init = @import("../mm/init.zig");
+const mm = @import("../mm/init.zig");
 const arch = @import("arch");
 
 
@@ -11,7 +11,7 @@ const STACK_SIZE: u32 = (STACK_PAGES - 1) * PAGE_SIZE;
 
 const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
-fn thread_wrapper() noreturn {
+fn threadWrapper() noreturn {
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
     tsk.tasks_mutex.lock();
     tsk.current.list.del();
@@ -19,23 +19,23 @@ fn thread_wrapper() noreturn {
         tsk.stopped_tasks = &tsk.current.list;
         tsk.stopped_tasks.?.setup();
     } else {
-        tsk.stopped_tasks.?.add_tail(&tsk.current.list);
+        tsk.stopped_tasks.?.addTail(&tsk.current.list);
     }
     tsk.current.state = .STOPPED;
     tsk.tasks_mutex.unlock();
     while (true) {}
 }
 
-pub fn kthread_stack_alloc(num_of_pages: u32) u32 {
-    const stack: u32 = mm_init.virt_memory_manager.find_free_space(num_of_pages, 0xB0000000, 0xFFFFF000, false);
+pub fn kthreadStackAlloc(num_of_pages: u32) u32 {
+    const stack: u32 = mm.virt_memory_manager.findFreeSpace(num_of_pages, 0xB0000000, 0xFFFFF000, false);
     for (0..num_of_pages) |index| {
-        const page: u32 = mm_init.virt_memory_manager.pmm.alloc_page();
+        const page: u32 = mm.virt_memory_manager.pmm.allocPage();
         if (page == 0) {
             for (0..index) |idx| {
-                mm_init.virt_memory_manager.unmap_page(stack + idx * PAGE_SIZE);
+                mm.virt_memory_manager.unmapPage(stack + idx * PAGE_SIZE);
             }
         }
-        mm_init.virt_memory_manager.map_page(stack + index * PAGE_SIZE,
+        mm.virt_memory_manager.mapPage(stack + index * PAGE_SIZE,
             page,
             .{.writable = index != 0}
         );
@@ -43,36 +43,36 @@ pub fn kthread_stack_alloc(num_of_pages: u32) u32 {
     return stack + PAGE_SIZE;
 }
 
-pub fn kthread_free_stack(addr: u32) void {
+pub fn kthreadStackFree(addr: u32) void {
     var page: u32 = addr - PAGE_SIZE; // RO page
-    mm_init.virt_memory_manager.unmap_page(page);
+    mm.virt_memory_manager.unmapPage(page);
     page += PAGE_SIZE;
-    mm_init.virt_memory_manager.unmap_page(page);
+    mm.virt_memory_manager.unmapPage(page);
     page += PAGE_SIZE;
-    mm_init.virt_memory_manager.unmap_page(page);
+    mm.virt_memory_manager.unmapPage(page);
     page += PAGE_SIZE;
 }
 
-pub fn kthread_create(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.task_struct {
-    const addr = km.kmalloc(@sizeOf(tsk.task_struct));
+pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
+    const addr = km.kmalloc(@sizeOf(tsk.Task));
     var stack: u32 = undefined;
     if (addr == 0)
         return error.MemoryAllocation;
-    const new_task: *tsk.task_struct = @ptrFromInt(
+    const new_task: *tsk.Task = @ptrFromInt(
         addr
     );
-    stack = kthread_stack_alloc(STACK_PAGES);
+    stack = kthreadStackAlloc(STACK_PAGES);
     if (stack == 0) {
         km.kfree(addr);
         return error.MemoryAllocation;
     }
-    const stack_top: u32 = arch.setup_stack(
+    const stack_top: u32 = arch.setupStack(
         stack + STACK_SIZE,
-        @intFromPtr(&thread_wrapper)
+        @intFromPtr(&threadWrapper)
     );
     new_task.threadfn = f;
     new_task.arg = arg;
-    new_task.init_self(
+    new_task.initSelf(
         @intFromPtr(&arch.vmm.initial_page_dir),
         stack_top,
         stack,
@@ -83,7 +83,7 @@ pub fn kthread_create(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.task_struc
     return new_task;
 }
 
-pub fn kthread_stop(thread: *tsk.task_struct) i32 {
+pub fn kthreadStop(thread: *tsk.Task) i32 {
     thread.refcount += 1;
     thread.should_stop = true;
     while (thread.state != .STOPPED) {

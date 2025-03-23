@@ -13,5 +13,5 @@ pub fn kfree(addr: u32) void {
 }
 
 pub fn ksize(addr: u32) u32 {
-    return mm.kheap.get_size(addr);
+    return mm.kheap.getSize(addr);
 }

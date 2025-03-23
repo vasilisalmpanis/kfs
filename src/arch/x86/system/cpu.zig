@@ -3,7 +3,7 @@ const KERNEL_CODE_SEGMENT = @import("../idt.zig").KERNEL_CODE_SEGMENT;
 const KERNEL_DATA_SEGMENT = @import("../idt.zig").KERNEL_DATA_SEGMENT;
 
 
-pub const registers_t = struct {
+pub const Regs = struct {
     gs: u32, 
     fs: u32,
     es: u32,
@@ -24,8 +24,8 @@ pub const registers_t = struct {
     useresp: u32, 
     ss: u32,
 
-    pub fn init() registers_t {
-        return registers_t{
+    pub fn init() Regs {
+        return Regs{
             .gs = KERNEL_DATA_SEGMENT,
             .fs = KERNEL_DATA_SEGMENT,
             .es = KERNEL_DATA_SEGMENT,
@@ -48,7 +48,7 @@ pub const registers_t = struct {
         };
     }
 
-    pub fn dump(self: *registers_t) void {
+    pub fn dump(self: *Regs) void {
         krn.logger.INFO("EIP: {X:0>8}\n", .{ self.eip});
 
         krn.logger.INFO("EAX: {X:0>8} EBX: {X:0>8} ECX: {X:0>8} EDX: {X:0>8}\n", .{ self.eax, self.ebx, self.ecx, self.edx });
@@ -63,8 +63,8 @@ pub const registers_t = struct {
     }
 };
 
-pub fn setup_stack(stack_top: u32, eip: u32) u32 {
-    var stack_ptr: [*]u32 = @ptrFromInt(stack_top - @sizeOf(registers_t));
+pub fn setupStack(stack_top: u32, eip: u32) u32 {
+    var stack_ptr: [*]u32 = @ptrFromInt(stack_top - @sizeOf(Regs));
     stack_ptr[0] = KERNEL_DATA_SEGMENT;
     stack_ptr[1] = KERNEL_DATA_SEGMENT;
     stack_ptr[2] = KERNEL_DATA_SEGMENT;
@@ -96,14 +96,14 @@ pub inline fn getEflags() u32 {
     );
 }
 
-pub fn are_int_enabled() bool {
+pub fn areIntEnabled() bool {
     const eflags = getEflags();
     if (eflags & (1<<9) == (1<<9))
         return true;
     return false;
 }
 
-pub inline fn arch_reschedule() void {
+pub inline fn archReschedule() void {
     asm volatile(
         \\ pushf
         \\ pop %%eax            # Pop into EAX

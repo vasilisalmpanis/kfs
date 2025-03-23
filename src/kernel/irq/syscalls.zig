@@ -1,5 +1,5 @@
 const arch = @import("arch");
-const register_handler = @import("./manage.zig").register_handler;
+const registerHandler = @import("./manage.zig").registerHandler;
 
 pub var syscalls: [arch.IDT_MAX_DESCRIPTORS] ?* const anyopaque = .{null} ** arch.IDT_MAX_DESCRIPTORS;
 
@@ -11,7 +11,7 @@ const SyscallHandler = fn (
     a5: u32,
 ) i32;
 
-pub fn syscallsManager(state: *arch.regs) void {
+pub fn syscallsManager(state: *arch.Regs) void {
     if (state.eax < 0 or state.eax >= arch.IDT_MAX_DESCRIPTORS) {
         state.eax = -1;
         return;
@@ -29,7 +29,7 @@ pub fn syscallsManager(state: *arch.regs) void {
 }
 
 pub fn initSyscalls() void {
-    register_handler(
+    registerHandler(
         arch.SYSCALL_INTERRUPT - arch.CPU_EXCEPTION_COUNT,
         &syscallsManager
     );
