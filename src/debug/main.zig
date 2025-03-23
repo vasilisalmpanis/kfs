@@ -1,11 +1,11 @@
-pub const print_mmap = @import("./mm.zig").print_mmap;
-pub const print_page_dir = @import("./mm.zig").print_page_dir;
-pub const TraceStackTrace = @import("./trace.zig").TraceStackTrace;
+pub const printMmap = @import("./mm.zig").printMmap;
+pub const printPageDir = @import("./mm.zig").printPageDir;
+pub const traceStackTrace = @import("./trace.zig").traceStackTrace;
 pub const printf = @import("./printf.zig").printf;
-pub const print_free_list = @import("./mm.zig").print_free_list;
+pub const printFreeList = @import("./mm.zig").printFreeList;
 pub const walkPageTables = @import("./mm.zig").walkPageTables;
-pub const run_tests = @import("./tests.zig").run_tests;
+pub const runTests = @import("./tests.zig").runTests;
 pub const Logger = @import("./logger.zig").Logger;
 pub const ps = @import("./tasks.zig").ps;
-pub const ps_tree = @import("./tasks.zig").ps_tree;
+pub const psTree = @import("./tasks.zig").psTree;
 pub const neofetch = @import("./neofetch.zig").neofetch;

@@ -4,7 +4,7 @@ const dbg = @import("debug");
 const drv = @import("drivers");
 const krn = @import("kernel");
 const printf = @import("debug").printf;
-const regs = @import("system/cpu.zig").registers_t;
+const Regs = @import("system/cpu.zig").Regs;
 
 pub const IDT_MAX_DESCRIPTORS   = 256;
 pub const CPU_EXCEPTION_COUNT   = 32;
@@ -15,19 +15,19 @@ pub const TIMER_INTERRUPT   = 0x20;
 pub const KERNEL_CODE_SEGMENT   = 0x08;
 pub const KERNEL_DATA_SEGMENT   = 0x10;
 
-const ExceptionHandler  = fn (regs: *regs) void;
-const SyscallHandler    = fn (regs: *regs) void;
+const ExceptionHandler  = fn (regs: *Regs) void;
+const SyscallHandler    = fn (regs: *Regs) void;
 const ISRHandler        = fn () callconv(.C) void;
 
-pub export fn exception_handler(state: *regs) callconv(.C) void {
+pub export fn exceptionHandler(state: *Regs) callconv(.C) void {
     if (krn.irq.handlers[state.int_no] != null) {
         const handler: *const ExceptionHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
         handler(state);
     }
 }
 
-pub export fn irq_handler(state: *regs) callconv(.C) *regs {
-    var new_state: *regs = state;
+pub export fn irqHandler(state: *Regs) callconv(.C) *Regs {
+    var new_state: *Regs = state;
     if (krn.irq.handlers[state.int_no] != null) {
         if (state.int_no == SYSCALL_INTERRUPT) {
             const handler: *const SyscallHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
@@ -115,7 +115,7 @@ pub fn generateIRQStub(comptime n: u8) []const u8 {
         \\ {s}
         \\ mov %esp, %eax
         \\ push %eax
-        \\ lea irq_handler, %eax
+        \\ lea irqHandler, %eax
         \\ call *%eax
         \\ add $4, %esp
         \\ mov %eax, %esp
@@ -137,7 +137,7 @@ fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
         \\ {s}
         \\ mov %esp, %eax
         \\ push %eax
-        \\ lea exception_handler, %eax
+        \\ lea exceptionHandler, %eax
         \\ call *%eax
         \\ add $4, %esp
         \\ mov %eax, %esp
@@ -189,7 +189,7 @@ pub export var isr_stub_table: [IDT_MAX_DESCRIPTORS]*const ISRHandler align(4) l
     break :init table;
 };
 
-fn IRQ_clear_mask(IRQ_line: u8) void {
+fn IRQClearMask(IRQ_line: u8) void {
     var IRQline: u8 = IRQ_line;
     var port: u16 = undefined;
     var value: u8 = undefined;
@@ -204,7 +204,7 @@ fn IRQ_clear_mask(IRQ_line: u8) void {
     io.outb(port, value & ~(@as(u8, 1) << @truncate(IRQline)));        
 }
 
-pub inline fn PIC_remap() void {
+pub inline fn PICRemap() void {
     io.outb(0x20, 0x11);
     io.outb(0xA0, 0x11);
     io.outb(0x21, 0x20);
@@ -217,7 +217,7 @@ pub inline fn PIC_remap() void {
     io.outb(0xA1, 0x0);
 }
 
-const idt_entry_t = packed struct {
+const IdtEntry = packed struct {
     isr_low: u16,       // The lower 16 bits of the ISR's address
     kernel_cs: u16,     // The GDT segment selector that the CPU will load into CS before calling the ISR
     reserved: u8,       // Set to zero
@@ -225,16 +225,16 @@ const idt_entry_t = packed struct {
     isr_high: u16,      // The higher 16 bits of the ISR's address
 };
 
-const idtr_t = packed struct {
+const Idtr = packed struct {
     limit: u16,
-    base: *const idt_entry_t,
+    base: *const IdtEntry,
 };
 
-var idt: [IDT_MAX_DESCRIPTORS] idt_entry_t align(0x10) = undefined;
-var idtr: idtr_t = undefined;
+var idt: [IDT_MAX_DESCRIPTORS] IdtEntry align(0x10) = undefined;
+var idtr: Idtr = undefined;
 
-pub fn idt_set_descriptor(vector: u8, isr: *const ISRHandler, flags: u8) void {
-    const descriptor: *idt_entry_t = &idt[vector];
+pub fn idtSetDescriptor(vector: u8, isr: *const ISRHandler, flags: u8) void {
+    const descriptor: *IdtEntry = &idt[vector];
 
     descriptor.isr_low        = @as(u16, @truncate(@intFromPtr(isr) & 0xFFFF));
     descriptor.isr_high       = @as(u16, @truncate(@intFromPtr(isr) >> 16));
@@ -243,12 +243,12 @@ pub fn idt_set_descriptor(vector: u8, isr: *const ISRHandler, flags: u8) void {
     descriptor.reserved       = 0;
 }
 
-pub fn idt_init() void {
+pub fn idtInit() void {
     idtr.base = &idt[0];
-    idtr.limit = idt.len * @sizeOf(idt_entry_t) - 1;
+    idtr.limit = idt.len * @sizeOf(IdtEntry) - 1;
 
     for (0..IDT_MAX_DESCRIPTORS) |index| {
-        idt[index] = idt_entry_t{
+        idt[index] = IdtEntry{
             .attributes =  0,
             .isr_high =  0,
             .isr_low = 0,
@@ -257,7 +257,7 @@ pub fn idt_init() void {
     };
     }
     for (0..IDT_MAX_DESCRIPTORS) |index| {
-        idt_set_descriptor(
+        idtSetDescriptor(
             @intCast(index),
             isr_stub_table[index],
             0x8E
@@ -269,7 +269,7 @@ pub fn idt_init() void {
         :
         : [idt_ptr] "r" (&idtr),
     );
-    PIC_remap();
+    PICRemap();
     krn.exceptions.registerExceptionHandlers();
     asm volatile ("sti"); // set the interrupt flag
 }

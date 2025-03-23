@@ -24,7 +24,7 @@ pub const Iterator = struct {
         return self;
     }
 
-    pub fn is_last(self: *Iterator) bool {
+    pub fn isLast(self: *Iterator) bool {
         return self.curr.next == self.head;
     }
 };
@@ -50,7 +50,7 @@ pub const ListHead = packed struct {
     }
 
     pub fn entry(self: *ListHead, comptime T: type, comptime member: []const u8) *T {
-        return container_of(T, @intFromPtr(self), member);
+        return containerOf(T, @intFromPtr(self), member);
     }
 
     pub fn add(self: *ListHead, new: *ListHead) void {
@@ -63,7 +63,7 @@ pub const ListHead = packed struct {
         }
     }
 
-    pub fn add_tail(self: *ListHead, new: *ListHead) void {
+    pub fn addTail(self: *ListHead, new: *ListHead) void {
         if (self.prev == null) {
             new.next = self;
             self.prev = new;
@@ -92,19 +92,19 @@ pub const ListHead = packed struct {
     }
 };
 
-pub fn container_of(comptime T: type, ptr: u32, comptime member: []const u8) *T {
+pub fn containerOf(comptime T: type, ptr: u32, comptime member: []const u8) *T {
     const offset = @offsetOf(T, member);
     const result: *T = @ptrFromInt(ptr - offset);
     return result;
 }
 
-pub fn list_map(
+pub fn listMap(
     comptime T: type,
     head: *ListHead, f: fn (arg: *T) void,
     comptime member: [] const u8
 ) void {
     var buf: ?*ListHead = head;
     while (buf != null) : (buf = buf.?.next) {
-        f(container_of(T, @intFromPtr(buf.?), member));
+        f(containerOf(T, @intFromPtr(buf.?), member));
     }
 }

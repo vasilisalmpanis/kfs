@@ -1,4 +1,4 @@
-const container_of = @import("./list.zig").container_of;
+const containerOf = @import("./list.zig").containerOf;
 
 pub const TreeNode = struct {
     parent: ?*TreeNode  = null,
@@ -17,15 +17,15 @@ pub const TreeNode = struct {
         self.prev = self;
     }
 
-    pub fn has_children(self: *TreeNode) bool {
+    pub fn hasChildren(self: *TreeNode) bool {
         return self.child != self;
     }
 
-    pub fn has_siblings(self: *TreeNode) bool {
+    pub fn hasSiblings(self: *TreeNode) bool {
         return self.next != self;
     }
 
-    pub fn add_sibling(self: *TreeNode, new: *TreeNode) void {
+    pub fn addSibling(self: *TreeNode, new: *TreeNode) void {
         new.next = self;
         new.prev = self.prev;
 
@@ -34,25 +34,25 @@ pub const TreeNode = struct {
         new.parent = self.parent;
     }
 
-    pub fn add_child(self: *TreeNode, new: *TreeNode) void {
-        if (self.has_children()) {
-            self.child.?.add_sibling(new);
+    pub fn addChild(self: *TreeNode, new: *TreeNode) void {
+        if (self.hasChildren()) {
+            self.child.?.addSibling(new);
         } else {
             self.child = new;
         }
         new.parent = self;
     }
 
-    pub fn set_parent(self: *TreeNode, parent: *TreeNode) void {
-        var it = self.siblings_iterator();
+    pub fn setParent(self: *TreeNode, parent: *TreeNode) void {
+        var it = self.siblingsIterator();
         while (it.next()) |i| {
             i.curr.parent = parent;
         }
     }
 
-    pub fn add_children(self: *TreeNode, new: *TreeNode) void {
-        new.set_parent(self);
-        if (self.has_children()) {
+    pub fn addChildren(self: *TreeNode, new: *TreeNode) void {
+        new.setParent(self);
+        if (self.hasChildren()) {
             const old_prev_child = self.child.?.prev;
             const new_prev_child = new.prev;
             new_prev_child.?.next = self.child;
@@ -65,7 +65,7 @@ pub const TreeNode = struct {
     }
 
     pub fn del(self: *TreeNode) void {
-        if (self.has_siblings()) {
+        if (self.hasSiblings()) {
             if (self.parent.?.child == self) {
                 self.parent.?.child = self.next;
             }
@@ -74,17 +74,17 @@ pub const TreeNode = struct {
         } else {
             self.parent.?.child = self.parent;
         }
-        if (self.has_children()) {
-            self.parent.?.add_children(self.child.?);
+        if (self.hasChildren()) {
+            self.parent.?.addChildren(self.child.?);
         }
     }
 
-    pub fn siblings_iterator(self: *TreeNode) Iterator {
+    pub fn siblingsIterator(self: *TreeNode) Iterator {
         return Iterator.init(self);
     }
 
     pub fn entry(self: *TreeNode, comptime T: type, comptime member: []const u8) *T {
-        return container_of(T, @intFromPtr(self), member);
+        return containerOf(T, @intFromPtr(self), member);
     }
 };
 
@@ -113,7 +113,7 @@ pub const Iterator = struct {
         return self;
     }
 
-    pub fn is_last(self: *Iterator) bool {
+    pub fn isLast(self: *Iterator) bool {
         return self.curr.next == self.head;
     }
 };

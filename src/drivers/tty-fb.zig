@@ -114,17 +114,17 @@ pub const TTY = struct {
         return tty;
     }
 
-    fn render_cursor(self: *TTY) void {
+    fn renderCursor(self: *TTY) void {
         scr.framebuffer.cursor(self._x, self._y, self._fg_colour);
     }
 
-    fn save_cursor(self: *TTY) void {
+    fn saveCursor(self: *TTY) void {
         self._prev_x = self._x;
         self._prev_y = self._y;
     }
 
     fn move(self: *TTY, direction : u8) void {
-        self.save_cursor();
+        self.saveCursor();
         if (direction == 0) {
             if (self._x > 0)
                 self._x -= 1;
@@ -138,12 +138,12 @@ pub const TTY = struct {
         self.render();
     }
 
-    fn cursor_updated(self: *TTY) bool {
+    fn cursorUpdated(self: *TTY) bool {
         return (self._x != self._prev_x or self._y != self._prev_y);
     }
 
     pub fn render(self: *TTY) void {
-        if (!self._has_dirty_rect and !self.cursor_updated())
+        if (!self._has_dirty_rect and !self.cursorUpdated())
             return ;
         if (self._has_dirty_rect) {
             const x1 = self._dirty_rect.x1;
@@ -173,7 +173,7 @@ pub const TTY = struct {
             self._bg_colour,
             self._fg_colour
         );
-        self.render_cursor();
+        self.renderCursor();
         scr.framebuffer.render();
         self._has_dirty_rect = false;
     }
@@ -197,7 +197,7 @@ pub const TTY = struct {
             1
         );
         self._y = self.height - 1;
-        self.save_cursor();
+        self.saveCursor();
         self.markDirty(DirtyRect.fullScreen(self.width, self.height));
     }
 
@@ -206,7 +206,7 @@ pub const TTY = struct {
             self._buffer[0..self.height * self.width],
             0
         );
-        self.save_cursor();
+        self.saveCursor();
         self._x = 0;
         self._y = 0;
         self.markDirty(DirtyRect.fullScreen(
@@ -259,13 +259,13 @@ pub const TTY = struct {
 
     fn home(self: *TTY) void {
         self.markDirty(DirtyRect.init(0, self._y, self._x, self._y));
-        self.save_cursor();
+        self.saveCursor();
         self._x = 0;
         self.render();
     }
 
     fn endline(self: *TTY) void {
-        self.save_cursor();
+        self.saveCursor();
         const row = self._y * self.width;
         while (self._buffer[row + self._x] != 0 and self._x < self.width - 1)
             self._x += 1;
@@ -303,7 +303,7 @@ pub const TTY = struct {
                     self._y
                 )
             );
-            self.save_cursor();
+            self.saveCursor();
             self._x += 1;
             self.render();
         }
@@ -311,7 +311,7 @@ pub const TTY = struct {
 
     fn removeAtCursor(self: *TTY) void {
         if (self._x > 0) {
-            self.save_cursor();
+            self.saveCursor();
             self._x -= 1;
             self.shiftBufferLeft();
             self.markDirty(
@@ -335,7 +335,7 @@ pub const TTY = struct {
         );
         const line: [] const u8 = self._line[0..self._input_len];
         self._input_len = 0;
-        self.save_cursor();
+        self.saveCursor();
         self.printChar('\n');
         self.render();
         if (line.len > 0)
@@ -365,7 +365,7 @@ pub const TTY = struct {
     }
 
     pub fn print(self: *TTY, msg: [] const u8) void {
-        self.save_cursor();
+        self.saveCursor();
         for (msg) |c| {
             self.printChar(c);
         }

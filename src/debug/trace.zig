@@ -1,12 +1,12 @@
 const printf = @import("./printf.zig").printf;
 
 
-const stackframe = struct {
-    ebp : ?*stackframe = null,
+const StackFrame = struct {
+    ebp : ?*StackFrame = null,
     eip : u32,
 
-    pub fn init() stackframe {
-        return stackframe{
+    pub fn init() StackFrame {
+        return StackFrame{
             .ebp = null,
             .eip = 0,
         };
@@ -17,14 +17,14 @@ const stackframe = struct {
 /// number specified as argument. Save the current
 /// register stake and print it.
 /// @param maxFrames: maximum amount of frames to trace.
-pub inline fn TraceStackTrace(maxFrames : u32 ) void {
+pub inline fn traceStackTrace(maxFrames : u32 ) void {
     var state: RegisterState = RegisterState.init();
 
     // save the state
     saveRegisters(&state);
-    var stk : ?*stackframe = 
+    var stk : ?*StackFrame = 
      asm ("movl %ebp, %[result]"
-        : [result] "={eax}" (-> *stackframe),
+        : [result] "={eax}" (-> *StackFrame),
         : :
     );
     printf("Stack Trace:\n",.{});

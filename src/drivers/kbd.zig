@@ -91,19 +91,19 @@ pub const Keyboard = struct {
         self.keymap = keymap;
     }
 
-    inline fn kb_wait() void {
+    inline fn kbWait() void {
         for (0..0x10000) |_| {
             if (io.inb(0x64) & 0x02 == 0)
                 break;
         }
     }
 
-    fn send_command(_: *Keyboard, cmd: u8) void {
-        kb_wait();
+    fn sendCommand(_: *Keyboard, cmd: u8) void {
+        kbWait();
         io.outb(0x64, cmd);
     }
 
-    fn save_scancode(self: *Keyboard, scancode: u8) void {
+    fn saveScancode(self: *Keyboard, scancode: u8) void {
         self.buffer[self.write_pos] = scancode;
         if (self.write_pos == 255) {
             self.write_pos = 0;
@@ -115,7 +115,7 @@ pub const Keyboard = struct {
         }
     }
 
-    fn get_scancode(self: *Keyboard) u8 {
+    fn getScancode(self: *Keyboard) u8 {
         const scancode = self.buffer[self.read_pos];
         if (scancode == 0)
             return 0;
@@ -128,7 +128,7 @@ pub const Keyboard = struct {
         return scancode;
     }
 
-    fn get_keyevent(self: *Keyboard, scancode: u8) ?KeyEvent {
+    fn getKeyevent(self: *Keyboard, scancode: u8) ?KeyEvent {
         const release_mask: u8 = 0x80;
         var code = scancode;
         var release: bool = false;
@@ -176,20 +176,20 @@ pub const Keyboard = struct {
         return null;
     }
 
-    pub fn get_input(self: *Keyboard) ?[] const KeyEvent {
-        self.send_command(0xAD); // Disable keyboard
-        defer self.send_command(0xAE); // Enable keyboard
-        var scancode = self.get_scancode();
+    pub fn getInput(self: *Keyboard) ?[] const KeyEvent {
+        self.sendCommand(0xAD); // Disable keyboard
+        defer self.sendCommand(0xAE); // Enable keyboard
+        var scancode = self.getScancode();
         if (scancode == 0)
             return null;
         var pos: u8 = 0;
         while (scancode != 0 and pos < 256) {
-            if (self.get_keyevent(scancode)) |key_event| {
+            if (self.getKeyevent(scancode)) |key_event| {
                 // krn.logger.DEBUG("event: {}\n", .{key_event});
                 input[pos] = key_event;
                 pos += 1;
             }
-            scancode = self.get_scancode();
+            scancode = self.getScancode();
         }
         if (pos == 0)
             return null;
@@ -199,10 +199,10 @@ pub const Keyboard = struct {
 
 pub var keyboard = Keyboard.init(&keymap_us);
 
-pub fn keyboard_interrupt() void {
+pub fn keyboardInterrupt() void {
     var scancode: u8 = undefined;
-    keyboard.send_command(0xAD); // Disable keyboard
-    defer keyboard.send_command(0xAE); // Enable keyboard
+    keyboard.sendCommand(0xAD); // Disable keyboard
+    defer keyboard.sendCommand(0xAE); // Enable keyboard
     if (io.inb(0x64) & 0x01 != 0x01)
         return ;
     scancode = io.inb(0x60);
@@ -213,5 +213,5 @@ pub fn keyboard_interrupt() void {
         else        => {}
     }
     // handle e0 e1
-    keyboard.save_scancode(scancode);
+    keyboard.saveScancode(scancode);
 }

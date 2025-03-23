@@ -1,15 +1,15 @@
 const drivers = @import("drivers");
 pub var jiffies: u32 = 0;
 
-pub fn timer_handler() void {
+pub fn timerHandler() void {
     jiffies += 1;
 }
 
-pub fn get_seconds_from_start() u32 {
+pub fn getSecondsFromStart() u32 {
     return (jiffies / drivers.pit.HZ);
 }
 
-pub fn current_ms() u32 {
+pub fn currentMs() u32 {
     if (drivers.pit.HZ < 1000) {
         return (jiffies * (1000 / drivers.pit.HZ));
     } else {

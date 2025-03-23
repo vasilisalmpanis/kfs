@@ -4,11 +4,11 @@ const mm = @import("kernel").mm;
 
 const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
-pub fn print_mmap(info: *multiboot.multiboot_info) void {
+pub fn printMmap(info: *multiboot.MultibootInfo) void {
     var i: u32 = 0;
     printf("type\tmem region\t\tsize\n", .{});
-    while (i < info.mmap_length) : (i += @sizeOf(multiboot.multiboot_memory_map)) {
-        const mmap: *multiboot.multiboot_memory_map = @ptrFromInt(info.mmap_addr + i);
+    while (i < info.mmap_length) : (i += @sizeOf(multiboot.MultibootMemoryMap)) {
+        const mmap: *multiboot.MultibootMemoryMap = @ptrFromInt(info.mmap_addr + i);
         printf("{d}\t{x:0>8} {x:0>8}\t{d}\n", .{
             mmap.type,
             mmap.addr[0],
@@ -18,7 +18,7 @@ pub fn print_mmap(info: *multiboot.multiboot_info) void {
     }
 }
 
-pub fn print_page_dir() void {
+pub fn printPageDir() void {
     var index: u32 = 0;
     printf(
         "idx\t\tvirt\traw\t\tphys\t|pres|write|user|wr-th|cach|acc|dirt|4M|\n",
@@ -58,7 +58,7 @@ pub fn print_page_dir() void {
     }
 }
 
-pub fn print_free_list() void {
+pub fn printFreeList() void {
     var buf = mm.kheap.head;
     printf("KHeap {?}\n", .{buf});
     while (buf != null) {
@@ -96,7 +96,7 @@ const PageEntry= packed struct {
     address: u20,
 };
 
-fn print_pe_format(pe: *const PageEntry) void {
+fn printPEFormat(pe: *const PageEntry) void {
     printf(" [", .{});
     if (pe.writable) printf("W", .{});
     if (pe.user) printf("U", .{});
@@ -128,7 +128,7 @@ pub fn walkPageTables() void {
                     phys_addr, phys_addr + 4 * 1024 * 1024
                 }
             );
-            print_pe_format(pde);
+            printPEFormat(pde);
             continue;
         }
         var page_table: [*]PageEntry = @ptrFromInt(0xFFC00000);
@@ -150,7 +150,7 @@ pub fn walkPageTables() void {
                     phys_addr, phys_addr + 4 * 1024
                 }
             );
-            print_pe_format(&pte);
+            printPEFormat(&pte);
         }
     }
 }
