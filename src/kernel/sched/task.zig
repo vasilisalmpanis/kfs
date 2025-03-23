@@ -1,3 +1,4 @@
+const std = @import("std");
 const vmm = @import("arch").vmm;
 const lst = @import("../utils/list.zig");
 const tree = @import("../utils/tree.zig");
@@ -92,12 +93,12 @@ pub const TSS = packed struct {
 // and put it when no longer needed.
 pub const Task = struct {
     pid:            u32,
-    type:           TaskType,
+    tsktype:        TaskType,
     virtual_space:  u32,
     uid:            u16,
     gid:            u16,
     stack_bottom:   u32,
-    state:          TaskState      = TaskState.RUNNING,
+    state:          TaskState       = TaskState.RUNNING,
     regs:           Regs            = Regs.init(),
     tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
@@ -117,7 +118,7 @@ pub const Task = struct {
             .uid = uid,
             .gid = gid,
             .stack_bottom = 0,
-            .type = tp,
+            .tsktype = tp,
         };
     }
 
@@ -126,8 +127,9 @@ pub const Task = struct {
         self.pid = pid;
         pid += 1;
         self.regs.esp = task_stack_top;
-        self.tree.setup();
         self.list.setup();
+        self.tree.setup();
+        self.refcount = 0;
     }
 
     pub fn initSelf(
@@ -139,24 +141,43 @@ pub const Task = struct {
         gid: u16,
         tp: TaskType
     ) void {
-        tasks_mutex.lock();
         const tmp = Task.init(virt, uid, gid, tp);
-        self.pid = tmp.pid;
-        self.regs.esp = task_stack_top;
-        self.virtual_space = tmp.virtual_space;
-        self.state = tmp.state;
         self.uid = tmp.uid;
         self.gid = tmp.gid;
+        self.state = tmp.state;
+        self.refcount = tmp.refcount;
+        self.wakeup_time = tmp.wakeup_time;
+        self.virtual_space = tmp.virtual_space;
+        self.stack_bottom = tmp.stack_bottom;
+        self.tsktype = tmp.tsktype;
+
+        self.regs = Regs.init();
+        self.tree = tree.TreeNode.init();
+        self.list = lst.ListHead.init();
+        self.regs.esp = task_stack_top;
+        self.stack_bottom = stack_bottom;
         self.pid = pid;
         pid += 1;
         self.list.setup();
-        self.stack_bottom = stack_bottom;
-        current.list.addTail(&self.list);
-
-        // tree logic
         self.tree.setup();
+        tasks_mutex.lock();
+        current.list.addTail(&self.list);
         current.tree.addChild(&self.tree);
         tasks_mutex.unlock();
+    }
+
+    fn zombifyChildren(self: *Task) void {
+        if (self.tree.child) |ch| {
+            var it = ch.siblingsIterator();
+            while (it.next()) |i| {
+                i.curr.entry(Task, "tree").*.state = .ZOMBIE;
+            }
+        }
+    }
+
+    pub fn delFromTree(self: *Task) void {
+        self.zombifyChildren();
+        self.tree.del();
     }
 };
 

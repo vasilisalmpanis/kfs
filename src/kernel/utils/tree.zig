@@ -1,4 +1,3 @@
-const containerOf = @import("./list.zig").containerOf;
 
 pub const TreeNode = struct {
     parent: ?*TreeNode  = null,
@@ -11,14 +10,14 @@ pub const TreeNode = struct {
     }
     
     pub fn setup(self: *TreeNode) void {
-        self.parent = self;
-        self.child = self;
+        self.parent = null;
+        self.child = null;
         self.next = self;
         self.prev = self;
     }
 
     pub fn hasChildren(self: *TreeNode) bool {
-        return self.child != self;
+        return self.child != null;
     }
 
     pub fn hasSiblings(self: *TreeNode) bool {
@@ -72,11 +71,12 @@ pub const TreeNode = struct {
             self.prev.?.next = self.next;
             self.next.?.prev = self.prev;
         } else {
-            self.parent.?.child = self.parent;
+            self.parent.?.child = null;
         }
         if (self.hasChildren()) {
             self.parent.?.addChildren(self.child.?);
         }
+        self.setup();
     }
 
     pub fn siblingsIterator(self: *TreeNode) Iterator {
@@ -84,7 +84,7 @@ pub const TreeNode = struct {
     }
 
     pub fn entry(self: *TreeNode, comptime T: type, comptime member: []const u8) *T {
-        return containerOf(T, @intFromPtr(self), member);
+        return @fieldParentPtr(member, self);
     }
 };
 
