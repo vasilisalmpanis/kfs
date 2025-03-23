@@ -58,9 +58,9 @@ pub fn temp(_: ?*const anyopaque) i32 {
     _ = krn.kthread_create(&temp2, null) catch null;
     _ = krn.kthread_create(&temp2, null) catch null;
     _ = krn.kthread_create(&temp2, null) catch null;
-    while (krn.task.current.should_stop != true) {
-        asm volatile ("nop;");
-    }
+    // while (krn.task.current.should_stop != true) {
+    //     asm volatile ("nop;");
+    // }
     return 0;
 }
 
