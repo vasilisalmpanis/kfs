@@ -3,6 +3,7 @@ const tsk = @import("./task.zig");
 const printf = @import("debug").printf;
 const mm = @import("../mm/init.zig");
 const arch = @import("arch");
+const krn = @import("../main.zig");
 
 
 const PAGE_SIZE = @import("arch").PAGE_SIZE;
@@ -14,14 +15,15 @@ const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 fn threadWrapper() noreturn {
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
     tsk.tasks_mutex.lock();
-    tsk.current.list.del();
+    const curr = tsk.current;
+    curr.state = .STOPPED;
+    curr.list.del();
     if (tsk.stopped_tasks == null) {
-        tsk.stopped_tasks = &tsk.current.list;
+        tsk.stopped_tasks = &curr.list;
         tsk.stopped_tasks.?.setup();
     } else {
-        tsk.stopped_tasks.?.addTail(&tsk.current.list);
+        tsk.stopped_tasks.?.addTail(&curr.list);
     }
-    tsk.current.state = .STOPPED;
     tsk.tasks_mutex.unlock();
     while (true) {}
 }
@@ -86,10 +88,8 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
 pub fn kthreadStop(thread: *tsk.Task) i32 {
     thread.refcount += 1;
     thread.should_stop = true;
-    while (thread.state != .STOPPED) {
-    }
+    while (thread.state != .STOPPED) {}
     const result = thread.result;
     thread.refcount -= 1;
     return result;
 }
-
