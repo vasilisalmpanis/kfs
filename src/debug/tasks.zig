@@ -8,9 +8,24 @@ pub fn ps() void {
     var it = tsk.initial_task.list.iterator();
     while (it.next()) |i| {
         const task = i.curr.entry(tsk.Task, "list");
-        printf("{d}: {any}\n", .{task.pid, task.state});
+        printf("{d}: {s} {d}\n", .{
+            task.pid,
+            @tagName(task.state),
+            task.refcount
+        });
     }
-    printf("stopped tasks {any}\n", .{tsk.stopped_tasks});
+    if (tsk.stopped_tasks) |stopped| {
+        printf("===STOPPED===\n", .{});
+        it = stopped.iterator();
+        while (it.next()) |i| {
+            const task = i.curr.entry(tsk.Task, "list");
+            printf("{d}: {s} {d}\n", .{
+                task.pid,
+                @tagName(task.state),
+                task.refcount
+            });
+        }
+    }
 }
 
 pub fn psTree(task: *tsk.Task, level: u32, last_child: bool) void {

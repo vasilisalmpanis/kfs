@@ -27,6 +27,11 @@ pub const Iterator = struct {
     pub fn isLast(self: *Iterator) bool {
         return self.curr.next == self.head;
     }
+
+    pub fn toEnd(self: *Iterator) void {
+        self.used = true;
+        self.curr = self.head.prev.?;
+    }
 };
 
 pub const ListHead = packed struct {
@@ -50,7 +55,7 @@ pub const ListHead = packed struct {
     }
 
     pub fn entry(self: *ListHead, comptime T: type, comptime member: []const u8) *T {
-        return containerOf(T, @intFromPtr(self), member);
+        return @fieldParentPtr(member, self);
     }
 
     pub fn add(self: *ListHead, new: *ListHead) void {

@@ -15,34 +15,32 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
 }
 
 fn processTasks() void {
-    var buf = tsk.stopped_tasks;
-    if (buf == null)
+    if (tsk.stopped_tasks == null)
         return;
     if (!tsk.tasks_mutex.trylock())
         return;
     defer tsk.tasks_mutex.unlock();
-    while (true) : (buf = buf.?.next) {
-        const task = buf.?.entry(tsk.Task, "list");
-        const next = buf.?.next.?;
+    var it = tsk.stopped_tasks.?.iterator();
+    while (it.next()) |i| {
+        var end: bool = false;
+        const curr = i.curr;
+        const task = curr.entry(tsk.Task, "list");
         if (task == tsk.current or task.refcount != 0)
-            break;
-        buf.?.del();
-        tsk.stopped_tasks = next;
-        if (task.tree.hasChildren()) {
-            var it = task.tree.child.?.siblingsIterator();
-            while (it.next()) |i| {
-                i.curr.entry(tsk.Task, "tree").*.state = .ZOMBIE;
-            }
-        }
-        task.tree.del();
-        if (next == tsk.stopped_tasks) {
+            continue;
+        if (curr.is_single()) {
+            end = true;
             tsk.stopped_tasks = null;
+        } else {
+            it = curr.next.?.iterator();
+            if (curr == tsk.stopped_tasks)
+                tsk.stopped_tasks = curr.next;
         }
+        curr.del();
+        task.delFromTree();
         kthreadStackFree(task.stack_bottom);
         km.kfree(@intFromPtr(task));
-        if (tsk.stopped_tasks == null) {
+        if (end)
             break;
-        }
     }
 }
 
