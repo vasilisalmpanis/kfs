@@ -8,11 +8,11 @@ pub const PIT = struct {
 
     pub fn init(frequency: u32) PIT {
         var pit = PIT{};
-        pit.set_frequency(frequency);
+        pit.setFrequency(frequency);
         return pit;
     }
 
-    fn calculate_divider(self: *PIT, frequency: u32) u16 {
+    fn calculateDivider(self: *PIT, frequency: u32) u16 {
         _ = self;
         var reload_value: u32 = 0;
 
@@ -38,9 +38,9 @@ pub const PIT = struct {
         return @truncate(reload_value);
     }
 
-    pub fn set_frequency(self: *PIT, frequency: u32) void {
+    pub fn setFrequency(self: *PIT, frequency: u32) void {
         HZ = frequency;
-        const divider = self.calculate_divider(frequency);
+        const divider = self.calculateDivider(frequency);
         io.outb(0x43, 0b00110100);
         io.outb(0x40, @truncate(divider & 0xFF));
         io.outb(0x40, @truncate(divider >> 8));

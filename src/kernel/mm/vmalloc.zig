@@ -9,5 +9,5 @@ pub fn vfree(addr: u32) void {
 }
 
 pub fn vsize(addr: u32) u32 {
-    return mm.vheap.get_size(addr);
+    return mm.vheap.getSize(addr);
 }

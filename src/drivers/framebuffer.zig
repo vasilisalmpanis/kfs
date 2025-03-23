@@ -23,7 +23,7 @@ pub const FrameBuffer = struct {
     font: *const Font,
 
     pub fn init(
-        boot_info: *multiboot.multiboot_info,
+        boot_info: *multiboot.MultibootInfo,
         font: *const Font
     ) FrameBuffer {
         const fb_info: ?multiboot.FramebufferInfo = multiboot.getFBInfo(boot_info);
@@ -31,7 +31,7 @@ pub const FrameBuffer = struct {
         const num_pages = (fb_size + 0xFFF) / mm.PAGE_SIZE;
         var i: u32 = 0;
         var addr = fb_info.?.address & 0xFFFFF000;
-        var virt_addr: u32 = mm.virt_memory_manager.find_free_space(
+        var virt_addr: u32 = mm.virt_memory_manager.findFreeSpace(
             num_pages,
             mm.PAGE_OFFSET,
             0xFFFFF000,
@@ -39,8 +39,8 @@ pub const FrameBuffer = struct {
         );
         const first_addr: u32 = virt_addr;
         while (i < num_pages) : (i += 1) {
-            mm.virt_memory_manager.map_page(virt_addr, addr, .{});
-            mm.virt_memory_manager.map_page(addr, addr, .{});
+            mm.virt_memory_manager.mapPage(virt_addr, addr, .{});
+            mm.virt_memory_manager.mapPage(addr, addr, .{});
             virt_addr += mm.PAGE_SIZE;
             addr += mm.PAGE_SIZE;
         }
@@ -65,7 +65,7 @@ pub const FrameBuffer = struct {
         @memset(self.virtual_buffer[0 .. self.fb_info.height * self.fb_info.width], 0);
     }
 
-    fn clear_char(self: *FrameBuffer, cx: u32, cy: u32, bg: u32) void {
+    fn clearChar(self: *FrameBuffer, cx: u32, cy: u32, bg: u32) void {
         const x = cx * self.font.width;
         const y = cy * self.font.height;
         const width = (self.fb_info.pitch / 4);
@@ -84,7 +84,7 @@ pub const FrameBuffer = struct {
         bg: u32,
         fg: u32,
     ) void {
-        if (c == 0) return self.clear_char(cx, cy, bg);
+        if (c == 0) return self.clearChar(cx, cy, bg);
         const char_data = self.font.data[c];
         const x = cx * self.font.width;
         const y = cy * self.font.height;

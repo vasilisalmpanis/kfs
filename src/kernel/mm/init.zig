@@ -1,5 +1,5 @@
-const multiboot_info = @import("arch").multiboot.multiboot_info;
-const multiboot_memory_map = @import("arch").multiboot.multiboot_memory_map;
+const multiboot_info = @import("arch").multiboot.MultibootInfo;
+const multiboot_memory_map = @import("arch").multiboot.MultibootMemoryMap;
 const std = @import("std");
 const arch = @import("arch");
 
@@ -22,11 +22,11 @@ pub const PAGE_SIZE: u32 = arch.PAGE_SIZE;
 extern const _kernel_end: u32;
 extern const _kernel_start: u32;
 
-pub fn virt_to_phys(comptime T: type, addr: *T) *T {
+pub fn virtToPhys(comptime T: type, addr: *T) *T {
     return @ptrFromInt(@intFromPtr(addr) - PAGE_OFFSET);
 }
 
-pub fn phys_to_virt(comptime T: type, addr: *T) *T {
+pub fn physToVirt(comptime T: type, addr: *T) *T {
     return @ptrFromInt(@intFromPtr(addr) + PAGE_OFFSET);
 }
 
@@ -39,7 +39,7 @@ pub var kheap: heap.FreeList = undefined;
 pub var vheap: heap.FreeList = undefined;
 
 // get the first availaanle address and put metadata there
-pub fn mm_init(info: *multiboot_info) void {
+pub fn mmInit(info: *multiboot_info) void {
     var i: u32 = 0;
 
     // Find the biggest memory region in memory map provided by multiboot

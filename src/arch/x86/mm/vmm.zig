@@ -7,7 +7,7 @@ const PAGE_WRITE: u8 = 0x2;
 const PAGE_USER: u8 = 0x4;
 const PAGE_4MB: u8 = 0x80;
 
-pub const paging_flags = packed struct {
+pub const PagingFlags = packed struct {
     present: bool       = true,
     writable: bool      = true,
     user: bool          = false,
@@ -23,7 +23,7 @@ pub const paging_flags = packed struct {
 pub extern var initial_page_dir: [1024]u32;
 // const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
-pub inline fn InvalidatePage(page: usize) void {
+pub inline fn invalidatePage(page: usize) void {
     asm volatile ("invlpg (%eax)"
         :
         : [pg] "{eax}" (page),
@@ -51,7 +51,7 @@ pub inline fn getCR3() u32 {
     );
 }
 
-const vmem_block = struct {
+const VmemBlock = struct {
     base: u32,
     size: u32,
     flags: u32
@@ -81,12 +81,12 @@ pub const VMM = struct {
         return vmm;
     }
 
-    pub fn page_table_to_addr(self: *VMM, pd_index: u32, pt_index: u32) u32 {
+    pub fn pageTableToAddr(self: *VMM, pd_index: u32, pt_index: u32) u32 {
         _ = self;
         return ((pd_index << 22) | (pt_index << 12));
     }
 
-    pub fn find_free_space(
+    pub fn findFreeSpace(
         self: *VMM,
         num_pages: u32,
         from_addr: u32, // Should be 4Mb aligned
@@ -101,7 +101,7 @@ pub const VMM = struct {
         while (pd_idx < max_pd_idx): (pd_idx += 1) {
             if (pd[pd_idx].present and pd[pd_idx].huge_page) {
                 pages = 0;
-                addr_to_ret = self.page_table_to_addr(pd_idx + 1, 0);
+                addr_to_ret = self.pageTableToAddr(pd_idx + 1, 0);
                 continue ;
             }
             // Empty page dir entry
@@ -111,7 +111,7 @@ pub const VMM = struct {
                 // If this page dir entry is not for userspace and we need for userspace => continue
                 if (user and !pd[pd_idx].user) {
                     pages = 0;
-                    addr_to_ret = self.page_table_to_addr(pd_idx + 1, 0);
+                    addr_to_ret = self.pageTableToAddr(pd_idx + 1, 0);
                     continue ;
                 }
                 var pt_idx: u32 = 0;
@@ -121,12 +121,12 @@ pub const VMM = struct {
                     if (pt[pt_idx].present) {
                         pages = 0;
                         if (pt_idx < 1023) {
-                            addr_to_ret = self.page_table_to_addr(
+                            addr_to_ret = self.pageTableToAddr(
                                 pd_idx,
                                 pt_idx + 1
                             );
                         } else {
-                            addr_to_ret = self.page_table_to_addr(
+                            addr_to_ret = self.pageTableToAddr(
                                 pd_idx + 1,
                                 0
                             );
@@ -146,7 +146,7 @@ pub const VMM = struct {
         return 0xFFFFFFFF;
     }
 
-    pub fn find_free_addr(self: *VMM) u32 {
+    pub fn findFreeAddr(self: *VMM) u32 {
         var pd_idx = PAGE_OFFSET >> 22;
         const pd: [*]u32 = @ptrFromInt(0xFFFFF000);
         var pt: [*]u32 = undefined;
@@ -160,7 +160,7 @@ pub const VMM = struct {
                 pt += (0x400 * pd_idx);
                 while (pt_idx < 1023) {
                     if (pt[pt_idx] == 0) {
-                        return self.page_table_to_addr(pd_idx, pt_idx);
+                        return self.pageTableToAddr(pd_idx, pt_idx);
                     }
                     pt_idx += 1;
                 }
@@ -169,22 +169,22 @@ pub const VMM = struct {
         return 0xFFFFFFFF;
     }
 
-    pub fn unmap_page(self: *VMM, virt: u32) void {
+    pub fn unmapPage(self: *VMM, virt: u32) void {
         const pd_index = virt >> 22;
         const pt_index = (virt >> 12) & 0x3FF;
         var pt: [*]u32 = @ptrFromInt(0xFFC00000);
         pt += (0x400 * pd_index);
         const pfn: u32 = pt[pt_index] & 0xFFFFF000;
-        self.pmm.free_page(pfn);
+        self.pmm.freePage(pfn);
         pt[pt_index] = 0;
-        InvalidatePage(virt);
+        invalidatePage(virt);
     }
 
-    pub fn map_page(
+    pub fn mapPage(
         self: *VMM,
         virtual_addr: u32,
         physical_addr: u32,
-        flags: paging_flags
+        flags: PagingFlags
     ) void {
         const pd_idx = virtual_addr >> 22;
         const pt_idx = (virtual_addr >> 12) & 0x3ff;
@@ -192,7 +192,7 @@ pub const VMM = struct {
         var pt: [*]u32 = undefined;
 
         if (pd[pd_idx] == 0) {
-            const pt_pfn = self.pmm.alloc_page();
+            const pt_pfn = self.pmm.allocPage();
             const tmp_pd_idx = (pt_pfn >> 20) / 4;
             pd[pd_idx] = pt_pfn | @as(u12, @bitCast(flags)) | PAGE_WRITE;
             const tmp = pd[tmp_pd_idx];
@@ -209,6 +209,6 @@ pub const VMM = struct {
         pt[pt_idx] = physical_addr | PAGE_PRESENT | PAGE_WRITE;
         const new_flags = @as(u12, @bitCast(flags));
         pt[pt_idx] = physical_addr | new_flags;
-        InvalidatePage(virtual_addr);
+        invalidatePage(virtual_addr);
     }
 };

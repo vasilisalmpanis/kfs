@@ -1,15 +1,15 @@
 const vmm = @import("arch").vmm;
 const lst = @import("../utils/list.zig");
 const tree = @import("../utils/tree.zig");
-const regs = @import("arch").regs;
-const current_ms = @import("../time/jiffies.zig").current_ms;
+const Regs = @import("arch").Regs;
+const currentMs = @import("../time/jiffies.zig").currentMs;
 const reschedule = @import("./scheduler.zig").reschedule;
 const printf = @import("debug").printf;
 const mutex = @import("./mutex.zig").Mutex;
 
 var pid: u32 = 0;
 
-const task_state = enum(u8) {
+const TaskState = enum(u8) {
     RUNNING,
     UNINTERRUPTIBLE_SLEEP,  // Sleep the whole duration
     INTERRUPTIBLE_SLEEP,    // IO finished? wake up
@@ -17,7 +17,7 @@ const task_state = enum(u8) {
     ZOMBIE,
 };
 
-const task_type = enum(u8) {
+const TaskType = enum(u8) {
     KTHREAD,
     PROCESS,
 };
@@ -25,7 +25,7 @@ const task_type = enum(u8) {
 // both threads and processes are tasks
 // and threads share 
 //
-pub const tss_struct = packed struct {
+pub const TSS = packed struct {
     back_link: u16,
     esp0: usize,
     ss0: u16,
@@ -54,8 +54,8 @@ pub const tss_struct = packed struct {
     trace: u16,
     bitmap: u16,
 
-    pub fn init() tss_struct {
-        return tss_struct {
+    pub fn init() TSS {
+        return TSS {
             .back_link = 0,
             .esp0 = 0,
             .ss0 = 0,
@@ -87,18 +87,18 @@ pub const tss_struct = packed struct {
     }
 };
 
-// task_struct
+// Task
 // Anyone using this struct must get refcount
 // and put it when no longer needed.
-pub const task_struct = struct {
+pub const Task = struct {
     pid:            u32,
-    type:           task_type,
+    type:           TaskType,
     virtual_space:  u32,
     uid:            u16,
     gid:            u16,
     stack_bottom:   u32,
-    state:          task_state      = task_state.RUNNING,
-    regs:           regs            = regs.init(),
+    state:          TaskState      = TaskState.RUNNING,
+    regs:           Regs            = Regs.init(),
     tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
     refcount:       u32             = 0,
@@ -110,8 +110,8 @@ pub const task_struct = struct {
     result:         i32                                     = 0,
     should_stop:    bool                                    = false,
 
-    pub fn init(virt: u32, uid: u16, gid: u16, tp: task_type) task_struct {
-        return task_struct{
+    pub fn init(virt: u32, uid: u16, gid: u16, tp: TaskType) Task {
+        return Task{
             .pid = 0,
             .virtual_space = virt,
             .uid = uid,
@@ -121,7 +121,7 @@ pub const task_struct = struct {
         };
     }
 
-    pub fn setup(self: *task_struct, virt: u32, task_stack_top: u32) void {
+    pub fn setup(self: *Task, virt: u32, task_stack_top: u32) void {
         self.virtual_space = virt;
         self.pid = pid;
         pid += 1;
@@ -130,17 +130,17 @@ pub const task_struct = struct {
         self.list.setup();
     }
 
-    pub fn init_self(
-        self: *task_struct,
+    pub fn initSelf(
+        self: *Task,
         virt: u32,
         task_stack_top: u32,
         stack_bottom: u32,
         uid: u16,
         gid: u16,
-        tp: task_type
+        tp: TaskType
     ) void {
         tasks_mutex.lock();
-        const tmp = task_struct.init(virt, uid, gid, tp);
+        const tmp = Task.init(virt, uid, gid, tp);
         self.pid = tmp.pid;
         self.regs.esp = task_stack_top;
         self.virtual_space = tmp.virtual_space;
@@ -151,11 +151,11 @@ pub const task_struct = struct {
         pid += 1;
         self.list.setup();
         self.stack_bottom = stack_bottom;
-        current.list.add_tail(&self.list);
+        current.list.addTail(&self.list);
 
         // tree logic
         self.tree.setup();
-        current.tree.add_child(&self.tree);
+        current.tree.addChild(&self.tree);
         tasks_mutex.unlock();
     }
 };
@@ -163,12 +163,12 @@ pub const task_struct = struct {
 pub fn sleep(millis: usize) void {
     if (current == &initial_task)
         return ;
-    current.wakeup_time = current_ms() + millis;
+    current.wakeup_time = currentMs() + millis;
     current.state = .UNINTERRUPTIBLE_SLEEP;
     reschedule();
 }
 
-pub var initial_task = task_struct.init(0, 0, 0, .KTHREAD);
+pub var initial_task = Task.init(0, 0, 0, .KTHREAD);
 pub var current = &initial_task;
 pub var tasks_mutex: mutex = mutex.init();
 pub var stopped_tasks: ?*lst.ListHead = null;

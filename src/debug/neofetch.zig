@@ -21,7 +21,7 @@ const header_color = @intFromEnum(ConsoleColors.LightBlue);
 const value_color = @intFromEnum(ConsoleColors.White);
 const separator_color = @intFromEnum(ConsoleColors.DarkGray);
 
-fn format_memory_size(bytes: u64, buffer: []u8) []u8 {
+fn formatMemorySize(bytes: u64, buffer: []u8) []u8 {
     if (bytes < 1024) {
         const len = std.fmt.formatIntBuf(
             buffer,
@@ -62,7 +62,7 @@ fn format_memory_size(bytes: u64, buffer: []u8) []u8 {
     }
 }
 
-pub fn neofetch(tty: *TTY, boot_info: *multiboot.multiboot_info) void {
+pub fn neofetch(tty: *TTY, boot_info: *multiboot.MultibootInfo) void {
     const original_fg = tty._fg_colour;
     
     const total_mem_kb = boot_info.mem_lower + boot_info.mem_upper;
@@ -75,8 +75,8 @@ pub fn neofetch(tty: *TTY, boot_info: *multiboot.multiboot_info) void {
     
     var available_mem: u64 = 0;
     var i: u32 = 0;
-    while (i < boot_info.mmap_length) : (i += @sizeOf(multiboot.multiboot_memory_map)) {
-        const mmap: *multiboot.multiboot_memory_map = @ptrFromInt(boot_info.mmap_addr + i);
+    while (i < boot_info.mmap_length) : (i += @sizeOf(multiboot.MultibootMemoryMap)) {
+        const mmap: *multiboot.MultibootMemoryMap = @ptrFromInt(boot_info.mmap_addr + i);
         if (mmap.type == 1) {
             available_mem += mmap.len[0];
         }
@@ -88,7 +88,7 @@ pub fn neofetch(tty: *TTY, boot_info: *multiboot.multiboot_info) void {
         task_count += 1;
     }
     
-    const uptime_seconds = krn.get_seconds_from_start();
+    const uptime_seconds = krn.getSecondsFromStart();
     const uptime_hours = uptime_seconds / 3600;
     const uptime_minutes = (uptime_seconds % 3600) / 60;
     const uptime_secs = uptime_seconds % 60;
@@ -151,10 +151,10 @@ pub fn neofetch(tty: *TTY, boot_info: *multiboot.multiboot_info) void {
                 printf("Memory: ", .{});
                 tty.setColor(value_color);
                 
-                var mem_str = format_memory_size(available_mem, buffer[0..]);
+                var mem_str = formatMemorySize(available_mem, buffer[0..]);
                 printf("{s} / ", .{mem_str});
                 
-                mem_str = format_memory_size(total_mem, buffer[0..]);
+                mem_str = formatMemorySize(total_mem, buffer[0..]);
                 printf("{s}", .{mem_str});
             },
             4 => {
@@ -179,11 +179,11 @@ pub fn neofetch(tty: *TTY, boot_info: *multiboot.multiboot_info) void {
                 tty.setColor(header_color);
                 printf("CPU: ", .{});
                 tty.setColor(value_color);
-                printf("{s}", .{get_cpu_info()});
+                printf("{s}", .{getCpuInfo()});
             },
             8 => {
                 for (0..8) |color_idx| {
-                    const color = get_color_by_index(color_idx);
+                    const color = getColorByIndex(color_idx);
                     tty.setColor(color);
                     printf("##", .{});
                     tty.setColor(value_color);
@@ -198,11 +198,11 @@ pub fn neofetch(tty: *TTY, boot_info: *multiboot.multiboot_info) void {
     tty.setColor(original_fg);
 }
 
-fn get_cpu_info() []const u8 {
+fn getCpuInfo() []const u8 {
     return "Some CPU @ 1.0 GHz";
 }
 
-fn get_color_by_index(index: usize) u32 {
+fn getColorByIndex(index: usize) u32 {
     const colors = [_]u32{
         @intFromEnum(ConsoleColors.Black),
         @intFromEnum(ConsoleColors.Red),

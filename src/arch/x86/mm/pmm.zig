@@ -37,7 +37,7 @@ pub const PMM = struct {
     }
 
     // Alloc num of contigueous physical pages
-    pub fn alloc_pages(self: *PMM, num: u32) u32 {
+    pub fn allocPages(self: *PMM, num: u32) u32 {
         var cont_size: u32 = 0;
         var idx: u32 = 0;
         var curr_pos: u32 = self.index;
@@ -77,7 +77,7 @@ pub const PMM = struct {
     ///
     /// Returns:
     ///     physical address : u32
-    pub fn alloc_page(self: *PMM) u32 {
+    pub fn allocPage(self: *PMM) u32 {
         const pf_addr = self.free_area[self.index];
         self.free_area[self.index] = 0;
         while(self.index > 0 and self.free_area[self.index] == 0) : (self.index -= 1) {}
@@ -89,7 +89,7 @@ pub const PMM = struct {
     /// the addresses in sorted order.
     /// Returns:
     ///     void
-    pub fn free_page(self: *PMM, pfn: u32) void {
+    pub fn freePage(self: *PMM, pfn: u32) void {
         if (pfn % PAGE_SIZE > 0)
             return ;
         if (pfn < self.begin or pfn >= self.end)

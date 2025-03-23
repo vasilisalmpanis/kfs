@@ -15,21 +15,20 @@ pub const irq = @import("./irq/manage.zig");
 pub const exceptions = @import("./irq/exceptions.zig");
 pub const syscalls = @import("./irq/syscalls.zig");
 pub const list = @import("./utils/list.zig");
-pub const kthread_create = @import("./sched/kthread.zig").kthread_create;
-pub const kthread_stop = @import("./sched/kthread.zig").kthread_stop;
+pub const kthreadCreate = @import("./sched/kthread.zig").kthreadCreate;
+pub const kthreadStop = @import("./sched/kthread.zig").kthreadStop;
 pub const task = @import("./sched/task.zig");
 pub const sched = @import("./sched/scheduler.zig");
-pub const timer_handler = @import("./time/jiffies.zig").timer_handler;
-pub const switch_to = @import("./sched/scheduler.zig").switch_to;
+pub const timerHandler = @import("./time/jiffies.zig").timerHandler;
 pub const sleep = @import("./sched/task.zig").sleep;
 pub const Mutex = @import("./sched/mutex.zig").Mutex;
 
-pub const get_seconds_from_start = @import("./time/jiffies.zig").get_seconds_from_start;
-pub const current_ms = @import("./time/jiffies.zig").current_ms;
+pub const getSecondsFromStart = @import("./time/jiffies.zig").getSecondsFromStart;
+pub const currentMs = @import("./time/jiffies.zig").currentMs;
 pub const jiffies = @import("./time/jiffies.zig");
 
 pub var keyboard: Keyboard = undefined;
 pub var pit: PIT = undefined;
 pub var serial: Serial = undefined;
 pub var logger: Logger = undefined;
-pub var boot_info: *multiboot.multiboot_info = undefined;
+pub var boot_info: *multiboot.MultibootInfo = undefined;

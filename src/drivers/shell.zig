@@ -30,17 +30,17 @@ pub const Shell = struct {
                 \\
             , .{});
         } else if (mem.eql(u8, input, "stack")) {
-            debug.TraceStackTrace(10);
+            debug.traceStackTrace(10);
         } else if (mem.eql(u8, input, "neofetch")) {
             debug.neofetch(screen.current_tty.?, krn.boot_info);
         } else if (mem.eql(u8, input, "ps")) {
             debug.ps();
-        } else if (mem.eql(u8, input, "ps_tree")) {
-            debug.ps_tree(&krn.task.initial_task, 0, false);
+        } else if (mem.eql(u8, input, "pstree")) {
+            debug.psTree(&krn.task.initial_task, 0, false);
         } else if (mem.eql(u8, input, "jiffies")) {
             debug.printf("{d}\n", .{krn.jiffies.jiffies});
         } else if (mem.eql(u8, input, "uptime")) {
-            debug.printf("{d}\n", .{krn.get_seconds_from_start()});
+            debug.printf("{d}\n", .{krn.getSecondsFromStart()});
         } else if (mem.eql(u8, input, "reboot")) {
             system.reboot();
         } else if (mem.eql(u8, input, "shutdown")) {
@@ -48,7 +48,7 @@ pub const Shell = struct {
         } else if (mem.eql(u8, input, "halt")) {
             system.halt();
         } else if (mem.eql(u8, input, "test")) {
-            debug.run_tests();
+            debug.runTests();
         } else if (mem.eql(u8, input, "red")) {
             screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Red));
         } else if (mem.eql(u8, input, "green")) {

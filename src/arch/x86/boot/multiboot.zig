@@ -1,4 +1,4 @@
-pub const multiboot_info = packed struct {
+pub const MultibootInfo = packed struct {
     flags: u32,
     mem_lower: u32,
     mem_upper: u32,
@@ -31,7 +31,7 @@ pub const multiboot_info = packed struct {
     framebuffer_type: u8,
 };
 
-pub const multiboot_memory_map = struct {
+pub const MultibootMemoryMap = struct {
     size: u32,      // Size of the memory_map struct
     addr: [2]u32,   // Base address
     len: [2]u32,    // Length in bytes
@@ -50,7 +50,7 @@ pub const FramebufferInfo = struct {
     pitch: u32,
 };
 
-pub fn getFBInfo(multiboot_ptr: *const multiboot_info) ?FramebufferInfo {
+pub fn getFBInfo(multiboot_ptr: *const MultibootInfo) ?FramebufferInfo {
     // Check if framebuffer info is available (bit 12)
     const MULTIBOOT_FRAMEBUFFER_INFO = (1 << 12);
     if ((multiboot_ptr.flags & MULTIBOOT_FRAMEBUFFER_INFO) == 0) {

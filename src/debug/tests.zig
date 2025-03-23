@@ -1,8 +1,8 @@
 const printf = @import("./printf.zig").printf;
 const mm = @import("kernel").mm;
-const print_free_list = @import("./mm.zig").print_free_list;
+const printFreeList = @import("./mm.zig").printFreeList;
 
-pub fn run_tests() void {
+pub fn runTests() void {
     var i: u32 = 0;
     var j: u32 = 0;
 
@@ -10,7 +10,7 @@ pub fn run_tests() void {
     const size: u32 = 10000;
     var arr: [size]u32 = .{0} ** size;
     var varr: [size]u32 = .{0} ** size;
-    print_free_list();
+    printFreeList();
     while (i < 1) : (i += 1) {
         j = 0;
         while (j < size) : (j += 1) {
@@ -27,5 +27,5 @@ pub fn run_tests() void {
         }
     }
     printf("Tests are done...\n", .{});
-    print_free_list();
+    printFreeList();
 }
