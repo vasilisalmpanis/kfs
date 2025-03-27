@@ -79,6 +79,30 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
 
+    const stack = krn.mm.vheap.alloc(4096, true, true) catch 0;
+    const code = krn.mm.vheap.alloc(4096, true, true) catch 0;
+    const code_ptr: [*]u8 = @ptrFromInt(code);
+    code_ptr[0] = 0xeb;
+    code_ptr[1] = 0xfe;
+    asm volatile(
+        \\ cli
+        \\ mov $((8 * 4) | 3), %%bx
+        \\ mov %%bx, %%ds
+        \\ mov %%bx, %%es
+        \\ mov %%bx, %%fs
+        \\ mov %%bx, %%gs
+        \\
+        \\ push $((8 * 4) | 3)
+        \\ push %[us]
+        \\ pushf
+        \\ push $((8 * 3) | 3)
+        \\ push %[uc]
+        \\ iret
+        \\
+        ::
+        [uc] "r" (code),
+        [us] "r" (stack + 4096),
+    );
     while (true) {
         asm volatile ("hlt");
     }

@@ -1,3 +1,4 @@
+const cpu = @import("./system/cpu.zig");
 
 const GDTBASE: u32  =  0x00000800;
 const Gdtr = packed struct {
@@ -30,17 +31,21 @@ pub fn gdtSetEntry(num: u32, base: u32, limit: u32, access: u8, gran: u8) void {
     gdt_temp.access = access;
 }
 
+extern const stack_top: u32;
+var tss: cpu.TSS = cpu.TSS.init();
+
 pub fn gdtInit() void {
-    gdt_ptr.limit = (@sizeOf(GdtEntry) * 7) - 1;
+    tss.ss0 = 8 * 2;
+    tss.esp0 = stack_top;
+    gdt_ptr.limit = (@sizeOf(GdtEntry) * 6) - 1;
     gdt_ptr.base = GDTBASE;
 
     gdtSetEntry(0,0,0,0,0);                    // Null segment
     gdtSetEntry(1, 0, 0xFFFFFFFF, 0x9A, 0xCF); // Kernel code
     gdtSetEntry(2, 0, 0xFFFFFFFF, 0x92, 0xCF); // Kernel data
-    gdtSetEntry(3, 0, 0xFFFFFFFF, 0x96, 0xCF); // kernel stack
-    gdtSetEntry(4, 0, 0xFFFFFFFF, 0xFA, 0xCF); // userspace code
-    gdtSetEntry(5, 0, 0xFFFFFFFF, 0xF2, 0xCF); // userspace data
-    gdtSetEntry(6, 0, 0xFFFFFFFF, 0xF6, 0xCF); // userspace stack
+    gdtSetEntry(3, 0, 0xFFFFFFFF, 0xFA, 0xCF); // userspace code
+    gdtSetEntry(4, 0, 0xFFFFFFFF, 0xF2, 0xCF); // userspace data
+    gdtSetEntry(5, @intFromPtr(&tss), @sizeOf(cpu.TSS) - 1, 0x89, 0x00); // userspace stack
     asm volatile (
         \\lgdt (%edi)
         \\jmp $0x08, $.reload_CS
@@ -54,5 +59,9 @@ pub fn gdtInit() void {
         :
         : [ptr] "{edi}" (&gdt_ptr),
         : "rax"
+    );
+    asm volatile (
+        \\ mov $(8 * 5), %ax
+        \\ ltr %ax
     );
 }
