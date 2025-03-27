@@ -1,4 +1,5 @@
 const cpu = @import("./system/cpu.zig");
+const KERNEL_DATA_SEGMENT = @import("./idt.zig").KERNEL_DATA_SEGMENT;
 
 const GDTBASE: u32  =  0x00000800;
 const Gdtr = packed struct {
@@ -32,11 +33,11 @@ pub fn gdtSetEntry(num: u32, base: u32, limit: u32, access: u8, gran: u8) void {
 }
 
 extern const stack_top: u32;
-var tss: cpu.TSS = cpu.TSS.init();
+pub var tss: cpu.TSS = cpu.TSS.init();
 
 pub fn gdtInit() void {
-    tss.ss0 = 8 * 2;
-    tss.esp0 = stack_top;
+    tss.ss0 = KERNEL_DATA_SEGMENT;
+    tss.esp0 = @intFromPtr(&stack_top);
     gdt_ptr.limit = (@sizeOf(GdtEntry) * 6) - 1;
     gdt_ptr.base = GDTBASE;
 
