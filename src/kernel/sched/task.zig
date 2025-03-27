@@ -26,67 +26,6 @@ const TaskType = enum(u8) {
 // both threads and processes are tasks
 // and threads share 
 //
-pub const TSS = packed struct {
-    back_link: u16,
-    esp0: usize,
-    ss0: u16,
-    esp1: usize,
-    ss1: u16,
-    esp2: usize,
-    ss2: u16,
-    cr3: usize,
-    eip: usize,
-    eflags: usize,
-    eax: usize,
-    ecx: usize,
-    edx: usize,
-    ebx: usize,
-    esp: usize,
-    ebp: usize,
-    esi: usize,
-    edi: usize,
-    es: u16,
-    cs: u16,
-    ss: u16,
-    ds: u16,
-    fs: u16,
-    gs: u16,
-    ldt: u16,
-    trace: u16,
-    bitmap: u16,
-
-    pub fn init() TSS {
-        return TSS {
-            .back_link = 0,
-            .esp0 = 0,
-            .ss0 = 0,
-            .esp1 = 0,
-            .ss1 = 0,
-            .esp2 = 0,
-            .ss2 = 0,
-            .cr3= 0 ,
-            .eip= 0 ,
-            .eflags = 0,
-            .eax = 0,
-            .ecx = 0,
-            .edx = 0,
-            .ebx = 0,
-            .esp = 0,
-            .ebp = 0,
-            .esi = 0,
-            .edi = 0,
-            .es = 0,
-            .cs = 0,
-            .ss = 0,
-            .ds = 0,
-            .fs = 0,
-            .gs = 0,
-            .ldt = 0,
-            .trace = 0,
-            .bitmap = 0,
-        };
-    }
-};
 
 // Task
 // Anyone using this struct must get refcount
