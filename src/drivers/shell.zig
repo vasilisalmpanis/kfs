@@ -41,6 +41,10 @@ pub const Shell = struct {
             debug.printf("{d}\n", .{krn.jiffies.jiffies});
         } else if (mem.eql(u8, input, "uptime")) {
             debug.printf("{d}\n", .{krn.getSecondsFromStart()});
+        } else if (mem.eql(u8, input, "gdt")) {
+            debug.printGDT();
+        } else if (mem.eql(u8, input, "tss")) {
+            debug.printTSS();
         } else if (mem.eql(u8, input, "reboot")) {
             system.reboot();
         } else if (mem.eql(u8, input, "shutdown")) {

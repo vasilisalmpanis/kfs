@@ -1,13 +1,13 @@
 const cpu = @import("./system/cpu.zig");
-const KERNEL_DATA_SEGMENT = @import("./idt.zig").KERNEL_DATA_SEGMENT;
+const idt = @import("./idt.zig");
 
-const GDTBASE: u32  =  0x00000800;
+pub const GDTBASE: u32  =  0x00000800;
 const Gdtr = packed struct {
     limit: u16,
     base: u32
 };
 
-const GdtEntry = packed struct {
+pub const GdtEntry = packed struct {
     limit_low: u16,
     base_low: u16,
     base_middle : u8,
@@ -16,7 +16,7 @@ const GdtEntry = packed struct {
     base_high: u8,
 };
 
-var gdt_ptr : Gdtr = undefined;
+pub var gdt_ptr : Gdtr = undefined;
 
 pub fn gdtSetEntry(num: u32, base: u32, limit: u32, access: u8, gran: u8) void {
     // load the entry using num as an index into GDTBASE (0x00000800)
@@ -36,8 +36,15 @@ extern const stack_top: u32;
 pub var tss: cpu.TSS = cpu.TSS.init();
 
 pub fn gdtInit() void {
-    tss.ss0 = KERNEL_DATA_SEGMENT;
+    tss.ss0 = idt.KERNEL_DATA_SEGMENT;
     tss.esp0 = @intFromPtr(&stack_top);
+    // tss.cs = 0x0b;
+    // tss.ss = 0x13;
+    // tss.ds = 0x13;
+    // tss.es = 0x13;
+    // tss.fs = 0x13;
+    // tss.gs = 0x13;
+
     gdt_ptr.limit = (@sizeOf(GdtEntry) * 6) - 1;
     gdt_ptr.base = GDTBASE;
 
@@ -47,16 +54,17 @@ pub fn gdtInit() void {
     gdtSetEntry(3, 0, 0xFFFFFFFF, 0xFA, 0xCF); // userspace code
     gdtSetEntry(4, 0, 0xFFFFFFFF, 0xF2, 0xCF); // userspace data
     gdtSetEntry(5, @intFromPtr(&tss), @sizeOf(cpu.TSS) - 1, 0x89, 0x00); // userspace stack
+
     asm volatile (
-        \\lgdt (%edi)
-        \\jmp $0x08, $.reload_CS
+        \\  lgdt (%edi)
+        \\  jmp $0x08, $.reload_CS
         \\.reload_CS:
-        \\mov $0x10, %ax
-        \\mov %ax, %ds
-        \\mov %ax, %es
-        \\mov %ax, %ss
-        \\mov %ax, %fs
-        \\mov %ax, %gs
+        \\  mov $0x10, %ax
+        \\  mov %ax, %ds
+        \\  mov %ax, %es
+        \\  mov %ax, %ss
+        \\  mov %ax, %fs
+        \\  mov %ax, %gs
         :
         : [ptr] "{edi}" (&gdt_ptr),
         : "rax"

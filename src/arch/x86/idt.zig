@@ -20,6 +20,7 @@ const SyscallHandler    = fn (regs: *Regs) void;
 const ISRHandler        = fn () callconv(.C) void;
 
 pub export fn exceptionHandler(state: *Regs) callconv(.C) void {
+    krn.logger.DEBUG("EXC {d}", .{state.int_no});
     if (krn.irq.handlers[state.int_no] != null) {
         const handler: *const ExceptionHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
         handler(state);
@@ -260,7 +261,7 @@ pub fn idtInit() void {
         idtSetDescriptor(
             @intCast(index),
             isr_stub_table[index],
-            0x8E
+            if (index < CPU_EXCEPTION_COUNT) 0x8E else 0xEE
         );
     }
     

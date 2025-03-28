@@ -84,6 +84,11 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     const code_ptr: [*]u8 = @ptrFromInt(code);
     code_ptr[0] = 0xeb;
     code_ptr[1] = 0xfe;
+    gdt.tss.esp0 = krn.task.current.regs.esp;
+
+    dbg.printGDT();
+    dbg.printTSS();
+    krn.logger.INFO("Go usermode", .{});
     asm volatile(
         \\ cli
         \\ mov $((8 * 4) | 3), %%bx
@@ -95,6 +100,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
         \\ push $((8 * 4) | 3)
         \\ push %[us]
         \\ pushf
+        \\ pop %%ebx
+        \\ or $0x200, %%ebx
+        \\ push %%ebx
         \\ push $((8 * 3) | 3)
         \\ push %[uc]
         \\ iret
