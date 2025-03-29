@@ -44,6 +44,50 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
     return 0;
 }
 
+fn go_userspace() void {
+    const userspace = @embedFile("userspace");
+
+    const code = krn.mm.vheap.alloc(
+        userspace.len,
+        true, true
+    ) catch 0;
+    const code_ptr: [*]u8 = @ptrFromInt(code);
+    @memcpy(code_ptr[0..], userspace[0..]);
+
+    const stack_size: u32 = 4096;
+    const stack = krn.mm.vheap.alloc(
+        stack_size,
+        true, true
+    ) catch 0;
+    const stack_ptr: [*]u8 = @ptrFromInt(stack);
+    @memset(stack_ptr[0..stack_size], 0);
+
+    gdt.tss.esp0 = krn.task.current.regs.esp;
+
+    asm volatile(
+        \\ cli
+        \\ mov $((8 * 4) | 3), %%bx
+        \\ mov %%bx, %%ds
+        \\ mov %%bx, %%es
+        \\ mov %%bx, %%fs
+        \\ mov %%bx, %%gs
+        \\
+        \\ push $((8 * 4) | 3)
+        \\ push %[us]
+        \\ pushf
+        \\ pop %%ebx
+        \\ or $0x200, %%ebx
+        \\ push %%ebx
+        \\ push $((8 * 3) | 3)
+        \\ push %[uc]
+        \\ iret
+        \\
+        ::
+        [uc] "r" (code),
+        [us] "r" (stack + stack_size),
+    );
+}
+
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x2BADB002) {
         system.halt();
@@ -78,41 +122,12 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     syscalls.initSyscalls();
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
-
-    const stack = krn.mm.vheap.alloc(4096, true, true) catch 0;
-    const code = krn.mm.vheap.alloc(4096, true, true) catch 0;
-    const code_ptr: [*]u8 = @ptrFromInt(code);
-    code_ptr[0] = 0xeb;
-    code_ptr[1] = 0xfe;
-    gdt.tss.esp0 = krn.task.current.regs.esp;
-
-    dbg.printGDT();
-    dbg.printTSS();
+    
     krn.logger.INFO("Go usermode", .{});
-    asm volatile(
-        \\ cli
-        \\ mov $((8 * 4) | 3), %%bx
-        \\ mov %%bx, %%ds
-        \\ mov %%bx, %%es
-        \\ mov %%bx, %%fs
-        \\ mov %%bx, %%gs
-        \\
-        \\ push $((8 * 4) | 3)
-        \\ push %[us]
-        \\ pushf
-        \\ pop %%ebx
-        \\ or $0x200, %%ebx
-        \\ push %%ebx
-        \\ push $((8 * 3) | 3)
-        \\ push %[uc]
-        \\ iret
-        \\
-        ::
-        [uc] "r" (code),
-        [us] "r" (stack + 4096),
-    );
+    go_userspace();
+    
     while (true) {
         asm volatile ("hlt");
     }
-    panic("You shouldn't be here");
+    @panic("You shouldn't be here");
 }

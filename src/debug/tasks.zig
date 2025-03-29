@@ -3,6 +3,7 @@ const printfLen = @import("./printf.zig").printfLen;
 const printf = @import("./printf.zig").printf;
 const writer = @import("./printf.zig").writer;
 const fmt = @import("std").fmt;
+const krn = @import("kernel");
 
 pub fn ps() void {
     var it = tsk.initial_task.list.iterator();
@@ -28,12 +29,12 @@ pub fn ps() void {
     }
 }
 
-pub fn psTree(task: *tsk.Task, level: u32, last_child: bool) void {
+fn psTreeHelper(task: *tsk.Task, level: u32, last_child: bool) void {
     const len = printfLen("{d} ", .{task.pid});
     if (task.tree.hasChildren()) {
         var it = task.tree.child.?.siblingsIterator();
         while (it.next()) |i| {
-            psTree(
+            psTreeHelper(
                 i.curr.entry(tsk.Task, "tree"),
                 level + len,
                 i.isLast()
@@ -51,4 +52,8 @@ pub fn psTree(task: *tsk.Task, level: u32, last_child: bool) void {
             writer
         ) catch {};
     }
+}
+
+pub fn psTree() void {
+    psTreeHelper(&krn.task.initial_task, 0, false);
 }
