@@ -5,12 +5,18 @@ const km = @import("../mm/kmalloc.zig");
 const kthreadStackFree = @import("./kthread.zig").kthreadStackFree;
 const currentMs = @import("../time/jiffies.zig").currentMs;
 const archReschedule = @import("arch").archReschedule;
+const signalWrapper = @import("./signals.zig").signalWrapper;
 
 
 fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs = state.*;
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;
+    if (tsk.current.sig_pending != 0 and tsk.current.sig_eip == 0) {
+        const regs: *Regs = @ptrFromInt(to.regs.esp);
+        tsk.current.sig_eip = regs.eip;
+        regs.eip = @intFromPtr(&signalWrapper);
+    }
     return @ptrFromInt(to.regs.esp);
 }
 
