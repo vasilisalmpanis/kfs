@@ -77,6 +77,19 @@ pub fn build(b: *std.Build) !void {
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
 
+        // Add userspace binary
+        const userspace_bin_path = b.path("./src/userspace/user.bin");
+        const userspace_src_path = b.path("./src/userspace/user.asm");
+        const userspace_asm = b.addSystemCommand(&.{
+            "nasm", "-f", "bin",
+            userspace_src_path.getPath(b),
+            "-o", userspace_bin_path.getPath(b)
+        });
+        kernel.root_module.addAnonymousImport("userspace", .{
+            .root_source_file =userspace_bin_path,
+        });
+        kernel.step.dependOn(&userspace_asm.step);
+
         const kernel_step = b.step(name, "Build the kernel");
         kernel_step.dependOn(&kernel.step);
     }
