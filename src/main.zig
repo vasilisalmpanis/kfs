@@ -20,6 +20,9 @@ const cpu = @import("arch").cpu;
 
 extern const stack_top: u32;
 
+fn testp(_: ?*const anyopaque) i32 {
+    while (true) {}
+}
 
 pub fn panic(
     msg: []const u8,
@@ -121,6 +124,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     irq.registerHandler(0, &krn.timerHandler);
     syscalls.initSyscalls();
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
+    _ = krn.kthreadCreate(&testp, null) catch null;
+    _ = krn.kthreadCreate(&testp, null) catch null;
+    _ = krn.kthreadCreate(&testp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
     
     krn.logger.INFO("Go usermode", .{});

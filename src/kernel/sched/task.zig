@@ -11,7 +11,7 @@ const signal = @import("./signals.zig");
 
 var pid: u32 = 0;
 
-const TaskState = enum(u8) {
+pub const TaskState = enum(u8) {
     RUNNING,
     UNINTERRUPTIBLE_SLEEP,  // Sleep the whole duration
     INTERRUPTIBLE_SLEEP,    // IO finished? wake up
@@ -50,6 +50,7 @@ pub const Task = struct {
     sig_pending:    u32                 = 0,
     sigaction:      signal.SigAction    = signal.SigAction.init(),
     sigmask:        u32                 = 0,
+    sig_eip:        u32                 = 0,
 
     // only for kthreads
     threadfn:       ?*const fn (arg: ?*const anyopaque) i32 = null,
