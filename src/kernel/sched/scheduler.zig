@@ -27,7 +27,7 @@ fn processTasks() void {
         const task = curr.entry(tsk.Task, "list");
         if (task == tsk.current or task.refcount != 0)
             continue;
-        if (curr.is_single()) {
+        if (curr.isEmpty()) {
             end = true;
             tsk.stopped_tasks = null;
         } else {
@@ -45,7 +45,7 @@ fn processTasks() void {
 }
 
 fn findNextTask() *tsk.Task {
-    if (tsk.current.list.is_single())
+    if (tsk.current.list.isEmpty())
         return &tsk.initial_task;
     if (!tsk.tasks_mutex.trylock())
         return tsk.current;
@@ -65,7 +65,7 @@ fn findNextTask() *tsk.Task {
 }
 
 pub export fn schedule(state: *Regs) *Regs {
-    if (tsk.initial_task.list.is_single())
+    if (tsk.initial_task.list.isEmpty())
         return state;
     processTasks();
     return switchTo(tsk.current, findNextTask(), state);

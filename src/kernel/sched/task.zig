@@ -7,6 +7,7 @@ const currentMs = @import("../time/jiffies.zig").currentMs;
 const reschedule = @import("./scheduler.zig").reschedule;
 const printf = @import("debug").printf;
 const mutex = @import("./mutex.zig").Mutex;
+const signal = @import("./signals.zig");
 
 var pid: u32 = 0;
 
@@ -22,6 +23,7 @@ const TaskType = enum(u8) {
     KTHREAD,
     PROCESS,
 };
+
 // Task is the basic unit of scheduling
 // both threads and processes are tasks
 // and threads share 
@@ -43,6 +45,11 @@ pub const Task = struct {
     list:           lst.ListHead    = lst.ListHead.init(),
     refcount:       u32             = 0,
     wakeup_time:    usize           = 0,
+
+    // signals
+    sig_pending:    u32                 = 0,
+    sigaction:      signal.SigAction    = signal.SigAction.init(),
+    sigmask:        u32                 = 0,
 
     // only for kthreads
     threadfn:       ?*const fn (arg: ?*const anyopaque) i32 = null,
@@ -99,6 +106,11 @@ pub const Task = struct {
         pid += 1;
         self.list.setup();
         self.tree.setup();
+
+        self.sig_pending = 0;
+        self.sigaction = signal.SigAction.init();
+        self.sigmask = 0;
+
         tasks_mutex.lock();
         current.list.addTail(&self.list);
         current.tree.addChild(&self.tree);
@@ -117,6 +129,21 @@ pub const Task = struct {
     pub fn delFromTree(self: *Task) void {
         self.zombifyChildren();
         self.tree.del();
+    }
+
+    pub fn findByPid(self: *Task, task_pid: u32) ?*Task {
+        if (self.pid == task_pid)
+            return self;
+        var res: ?*Task = null;
+        if (self.tree.hasChildren()) {
+            var it = self.tree.child.?.siblingsIterator();
+            while (it.next()) |i| {
+                res = i.curr.entry(Task, "tree").*.findByPid(task_pid);
+                if (res != null)
+                    break ;
+            }
+        }
+        return res;
     }
 };
 

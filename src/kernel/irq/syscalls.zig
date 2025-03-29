@@ -1,4 +1,5 @@
 const arch = @import("arch");
+const init = @import("../syscalls/init.zig");
 const registerHandler = @import("./manage.zig").registerHandler;
 
 pub var syscalls: [arch.IDT_MAX_DESCRIPTORS] ?* const anyopaque = .{null} ** arch.IDT_MAX_DESCRIPTORS;
@@ -33,6 +34,7 @@ pub fn initSyscalls() void {
         arch.SYSCALL_INTERRUPT - arch.CPU_EXCEPTION_COUNT,
         &syscallsManager
     );
+    init.init();
 }
 
 pub fn registerSyscall(num: u32, handler: * const anyopaque) void {

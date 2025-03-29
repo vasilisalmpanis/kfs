@@ -92,7 +92,7 @@ pub const ListHead = packed struct {
         self.next.?.prev = self.prev;
     }
 
-    pub fn is_single(self: *ListHead) bool {
+    pub fn isEmpty(self: *ListHead) bool {
         return self.next == self;
     }
 };
