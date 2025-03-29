@@ -1,9 +1,8 @@
+BITS 32
+
 userspace:
-    ; xor eax, eax
-    ; mov eax, 6
-    ; xor ebx, ebx
-    ; mov ebx, 7
-    ; xor ecx, ecx
-    ; mov ecx, 8
-    ; int 0x80
+    mov eax, 62
+    mov ebx, 3
+    mov ecx, 31
+    int 0x80
     jmp userspace
