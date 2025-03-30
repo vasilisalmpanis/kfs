@@ -1,5 +1,6 @@
 const printf = @import("./printf.zig").printf;
-
+const krn = @import("kernel");
+const arch = @import("arch");
 
 const StackFrame = struct {
     ebp : ?*StackFrame = null,
@@ -132,4 +133,50 @@ inline fn saveRegisters(state: *RegisterState) void {
     );
     state.esp = value;
 
+}
+
+pub export fn dumpRedsHelper(state: *arch.Regs) *arch.Regs {
+    state.dump();
+    return state;
+}
+
+pub inline fn dumpRegs() void {
+    asm volatile(
+        \\ pushf
+        \\ cli
+        \\ push %[code_seg]     # CS (kernel code segment)
+        \\ push $dumpRegs_return_point
+        \\ push $0
+        \\ push $16
+        \\ pusha
+        \\ push %%ds
+        \\ push %%es
+        \\ push %%fs
+        \\ push %%gs
+        \\ mov %[data_seg], %%ax
+        \\ mov %%ax, %%ds
+        \\ mov %%ax, %%es
+        \\ mov %%ax, %%fs
+        \\ mov %%ax, %%gs
+        \\ mov %%esp, %%eax
+        \\ push %%eax
+        \\ lea dumpRedsHelper, %%eax
+        \\ call *%%eax
+        \\ add $4, %%esp
+        \\ mov %%eax, %%esp
+        \\ pop %%gs
+        \\ pop %%fs
+        \\ pop %%es
+        \\ pop %%ds
+        \\ popa
+        \\ add $8, %%esp
+        \\ iret
+        \\ dumpRegs_return_point:
+        \\ nop
+        \\
+        :
+        : [code_seg] "i" (arch.idt.KERNEL_CODE_SEGMENT),
+          [data_seg] "i" (arch.idt.KERNEL_DATA_SEGMENT)
+        : "memory"
+    );
 }

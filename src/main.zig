@@ -23,6 +23,9 @@ extern const stack_top: u32;
 
 fn testp(_: ?*const anyopaque) i32 {
     while (true) {
+        asm volatile("cli;");
+        dbg.dumpRegs();
+        defer asm volatile("sti;");
     }
 }
 
