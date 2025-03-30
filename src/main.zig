@@ -23,8 +23,6 @@ extern const stack_top: u32;
 
 fn testp(_: ?*const anyopaque) i32 {
     while (true) {
-        io.outb(0x3F8, 't');
-        // krn.logger.WARN("thread", .{});
     }
 }
 
