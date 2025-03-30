@@ -87,34 +87,41 @@ fn sigHandler(signum: u8) void {
     krn.logger.WARN("Default signal handler\n", .{});
 }
 
+export fn restoreRegs() *arch.Regs {
+    const res: *arch.Regs = @ptrFromInt(tsk.current.sigaction.taskRegs.esp);
+    res.* = tsk.current.sigaction.taskRegs;
+    res.eip = tsk.current.sig_eip;
+    return res;
+}
+
 pub fn signalWrapper() void {
-    const stack: u32 = tsk.current.sigaction.taskRegs.esp + @sizeOf(arch.cpu.Regs) - 2 * @sizeOf(u32);
-    const eip: u32 = tsk.current.sig_eip;
-    // krn.logger.WARN("stack {x}\n", .{stack});
     // if (tsk.current.sigaction.deliverSignals(pending)) {
         // @import("./scheduler.zig").reschedule();
     // }
-    tsk.current.sig_eip = 0;
     _ = tsk.current.sigaction.deliverSignals();
-    asm volatile (
-        \\ cli
-        \\ mov $0x10, %bx
-        \\ mov %bx, %ds
-        \\ mov %bx, %es
-        \\ mov %bx, %fs
-        \\ mov %bx, %gs
-        \\ mov %[stack], %esp
+    asm volatile(
         \\ pushf
-        \\ pop %ebx
-        \\ or $0x200, %ebx
-        \\ push %ebx
-        \\ push $0x8
-        \\ push %[eip]
+        \\ cli
+        \\ push $0
+        \\ push $0
+        \\ push $0
+        \\ push $0
+        \\ pusha
+        \\ push %ds
+        \\ push %es
+        \\ push %fs
+        \\ push %gs
+        \\ lea restoreRegs, %eax
+        \\ call *%eax
+        \\ mov %eax, %esp
+        \\ pop %gs
+        \\ pop %fs
+        \\ pop %es
+        \\ pop %ds
+        \\ popa
+        \\ add $8, %esp
         \\ iret
-        ::
-            [stack] "{esi}" (stack),
-            [eip] "{edi}" (eip),
-        :
+        \\
     );
 }
 
