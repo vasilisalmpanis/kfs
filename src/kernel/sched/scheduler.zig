@@ -12,7 +12,8 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs = state.*;
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;
-    if (tsk.current.sig_pending != 0 and tsk.current.sig_eip == 0) {
+    if (tsk.current.sigaction.isReady()) {
+        tsk.current.sigaction.saveTaskRegs(to.regs.esp);
         const regs: *Regs = @ptrFromInt(to.regs.esp);
         tsk.current.sig_eip = regs.eip;
         regs.eip = @intFromPtr(&signalWrapper);
