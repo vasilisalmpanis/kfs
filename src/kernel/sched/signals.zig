@@ -87,42 +87,13 @@ fn sigHandler(signum: u8) void {
     krn.logger.WARN("Default signal handler\n", .{});
 }
 
-export fn restoreRegs() *arch.Regs {
-    const res: *arch.Regs = @ptrFromInt(tsk.current.sigaction.taskRegs.esp);
-    res.* = tsk.current.sigaction.taskRegs;
-    res.eip = tsk.current.sig_eip;
-    return res;
-}
-
 pub fn signalWrapper() void {
-    // if (tsk.current.sigaction.deliverSignals(pending)) {
-        // @import("./scheduler.zig").reschedule();
-    // }
+    asm volatile (arch.idt.push_regs);
+    var stack: u32 = 1;
+    stack +=1;
     _ = tsk.current.sigaction.deliverSignals();
-    asm volatile(
-        \\ pushf
-        \\ cli
-        \\ push $0
-        \\ push $0
-        \\ push $0
-        \\ push $0
-        \\ pusha
-        \\ push %ds
-        \\ push %es
-        \\ push %fs
-        \\ push %gs
-        \\ lea restoreRegs, %eax
-        \\ call *%eax
-        \\ mov %eax, %esp
-        \\ pop %gs
-        \\ pop %fs
-        \\ pop %es
-        \\ pop %ds
-        \\ popa
-        \\ add $8, %esp
-        \\ iret
-        \\
-    );
+    asm volatile (arch.idt.pop_regs);
+    return;
 }
 
 fn sigHup(_: u8) void {
