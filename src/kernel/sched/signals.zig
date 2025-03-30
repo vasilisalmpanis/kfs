@@ -81,18 +81,17 @@ const SignalTerminated = std.EnumMap(Signal, bool).init(.{
     .SIGSYS     = false,
     .SIGUNUSED  = false,
 });
+
 fn sigHandler(signum: u8) void {
     _ = signum;
-    krn.logger.WARN("Hup\n", .{});
+    krn.logger.WARN("Default signal handler\n", .{});
 }
 
 pub fn signalWrapper() void {
-    asm volatile ("pop %ebp;");
-    const stack: u32 = arch.cpu.getESP();
+    asm volatile("cli");
+    const stack: u32 = tsk.current.sigaction.taskRegs.esp;// + @sizeOf(arch.cpu.Regs) - 2;
     const eip: u32 = tsk.current.sig_eip;
-    // const pending = tsk.current.sig_pending;
-    tsk.current.sig_pending = 0;
-    asm volatile (arch.idt.push_regs);
+    // asm volatile (arch.idt.push_regs);
     asm volatile(
         \\ xor %eax, %eax
         \\ xor %ebx, %ebx
@@ -102,8 +101,10 @@ pub fn signalWrapper() void {
         // @import("./scheduler.zig").reschedule();
     // }
     // arch.io.outb(0x3F8, 'a');
-    asm volatile (arch.idt.pop_regs);
+    // while (true) {}
+    // asm volatile (arch.idt.pop_regs);
     tsk.current.sig_eip = 0;
+    _ = tsk.current.sigaction.deliverSignals();
     asm volatile (
         \\ cli
         \\ push $0x10
@@ -115,7 +116,13 @@ pub fn signalWrapper() void {
         \\ push $0x8
         \\ push %[eip]
         \\ iret
-        :: [stack] "r" (stack), [eip] "r" (eip)
+        ::
+            [stack] "{esi}" (stack),
+            [eip] "{edi}" (eip),
+            [eax] "{eax}" (tsk.current.sigaction.taskRegs.eax),
+            // // [ebx] "{ebx}" (tsk.current.sigaction.taskRegs.ebx),
+            [ecx] "{ecx}" (tsk.current.sigaction.taskRegs.ecx),
+            [edx] "{edx}" (tsk.current.sigaction.taskRegs.edx),
         :
     );
 }
@@ -135,33 +142,82 @@ fn sigHup(_: u8) void {
 }
 
 pub const SigAction = struct {
-    sig_handlers:   [SIG_COUNT]*const SigHandler = undefined,
+    processing: bool = false,
+    pending: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
+    taskRegs: arch.cpu.Regs = arch.cpu.Regs.init(),
+    sig_handlers: std.EnumArray(Signal, *const SigHandler) =
+        std.EnumArray(Signal, *const SigHandler).init(.{
+            .EMPTY      = &sigHandler,
+            .SIGHUP     = &sigHup,
+            .SIGINT     = &sigHandler,
+            .SIGQUIT    = &sigHandler,
+            .SIGILL     = &sigHandler,
+            .SIGTRAP    = &sigHandler,
+            .SIGABRT    = &sigHandler,
+            .SIGIOT     = &sigHandler,
+            .SIGBUS     = &sigHandler,
+            .SIGFPE     = &sigHandler,
+            .SIGKILL    = &sigHandler,
+            .SIGUSR1    = &sigHandler,
+            .SIGSEGV    = &sigHandler,
+            .SIGUSR2    = &sigHandler,
+            .SIGPIPE    = &sigHandler,
+            .SIGALRM    = &sigHandler,
+            .SIGTERM    = &sigHandler,
+            .SIGSTKFLT  = &sigHandler,
+            .SIGCHLD    = &sigHandler,
+            .SIGCONT    = &sigHandler,
+            .SIGSTOP    = &sigHandler,
+            .SIGTSTP    = &sigHandler,
+            .SIGTTIN    = &sigHandler,
+            .SIGTTOU    = &sigHandler,
+            .SIGURG     = &sigHandler,
+            .SIGXCPU    = &sigHandler,
+            .SIGXFSZ    = &sigHandler,
+            .SIGVTALRM  = &sigHandler,
+            .SIGPROF    = &sigHandler,
+            .SIGWINCH   = &sigHandler,
+            .SIGIO      = &sigHandler,
+            .SIGPOLL    = &sigHandler,
+            .SIGPWR     = &sigHandler,
+            .SIGSYS     = &sigHandler,
+            .SIGUNUSED  = &sigHandler,
+        }),
     
     pub fn init() SigAction {
-        var sigaction = SigAction{};
-        for (0..SIG_COUNT) |idx| {
-            sigaction.sig_handlers[idx] = &sigHandler;
-        }
-        sigaction.sig_handlers[1] = &sigHup;
-        return sigaction;
+        return SigAction{};
     }
 
-    pub fn deliverSignals(self: *SigAction, pending: u32) bool {
-        var temp: u32 = pending;
-        for(0..32) |i| {
-            temp = pending >> @as(u5, @truncate(i));
-            if (temp & 0x1 > 0) {
-                self.sig_handlers[i](@intCast(i));
-                if (SignalTerminated.get(@enumFromInt(i)) orelse false)
-                    return true;
-            }
+    pub fn deliverSignals(self: *SigAction) bool {
+        var it = self.pending.iterator(.{});
+        while (it.next()) |i| {
+            self.pending.toggle(i);
+            const signal: Signal = @enumFromInt(i);
+            self.sig_handlers.get(signal)(@intCast(i));
+                // if (SignalTerminated.get(signal) orelse false)
+                //     return true;
+        }
+        self.processing = false;
+        return false;
+    }
+
+    pub fn setSignal(self: *SigAction, signal: Signal) void {
+        self.pending.set(@intFromEnum(signal));
+    }
+
+    pub fn isReady(self: *SigAction) bool {
+        if (self.processing)
+            return false;
+        if (self.pending.count() != 0) {
+            self.processing = true;
+            return true;
         }
         return false;
     }
-};
 
-pub fn setSignal(pending: u32, signal: Signal) u32 {
-    const s: u8 = @intFromEnum(signal);
-    const mask: u32 = @as(u32, 1) << @as(u5, @truncate(s));
-    return pending | mask;
-}
+    pub fn saveTaskRegs(self: *SigAction, esp: u32) void {
+        const task_regs: *arch.cpu.Regs = @ptrFromInt(esp);
+        self.taskRegs = task_regs.*;
+        self.taskRegs.esp = esp;
+    }
+};

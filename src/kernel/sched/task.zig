@@ -47,10 +47,9 @@ pub const Task = struct {
     wakeup_time:    usize           = 0,
 
     // signals
-    sig_pending:    u32                 = 0,
-    sigaction:      signal.SigAction    = signal.SigAction.init(),
-    sigmask:        u32                 = 0,
-    sig_eip:        u32                 = 0,
+    sigaction:      signal.SigAction        = signal.SigAction.init(),
+    sigmask:        u32                     = 0,
+    sig_eip:        u32                     = 0,
 
     // only for kthreads
     threadfn:       ?*const fn (arg: ?*const anyopaque) i32 = null,
@@ -108,7 +107,6 @@ pub const Task = struct {
         self.list.setup();
         self.tree.setup();
 
-        self.sig_pending = 0;
         self.sigaction = signal.SigAction.init();
         self.sigmask = 0;
 

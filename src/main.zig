@@ -17,11 +17,15 @@ const krn = @import("kernel");
 const syscalls = @import("kernel").syscalls;
 const std = @import("std");
 const cpu = @import("arch").cpu;
+const io = @import("arch").io;
 
 extern const stack_top: u32;
 
 fn testp(_: ?*const anyopaque) i32 {
-    while (true) {}
+    while (true) {
+        io.outb(0x3F8, 't');
+        // krn.logger.WARN("thread", .{});
+    }
 }
 
 pub fn panic(
@@ -125,8 +129,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     syscalls.initSyscalls();
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
     _ = krn.kthreadCreate(&testp, null) catch null;
-    _ = krn.kthreadCreate(&testp, null) catch null;
-    _ = krn.kthreadCreate(&testp, null) catch null;
+    // _ = krn.kthreadCreate(&testp, null) catch null;
+    // _ = krn.kthreadCreate(&testp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
     
     krn.logger.INFO("Go usermode", .{});
