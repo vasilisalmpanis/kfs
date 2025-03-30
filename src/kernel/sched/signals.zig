@@ -88,27 +88,22 @@ fn sigHandler(signum: u8) void {
 }
 
 pub fn signalWrapper() void {
-    asm volatile("cli");
-    const stack: u32 = tsk.current.sigaction.taskRegs.esp;// + @sizeOf(arch.cpu.Regs) - 2;
+    const stack: u32 = tsk.current.sigaction.taskRegs.esp + @sizeOf(arch.cpu.Regs) - 2 * @sizeOf(u32);
     const eip: u32 = tsk.current.sig_eip;
-    // asm volatile (arch.idt.push_regs);
-    asm volatile(
-        \\ xor %eax, %eax
-        \\ xor %ebx, %ebx
-        \\ xor %ecx, %ecx
-    );
+    // krn.logger.WARN("stack {x}\n", .{stack});
     // if (tsk.current.sigaction.deliverSignals(pending)) {
         // @import("./scheduler.zig").reschedule();
     // }
-    // arch.io.outb(0x3F8, 'a');
-    // while (true) {}
-    // asm volatile (arch.idt.pop_regs);
     tsk.current.sig_eip = 0;
     _ = tsk.current.sigaction.deliverSignals();
     asm volatile (
         \\ cli
-        \\ push $0x10
-        \\ push %[stack]
+        \\ mov $0x10, %bx
+        \\ mov %bx, %ds
+        \\ mov %bx, %es
+        \\ mov %bx, %fs
+        \\ mov %bx, %gs
+        \\ mov %[stack], %esp
         \\ pushf
         \\ pop %ebx
         \\ or $0x200, %ebx
@@ -119,10 +114,6 @@ pub fn signalWrapper() void {
         ::
             [stack] "{esi}" (stack),
             [eip] "{edi}" (eip),
-            [eax] "{eax}" (tsk.current.sigaction.taskRegs.eax),
-            // // [ebx] "{ebx}" (tsk.current.sigaction.taskRegs.ebx),
-            [ecx] "{ecx}" (tsk.current.sigaction.taskRegs.ecx),
-            [edx] "{edx}" (tsk.current.sigaction.taskRegs.edx),
         :
     );
 }
