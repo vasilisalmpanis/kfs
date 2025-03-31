@@ -45,18 +45,6 @@ pub export fn irqHandler(state: *Regs) callconv(.C) *Regs {
     if (state.int_no == TIMER_INTERRUPT) {
         new_state = krn.sched.schedule(state);
     }
-    // we find current has pending signal.
-    // get the handler
-    // new_state->eip = handler
-    // new_state->eax = first
-    // new_state->ebx = second
-    // new_state->useresp and push things on to the stack
-    //
-    // 1. Kernel tasks cannot modify their default handlers.
-    // 2. Userspace tasks can only modify their handlers. Userspace handlers run in userspace with pending task masked.
-    // 3. if userspace handler[signal] is not equal to default kernel handler the handler will run in userspace.
-    //
-    // Potentially a usespace handler could just call exit() and terminate itself.
     return new_state;
 }
 

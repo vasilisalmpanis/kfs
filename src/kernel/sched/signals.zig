@@ -185,3 +185,28 @@ pub const SigAction = struct {
         return false;
     }
 };
+
+pub fn processSignals(task: *tsk.Task) void {
+    if (tsk.current.sigaction.isReady()) {
+        const regs: *arch.Regs = @ptrFromInt(task.regs.esp);
+        const eip: u32 = regs.eip;
+
+        regs.eip = @intFromPtr(&signalWrapper);
+
+        const kernelContextSize = @sizeOf(arch.Regs) - 8;
+        const returnAddrSize: u32 = 4;
+
+        const new: [*]u32 = @ptrFromInt(task.regs.esp - returnAddrSize);
+        const old: [*]u32 = @ptrFromInt(task.regs.esp);
+        std.mem.copyForwards(
+            u32,
+            new[0..kernelContextSize/4],
+            old[0..kernelContextSize/4],
+        );
+
+        task.regs.esp -= returnAddrSize;
+
+        const original_return: *u32 = @ptrFromInt(task.regs.esp + kernelContextSize);
+        original_return.* = eip;
+    }
+}
