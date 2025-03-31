@@ -71,6 +71,7 @@ pub const Shell = struct {
                 arg_count += 1;
             }
         }
+        if (arg_count == 0) return;
         
         const cmd_name = self.arg_buf[0];
         const cmd_args = self.arg_buf[1..arg_count];
