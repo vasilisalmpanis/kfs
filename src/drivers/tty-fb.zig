@@ -97,7 +97,7 @@ pub const TTY = struct {
     _prev_y: u32 = 0,
     _dirty_rect: DirtyRect = DirtyRect.init(0, 0, 0, 0),
     _has_dirty_rect: bool = false,
-    shell: *Shell,
+    shell: Shell,
 
     pub fn init(width: u32, height: u32) TTY {
         var tty = TTY{
@@ -140,6 +140,19 @@ pub const TTY = struct {
 
     fn cursorUpdated(self: *TTY) bool {
         return (self._x != self._prev_x or self._y != self._prev_y);
+    }
+
+    pub fn reRenderAll(self: *TTY) void {
+        scr.framebuffer.clear(self._bg_colour);
+        @memset(
+            self._prev_buffer[0..self.height * self.width],
+            0
+        );
+        self.markDirty(DirtyRect.fullScreen(
+            self.width,
+            self.height
+        ));
+        self.render();
     }
 
     pub fn render(self: *TTY) void {
@@ -374,5 +387,9 @@ pub const TTY = struct {
 
     pub fn setColor(self: *TTY, fg: u32) void {
         self._fg_colour = fg;
+    }
+
+    pub fn setBgColor(self: *TTY, bg: u32) void {
+        self._bg_colour = bg;
     }
 };

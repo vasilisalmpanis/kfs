@@ -52,7 +52,7 @@ pub const FrameBuffer = struct {
             .virtual_buffer = @ptrFromInt(mm.kmalloc(fb_info.?.width * fb_info.?.height * @sizeOf(u32))),
             .font = font,
         };
-        fb.clear();
+        fb.clear(0);
         return fb;
     }
 
@@ -61,8 +61,8 @@ pub const FrameBuffer = struct {
         @memcpy(self.fb_ptr[0..max_index], self.virtual_buffer[0..max_index]);
     }
 
-    pub fn clear(self: *FrameBuffer) void {
-        @memset(self.virtual_buffer[0 .. self.fb_info.height * self.fb_info.width], 0);
+    pub fn clear(self: *FrameBuffer, bg: u32) void {
+        @memset(self.virtual_buffer[0 .. self.fb_info.height * self.fb_info.width], bg);
     }
 
     fn clearChar(self: *FrameBuffer, cx: u32, cy: u32, bg: u32) void {
