@@ -24,7 +24,7 @@ extern const stack_top: u32;
 fn testp(_: ?*const anyopaque) i32 {
     while (true) {
         asm volatile("cli;");
-        dbg.dumpRegs();
+        // dbg.dumpRegs();
         defer asm volatile("sti;");
     }
 }
@@ -130,8 +130,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     syscalls.initSyscalls();
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
     _ = krn.kthreadCreate(&testp, null) catch null;
-    // _ = krn.kthreadCreate(&testp, null) catch null;
-    // _ = krn.kthreadCreate(&testp, null) catch null;
+    _ = krn.kthreadCreate(&testp, null) catch null;
+    _ = krn.kthreadCreate(&testp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
     
     krn.logger.INFO("Go usermode", .{});

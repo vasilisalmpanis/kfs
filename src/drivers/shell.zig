@@ -5,6 +5,7 @@ const system = @import("arch").system;
 const screen = @import("screen.zig");
 const tty = @import("tty-fb.zig");
 const krn = @import("kernel");
+const std = @import("std");
 
 pub const Shell = struct {
     pub fn init() *Shell {
@@ -29,6 +30,23 @@ pub const Shell = struct {
                 \\  help: Display this help message
                 \\
             , .{});
+        } else if (mem.startsWith(u8, input, "kill")) {
+            if (input.len < 6) {
+                debug.printf("Usage: kill <pid>\n", .{});
+                return;
+            }
+            const pid = std.fmt.parseInt(u8, input[5..], 10) catch 0;
+            if (pid == 0) {
+                debug.printf("Invalid PID: {s}\n", .{input[5..]});
+                return;
+            }
+            debug.printf("Killing PID: {d}\n", .{pid});
+            asm volatile(
+                \\ mov $62, %eax
+                \\ mov $1, %ecx
+                \\ int $0x80
+                :: [ebx] "{ebx}" (pid),
+            );
         } else if (mem.eql(u8, input, "stack")) {
             debug.traceStackTrace(10);
         } else if (mem.eql(u8, input, "neofetch")) {
