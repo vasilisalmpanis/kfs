@@ -49,7 +49,6 @@ pub const Task = struct {
     // signals
     sigaction:      signal.SigAction        = signal.SigAction.init(),
     sigmask:        u32                     = 0,
-    sig_eip:        u32                     = 0,
 
     // only for kthreads
     threadfn:       ?*const fn (arg: ?*const anyopaque) i32 = null,

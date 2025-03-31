@@ -91,29 +91,31 @@ pub fn signalWrapper() void {
     asm volatile (arch.idt.push_regs);
     var stack: u32 = 1;
     stack +=1;
-    _ = tsk.current.sigaction.deliverSignals();
+    if (tsk.current.sigaction.deliverSignals()) {
+        while (true) {}
+    }
     asm volatile (arch.idt.pop_regs);
     return;
 }
 
 fn sigHup(_: u8) void {
     // Terminating.
-    // tsk.current.state = .STOPPED;
-    // tsk.current.list.del();
-    // if (tsk.stopped_tasks == null) {
-    //     tsk.stopped_tasks = &tsk.current.list;
-    //     tsk.stopped_tasks.?.setup();
-    // } else {
-    //     tsk.stopped_tasks.?.addTail(&tsk.current.list);
-    // }
-    // tsk.tasks_mutex.unlock();
-    krn.logger.WARN("Hup\n", .{});
+    tsk.tasks_mutex.lock();
+    tsk.current.state = .STOPPED;
+    tsk.current.list.del();
+    if (tsk.stopped_tasks == null) {
+        tsk.stopped_tasks = &tsk.current.list;
+        tsk.stopped_tasks.?.setup();
+    } else {
+        tsk.stopped_tasks.?.addTail(&tsk.current.list);
+    }
+    tsk.tasks_mutex.unlock();
+    // krn.logger.WARN("Hup\n", .{});
 }
 
 pub const SigAction = struct {
     processing: bool = false,
     pending: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
-    taskRegs: arch.cpu.Regs = arch.cpu.Regs.init(),
     sig_handlers: std.EnumArray(Signal, *const SigHandler) =
         std.EnumArray(Signal, *const SigHandler).init(.{
             .EMPTY      = &sigHandler,
@@ -163,8 +165,8 @@ pub const SigAction = struct {
             self.pending.toggle(i);
             const signal: Signal = @enumFromInt(i);
             self.sig_handlers.get(signal)(@intCast(i));
-                // if (SignalTerminated.get(signal) orelse false)
-                //     return true;
+                if (SignalTerminated.get(signal) orelse false)
+                    return true;
         }
         self.processing = false;
         return false;
@@ -182,11 +184,5 @@ pub const SigAction = struct {
             return true;
         }
         return false;
-    }
-
-    pub fn saveTaskRegs(self: *SigAction, esp: u32) void {
-        const task_regs: *arch.cpu.Regs = @ptrFromInt(esp);
-        self.taskRegs = task_regs.*;
-        self.taskRegs.esp = esp;
     }
 };

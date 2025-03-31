@@ -13,9 +13,9 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;
     if (tsk.current.sigaction.isReady()) {
-        tsk.current.sigaction.saveTaskRegs(to.regs.esp);
+        // tsk.current.sigaction.saveTaskRegs(to.regs.esp);
         const regs: *Regs = @ptrFromInt(to.regs.esp);
-        tsk.current.sig_eip = regs.eip;
+        const eip: u32 = regs.eip;
 
         regs.eip = @intFromPtr(&signalWrapper);
 
@@ -33,7 +33,7 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
         to.regs.esp -= returnAddrSize;
 
         const original_return: *u32 = @ptrFromInt(to.regs.esp + kernelContextSize);
-        original_return.* = tsk.current.sig_eip;
+        original_return.* = eip;
     }
     return @ptrFromInt(to.regs.esp);
 }
