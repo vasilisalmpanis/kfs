@@ -110,7 +110,6 @@ fn sigHup(_: u8) void {
         tsk.stopped_tasks.?.addTail(&tsk.current.list);
     }
     tsk.tasks_mutex.unlock();
-    // krn.logger.WARN("Hup\n", .{});
 }
 
 pub const SigAction = struct {
