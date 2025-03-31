@@ -5,36 +5,14 @@ const km = @import("../mm/kmalloc.zig");
 const kthreadStackFree = @import("./kthread.zig").kthreadStackFree;
 const currentMs = @import("../time/jiffies.zig").currentMs;
 const archReschedule = @import("arch").archReschedule;
-const signalWrapper = @import("./signals.zig").signalWrapper;
+const signals = @import("./signals.zig");
 const std = @import("std");
 
 fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs = state.*;
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;
-    if (tsk.current.sigaction.isReady()) {
-        // tsk.current.sigaction.saveTaskRegs(to.regs.esp);
-        const regs: *Regs = @ptrFromInt(to.regs.esp);
-        const eip: u32 = regs.eip;
-
-        regs.eip = @intFromPtr(&signalWrapper);
-
-        const kernelContextSize = @sizeOf(Regs) - 8;
-        const returnAddrSize: u32 = 4;
-
-        const new: [*]u32 = @ptrFromInt(to.regs.esp - returnAddrSize);
-        const old: [*]u32 = @ptrFromInt(to.regs.esp);
-        std.mem.copyForwards(
-            u32,
-            new[0..kernelContextSize/4],
-            old[0..kernelContextSize/4],
-        );
-
-        to.regs.esp -= returnAddrSize;
-
-        const original_return: *u32 = @ptrFromInt(to.regs.esp + kernelContextSize);
-        original_return.* = eip;
-    }
+    signals.processSignals(to);
     return @ptrFromInt(to.regs.esp);
 }
 
