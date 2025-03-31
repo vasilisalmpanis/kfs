@@ -26,6 +26,7 @@ pub const Mutex = @import("./sched/mutex.zig").Mutex;
 pub const getSecondsFromStart = @import("./time/jiffies.zig").getSecondsFromStart;
 pub const currentMs = @import("./time/jiffies.zig").currentMs;
 pub const jiffies = @import("./time/jiffies.zig");
+pub const errors = @import("./syscalls/error-codes.zig");
 
 pub var keyboard: Keyboard = undefined;
 pub var pit: PIT = undefined;
