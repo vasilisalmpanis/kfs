@@ -7,86 +7,193 @@ const tty = @import("tty-fb.zig");
 const krn = @import("kernel");
 const std = @import("std");
 
+const ShellCommandHandler = fn (self: *Shell, args: [][]const u8) void;
+
+const MAX_ARGS: usize = 10;
+
+pub const ShellCommand = struct {
+    name: []const u8,
+    desc: []const u8,
+    hndl: *const ShellCommandHandler,
+};
+
 pub const Shell = struct {
-    pub fn init() *Shell {
+    arg_buf: [MAX_ARGS][]const u8 = undefined,
+    buffer: [3000]u8 = .{0} ** 3000,
+    fba: std.heap.FixedBufferAllocator = undefined,
+    commands: std.StringHashMap(ShellCommand) = undefined,
+
+    pub fn init() Shell {
         var shell = Shell{};
-        return &shell;
+        shell.fba = std.heap.FixedBufferAllocator.init(&shell.buffer);
+        shell.commands = std.StringHashMap(ShellCommand).init(
+            shell.fba.allocator(),
+        );
+        shell.registerBuiltins();
+        return shell;
+    }
+
+    pub fn registerCommand(
+        self: *Shell,
+        command: ShellCommand,
+    ) void {
+        self.commands.put(command.name, command) catch |err| {
+            printf("Error registering command: {!}\n", .{err});
+        };
+    }
+
+    fn registerBuiltins(self: *Shell) void {
+        self.registerCommand(.{ .name = "help", .desc = "Display this help message", .hndl = &help });
+        self.registerCommand(.{ .name = "kill", .desc = "Kill a process by PID (kill 3)", .hndl = &kill });
+        self.registerCommand(.{ .name = "ps", .desc = "Show tasks", .hndl = &ps });
+        self.registerCommand(.{ .name = "pstree", .desc = "Show tasks tree", .hndl = &psTree });
+        self.registerCommand(.{ .name = "stack", .desc = "Print the stack trace", .hndl = &stack });
+        self.registerCommand(.{ .name = "neofetch", .desc = "Show system info", .hndl = &neofetch });
+        self.registerCommand(.{ .name = "jiffies", .desc = "Show jiffies", .hndl = &jiffies });
+        self.registerCommand(.{ .name = "uptime", .desc = "Show uptime in seconds", .hndl = &uptime });
+        self.registerCommand(.{ .name = "gdt", .desc = "Print GDT", .hndl = &gdt });
+        self.registerCommand(.{ .name = "tss", .desc = "Print TSS", .hndl = &tss });
+        self.registerCommand(.{ .name = "reboot", .desc = "Reboot the PC", .hndl = &reboot });
+        self.registerCommand(.{ .name = "shutdown", .desc = "Power off the PC", .hndl = &shutdown });
+        self.registerCommand(.{ .name = "halt", .desc = "Halt the PC", .hndl = &halt });
+        self.registerCommand(.{ .name = "test", .desc = "Run tests", .hndl = &runTests });
+        self.registerCommand(.{ .name = "color", .desc = "Change the input color (color FFAABB bg)", .hndl = &color });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
-        _ = self;
-        if (mem.eql(u8, input, "help")) {
-            printf(
-                \\
-                \\available commands:
-                \\  stack: Print the stack trace
-                \\  reboot: Reboot the PC
-                \\  shutdown: Power off the PC
-                \\  halt: Halt the PC
-                \\  uptime: Show uptime in seconds
-                \\  ps: Show tasks
-                \\  neofetch: Show system info
-                \\  [color name]: Change the input color
-                \\  help: Display this help message
-                \\
-            , .{});
-        } else if (mem.startsWith(u8, input, "kill")) {
-            if (input.len < 6) {
-                debug.printf("Usage: kill <pid>\n", .{});
-                return;
+        if (input.len == 0) return;
+
+        var arg_count: usize = 0;
+        var it = std.mem.tokenizeAny(u8, input, " \t");
+        while (it.next()) |arg| {
+            if (arg_count < MAX_ARGS) {
+                self.arg_buf[arg_count] = arg;
+                arg_count += 1;
             }
-            const pid = std.fmt.parseInt(u8, input[5..], 10) catch 0;
-            if (pid == 0) {
-                debug.printf("Invalid PID: {s}\n", .{input[5..]});
-                return;
-            }
-            debug.printf("Killing PID: {d}\n", .{pid});
-            asm volatile(
-                \\ mov $62, %eax
-                \\ mov $1, %ecx
-                \\ int $0x80
-                :: [ebx] "{ebx}" (pid),
-            );
-        } else if (mem.eql(u8, input, "stack")) {
-            debug.traceStackTrace(10);
-        } else if (mem.eql(u8, input, "neofetch")) {
-            debug.neofetch(screen.current_tty.?, krn.boot_info);
-        } else if (mem.eql(u8, input, "ps")) {
-            debug.ps();
-        } else if (mem.eql(u8, input, "pstree")) {
-            debug.psTree();
-        } else if (mem.eql(u8, input, "jiffies")) {
-            debug.printf("{d}\n", .{krn.jiffies.jiffies});
-        } else if (mem.eql(u8, input, "uptime")) {
-            debug.printf("{d}\n", .{krn.getSecondsFromStart()});
-        } else if (mem.eql(u8, input, "gdt")) {
-            debug.printGDT();
-        } else if (mem.eql(u8, input, "tss")) {
-            debug.printTSS();
-        } else if (mem.eql(u8, input, "reboot")) {
-            system.reboot();
-        } else if (mem.eql(u8, input, "shutdown")) {
-            system.shutdown();
-        } else if (mem.eql(u8, input, "halt")) {
-            system.halt();
-        } else if (mem.eql(u8, input, "test")) {
-            debug.runTests();
-        } else if (mem.eql(u8, input, "red")) {
-            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Red));
-        } else if (mem.eql(u8, input, "green")) {
-            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Green));
-        } else if (mem.eql(u8, input, "blue")) {
-            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Blue));
-        } else if (mem.eql(u8, input, "orange")) {
-            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Brown));
-        } else if (mem.eql(u8, input, "magenta")) {
-            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Magenta));
-        } else if (mem.eql(u8, input, "white")) {
-            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.White));
-        } else if (mem.eql(u8, input, "black")) {
-            screen.current_tty.?.setColor(@intFromEnum(tty.ConsoleColors.Black));
+        }
+        
+        const cmd_name = self.arg_buf[0];
+        const cmd_args = self.arg_buf[1..arg_count];
+        if (self.commands.get(cmd_name)) |cmd| {
+            cmd.hndl(self, cmd_args);
         } else {
             printf("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{input});
         }
     }
 };
+
+
+fn help(self: *Shell, args: [][]const u8) void {
+    _ = args;
+    printf("available commands:\n", .{});
+    var it = self.commands.iterator();
+    while (it.next()) |entry| {
+        printf("  {s}: {s}\n", .{entry.value_ptr.name, entry.value_ptr.desc});
+    }
+}
+
+fn kill(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf("Usage: kill <pid>\n", .{});
+        return;
+    }
+    const pid = std.fmt.parseInt(u8, args[0], 10) catch 0;
+    if (pid == 0) {
+        debug.printf("Invalid PID: {s}\n", .{args[0]});
+        return;
+    }
+    debug.printf("Killing PID: {d}\n", .{pid});
+    asm volatile(
+        \\ mov $62, %eax
+        \\ mov $1, %ecx
+        \\ int $0x80
+        :: [ebx] "{ebx}" (pid),
+    );
+}
+
+fn ps(_: *Shell, _: [][]const u8) void {
+    debug.ps();
+}
+
+fn psTree(_: *Shell, _: [][]const u8) void {
+    debug.psTree();
+}
+
+fn stack(_: *Shell, _: [][]const u8) void {
+    debug.traceStackTrace(20);
+}
+
+fn neofetch(_: *Shell, _: [][]const u8) void {
+    debug.neofetch(screen.current_tty.?, krn.boot_info);
+}
+
+fn jiffies(_: *Shell, _: [][]const u8) void {
+    debug.printf("{d}\n", .{krn.jiffies.jiffies});
+}
+
+fn uptime(_: *Shell, _: [][]const u8) void {
+    debug.printf("{d}\n", .{krn.getSecondsFromStart()});
+}
+
+fn gdt(_: *Shell, _: [][]const u8) void {
+    debug.printGDT();
+}
+
+fn tss(_: *Shell, _: [][]const u8) void {
+    debug.printTSS();
+}
+
+fn reboot(_: *Shell, _: [][]const u8) void {
+    system.reboot();
+}
+
+fn shutdown(_: *Shell, _: [][]const u8) void {
+    system.shutdown();
+}
+
+fn halt(_: *Shell, _: [][]const u8) void {
+    system.halt();
+}
+
+fn runTests(_: *Shell, _: [][]const u8) void {
+    debug.runTests();
+}
+
+fn color(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf(
+            \\Usage: color <color> [bg]
+            \\  Available colors: red, green, blue, orange, magenta, white, black
+            \\  Or a hex value (FFAABB)
+            \\  Example: color FFAABB bg
+            \\
+            , .{}
+        );
+        return;
+    }
+    var col: u32 = 0;
+    if (mem.eql(u8, args[0], "red")) {
+        col = @intFromEnum(tty.ConsoleColors.Red);
+    } else if (mem.eql(u8, args[0], "green")) {
+        col = @intFromEnum(tty.ConsoleColors.Green);
+    } else if (mem.eql(u8, args[0], "blue")) {
+        col = @intFromEnum(tty.ConsoleColors.Blue);
+    } else if (mem.eql(u8, args[0], "orange")) {
+        col = @intFromEnum(tty.ConsoleColors.Brown);
+    } else if (mem.eql(u8, args[0], "magenta")) {
+        col = @intFromEnum(tty.ConsoleColors.Magenta);
+    } else if (mem.eql(u8, args[0], "white")) {
+        col = @intFromEnum(tty.ConsoleColors.White);
+    } else if (mem.eql(u8, args[0], "black")) {
+        col = @intFromEnum(tty.ConsoleColors.Black);
+    } else {
+        col = std.fmt.parseInt(u32, args[0], 16) catch 0;
+    }
+
+    if (args.len > 1 and std.mem.eql(u8, args[1], "bg")) {
+        screen.current_tty.?.setBgColor(col);
+    } else {
+        screen.current_tty.?.setColor(col);
+    }
+    screen.current_tty.?.reRenderAll();
+}
