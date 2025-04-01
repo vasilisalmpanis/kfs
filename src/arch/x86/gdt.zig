@@ -38,12 +38,6 @@ pub var tss: cpu.TSS = cpu.TSS.init();
 pub fn gdtInit() void {
     tss.ss0 = idt.KERNEL_DATA_SEGMENT;
     tss.esp0 = @intFromPtr(&stack_top);
-    // tss.cs = 0x0b;
-    // tss.ss = 0x13;
-    // tss.ds = 0x13;
-    // tss.es = 0x13;
-    // tss.fs = 0x13;
-    // tss.gs = 0x13;
 
     gdt_ptr.limit = (@sizeOf(GdtEntry) * 6) - 1;
     gdt_ptr.base = GDTBASE;
