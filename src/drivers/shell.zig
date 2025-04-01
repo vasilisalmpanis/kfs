@@ -58,6 +58,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "halt", .desc = "Halt the PC", .hndl = &halt });
         self.registerCommand(.{ .name = "test", .desc = "Run tests", .hndl = &runTests });
         self.registerCommand(.{ .name = "color", .desc = "Change the input color (color FFAABB bg)", .hndl = &color });
+        self.registerCommand(.{ .name = "mm", .desc = "Walk page tables", .hndl = &mm });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -158,6 +159,10 @@ fn halt(_: *Shell, _: [][]const u8) void {
 
 fn runTests(_: *Shell, _: [][]const u8) void {
     debug.runTests();
+}
+
+fn mm(_: *Shell, _: [][]const u8) void {
+    debug.walkPageTables();
 }
 
 fn color(_: *Shell, args: [][]const u8) void {

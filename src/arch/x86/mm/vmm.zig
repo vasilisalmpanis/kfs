@@ -211,4 +211,47 @@ pub const VMM = struct {
         pt[pt_idx] = physical_addr | new_flags;
         invalidatePage(virtual_addr);
     }
+
+    pub fn cloneVirtualSpace(self: *VMM) u32 {
+        const new_pd_addr = self.findFreeSpace(
+            1, 0, 0xFFFFF000, false
+        );
+        const new_pd_ph_addr = self.pmm.allocPage();
+        self.mapPage(new_pd_addr, new_pd_ph_addr, .{});
+        const new_pd: [*]u32 = @ptrFromInt(new_pd_addr);
+        // recursive mapping
+        new_pd[1023] = new_pd_ph_addr | PAGE_PRESENT | PAGE_WRITE;
+        
+        var pd_idx: u32 = 0;
+        const kernel_pd: u32 = PAGE_OFFSET >> 22;
+        const pd: [*]u32 = @ptrFromInt(0xFFFFF000);
+        var pt: [*]u32 = undefined;
+        while (pd_idx < 1023) : (pd_idx += 1) {
+            var pt_idx: u32 = 0;
+            if (pd[pd_idx] == 0) {
+                continue ;
+            }
+            if ((pd[pd_idx] & PAGE_4MB) == 0) {
+                pt = @ptrFromInt(0xFFC00000);
+                pt += (0x400 * pd_idx);
+                if (pd_idx >= kernel_pd) {
+                    new_pd[pd_idx] = pd[pd_idx];
+                } else {
+                    while (pt_idx < 1023) : (pt_idx += 1) {
+                        if (pt[pt_idx] == 0) {
+                            continue ;
+                        }
+                        // user space
+                        // self.cloneTable();
+                    }
+                }
+            } else {
+                if (pd_idx >= kernel_pd) {
+                    new_pd[pd_idx] = pd[pd_idx];
+                    krn.logger.INFO("big {d}", .{pd_idx});
+                }
+            }
+        }
+        return 0;
+    }
 };
