@@ -29,7 +29,12 @@ fn threadWrapper() noreturn {
 }
 
 pub fn kthreadStackAlloc(num_of_pages: u32) u32 {
-    const stack: u32 = mm.virt_memory_manager.findFreeSpace(num_of_pages, 0xB0000000, 0xFFFFF000, false);
+    const stack: u32 = mm.virt_memory_manager.findFreeSpace(
+        num_of_pages,
+        mm.PAGE_OFFSET,
+        0xFFFFF000,
+        false
+    );
     for (0..num_of_pages) |index| {
         const page: u32 = mm.virt_memory_manager.pmm.allocPage();
         if (page == 0) {
