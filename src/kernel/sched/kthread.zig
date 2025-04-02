@@ -6,9 +6,10 @@ const arch = @import("arch");
 const krn = @import("../main.zig");
 
 
-const PAGE_SIZE = @import("arch").PAGE_SIZE;
-const STACK_PAGES = 3;
-const STACK_SIZE: u32 = (STACK_PAGES - 1) * PAGE_SIZE;
+const PAGE_SIZE         = @import("arch").PAGE_SIZE;
+const STACK_PAGES       = 3;
+const STACK_SIZE: u32   = (STACK_PAGES - 1) * PAGE_SIZE;
+const PAGE_OFFSET       = arch.vmm.PAGE_OFFSET;
 
 const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
@@ -29,7 +30,7 @@ fn threadWrapper() noreturn {
 }
 
 pub fn kthreadStackAlloc(num_of_pages: u32) u32 {
-    const stack: u32 = mm.virt_memory_manager.findFreeSpace(num_of_pages, 0xB0000000, 0xFFFFF000, false);
+    const stack: u32 = mm.virt_memory_manager.findFreeSpace(num_of_pages, PAGE_OFFSET, 0xFFFFF000, false);
     for (0..num_of_pages) |index| {
         const page: u32 = mm.virt_memory_manager.pmm.allocPage();
         if (page == 0) {

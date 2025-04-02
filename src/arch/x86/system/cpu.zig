@@ -96,12 +96,20 @@ pub inline fn getEflags() u32 {
     );
 }
 
+pub inline fn getFaultyAdress() u32 {
+    return asm volatile (
+        \\ mov %cr2, %[value]
+        : [value] "={eax}" (-> u32),
+    );
+}
+
 pub inline fn getESP() u32 {
     return asm volatile (
         \\ mov %esp, %[value]
         : [value] "={eax}" (-> u32),
     );
 }
+
 pub fn areIntEnabled() bool {
     const eflags = getEflags();
     if (eflags & (1<<9) == (1<<9))

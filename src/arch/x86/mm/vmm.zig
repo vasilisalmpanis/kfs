@@ -1,7 +1,7 @@
 const printf = @import("debug").printf;
 const PMM = @import("./pmm.zig").PMM;
 const krn = @import("kernel");
-const PAGE_OFFSET: u32 = 0xC0000000;
+pub const PAGE_OFFSET: u32 = 0xC0000000;
 const PAGE_PRESENT: u8 = 0x1;
 const PAGE_WRITE: u8 = 0x2;
 const PAGE_USER: u8 = 0x4;
@@ -57,7 +57,7 @@ const VmemBlock = struct {
     flags: u32
 };
 
-const PageEntry= packed struct {
+pub const PageEntry= packed struct {
     present: bool,
     writable: bool,
     user: bool,

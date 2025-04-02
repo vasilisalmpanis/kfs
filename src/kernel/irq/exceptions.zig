@@ -1,6 +1,9 @@
 const Regs = @import("arch").Regs;
 const std = @import("std");
 const registerExceptionHandler = @import("./manage.zig").registerExceptionHandler;
+const cpu = @import("arch").cpu;
+const PageEntry = @import("arch").vmm.PageEntry;
+const krn = @import("../main.zig");
 
 pub const Exceptions = enum {
     DivisionError,
@@ -109,7 +112,14 @@ pub fn hGeneralProtectionFault(regs: *Regs) void {
 
 pub fn hPageFault(regs: *Regs) void {
     _ = regs;
-    @panic("hPageFault");
+    const faultyAddress: u32 = cpu.getFaultyAdress();
+    const pd_idx: u32 = (faultyAddress >> 22);
+    // const pt_idx: u32 = (faultyAddress >> 12) & 0x3FF;
+    const pd: [*]PageEntry = @ptrFromInt(0xFFFFF000);
+    if (pd[pd_idx].address == 0)
+        @panic("hPageFault");
+
+    @panic("Not implemented yet.");
 }
 
 pub fn hReserved_1(regs: *Regs) void {
