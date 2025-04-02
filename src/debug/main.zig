@@ -4,6 +4,7 @@ pub const traceStackTrace = @import("./trace.zig").traceStackTrace;
 pub const printf = @import("./printf.zig").printf;
 pub const printFreeList = @import("./mm.zig").printFreeList;
 pub const walkPageTables = @import("./mm.zig").walkPageTables;
+pub const printMapped = @import("./mm.zig").printMapped;
 pub const runTests = @import("./tests.zig").runTests;
 pub const Logger = @import("./logger.zig").Logger;
 pub const ps = @import("./tasks.zig").ps;

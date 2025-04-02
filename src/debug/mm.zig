@@ -154,3 +154,102 @@ pub fn walkPageTables() void {
         }
     }
 }
+
+fn printMappedArea(start: u32, end: u32, is_4mb: bool) void {
+    const size = end - start;
+    var size_friendly: u32 = size;
+    var unit = "B ";
+    if (size > 1024 * 1024 * 1024) {
+        size_friendly = size / (1024 * 1024 * 1024);
+        unit = "GB";
+    } else if (size > 1024 * 1024) {
+        size_friendly = size / (1024 * 1024);
+        unit = "MB";
+    } else if (size > 1024) {
+        size_friendly = size / 1024;
+        unit = "KB";
+    }
+    printf("{x:0>8} {x:0>8} {d:>4} {s} {d:>4} pgs {s:<16} {s}\n", .{
+        start,
+        end,
+        size_friendly,
+        unit,
+        size / mm.PAGE_SIZE,
+        switch (start) {
+            0x00000000...0x00C00000 - 1 => "Kernel ID",
+            0x00C00000...0xC0000000 - 1 => "User space",
+            0xC0000000...0xC1000000 - 1 => "Kern code/stack",
+            0xC1000000...0xFFFFF000 - 1 => "Kernel heap",
+            0xFFFFF000...0xFFFFFFFF - 1 => "Recurs page dir",
+            else => "Unknown"
+        },
+
+        if (is_4mb) "4M pages" else ""
+    });
+}
+
+pub fn printMapped() void {
+    var pd_idx: usize = 0;
+    var start: u32 = 1;
+    var end: u32 = 0;
+    var huge_page: bool = false;
+    var total: u32 = 0;
+    while (pd_idx < 1024) : (pd_idx += 1) {
+        const pde: *PageEntry = @ptrCast(&initial_page_dir[pd_idx]);
+        if (!pde.present) {
+            if (start != 1) {
+                end = (pd_idx << 22);
+                total += end - start;
+                printMappedArea(start, end, huge_page);
+                start = 1;
+            }
+            continue;
+        }
+        const dir_base = pd_idx << 22;
+        if (start == 1) {
+            start = dir_base;
+            huge_page = pde.huge_page;
+        } else if (huge_page != pde.huge_page) {
+            end = (pd_idx << 22);
+            total += end - start;
+            printMappedArea(start, end, huge_page);
+            start = dir_base;
+            huge_page = pde.huge_page;
+        }
+        if (pde.huge_page) {
+            continue;
+        } else {
+            var page_table: [*]PageEntry = @ptrFromInt(0xFFC00000);
+            page_table += (0x400 * pd_idx);
+            var pt_idx: usize = 0;
+            while (pt_idx < 1024) : (pt_idx += 1) {
+                const pte = page_table[pt_idx];
+                if (!pte.present) {
+                    if (start != 1) {
+                        end = (pd_idx << 22) | (pt_idx << 12);
+                        total += end - start;
+                        printMappedArea(start, end, huge_page);
+                        start = 1;
+                    }
+                    continue;
+                }
+                if (start == 1) {
+                    start = dir_base | (pt_idx << 12);
+                }
+            }
+        }
+    }
+    var size_friendly: u32 = total;
+    var unit = "B ";
+    if (total > 1024 * 1024 * 1024) {
+        size_friendly = total / (1024 * 1024 * 1024);
+        unit = "GB";
+    } else if (total > 1024 * 1024) {
+        size_friendly = total / (1024 * 1024);
+        unit = "MB";
+    } else if (total > 1024) {
+        size_friendly = total / 1024;
+        unit = "KB";
+    }
+    printf("Total: {d} {s} ({d} B)\n", .{size_friendly, unit, total});
+}
