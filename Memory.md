@@ -62,3 +62,7 @@ The paging system implements a 4-GiB virtual memory map through a two-level tabl
 
 * Enable paging
 * Map kernel to upper half of memory.
+
+### Memory Layout
+
+![Memory Layout](./memory-layout.svg)
