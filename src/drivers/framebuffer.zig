@@ -40,7 +40,6 @@ pub const FrameBuffer = struct {
         const first_addr: u32 = virt_addr;
         while (i < num_pages) : (i += 1) {
             mm.virt_memory_manager.mapPage(virt_addr, addr, .{});
-            mm.virt_memory_manager.mapPage(addr, addr, .{});
             virt_addr += mm.PAGE_SIZE;
             addr += mm.PAGE_SIZE;
         }
