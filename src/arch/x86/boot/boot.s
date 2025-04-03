@@ -60,7 +60,7 @@ _start:
 	# TODO: I recall seeing some assembly that used a macro to do the
 	#       conversions to and from physical. Maybe this should be done in this
 	#       code as well?
-	movl $(initial_page_dir - 0xC0000000), %ecx
+	movl $(initialPageDir - 0xC0000000), %ecx
 	movl %ecx, %cr3
 
 	mov %cr4, %ecx
@@ -94,8 +94,8 @@ higher_half:
 .section .data
 .align 4096
 
-.global initial_page_dir
-initial_page_dir:
+.global initialPageDir
+initialPageDir:
     .long 0b10000011           # First entry in the page directory
     .long 0b10000011           # First entry in the page directory
     .long 0b10000011           # First entry in the page directory
