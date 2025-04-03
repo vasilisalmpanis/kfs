@@ -41,6 +41,7 @@ pub fn kthreadStackAlloc(num_of_pages: u32) u32 {
             for (0..index) |idx| {
                 mm.virt_memory_manager.unmapPage(stack + idx * PAGE_SIZE);
             }
+            return 0;
         }
         mm.virt_memory_manager.mapPage(stack + index * PAGE_SIZE,
             page,
