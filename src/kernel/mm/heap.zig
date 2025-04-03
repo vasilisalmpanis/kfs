@@ -134,7 +134,7 @@ pub const FreeList = struct {
                     and remainder % PAGE_SIZE > 0)
                     free_pages -= 1;
                 for (0..free_pages) |page| {
-                    self.vmm.unmapPage(page_start + page * PAGE_SIZE);
+                    self.vmm.unmapPage(page_start + page * PAGE_SIZE, true);
                     returned = true;
                 }
                 if (page_start > block_start and returned) {
@@ -345,7 +345,7 @@ pub const FreeList = struct {
                 // Unmap all the previous mapped pages
                 while (idx > 0) : (idx -= 1) {
                     virt_addr -= PAGE_SIZE;
-                    self.vmm.unmapPage(virt_addr);
+                    self.vmm.unmapPage(virt_addr, true);
                 }
                 return AllocationError.OutOfMemory;
             }

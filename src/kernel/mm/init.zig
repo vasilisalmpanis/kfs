@@ -37,6 +37,7 @@ var phys_memory_manager: pmm.PMM = undefined;
 pub var virt_memory_manager: vmm.VMM = undefined;
 pub var kheap: heap.FreeList = undefined;
 pub var vheap: heap.FreeList = undefined;
+pub var uheap: heap.FreeList = undefined;
 
 // get the first availaanle address and put metadata there
 pub fn mmInit(info: *multiboot_info) void {
@@ -77,6 +78,13 @@ pub fn mmInit(info: *multiboot_info) void {
         &virt_memory_manager,
         PAGE_OFFSET,
         0xFFFFF000,
+        16
+    );
+    uheap = heap.FreeList.init(
+        &phys_memory_manager,
+        &virt_memory_manager,
+        0,
+        PAGE_OFFSET,
         16
     );
 }
