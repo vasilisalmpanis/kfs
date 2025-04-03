@@ -39,7 +39,7 @@ pub fn kthreadStackAlloc(num_of_pages: u32) u32 {
         const page: u32 = mm.virt_memory_manager.pmm.allocPage();
         if (page == 0) {
             for (0..index) |idx| {
-                mm.virt_memory_manager.unmapPage(stack + idx * PAGE_SIZE);
+                mm.virt_memory_manager.unmapPage(stack + idx * PAGE_SIZE, true);
             }
             return 0;
         }
@@ -53,11 +53,11 @@ pub fn kthreadStackAlloc(num_of_pages: u32) u32 {
 
 pub fn kthreadStackFree(addr: u32) void {
     var page: u32 = addr - PAGE_SIZE; // RO page
-    mm.virt_memory_manager.unmapPage(page);
+    mm.virt_memory_manager.unmapPage(page, true);
     page += PAGE_SIZE;
-    mm.virt_memory_manager.unmapPage(page);
+    mm.virt_memory_manager.unmapPage(page, true);
     page += PAGE_SIZE;
-    mm.virt_memory_manager.unmapPage(page);
+    mm.virt_memory_manager.unmapPage(page, true);
     page += PAGE_SIZE;
 }
 
