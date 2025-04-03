@@ -202,7 +202,6 @@ pub const VMM = struct {
         pt += (0x400 * pd_idx);
         if (pt[pt_idx] != 0)
             return; // Do something
-        krn.logger.INFO("mapping\n", .{});
         const new_flags = @as(u12, @bitCast(flags));
         pt[pt_idx] = physical_addr | new_flags;
         invalidatePage(virtual_addr);
