@@ -1,6 +1,7 @@
 const printf = @import("debug").printf;
 const PMM = @import("./pmm.zig").PMM;
 const krn = @import("kernel");
+const PAGE_SIZE = @import("./pmm.zig").PAGE_SIZE;
 const PAGE_OFFSET: u32 = 0xC0000000;
 const PAGE_PRESENT: u8 = 0x1;
 const PAGE_WRITE: u8 = 0x2;
@@ -83,7 +84,9 @@ pub const VMM = struct {
     pub fn init(pmm: *PMM) VMM {
         initialPageDir[1023] = (@intFromPtr(&initialPageDir) - PAGE_OFFSET)
             | PAGE_PRESENT | PAGE_WRITE;
-        const vmm = VMM{ .pmm = pmm };
+        const vmm = VMM{ 
+            .pmm = pmm,
+        };
         return vmm;
     }
 
@@ -170,12 +173,13 @@ pub const VMM = struct {
         return 0xFFFFFFFF;
     }
 
-    pub fn unmapPage(self: *VMM, virt: u32) void {
+    pub fn unmapPage(self: *VMM, virt: u32, free_pfn: bool) void {
         const pd_index = virt >> 22;
         const pt_index = (virt >> 12) & 0x3FF;
         const pt: [*]PageEntry = firstPageTable + (0x400 * pd_index);
         const pfn: u32 = pt[pt_index].address;
-        self.pmm.freePage(pfn);
+        if (free_pfn)
+            self.pmm.freePage(pfn);
         pt[pt_index].erase();
         invalidatePage(virt);
     }
@@ -207,9 +211,57 @@ pub const VMM = struct {
         invalidatePage(virtual_addr);
     }
 
+    fn allocatePageTable(self: *VMM, pd: [*]u32, pd_idx: u32, flags: PagingFlags) u32 {
+        const new_page: u32 = self.pmm.allocPage();
+        const currentPd: [*]u32 = @ptrCast(currentPageDir);
+        var free_index: u32 = 0;
+        while (currentPd[free_index] != 0 and free_index < 1024) : (free_index += 1) {} // TODO: improve
+        if (free_index == 1024)
+            return 0;
+        currentPd[free_index] = new_page | PAGE_WRITE | PAGE_PRESENT;
+        var pt: [*]u32 = @ptrFromInt(0xFFC00000);
+        pt += (0x400 * free_index);
+        @memset(pt[0..1024], 0); // sets the whole PT to 0.
+        pd[pd_idx] = new_page | @as(u12, @bitCast(flags));
+        return free_index;
+    }
+
+    pub fn cloneTable(self: *VMM, pd_idx: u32, pt_idx: u32, new_pd: [*]u32) u32 {
+        const pd: [*]u32 = @ptrCast(currentPageDir);
+        const flags: PagingFlags = @bitCast(@as(u12, @truncate(pd[pd_idx] & 0xFFF)));
+        const free_index: u32 = self.allocatePageTable(new_pd, pd_idx, flags);
+        if (free_index == 0)
+            return 0;
+        var tempPT: [*]u32 = @ptrCast(firstPageTable);
+        tempPT += 0x400 * free_index;
+        var pt: [*]u32 = @ptrCast(firstPageTable);
+        pt += pd_idx * 0x400;
+        for (0..1024) |idx| {
+            if (pt[idx] != 0 and pt[idx] & PAGE_PRESENT != 0) {
+                // allocate page
+                const new_page: u32 = self.pmm.allocPage();
+                if (new_page == 0) // TODO error
+                    return 0;
+                const virt = self.findFreeSpace(
+                    1, PAGE_OFFSET, 0xFFFFF000, false
+                );
+                self.mapPage(virt, new_page, .{.writable = true, .present = true});
+                const fromCopy: [*]u8 = @ptrFromInt(self.pageTableToAddr(pd_idx, pt_idx));
+                const toCopy: [*]u8 = @ptrFromInt(virt);
+                @memcpy(toCopy[0..PAGE_SIZE], fromCopy[0..PAGE_SIZE]);
+                const page_flags: u12 = @truncate(pt[idx] & 0xFFF);
+                tempPT[idx] = new_page | page_flags;
+                self.unmapPage(virt, false);
+            }
+        }
+        pd[free_index] = 0;
+        return 1; 
+    }
+
+extern const _kernel_end: u32;
     pub fn cloneVirtualSpace(self: *VMM) u32 {
         const new_pd_addr = self.findFreeSpace(
-            1, 0, 0xFFFFF000, false
+            1, PAGE_OFFSET, 0xFFFFF000, false
         );
         const new_pd_ph_addr = self.pmm.allocPage();
         self.mapPage(new_pd_addr, new_pd_ph_addr, .{});
@@ -225,27 +277,27 @@ pub const VMM = struct {
             if (pd[pd_idx] == 0) {
                 continue ;
             }
-            if ((pd[pd_idx] & PAGE_4MB) == 0) {
+            if (pd[pd_idx] & PAGE_4MB == 0) {
                 var pt: [*]u32 = @ptrCast(firstPageTable);
                 pt += (0x400 * pd_idx);
                 if (pd_idx >= kernel_pd) {
                     new_pd[pd_idx] = pd[pd_idx];
                 } else {
-                    while (pt_idx < 1023) : (pt_idx += 1) {
+                    while (pt_idx < 1024) : (pt_idx += 1) {
                         if (pt[pt_idx] == 0) {
                             continue ;
                         }
-                        // user space
-                        // self.cloneTable();
+                        if (pt[pt_idx] & PAGE_PRESENT > 0)
+                            _ = self.cloneTable(pd_idx, pt_idx, new_pd);
                     }
                 }
             } else {
-                if (pd_idx >= kernel_pd) {
-                    new_pd[pd_idx] = pd[pd_idx];
-                    krn.logger.INFO("big {d}", .{pd_idx});
-                }
+                new_pd[pd_idx] = pd[pd_idx];
+                // TODO: understand why we cannot remove identity mapping from first 4 pages.
+                // if (pd_idx >= kernel_pd) {
+                // }
             }
         }
-        return 0;
+        return new_pd_ph_addr;
     }
 };
