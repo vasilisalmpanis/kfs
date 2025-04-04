@@ -117,7 +117,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     screen.current_tty = &scrn.tty[0];
     krn.pit = PIT.init(1000);
     krn.task.initial_task.setup(
-        @intFromPtr(&vmm.initialPageDir),
+        @intFromPtr(&vmm.initial_page_dir),
         @intFromPtr(&stack_top)
     );
     idt.idtInit();
