@@ -1,7 +1,7 @@
 const cpu = @import("./system/cpu.zig");
 const idt = @import("./idt.zig");
 
-pub const GDTBASE: u32  =  0x00000800;
+pub const GDTBASE: u32  =  0xC0000800;
 const Gdtr = packed struct {
     limit: u16,
     base: u32

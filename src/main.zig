@@ -138,6 +138,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     );
     irq.registerHandler(0, &krn.timerHandler);
     syscalls.initSyscalls();
+    mm.virt_memory_manager.removeIdentityMapping();
     krn.logger.INFO("new {d}\n", .{p1[0]});
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
     _ = krn.kthreadCreate(&testp, null) catch null;

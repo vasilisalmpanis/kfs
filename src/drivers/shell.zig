@@ -44,7 +44,7 @@ pub const Shell = struct {
 
     fn registerBuiltins(self: *Shell) void {
         self.registerCommand(.{ .name = "help", .desc = "Display this help message", .hndl = &help });
-        self.registerCommand(.{ .name = "kill", .desc = "Kill a process by PID (kill 3)", .hndl = &kill });
+        self.registerCommand(.{ .name = "kill", .desc = "Kill a process by PID (kill 3)", .hndl = &kill }); // FIX: killing with shell is not working. Something wrong with arguments.
         self.registerCommand(.{ .name = "ps", .desc = "Show tasks", .hndl = &ps });
         self.registerCommand(.{ .name = "pstree", .desc = "Show tasks tree", .hndl = &psTree });
         self.registerCommand(.{ .name = "stack", .desc = "Print the stack trace", .hndl = &stack });
