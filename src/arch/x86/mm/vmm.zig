@@ -21,9 +21,9 @@ pub const PagingFlags = packed struct {
     available: u3       = 0x000, // available for us to use
 };
 
-pub extern var initialPageDir: [1024]u32;
-pub const currentPageDir: [*]PageEntry = @ptrFromInt(0xFFFFF000);
-pub const firstPageTable: [*]PageEntry = @ptrFromInt(0xFFC00000);
+pub extern var initial_page_dir: [1024]u32;
+pub const current_page_dir: [*]PageEntry = @ptrFromInt(0xFFFFF000);
+pub const first_page_table: [*]PageEntry = @ptrFromInt(0xFFC00000);
 
 pub inline fn invalidatePage(page: usize) void {
     asm volatile ("invlpg (%eax)"
@@ -82,7 +82,7 @@ pub const VMM = struct {
     pmm: *PMM,
 
     pub fn init(pmm: *PMM) VMM {
-        initialPageDir[1023] = (@intFromPtr(&initialPageDir) - PAGE_OFFSET)
+        initial_page_dir[1023] = (@intFromPtr(&initial_page_dir) - PAGE_OFFSET)
             | PAGE_PRESENT | PAGE_WRITE;
         const vmm = VMM{ 
             .pmm = pmm,
@@ -107,23 +107,23 @@ pub const VMM = struct {
         var pd_idx = from_addr >> 22;
         const max_pd_idx = to_addr >> 22;
         while (pd_idx < max_pd_idx): (pd_idx += 1) {
-            if (currentPageDir[pd_idx].present and currentPageDir[pd_idx].huge_page) {
+            if (current_page_dir[pd_idx].present and current_page_dir[pd_idx].huge_page) {
                 pages = 0;
                 addr_to_ret = self.pageTableToAddr(pd_idx + 1, 0);
                 continue ;
             }
             // Empty page dir entry
-            if (!currentPageDir[pd_idx].present) {
+            if (!current_page_dir[pd_idx].present) {
                 pages += 1024;
-            } else if (currentPageDir[pd_idx].present and !currentPageDir[pd_idx].huge_page) {
+            } else if (current_page_dir[pd_idx].present and !current_page_dir[pd_idx].huge_page) {
                 // If this page dir entry is not for userspace and we need for userspace => continue
-                if (user and !currentPageDir[pd_idx].user) {
+                if (user and !current_page_dir[pd_idx].user) {
                     pages = 0;
                     addr_to_ret = self.pageTableToAddr(pd_idx + 1, 0);
                     continue ;
                 }
                 var pt_idx: u32 = 0;
-                const pt: [*]PageEntry = firstPageTable + (0x400 * pd_idx);
+                const pt: [*]PageEntry = first_page_table + (0x400 * pd_idx);
                 while (pt_idx < 1024) : (pt_idx += 1) {
                     if (pt[pt_idx].present) {
                         pages = 0;
@@ -157,11 +157,11 @@ pub const VMM = struct {
         var pd_idx = PAGE_OFFSET >> 22;
         while (pd_idx < 1023) : (pd_idx += 1) {
             var pt_idx: u32 = 0;
-            if (currentPageDir[pd_idx] == 0) {
+            if (current_page_dir[pd_idx] == 0) {
                 return pd_idx << 22;
             }
-            if ((currentPageDir[pd_idx].huge_page) == 0) {
-                const pt: [*]PageEntry = firstPageTable + (0x400 * pd_idx);
+            if ((current_page_dir[pd_idx].huge_page) == 0) {
+                const pt: [*]PageEntry = first_page_table + (0x400 * pd_idx);
                 while (pt_idx < 1023) {
                     if (pt[pt_idx] == 0) {
                         return self.pageTableToAddr(pd_idx, pt_idx);
@@ -176,7 +176,7 @@ pub const VMM = struct {
     pub fn unmapPage(self: *VMM, virt: u32, free_pfn: bool) void {
         const pd_index = virt >> 22;
         const pt_index = (virt >> 12) & 0x3FF;
-        const pt: [*]PageEntry = firstPageTable + (0x400 * pd_index);
+        const pt: [*]PageEntry = first_page_table + (0x400 * pd_index);
         const pfn: u32 = pt[pt_index].address;
         if (free_pfn)
             self.pmm.freePage(pfn);
@@ -192,17 +192,17 @@ pub const VMM = struct {
     ) void {
         const pd_idx = virtual_addr >> 22;
         const pt_idx = (virtual_addr >> 12) & 0x3ff;
-        const pd: [*]u32 = @ptrCast(currentPageDir);
+        const pd: [*]u32 = @ptrCast(current_page_dir);
         var pt: [*]u32 = undefined;
 
         if (pd[pd_idx] == 0) {
             const pt_pfn = self.pmm.allocPage();
             pd[pd_idx] = pt_pfn | @as(u12, @bitCast(flags)) | PAGE_WRITE;
-            pt = @ptrCast(firstPageTable);
+            pt = @ptrCast(first_page_table);
             pt += (0x400 * pd_idx);
             @memset(pt[0..1024], 0); // sets the whole PT to 0.
         }
-        pt = @ptrCast(firstPageTable);
+        pt = @ptrCast(first_page_table);
         pt += (0x400 * pd_idx);
         if (pt[pt_idx] != 0)
             return; // Do something
@@ -213,13 +213,13 @@ pub const VMM = struct {
 
     fn allocatePageTable(self: *VMM, pd: [*]u32, pd_idx: u32, flags: PagingFlags) u32 {
         const new_page: u32 = self.pmm.allocPage();
-        const currentPd: [*]u32 = @ptrCast(currentPageDir);
+        const current_pd: [*]u32 = @ptrCast(current_page_dir);
         var free_index: u32 = 0;
-        while (currentPd[free_index] != 0 and free_index < 1024) : (free_index += 1) {} // TODO: improve
+        while (current_pd[free_index] != 0 and free_index < 1024) : (free_index += 1) {} // TODO: improve
         if (free_index == 1024)
             return 0;
-        currentPd[free_index] = new_page | PAGE_WRITE | PAGE_PRESENT;
-        var pt: [*]u32 = @ptrFromInt(0xFFC00000);
+        current_pd[free_index] = new_page | PAGE_WRITE | PAGE_PRESENT;
+        var pt: [*]u32 = @ptrCast(first_page_table);
         pt += (0x400 * free_index);
         @memset(pt[0..1024], 0); // sets the whole PT to 0.
         pd[pd_idx] = new_page | @as(u12, @bitCast(flags));
@@ -227,14 +227,14 @@ pub const VMM = struct {
     }
 
     pub fn cloneTable(self: *VMM, pd_idx: u32, pt_idx: u32, new_pd: [*]u32) u32 {
-        const pd: [*]u32 = @ptrCast(currentPageDir);
+        const pd: [*]u32 = @ptrCast(current_page_dir);
         const flags: PagingFlags = @bitCast(@as(u12, @truncate(pd[pd_idx] & 0xFFF)));
         const free_index: u32 = self.allocatePageTable(new_pd, pd_idx, flags);
         if (free_index == 0)
             return 0;
-        var tempPT: [*]u32 = @ptrCast(firstPageTable);
-        tempPT += 0x400 * free_index;
-        var pt: [*]u32 = @ptrCast(firstPageTable);
+        var temp_pt: [*]u32 = @ptrCast(first_page_table);
+        temp_pt += 0x400 * free_index;
+        var pt: [*]u32 = @ptrCast(first_page_table);
         pt += pd_idx * 0x400;
         for (0..1024) |idx| {
             if (pt[idx] != 0 and pt[idx] & PAGE_PRESENT != 0) {
@@ -246,11 +246,11 @@ pub const VMM = struct {
                     1, PAGE_OFFSET, 0xFFFFF000, false
                 );
                 self.mapPage(virt, new_page, .{.writable = true, .present = true});
-                const fromCopy: [*]u8 = @ptrFromInt(self.pageTableToAddr(pd_idx, pt_idx));
-                const toCopy: [*]u8 = @ptrFromInt(virt);
-                @memcpy(toCopy[0..PAGE_SIZE], fromCopy[0..PAGE_SIZE]);
+                const from_copy: [*]u8 = @ptrFromInt(self.pageTableToAddr(pd_idx, pt_idx));
+                const to_copy: [*]u8 = @ptrFromInt(virt);
+                @memcpy(to_copy[0..PAGE_SIZE], from_copy[0..PAGE_SIZE]);
                 const page_flags: u12 = @truncate(pt[idx] & 0xFFF);
-                tempPT[idx] = new_page | page_flags;
+                temp_pt[idx] = new_page | page_flags;
                 self.unmapPage(virt, false);
             }
         }
@@ -271,14 +271,14 @@ extern const _kernel_end: u32;
         
         var pd_idx: u32 = 0;
         const kernel_pd: u32 = PAGE_OFFSET >> 22;
-        const pd: [*]u32 = @ptrCast(currentPageDir);
+        const pd: [*]u32 = @ptrCast(current_page_dir);
         while (pd_idx < 1023) : (pd_idx += 1) {
             var pt_idx: u32 = 0;
             if (pd[pd_idx] == 0) {
                 continue ;
             }
             if (pd[pd_idx] & PAGE_4MB == 0) {
-                var pt: [*]u32 = @ptrCast(firstPageTable);
+                var pt: [*]u32 = @ptrCast(first_page_table);
                 pt += (0x400 * pd_idx);
                 if (pd_idx >= kernel_pd) {
                     new_pd[pd_idx] = pd[pd_idx];
