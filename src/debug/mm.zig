@@ -176,10 +176,10 @@ fn printMappedArea(start: u32, end: u32, is_4mb: bool) void {
         unit,
         size / mm.PAGE_SIZE,
         switch (start) {
-            0x00000000...0x00C00000 - 1 => "Kernel ID",
-            0x00C00000...0xC0000000 - 1 => "User space",
-            0xC0000000...0xC1000000 - 1 => "Kern code/stack",
-            0xC1000000...0xFFFFF000 - 1 => "Kernel heap",
+            0x00000000...0x00001000 - 1 => "Kernel ID",
+            0x00001000...0xC0000000 - 1 => "User space",
+            0xC0000000...0xC0400000 - 1 => "Kern code/stack",
+            0xC0400000...0xFFFFF000 - 1 => "Kernel heap",
             0xFFFFF000...0xFFFFFFFF - 1 => "Recurs page dir",
             else => "Unknown"
         },

@@ -1,5 +1,6 @@
 const Regs = @import("arch").Regs;
 const std = @import("std");
+const dbg = @import("debug");
 const registerExceptionHandler = @import("./manage.zig").registerExceptionHandler;
 
 pub const Exceptions = enum {
@@ -108,7 +109,25 @@ pub fn hGeneralProtectionFault(regs: *Regs) void {
 }
 
 pub fn hPageFault(regs: *Regs) void {
-    _ = regs;
+    var addr: u32 = 0;
+    addr = asm volatile("mov %%cr2, %[val]" : [val] "={eax}" (-> u32));
+    dbg.printf(
+        \\Page Fault at addr: {x}
+        \\EIP: {x}
+        \\  present:      {d}
+        \\  write:        {d}
+        \\  user:         {d}
+        \\  reserved:     {d}
+        \\  intsr. fetch: {d}
+        , .{
+            addr,
+            regs.eip,
+            regs.err_code & 0x1,
+            regs.err_code & 0x2,
+            regs.err_code & 0x4,
+            regs.err_code & 0x8,
+            regs.err_code & 0x10,
+        });
     @panic("hPageFault");
 }
 
