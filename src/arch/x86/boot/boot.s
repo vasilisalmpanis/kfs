@@ -97,16 +97,11 @@ higher_half:
 .global initial_page_dir
 initial_page_dir:
     .long 0b10000011           # First entry in the page directory
-    .long 0b10000011           # First entry in the page directory
-    .long 0b10000011           # First entry in the page directory
-    .rept 768-3
+    .rept 768-1
     .long 0                    # Fill remaining entries with 0s
     .endr
 
     .long (0 << 22) | 0b10000011   # Map page 0
-    .long (1 << 22) | 0b10000011   # Map page 1
-    .long (2 << 22) | 0b10000011   # Map page 2
-    .long (3 << 22) | 0b10000011   # Map page 3 first 16 mb of physical memory mapped
-    .rept 256-4
+    .rept 256-1
     .long 0                    # Fill remaining entries with 0s
     .endr
