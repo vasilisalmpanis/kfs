@@ -76,7 +76,7 @@ pub fn neofetch(tty: *TTY, boot_info: *multiboot.MultibootInfo) void {
     var available_mem: u64 = 0;
     var i: u32 = 0;
     while (i < boot_info.mmap_length) : (i += @sizeOf(multiboot.MultibootMemoryMap)) {
-        const mmap: *multiboot.MultibootMemoryMap = @ptrFromInt(boot_info.mmap_addr + i);
+        const mmap: *multiboot.MultibootMemoryMap = @ptrFromInt(boot_info.mmap_addr + i + krn.mm.PAGE_OFFSET);
         if (mmap.type == 1) {
             available_mem += mmap.len[0];
         }

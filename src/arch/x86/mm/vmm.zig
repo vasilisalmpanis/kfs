@@ -87,6 +87,8 @@ pub const VMM = struct {
         const vmm = VMM{ 
             .pmm = pmm,
         };
+        initial_page_dir[0] = 0;
+        invalidatePage(0);
         return vmm;
     }
 
@@ -299,16 +301,5 @@ extern const _kernel_end: u32;
             }
         }
         return new_pd_ph_addr;
-    }
-
-    pub fn removeIdentityMapping(self: *VMM) void {
-        const pd: [*]u32 = @ptrCast(current_page_dir);
-        pd[0] = 0;
-        invalidatePage(0);
-
-        // For address 0x00000000. Further investigation needed how to remove this. 
-        self.mapPage(0, 0, .{
-            .writable = false,
-        });
     }
 };

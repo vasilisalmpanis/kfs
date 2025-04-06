@@ -2,16 +2,16 @@
   <!-- Memory address labels - main sections -->
   <text x="10" y="30" font-family="monospace" font-size="12">0xFFFFFFFF</text>
   <text x="10" y="50" font-family="monospace" font-size="12">0xFFFFF000</text>
-  <text x="10" y="140" font-family="monospace" font-size="12">0xC1000000</text>
+  <text x="10" y="140" font-family="monospace" font-size="12">0xC0400000</text>
   
   <!-- User space and lower memory labels -->
   <text x="10" y="290" font-family="monospace" font-size="12">0xC0000000</text>
-  <text x="10" y="830" font-family="monospace" font-size="12">0x00C00000</text>
+  <text x="10" y="830" font-family="monospace" font-size="12">0x00001000</text>
   <text x="10" y="855" font-family="monospace" font-size="12">0x00000000</text>
   
   <!-- Expanded kernel section labels -->
-  <text x="10" y="190" font-family="monospace" font-size="12">0xC01FD328</text>
-  <text x="10" y="210" font-family="monospace" font-size="12">0xC01D5328</text>
+  <text x="10" y="210" font-family="monospace" font-size="12">0xC01FD328</text>
+  <text x="10" y="230" font-family="monospace" font-size="12">0xC01D5328</text>
   
   <!-- Recursively mapped page directory (smaller) -->
   <rect x="150" y="30" width="200" height="20" fill="#FF9999" stroke="black" stroke-width="1"/>
@@ -20,18 +20,18 @@
   <!-- Kernel space heap -->
   <rect x="150" y="50" width="200" height="90" fill="#99CCFF" stroke="black" stroke-width="1"/>
   <text x="155" y="85" font-family="sans-serif" font-size="12">Kernel Space Heap</text>
-  <text x="155" y="105" font-family="sans-serif" font-size="11">(4K pages, ~1007 MB)</text>
+  <text x="155" y="105" font-family="sans-serif" font-size="11">(4K pages, ~1019 MB)</text>
   
   <!-- Kernel unused space -->
-  <rect x="150" y="140" width="200" height="50" fill="#DDDDDD" stroke="black" stroke-width="1"/>
-  <text x="155" y="160" font-family="sans-serif" font-size="12">Unused (~14MB)</text>
+  <rect x="150" y="140" width="200" height="70" fill="#DDDDDD" stroke="black" stroke-width="1"/>
+  <text x="155" y="160" font-family="sans-serif" font-size="12">Unused (~2MB)</text>
   
   <!-- Kernel stack -->
-  <rect x="150" y="190" width="200" height="40" fill="#CCCCFF" stroke="black" stroke-width="1"/>
-  <text x="155" y="205" font-family="sans-serif" font-size="12">Kernel Stack (160KB)</text>
+  <rect x="150" y="210" width="200" height="20" fill="#CCCCFF" stroke="black" stroke-width="1"/>
+  <text x="155" y="225" font-family="sans-serif" font-size="12">Kernel Stack (160KB)</text>
   
   <!-- Kernel code -->
-  <rect x="150" y="210" width="200" height="80" fill="#9999FF" stroke="black" stroke-width="1"/>
+  <rect x="150" y="230" width="200" height="60" fill="#9999FF" stroke="black" stroke-width="1"/>
   <text x="155" y="250" font-family="sans-serif" font-size="12">Kernel Code (~1.85MB)</text>
   
   <!-- User space (largest) -->
@@ -42,14 +42,14 @@
   
   <!-- Kernel space identity mapping -->
   <rect x="150" y="830" width="200" height="25" fill="#FFCC99" stroke="black" stroke-width="1"/>
-  <text x="155" y="847" font-family="sans-serif" font-size="11">Kernel Identity Map (4M pages, 12 MB)</text>
+  <text x="155" y="847" font-family="sans-serif" font-size="11">Kernel Identity Map (4K)</text>
   
   <!-- Lines connecting labels to blocks -->
   <line x1="110" y1="30" x2="150" y2="30" stroke="black" stroke-width="1"/>
   <line x1="110" y1="50" x2="150" y2="50" stroke="black" stroke-width="1"/>
   <line x1="110" y1="140" x2="150" y2="140" stroke="black" stroke-width="1"/>
-  <line x1="110" y1="190" x2="150" y2="190" stroke="black" stroke-width="1"/>
   <line x1="110" y1="210" x2="150" y2="210" stroke="black" stroke-width="1"/>
+  <line x1="110" y1="230" x2="150" y2="230" stroke="black" stroke-width="1"/>
   <line x1="110" y1="290" x2="150" y2="290" stroke="black" stroke-width="1"/>
   <line x1="110" y1="830" x2="150" y2="830" stroke="black" stroke-width="1"/>
   <line x1="110" y1="855" x2="150" y2="855" stroke="black" stroke-width="1"/>

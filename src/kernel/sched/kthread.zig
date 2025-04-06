@@ -10,9 +10,9 @@ const PAGE_SIZE = @import("arch").PAGE_SIZE;
 const STACK_PAGES = 3;
 const STACK_SIZE: u32 = (STACK_PAGES - 1) * PAGE_SIZE;
 
-const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
+pub const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
-fn threadWrapper() noreturn {
+fn threadWrapper() callconv(.c) noreturn {
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
     tsk.tasks_mutex.lock();
     const curr = tsk.current;

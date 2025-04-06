@@ -23,10 +23,11 @@ extern const stack_top: u32;
 
 fn testp(_: ?*const anyopaque) i32 {
     while (true) {
-        asm volatile("cli;");
+        // asm volatile("cli;");
         // dbg.dumpRegs();
-        defer asm volatile("sti;");
+        // defer asm volatile("sti;");
     }
+    return 0;
 }
 
 pub fn panic(
@@ -55,7 +56,7 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
 fn go_userspace() void {
     const userspace = @embedFile("userspace");
 
-    const code = krn.mm.vheap.alloc(
+    const code = krn.mm.uheap.alloc(
         userspace.len,
         true, true
     ) catch 0;
@@ -63,7 +64,7 @@ fn go_userspace() void {
     @memcpy(code_ptr[0..], userspace[0..]);
 
     const stack_size: u32 = 4096;
-    const stack = krn.mm.vheap.alloc(
+    const stack = krn.mm.uheap.alloc(
         stack_size,
         true, true
     ) catch 0;
@@ -103,7 +104,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial = Serial.init();
     krn.logger = Logger.init(.DEBUG);
 
-    const boot_info: *multiboot.MultibootInfo = @ptrFromInt(address);
+    const boot_info: *multiboot.MultibootInfo = @ptrFromInt(address + mm.PAGE_OFFSET);
     krn.boot_info = boot_info;
     krn.logger.INFO("Boot info {}", .{boot_info});
 
@@ -122,7 +123,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     );
     idt.idtInit();
     krn.logger.INFO("IDT initialized", .{});
-    // system.enableWriteProtect();
+    system.enableWriteProtect();
 
     irq.registerHandler(1, &keyboard.keyboardInterrupt);
     krn.logger.INFO("Keyboard handler added", .{});
@@ -141,8 +142,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     irq.registerHandler(0, &krn.timerHandler);
     syscalls.initSyscalls();
-
-    mm.virt_memory_manager.removeIdentityMapping();
 
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
     _ = krn.kthreadCreate(&testp, null) catch null;
