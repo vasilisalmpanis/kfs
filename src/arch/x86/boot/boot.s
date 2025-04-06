@@ -32,7 +32,7 @@
 
 # Allocate the initial stack.
 .section .bootstrap_stack, "aw", @nobits
-.align 8
+.align 16
 stack_bottom:
 .skip 16384 * 10# 16 KiB
 .globl stack_top
@@ -55,7 +55,6 @@ boot_page_table1:
 .global _start
 .type _start, @function
 _start:
-
 	# Physical address of boot_page_table1.
 	# TODO: I recall seeing some assembly that used a macro to do the
 	#       conversions to and from physical. Maybe this should be done in this

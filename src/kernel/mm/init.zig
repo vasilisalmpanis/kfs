@@ -83,7 +83,7 @@ pub fn mmInit(info: *multiboot_info) void {
     uheap = heap.FreeList.init(
         &phys_memory_manager,
         &virt_memory_manager,
-        0,
+        PAGE_SIZE,
         PAGE_OFFSET,
         16
     );

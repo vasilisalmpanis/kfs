@@ -8,6 +8,7 @@ const reschedule = @import("./scheduler.zig").reschedule;
 const printf = @import("debug").printf;
 const mutex = @import("./mutex.zig").Mutex;
 const signal = @import("./signals.zig");
+const ThreadHandler = @import("./kthread.zig").ThreadHandler;
 
 var pid: u32 = 0;
 
@@ -51,10 +52,10 @@ pub const Task = struct {
     sigmask:        u32                     = 0,
 
     // only for kthreads
-    threadfn:       ?*const fn (arg: ?*const anyopaque) i32 = null,
-    arg:            ?*const anyopaque                       = null,
-    result:         i32                                     = 0,
-    should_stop:    bool                                    = false,
+    threadfn:       ?ThreadHandler       = null,
+    arg:            ?*const anyopaque    = null,
+    result:         i32                  = 0,
+    should_stop:    bool                 = false,
 
     pub fn init(virt: u32, uid: u16, gid: u16, tp: TaskType) Task {
         return Task{
