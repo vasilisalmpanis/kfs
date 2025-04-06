@@ -106,6 +106,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     const boot_info: *multiboot.MultibootInfo = @ptrFromInt(address + mm.PAGE_OFFSET);
     krn.boot_info = boot_info;
+    dbg.initSymbolTable(boot_info);
     krn.logger.INFO("Boot info {}", .{boot_info});
 
     gdt.gdtInit();

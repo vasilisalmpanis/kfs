@@ -1,4 +1,5 @@
 const printf = @import("./printf.zig").printf;
+const lookupSymbol = @import("./symbols.zig").lookupSymbol;
 const krn = @import("kernel");
 const arch = @import("arch");
 
@@ -33,7 +34,10 @@ pub inline fn traceStackTrace(maxFrames : u32 ) void {
     // unwind the stack
     while (frame < maxFrames and stk != null) : (frame += 1) {
         if (stk != null) {
-            printf("  0x{x}     \n", .{ stk.?.eip });
+            printf("  0x{x}: {s}\n", .{
+                stk.?.eip,
+                if(lookupSymbol(stk.?.eip)) |sym| sym else "?"
+            });
         }
         stk = stk.?.ebp;
     }
