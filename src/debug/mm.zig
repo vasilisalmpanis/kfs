@@ -228,7 +228,8 @@ pub fn printMapped() void {
                     if (start != 1) {
                         end = (pd_idx << 22) | (pt_idx << 12);
                         total += end - start;
-                        printMappedArea(start, end, huge_page);
+                        if (total > 0)
+                            printMappedArea(start, end, huge_page);
                         start = 1;
                     }
                     continue;
