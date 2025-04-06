@@ -128,18 +128,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     irq.registerHandler(1, &keyboard.keyboardInterrupt);
     krn.logger.INFO("Keyboard handler added", .{});
 
-    _ = mm.uheap.alloc(4080, false, true) catch 0;
-    const temp: u32 = mm.uheap.alloc(10, false, true) catch 0;
-    const p1: [*]u8 = @ptrFromInt(temp);
-    p1[0] = 1;
-    const new_cr3: u32 = mm.virt_memory_manager.cloneVirtualSpace();
-    asm volatile (
-        \\ mov %[ecx], %cr3
-        :
-        : [ecx] "r" (new_cr3)
-    );
-    krn.logger.INFO("new {d}\n", .{p1[0]});
-
     irq.registerHandler(0, &krn.timerHandler);
     syscalls.initSyscalls();
 
@@ -148,7 +136,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     _ = krn.kthreadCreate(&testp, null) catch null;
     _ = krn.kthreadCreate(&testp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
-    
+
     krn.logger.INFO("Go usermode", .{});
 
     go_userspace();
