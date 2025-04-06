@@ -60,6 +60,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "color", .desc = "Change the input color (color FFAABB bg)", .hndl = &color });
         self.registerCommand(.{ .name = "mm", .desc = "Walk page tables", .hndl = &mm });
         self.registerCommand(.{ .name = "mm-usage", .desc = "Show memory usage", .hndl = &mmUsage });
+        self.registerCommand(.{ .name = "sym", .desc = "Lookup symbol name by address", .hndl = &sym });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -207,4 +208,22 @@ fn color(_: *Shell, args: [][]const u8) void {
         screen.current_tty.?.setColor(col);
     }
     screen.current_tty.?.reRenderAll();
+}
+
+fn sym(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf(
+            \\Usage: sym <address>
+            \\  Example: sym c013ad50
+            \\
+            , .{}
+        );
+        return ;
+    }
+    const addr: u32 = std.fmt.parseInt(u32, args[0], 16) catch 0;
+    debug.printf("{x}: {s}\n", .{
+        addr,
+        if (debug.lookupSymbol(addr)) |s| s else "?"
+    });
+    return;
 }
