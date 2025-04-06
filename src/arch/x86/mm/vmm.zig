@@ -260,7 +260,6 @@ pub const VMM = struct {
         return 1; 
     }
 
-extern const _kernel_end: u32;
     pub fn cloneVirtualSpace(self: *VMM) u32 {
         const new_pd_addr = self.findFreeSpace(
             1, PAGE_OFFSET, 0xFFFFF000, false
@@ -295,11 +294,9 @@ extern const _kernel_end: u32;
                 }
             } else {
                 new_pd[pd_idx] = pd[pd_idx];
-                // TODO: understand why we cannot remove identity mapping from first 4 pages.
-                // if (pd_idx >= kernel_pd) {
-                // }
             }
         }
+        self.unmapPage(new_pd_addr, false);
         return new_pd_ph_addr;
     }
 };
