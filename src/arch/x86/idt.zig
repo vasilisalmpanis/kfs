@@ -14,6 +14,8 @@ pub const TIMER_INTERRUPT   = 0x20;
 
 pub const KERNEL_CODE_SEGMENT   = 0x08;
 pub const KERNEL_DATA_SEGMENT   = 0x10;
+pub const USER_CODE_SEGMENT   = 0x18;
+pub const USER_DATA_SEGMENT   = 0x20;
 
 const ExceptionHandler  = fn (regs: *Regs) void;
 const SyscallHandler    = fn (regs: *Regs) void;

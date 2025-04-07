@@ -7,12 +7,15 @@ const currentMs = @import("../time/jiffies.zig").currentMs;
 const archReschedule = @import("arch").archReschedule;
 const signals = @import("./signals.zig");
 const std = @import("std");
+const gdt = @import("arch").gdt;
+const krn = @import("../main.zig");
 
 fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs = state.*;
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;
     signals.processSignals(to);
+    // gdt.tss.esp0 = to.stack; // this needs fixing
     return @ptrFromInt(to.regs.esp);
 }
 

@@ -7,8 +7,8 @@ const krn = @import("../main.zig");
 
 
 const PAGE_SIZE = @import("arch").PAGE_SIZE;
-const STACK_PAGES = 3;
-const STACK_SIZE: u32 = (STACK_PAGES - 1) * PAGE_SIZE;
+pub const STACK_PAGES = 3;
+pub const STACK_SIZE: u32 = (STACK_PAGES - 1) * PAGE_SIZE;
 
 pub const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
@@ -76,10 +76,14 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
     }
     const stack_top: u32 = arch.setupStack(
         stack + STACK_SIZE,
-        @intFromPtr(&threadWrapper)
+        @intFromPtr(&threadWrapper),
+        0,
+        arch.idt.KERNEL_CODE_SEGMENT,
+        arch.idt.KERNEL_DATA_SEGMENT,
     );
     new_task.threadfn = f;
     new_task.arg = arg;
+    new_task.stack = stack_top;
     new_task.initSelf(
         @intFromPtr(&arch.vmm.initial_page_dir),
         stack_top,
