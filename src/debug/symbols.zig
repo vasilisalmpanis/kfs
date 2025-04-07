@@ -40,10 +40,7 @@ pub fn lookupSymbol(addr: usize) ?[]const u8 {
     
     for (0..symbol_count) |i| {
         const sym = &symbol_table[i];
-        
-        if (sym.st_size == 0) {
-            continue;
-        }
+
         if (addr >= sym.st_value and addr < sym.st_value + sym.st_size) {
             const name: [*:0]const u8 = @ptrCast(@alignCast(&string_table[sym.st_name]));
             return std.mem.span(name);
@@ -69,6 +66,6 @@ pub fn lookupSymbol(addr: usize) ?[]const u8 {
         }) catch offset_buffer[0..];
         return offset_str;
     }
-
+    
     return null;
 }
