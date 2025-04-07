@@ -200,7 +200,8 @@ pub fn printMapped() void {
             if (start != 1) {
                 end = (pd_idx << 22);
                 total += end - start;
-                printMappedArea(start, end, huge_page);
+                if (end > start)
+                    printMappedArea(start, end, huge_page);
                 start = 1;
             }
             continue;
@@ -212,7 +213,8 @@ pub fn printMapped() void {
         } else if (huge_page != pde.huge_page) {
             end = (pd_idx << 22);
             total += end - start;
-            printMappedArea(start, end, huge_page);
+            if (end > start)
+                printMappedArea(start, end, huge_page);
             start = dir_base;
             huge_page = pde.huge_page;
         }
@@ -228,7 +230,7 @@ pub fn printMapped() void {
                     if (start != 1) {
                         end = (pd_idx << 22) | (pt_idx << 12);
                         total += end - start;
-                        if (total > 0)
+                        if (end > start)
                             printMappedArea(start, end, huge_page);
                         start = 1;
                     }

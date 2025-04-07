@@ -85,11 +85,12 @@ pub const VMM = struct {
     pub fn init(pmm: *PMM) VMM {
         initial_page_dir[1023] = (@intFromPtr(&initial_page_dir) - PAGE_OFFSET)
             | PAGE_PRESENT | PAGE_WRITE;
-        const vmm = VMM{ 
+        var vmm = VMM{ 
             .pmm = pmm,
         };
         initial_page_dir[0] = 0;
         invalidatePage(0);
+        vmm.initKernelSpace();
         return vmm;
     }
 
