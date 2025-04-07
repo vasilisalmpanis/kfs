@@ -1,5 +1,7 @@
 const arch = @import("arch");
 const init = @import("../syscalls/init.zig");
+const tsk = @import("../sched/task.zig");
+const krn = @import("../main.zig");
 const registerHandler = @import("./manage.zig").registerHandler;
 
 pub var syscalls: [arch.IDT_MAX_DESCRIPTORS] ?* const anyopaque = .{null} ** arch.IDT_MAX_DESCRIPTORS;
@@ -13,6 +15,12 @@ const SyscallHandler = fn (
 ) i32;
 
 pub fn syscallsManager(state: *arch.Regs) void {
+    tsk.current.regs = state.*;
+    if (state.eax == 10) {
+        krn.logger.INFO("hello from parent\n", .{});
+    } else if (state.eax == 11) {
+        krn.logger.INFO("hello from the child\n", .{});
+    }
     if (state.eax < 0 or state.eax >= arch.IDT_MAX_DESCRIPTORS) {
         state.eax = -1;
         return;

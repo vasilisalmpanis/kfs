@@ -1,6 +1,8 @@
 const krn = @import("kernel");
 const KERNEL_CODE_SEGMENT = @import("../idt.zig").KERNEL_CODE_SEGMENT;
 const KERNEL_DATA_SEGMENT = @import("../idt.zig").KERNEL_DATA_SEGMENT;
+const USER_CODE_SEGMENT = @import("../idt.zig").USER_CODE_SEGMENT;
+const USER_DATA_SEGMENT = @import("../idt.zig").USER_DATA_SEGMENT;
 
 
 pub const Regs = struct {
@@ -63,12 +65,18 @@ pub const Regs = struct {
     }
 };
 
-pub fn setupStack(stack_top: u32, eip: u32) u32 {
+pub fn setupStack(
+    stack_top: u32,
+    eip: u32,
+    useresp: u32,
+    cs: u32,
+    ss: u32
+) u32 {
     var stack_ptr: [*]u32 = @ptrFromInt(stack_top - @sizeOf(Regs));
-    stack_ptr[0] = KERNEL_DATA_SEGMENT;
-    stack_ptr[1] = KERNEL_DATA_SEGMENT;
-    stack_ptr[2] = KERNEL_DATA_SEGMENT;
-    stack_ptr[3] = KERNEL_DATA_SEGMENT;            // segments
+    stack_ptr[0] = ss;
+    stack_ptr[1] = ss;
+    stack_ptr[2] = ss;
+    stack_ptr[3] = ss;              // segments
     stack_ptr[4] = 0;               // GPR
     stack_ptr[5] = 0;
     stack_ptr[6] = 0;
@@ -80,10 +88,10 @@ pub fn setupStack(stack_top: u32, eip: u32) u32 {
     stack_ptr[12] = 0;              // int code
     stack_ptr[13] = 0;              // error code
     stack_ptr[14] = eip;            // eip
-    stack_ptr[15] = KERNEL_CODE_SEGMENT;            // cs
+    stack_ptr[15] = cs;             // cs
     stack_ptr[16] = 0x202;          // eflags
-    stack_ptr[17] = 0x0;            // useresp
-    stack_ptr[18] = KERNEL_DATA_SEGMENT;           // ss
+    stack_ptr[17] = useresp;        // useresp
+    stack_ptr[18] = ss;             // ss
     return @intFromPtr(stack_ptr);
 }
 

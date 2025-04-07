@@ -23,9 +23,8 @@ extern const stack_top: u32;
 
 fn testp(_: ?*const anyopaque) i32 {
     while (true) {
-        // asm volatile("cli;");
-        // dbg.dumpRegs();
-        // defer asm volatile("sti;");
+        // dbg.ps();
+        // krn.sleep(2000);
     }
     return 0;
 }
@@ -123,6 +122,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
         @intFromPtr(&vmm.initial_page_dir),
         @intFromPtr(&stack_top)
     );
+    krn.task.initial_task.stack = @intFromPtr(&stack_top);
     idt.idtInit();
     krn.logger.INFO("IDT initialized", .{});
     system.enableWriteProtect();
@@ -135,8 +135,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
     _ = krn.kthreadCreate(&testp, null) catch null;
-    _ = krn.kthreadCreate(&testp, null) catch null;
-    _ = krn.kthreadCreate(&testp, null) catch null;
+    // _ = krn.kthreadCreate(&testp, null) catch null;
+    // _ = krn.kthreadCreate(&testp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
 
     krn.logger.INFO("Go usermode", .{});

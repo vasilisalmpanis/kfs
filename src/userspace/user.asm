@@ -1,12 +1,21 @@
 BITS 32
 
 userspace:
-    mov eax, 62
-    mov ebx, 2
-    mov ecx, 1
-    int 0x80
-    ; In this point the result of kill should be stored in eax
-    cmp eax, 0
-    jne userspace
-holder:
-    jmp holder
+	;mov eax, 5
+	;int 0x80
+	;jmp userspace
+fork:
+	mov eax, 57
+	int 0x80
+	cmp eax, 0
+	je child
+parent:
+	mov eax, 10
+	int 0x80
+new:
+	jmp new
+child:
+	mov eax, 11
+	int 0x80
+child_after:
+	jmp child_after
