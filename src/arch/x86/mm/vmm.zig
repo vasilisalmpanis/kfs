@@ -245,7 +245,7 @@ pub const VMM = struct {
         }
     }
 
-    pub fn cloneTable(self: *VMM, pd_idx: u32, pt_idx: u32, new_pd: []u32) u32 {
+    pub fn cloneTable(self: *VMM, pd_idx: u32, pt_idx: u32, new_pd: [*]u32) u32 {
         const pd: [*]u32 = @ptrCast(current_page_dir);
         const flags: PagingFlags = @bitCast(@as(u12, @truncate(pd[pd_idx] & 0xFFF)));
         const free_index: u32 = self.allocatePageTable(new_pd, pd_idx, flags);
