@@ -231,7 +231,7 @@ pub const VMM = struct {
     }
 
     pub fn initKernelSpace(self: *VMM) void {
-        var count: u32 = 0;
+        const first_pt: [*]u32 = @ptrCast(first_page_table);
         for (KERNEL_START..1023) |idx| { // last one is kept for recursive paging
             if (initial_page_dir[idx] == 0) {
                 const pfn: u32 = self.pmm.allocPage();
@@ -239,7 +239,8 @@ pub const VMM = struct {
                     @panic("Could not allocate memory for kernel space.");
                 }
                 initial_page_dir[idx] = pfn | PAGE_PRESENT | PAGE_WRITE; // Premap page tables
-                count += 1;
+                var pt = first_pt + (0x400 * idx);
+                @memset(pt[0..1024], 0);
             }
         }
     }
