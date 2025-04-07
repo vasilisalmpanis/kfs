@@ -3,6 +3,7 @@ const PMM = @import("./pmm.zig").PMM;
 const krn = @import("kernel");
 const PAGE_SIZE = @import("./pmm.zig").PAGE_SIZE;
 const PAGE_OFFSET: u32 = 0xC0000000;
+const KERNEL_START: u32 = PAGE_OFFSET >> 22;
 const PAGE_PRESENT: u8 = 0x1;
 const PAGE_WRITE: u8 = 0x2;
 const PAGE_USER: u8 = 0x4;
@@ -228,7 +229,21 @@ pub const VMM = struct {
         return free_index;
     }
 
-    pub fn cloneTable(self: *VMM, pd_idx: u32, pt_idx: u32, new_pd: [*]u32) u32 {
+    pub fn initKernelSpace(self: *VMM) void {
+        var count: u32 = 0;
+        for (KERNEL_START..1023) |idx| { // last one is kept for recursive paging
+            if (initial_page_dir[idx] == 0) {
+                const pfn: u32 = self.pmm.allocPage();
+                if (pfn == 0) {
+                    @panic("Could not allocate memory for kernel space.");
+                }
+                initial_page_dir[idx] = pfn | PAGE_PRESENT | PAGE_WRITE; // Premap page tables
+                count += 1;
+            }
+        }
+    }
+
+    pub fn cloneTable(self: *VMM, pd_idx: u32, pt_idx: u32, new_pd: []u32) u32 {
         const pd: [*]u32 = @ptrCast(current_page_dir);
         const flags: PagingFlags = @bitCast(@as(u12, @truncate(pd[pd_idx] & 0xFFF)));
         const free_index: u32 = self.allocatePageTable(new_pd, pd_idx, flags);
