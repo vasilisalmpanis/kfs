@@ -25,8 +25,8 @@ pub fn doFork() i32 {
         stack + kthread.STACK_SIZE,
         tsk.current.regs.eip,
         tsk.current.regs.useresp,
-        arch.idt.KERNEL_CODE_SEGMENT, //arch.idt.USER_CODE_SEGMENT | 3,
-        arch.idt.KERNEL_DATA_SEGMENT, //arch.idt.USER_DATA_SEGMENT | 3,
+        arch.idt.USER_CODE_SEGMENT | 3,
+        arch.idt.USER_DATA_SEGMENT | 3,
     );
     child.?.initSelf(
         page_directory,

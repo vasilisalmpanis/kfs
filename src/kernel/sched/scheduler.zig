@@ -3,6 +3,7 @@ const dbg = @import("debug");
 const Regs = @import("arch").Regs;
 const km = @import("../mm/kmalloc.zig");
 const kthreadStackFree = @import("./kthread.zig").kthreadStackFree;
+const STACK_SIZE = @import("./kthread.zig").STACK_SIZE;
 const currentMs = @import("../time/jiffies.zig").currentMs;
 const archReschedule = @import("arch").archReschedule;
 const signals = @import("./signals.zig");
@@ -15,7 +16,7 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;
     signals.processSignals(to);
-    gdt.tss.esp0 = to.stack; // this needs fixing
+    gdt.tss.esp0 = to.stack_bottom + STACK_SIZE; // this needs fixing
     return @ptrFromInt(to.regs.esp);
 }
 

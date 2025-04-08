@@ -40,7 +40,6 @@ pub const Task = struct {
     uid:            u16,
     gid:            u16,
     stack_bottom:   u32,
-    stack:          u32 = 0,
     state:          TaskState       = TaskState.RUNNING,
     regs:           Regs            = Regs.init(),
     tree:           tree.TreeNode   = tree.TreeNode.init(),
