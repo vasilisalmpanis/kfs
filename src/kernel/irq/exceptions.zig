@@ -1,7 +1,6 @@
 const Regs = @import("arch").Regs;
 const std = @import("std");
 const dbg = @import("debug");
-const krn = @import("../main.zig");
 const registerExceptionHandler = @import("./manage.zig").registerExceptionHandler;
 
 pub const Exceptions = enum {
@@ -112,7 +111,7 @@ pub fn hGeneralProtectionFault(regs: *Regs) void {
 pub fn hPageFault(regs: *Regs) void {
     var addr: u32 = 0;
     addr = asm volatile("mov %%cr2, %[val]" : [val] "={eax}" (-> u32));
-    krn.logger.ERROR(
+    dbg.printf(
         \\Page Fault at addr: {x}
         \\EIP: {x}
         \\  present:      {d}
