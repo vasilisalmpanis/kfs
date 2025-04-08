@@ -12,10 +12,12 @@ fork:
 parent:
 	mov eax, 10
 	int 0x80
+	jmp parent
 new:
 	jmp new
 child:
 	mov eax, 11
 	int 0x80
+	jmp child
 child_after:
 	jmp child_after
