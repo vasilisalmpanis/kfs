@@ -29,12 +29,12 @@ pub inline fn traceStackTrace(maxFrames : u32 ) void {
         : [result] "={eax}" (-> *StackFrame),
         : :
     );
-    printf("Stack Trace:\n",.{});
+    krn.logger.INFO("Stack Trace:\n",.{});
     var frame : u32 = 0;
     // unwind the stack
     while (frame < maxFrames and stk != null) : (frame += 1) {
         if (stk != null) {
-            printf("  0x{x}: {s}\n", .{
+            krn.logger.INFO("  0x{x}: {s}\n", .{
                 stk.?.eip,
                 if(lookupSymbol(stk.?.eip)) |sym| sym else "?"
             });

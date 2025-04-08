@@ -34,7 +34,7 @@ pub fn panic(
     stack: ?*builtin.StackTrace,
     first_trace_addr: ?usize
 ) noreturn {
-    dbg.printf(
+    krn.logger.ERROR(
         "\nPANIC: {s}\nfirst_trace_addr {?}\nstack: {?}\n",
         .{msg, first_trace_addr, stack}
     );
