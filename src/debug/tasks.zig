@@ -4,15 +4,17 @@ const printf = @import("./printf.zig").printf;
 const writer = @import("./printf.zig").writer;
 const fmt = @import("std").fmt;
 const krn = @import("kernel");
+const arch = @import("arch");
 
 pub fn ps() void {
     var it = tsk.initial_task.list.iterator();
     while (it.next()) |i| {
         const task = i.curr.entry(tsk.Task, "list");
-        printf("{d}: {s} {d}\n", .{
+        printf("{d}: {s} {s} {s}\n", .{
             task.pid,
             @tagName(task.state),
-            task.refcount
+            @tagName(task.tsktype),
+            if (task.regs.cs == arch.idt.KERNEL_CODE_SEGMENT) "kernel" else "user",
         });
     }
     if (tsk.stopped_tasks) |stopped| {
@@ -20,10 +22,11 @@ pub fn ps() void {
         it = stopped.iterator();
         while (it.next()) |i| {
             const task = i.curr.entry(tsk.Task, "list");
-            printf("{d}: {s} {d}\n", .{
+            printf("{d}: {s} {s} {s}\n", .{
                 task.pid,
                 @tagName(task.state),
-                task.refcount
+                @tagName(task.tsktype),
+                if (task.regs.cs == arch.idt.KERNEL_CODE_SEGMENT) "kernel" else "user",
             });
         }
     }
