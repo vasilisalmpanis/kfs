@@ -83,7 +83,6 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
     );
     new_task.threadfn = f;
     new_task.arg = arg;
-    new_task.stack = stack_top;
     new_task.initSelf(
         @intFromPtr(&arch.vmm.initial_page_dir),
         stack_top,

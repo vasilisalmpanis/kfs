@@ -122,7 +122,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
         @intFromPtr(&vmm.initial_page_dir),
         @intFromPtr(&stack_top)
     );
-    krn.task.initial_task.stack = @intFromPtr(&stack_top);
     idt.idtInit();
     krn.logger.INFO("IDT initialized", .{});
     system.enableWriteProtect();
