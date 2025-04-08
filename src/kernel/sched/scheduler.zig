@@ -15,7 +15,7 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;
     signals.processSignals(to);
-    // gdt.tss.esp0 = to.stack; // this needs fixing
+    gdt.tss.esp0 = to.regs.esp; // this needs fixing
     return @ptrFromInt(to.regs.esp);
 }
 
