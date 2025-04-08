@@ -119,7 +119,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     krn.pit = PIT.init(1000);
     krn.task.initial_task.setup(
-        @intFromPtr(&vmm.initial_page_dir),
+        @intFromPtr(&vmm.initial_page_dir) - vmm.PAGE_OFFSET,
         @intFromPtr(&stack_top)
     );
     krn.task.initial_task.stack = @intFromPtr(&stack_top);
