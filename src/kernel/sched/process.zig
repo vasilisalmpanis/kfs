@@ -5,7 +5,7 @@ const errors = @import("../syscalls/error-codes.zig");
 const kthread = @import("./kthread.zig");
 const arch = @import("arch");
 
-pub fn doFork() i32 {
+pub fn doFork(state: *arch.Regs) i32 {
     var child: ?*tsk.Task = null;
     const page_directory: u32 = mm.virt_memory_manager.cloneVirtualSpace(); // it clones all memory including stack
     if (page_directory == 0)
@@ -23,8 +23,8 @@ pub fn doFork() i32 {
     }
     const stack_top: u32 = arch.setupStack(
         stack + kthread.STACK_SIZE,
-        tsk.current.regs.eip,
-        tsk.current.regs.useresp,
+        state.eip,
+        state.useresp,
         arch.idt.USER_CODE_SEGMENT | 3,
         arch.idt.USER_DATA_SEGMENT | 3,
     );
