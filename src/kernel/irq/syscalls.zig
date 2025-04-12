@@ -7,6 +7,7 @@ const registerHandler = @import("./manage.zig").registerHandler;
 pub var syscalls: [arch.IDT_MAX_DESCRIPTORS] ?* const anyopaque = .{null} ** arch.IDT_MAX_DESCRIPTORS;
 
 const SyscallHandler = fn (
+    state: *arch.Regs,
     a1: u32,
     a2: u32,
     a3: u32,
@@ -16,11 +17,8 @@ const SyscallHandler = fn (
 
 pub fn syscallsManager(state: *arch.Regs) void {
     tsk.current.regs = state.*;
-    if (state.eax == 10) {
-        krn.logger.INFO("hello from parent\n", .{});
-    } else if (state.eax == 11) {
-        krn.logger.INFO("hello from the child\n", .{});
-    }
+    asm volatile ("sti;");
+    defer asm volatile ("cli;");
     if (state.eax < 0 or state.eax >= arch.IDT_MAX_DESCRIPTORS) {
         state.eax = -1;
         return;
@@ -28,6 +26,7 @@ pub fn syscallsManager(state: *arch.Regs) void {
     if (syscalls[@intCast(state.eax)]) |handler| {
         const hnd: *const SyscallHandler = @ptrCast(handler);
         state.eax = hnd(
+            state,
             state.ebx,    
             state.ecx,    
             state.edx,    
