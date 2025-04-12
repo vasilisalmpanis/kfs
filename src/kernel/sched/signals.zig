@@ -187,7 +187,7 @@ pub const SigAction = struct {
 };
 
 pub fn processSignals(task: *tsk.Task) void {
-    if (tsk.current.sigaction.isReady()) {
+    if (task.sigaction.isReady()) {
         const regs: *arch.Regs = @ptrFromInt(task.regs.esp);
         const eip: u32 = regs.eip;
 
