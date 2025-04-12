@@ -107,12 +107,12 @@ pub const Task = struct {
         self.list.setup();
         self.tree.setup();
 
-        self.sigaction = signal.SigAction.init();
+        self.sigaction = current.sigaction;
         self.sigmask = 0;
 
         tasks_mutex.lock();
-        current.list.addTail(&self.list);
         current.tree.addChild(&self.tree);
+        current.list.addTail(&self.list);
         tasks_mutex.unlock();
     }
 
