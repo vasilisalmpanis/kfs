@@ -22,6 +22,7 @@ const io = @import("arch").io;
 extern const stack_top: u32;
 
 fn testp(_: ?*const anyopaque) i32 {
+    // go_userspace();
     while (true) {
         // dbg.ps();
         // krn.sleep(2000);
@@ -59,7 +60,6 @@ fn go_userspace() void {
         userspace.len,
         true, true
     ) catch 0;
-    krn.logger.INFO("userspace code {x}", .{code});
     const code_ptr: [*]u8 = @ptrFromInt(code);
     @memcpy(code_ptr[0..], userspace[0..]);
 
@@ -120,7 +120,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     krn.pit = PIT.init(1000);
     krn.task.initial_task.setup(
-        @intFromPtr(&vmm.initial_page_dir),
+        @intFromPtr(&vmm.initial_page_dir) - mm.PAGE_OFFSET,
         @intFromPtr(&stack_top)
     );
     idt.idtInit();
@@ -133,8 +133,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     irq.registerHandler(0, &krn.timerHandler);
     syscalls.initSyscalls();
 
-    // _ = krn.kthreadCreate(&tty_thread, null) catch null;
-    // _ = krn.kthreadCreate(&testp, null) catch null;
+    _ = krn.kthreadCreate(&tty_thread, null) catch null;
+    _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});

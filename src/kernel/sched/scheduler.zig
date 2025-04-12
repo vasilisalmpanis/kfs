@@ -17,6 +17,7 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     tsk.current = to;
     signals.processSignals(to);
     gdt.tss.esp0 = to.stack_bottom + STACK_SIZE; // this needs fixing
+    asm volatile("mov %[pd], %cr3"::[pd] "r" (to.virtual_space));
     return @ptrFromInt(to.regs.esp);
 }
 

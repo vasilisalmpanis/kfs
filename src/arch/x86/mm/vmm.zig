@@ -245,7 +245,7 @@ pub const VMM = struct {
         }
     }
 
-    pub fn cloneTable(self: *VMM, pd_idx: u32, pt_idx: u32, new_pd: [*]u32) u32 {
+    pub fn cloneTable(self: *VMM, pd_idx: u32, new_pd: [*]u32) u32 {
         const pd: [*]u32 = @ptrCast(current_page_dir);
         const flags: PagingFlags = @bitCast(@as(u12, @truncate(pd[pd_idx] & 0xFFF)));
         const free_index: u32 = self.allocatePageTable(new_pd, pd_idx, flags);
@@ -265,7 +265,7 @@ pub const VMM = struct {
                     1, PAGE_OFFSET, 0xFFFFF000, false
                 );
                 self.mapPage(virt, new_page, .{.writable = true, .present = true});
-                const from_copy: [*]u8 = @ptrFromInt(self.pageTableToAddr(pd_idx, pt_idx));
+                const from_copy: [*]u8 = @ptrFromInt(self.pageTableToAddr(pd_idx, idx));
                 const to_copy: [*]u8 = @ptrFromInt(virt);
                 @memcpy(to_copy[0..PAGE_SIZE], from_copy[0..PAGE_SIZE]);
                 const page_flags: u12 = @truncate(pt[idx] & 0xFFF);
@@ -291,7 +291,6 @@ pub const VMM = struct {
         const kernel_pd: u32 = PAGE_OFFSET >> 22;
         const pd: [*]u32 = @ptrCast(current_page_dir);
         while (pd_idx < 1023) : (pd_idx += 1) {
-            var pt_idx: u32 = 0;
             if (pd[pd_idx] == 0) {
                 continue ;
             }
@@ -301,13 +300,7 @@ pub const VMM = struct {
                 if (pd_idx >= kernel_pd) {
                     new_pd[pd_idx] = pd[pd_idx];
                 } else {
-                    while (pt_idx < 1024) : (pt_idx += 1) {
-                        if (pt[pt_idx] == 0) {
-                            continue ;
-                        }
-                        if (pt[pt_idx] & PAGE_PRESENT > 0)
-                            _ = self.cloneTable(pd_idx, pt_idx, new_pd);
-                    }
+                    _ = self.cloneTable(pd_idx, new_pd);
                 }
             } else {
                 new_pd[pd_idx] = pd[pd_idx];
