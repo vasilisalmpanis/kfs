@@ -39,15 +39,33 @@ pub fn doFork(state: *arch.Regs) i32 {
     return @intCast(child.?.pid);
 }
 
-pub fn getPID() i32 {
+pub fn getPID(_: *arch.Regs) i32 {
     return @intCast(tsk.current.pid);
 }
 
-pub fn getPPID() i32 {
+pub fn getPPID(_: *arch.Regs) i32 {
     var pid: u32 = 0;
     if (tsk.current.tree.parent != null) {
         const p: *tsk.Task = tsk.current.tree.parent.?.entry(tsk.Task, "tree");
         pid = p.pid;
     }
     return @intCast(pid);
+}
+
+pub fn getUID(_: *arch.Regs) i32 {
+    return tsk.current.uid;
+}
+
+pub fn setUID(_: *arch.Regs, uid: u16) i32 {
+    tsk.current.uid = uid;
+    return 0;
+}
+
+pub fn getGID(_: *arch.Regs) i32 {
+    return tsk.current.gid;
+}
+
+pub fn setGID(_: *arch.Regs, gid: u16) i32 {
+    tsk.current.gid = gid;
+    return 0;
 }

@@ -59,6 +59,7 @@ fn go_userspace() void {
         userspace.len,
         true, true
     ) catch 0;
+    krn.logger.INFO("userspace code {x}", .{code});
     const code_ptr: [*]u8 = @ptrFromInt(code);
     @memcpy(code_ptr[0..], userspace[0..]);
 
@@ -132,8 +133,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     irq.registerHandler(0, &krn.timerHandler);
     syscalls.initSyscalls();
 
-    _ = krn.kthreadCreate(&tty_thread, null) catch null;
-    _ = krn.kthreadCreate(&testp, null) catch null;
+    // _ = krn.kthreadCreate(&tty_thread, null) catch null;
+    // _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
