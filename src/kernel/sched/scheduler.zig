@@ -32,7 +32,7 @@ fn processTasks() void {
         var end: bool = false;
         const curr = i.curr;
         const task = curr.entry(tsk.Task, "list");
-        if (task == tsk.current or task.refcount != 0)
+        if (task == tsk.current or !task.refcount.isFree())
             continue;
         if (curr.isEmpty()) {
             end = true;

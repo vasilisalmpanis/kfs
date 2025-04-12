@@ -25,6 +25,49 @@ const TaskType = enum(u8) {
     PROCESS,
 };
 
+pub const RefCount = struct {
+    count: std.atomic.Value(usize),
+    dropFn: *const fn (*RefCount) void,
+
+    pub fn init() RefCount {
+        return .{
+            .count = std.atomic.Value(usize).init(0),
+            .dropFn = RefCount.noop,
+        };
+    }
+
+    pub fn ref(rc: *RefCount) void {
+        // no synchronization necessary; just updating a counter.
+        _ = rc.count.fetchAdd(1, .monotonic);
+    }
+
+    pub fn unref(rc: *RefCount) void {
+        // release ensures code before unref() happens-before the
+        // count is decremented as dropFn could be called by then.
+        if (rc.count.fetchSub(1, .release) == 1) {
+            // seeing 1 in the counter means that other unref()s have happened,
+            // but it doesn't mean that uses before each unref() are visible.
+            // The load acquires the release-sequence created by previous unref()s
+            // in order to ensure visibility of uses before dropping.
+            _ = rc.count.load(.acquire);
+            (rc.dropFn)(rc);
+        }
+    }
+
+    pub fn getValue(rc: *RefCount) usize {
+        return rc.count.load(.monotonic);
+    }
+
+    pub fn isFree(rc: *RefCount) bool {
+        return rc.getValue() == 0;
+    }
+
+    fn noop(rc: *RefCount) void {
+        _ = rc;
+    }
+};
+
+
 // Task is the basic unit of scheduling
 // both threads and processes are tasks
 // and threads share 
@@ -44,7 +87,7 @@ pub const Task = struct {
     regs:           Regs            = Regs.init(),
     tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
-    refcount:       u32             = 0,
+    refcount:       RefCount        = RefCount.init(),
     wakeup_time:    usize           = 0,
 
     // signals
@@ -75,7 +118,7 @@ pub const Task = struct {
         self.regs.esp = task_stack_top;
         self.list.setup();
         self.tree.setup();
-        self.refcount = 0;
+        self.refcount = RefCount.init();
     }
 
     pub fn initSelf(
@@ -131,8 +174,10 @@ pub const Task = struct {
     }
 
     pub fn findByPid(self: *Task, task_pid: u32) ?*Task {
-        if (self.pid == task_pid)
+        if (self.pid == task_pid) {
+            self.refcount.ref();
             return self;
+        }
         var res: ?*Task = null;
         if (self.tree.hasChildren()) {
             var it = self.tree.child.?.siblingsIterator();

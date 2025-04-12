@@ -27,11 +27,11 @@ pub fn syscallsManager(state: *arch.Regs) void {
         const hnd: *const SyscallHandler = @ptrCast(handler);
         state.eax = hnd(
             state,
-            state.ebx,    
-            state.ecx,    
-            state.edx,    
-            state.esi,    
-            state.edi,    
+            state.ebx,
+            state.ecx,
+            state.edx,
+            state.esi,
+            state.edi,
         );
     }
 }
