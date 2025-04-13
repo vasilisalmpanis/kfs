@@ -295,8 +295,6 @@ pub const VMM = struct {
                 continue ;
             }
             if (pd[pd_idx] & PAGE_4MB == 0) {
-                var pt: [*]u32 = @ptrCast(first_page_table);
-                pt += (0x400 * pd_idx);
                 if (pd_idx >= kernel_pd) {
                     new_pd[pd_idx] = pd[pd_idx];
                 } else {
@@ -308,5 +306,52 @@ pub const VMM = struct {
         }
         self.unmapPage(new_pd_addr, false);
         return new_pd_ph_addr;
+    }
+
+    pub fn deinitVirtualSpace(self: *VMM, pd_phys: u32) void {
+        if (pd_phys == @intFromPtr(&initial_page_dir) - PAGE_OFFSET)
+            return ;
+
+        const curr_phys_ps = asm volatile("mov %cr3, %[out]": [out] "=%{eax}" (-> u32));
+        
+        krn.logger.INFO("deinit VS {x} -> {x}", .{curr_phys_ps, pd_phys});
+        // Switch to page directory to clean, clean user space, return back to curr page directory
+        asm volatile("mov %[pd], %cr3":: [pd] "r" (pd_phys));
+        const kernel_pd: u32 = PAGE_OFFSET >> 22;
+        var pd_idx: u32 = 0;
+        krn.logger.INFO("switched VS {x} -> {x}", .{curr_phys_ps, pd_phys});
+        krn.logger.INFO("cleaning pd {d}", .{pd_idx});
+        while (pd_idx < kernel_pd) : (pd_idx += 1) {
+            krn.logger.INFO("cleaning pd {d}", .{pd_idx});
+            if (!current_page_dir[pd_idx].present) {
+                continue ;
+            }
+            if (!current_page_dir[pd_idx].huge_page) {
+                var pt: [*]PageEntry = @ptrCast(first_page_table);
+                pt += pd_idx * 0x400;
+                for (0..1024) |idx| {
+                    self.pmm.freePage(pt[idx].address);
+                    pt[idx].erase();
+                }
+                self.pmm.freePage(current_page_dir[pd_idx].address);
+            } else {
+                current_page_dir[pd_idx].erase();
+            }
+        }
+        krn.logger.INFO("end clear us", .{});
+        asm volatile("mov %[pd], %cr3":: [pd] "r" (curr_phys_ps));
+
+        krn.logger.INFO("clear kernel", .{});
+        // Clean kernel space
+        const old_pd_addr = self.findFreeSpace(
+            1, PAGE_OFFSET, 0xFFFFF000, false
+        );
+        self.mapPage(old_pd_addr, pd_phys, .{});
+        defer self.unmapPage(old_pd_addr, true);
+
+        const old_pd: [*]u32 = @ptrFromInt(old_pd_addr);
+        while (pd_idx < 1024) : (pd_idx += 1) {
+            old_pd[pd_idx] = 0;
+        }
     }
 };
