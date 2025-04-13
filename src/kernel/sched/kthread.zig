@@ -14,17 +14,7 @@ pub const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
 fn threadWrapper() callconv(.c) noreturn {
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
-    tsk.tasks_mutex.lock();
-    const curr = tsk.current;
-    curr.state = .STOPPED;
-    curr.list.del();
-    if (tsk.stopped_tasks == null) {
-        tsk.stopped_tasks = &curr.list;
-        tsk.stopped_tasks.?.setup();
-    } else {
-        tsk.stopped_tasks.?.addTail(&curr.list);
-    }
-    tsk.tasks_mutex.unlock();
+    tsk.finishCurrentTask();
     while (true) {}
 }
 

@@ -41,12 +41,15 @@ pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusag
     _ = rusage;
     _ = stat_addr;
     _ = options;
+    krn.logger.DEBUG("waiting pid {d} from pid {d}", .{pid, tsk.current.pid});
     if (pid > 0) {
         if (tsk.current.findByPid(pid_arg)) |task| {
             defer task.refcount.unref();
             if (task.pid == tsk.current.pid) {
                 return -errors.ECHILD;
             }
+            while (task.state != .STOPPED) {}
+            return task.result;
         } else {
             return -errors.ECHILD;
         }
