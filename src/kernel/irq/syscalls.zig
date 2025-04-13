@@ -23,6 +23,7 @@ pub fn syscallsManager(state: *arch.Regs) void {
         state.eax = -1;
         return;
     }
+    krn.logger.INFO("syscall {d}", .{state.eax});
     if (syscalls[@intCast(state.eax)]) |handler| {
         const hnd: *const SyscallHandler = @ptrCast(handler);
         state.eax = hnd(

@@ -199,6 +199,21 @@ pub fn sleep(millis: usize) void {
     reschedule();
 }
 
+pub fn finishCurrentTask() void {
+    current.state = .STOPPED;
+    while (!current.refcount.isFree()) {}
+    tasks_mutex.lock();
+    current.list.del();
+    if (stopped_tasks == null) {
+        stopped_tasks = &current.list;
+        stopped_tasks.?.setup();
+    } else {
+        stopped_tasks.?.addTail(&current.list);
+    }
+    tasks_mutex.unlock();
+    while (true) {}
+}
+
 pub var initial_task = Task.init(0, 0, 0, .KTHREAD);
 pub var current = &initial_task;
 pub var tasks_mutex: mutex = mutex.init();
