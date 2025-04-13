@@ -44,6 +44,7 @@ fn processTasks() void {
         }
         curr.del();
         task.delFromTree();
+        krn.mm.virt_memory_manager.deinitVirtualSpace(task.virtual_space);
         kthreadStackFree(task.stack_bottom);
         km.kfree(@intFromPtr(task));
         if (end)
