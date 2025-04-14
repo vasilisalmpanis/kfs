@@ -111,11 +111,12 @@ pub const Task = struct {
         };
     }
 
-    pub fn setup(self: *Task, virt: u32, task_stack_top: u32) void {
+    pub fn setup(self: *Task, virt: u32, task_stack_top: u32, task_stack_bottom: u32) void {
         self.virtual_space = virt;
         self.pid = pid;
         pid += 1;
         self.regs.esp = task_stack_top;
+        self.stack_bottom = task_stack_bottom;
         self.list.setup();
         self.tree.setup();
         self.refcount = RefCount.init();

@@ -33,6 +33,7 @@
 # Allocate the initial stack.
 .section .bootstrap_stack, "aw", @nobits
 .align 16
+.globl stack_bottom
 stack_bottom:
 .skip 16384 * 10# 16 KiB
 .globl stack_top
