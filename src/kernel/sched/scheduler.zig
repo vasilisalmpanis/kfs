@@ -11,12 +11,18 @@ const std = @import("std");
 const gdt = @import("arch").gdt;
 const krn = @import("../main.zig");
 
+extern const stack_top: u32;
+
 fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs = state.*;
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;
     signals.processSignals(to);
-    gdt.tss.esp0 = to.stack_bottom + STACK_SIZE; // this needs fixing
+    if (to == &tsk.initial_task) {
+        gdt.tss.esp0 = @intFromPtr(&stack_top);
+    } else {
+        gdt.tss.esp0 = to.stack_bottom + STACK_SIZE; // this needs fixing
+    }
     asm volatile("mov %[pd], %cr3"::[pd] "r" (to.virtual_space));
     return @ptrFromInt(to.regs.esp);
 }
