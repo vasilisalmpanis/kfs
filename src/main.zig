@@ -20,6 +20,7 @@ const cpu = @import("arch").cpu;
 const io = @import("arch").io;
 
 extern const stack_top: u32;
+extern const stack_bottom: u32;
 
 fn testp(_: ?*const anyopaque) i32 {
     // go_userspace();
@@ -121,7 +122,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.pit = PIT.init(1000);
     krn.task.initial_task.setup(
         @intFromPtr(&vmm.initial_page_dir) - mm.PAGE_OFFSET,
-        @intFromPtr(&stack_top)
+        @intFromPtr(&stack_top),
+        @intFromPtr(&stack_bottom),
     );
     idt.idtInit();
     krn.logger.INFO("IDT initialized", .{});
