@@ -82,6 +82,7 @@ pub const Task = struct {
     virtual_space:  u32,
     uid:            u16,
     gid:            u16,
+    pgid:           u16             = 0,
     stack_bottom:   u32,
     state:          TaskState       = TaskState.RUNNING,
     regs:           Regs            = Regs.init(),
@@ -100,12 +101,13 @@ pub const Task = struct {
     result:         i32                  = 0,
     should_stop:    bool                 = false,
 
-    pub fn init(virt: u32, uid: u16, gid: u16, tp: TaskType) Task {
+    pub fn init(virt: u32, uid: u16, gid: u16, pgid: u16, tp: TaskType) Task {
         return Task{
             .pid = 0,
             .virtual_space = virt,
             .uid = uid,
             .gid = gid,
+            .pgid = pgid,
             .stack_bottom = 0,
             .tsktype = tp,
         };
@@ -129,11 +131,13 @@ pub const Task = struct {
         stack_bottom: u32,
         uid: u16,
         gid: u16,
+        pgid: u16,
         tp: TaskType
     ) void {
-        const tmp = Task.init(virt, uid, gid, tp);
+        const tmp = Task.init(virt, uid, gid, pgid, tp);
         self.uid = tmp.uid;
         self.gid = tmp.gid;
+        self.pgid = tmp.pgid;
         self.state = tmp.state;
         self.refcount = tmp.refcount;
         self.wakeup_time = tmp.wakeup_time;
@@ -215,7 +219,7 @@ pub fn finishCurrentTask() void {
     while (true) {}
 }
 
-pub var initial_task = Task.init(0, 0, 0, .KTHREAD);
+pub var initial_task = Task.init(0, 0, 0, 0, .KTHREAD);
 pub var current = &initial_task;
 pub var tasks_mutex: mutex = mutex.init();
 pub var stopped_tasks: ?*lst.ListHead = null;

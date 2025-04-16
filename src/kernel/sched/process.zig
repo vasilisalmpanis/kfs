@@ -34,6 +34,7 @@ pub fn doFork(state: *arch.Regs) i32 {
         stack,
         0, 
         0, 
+        tsk.current.pgid,
         .PROCESS,
     );
     return @intCast(child.?.pid);
@@ -68,4 +69,34 @@ pub fn getGID(_: *arch.Regs) i32 {
 pub fn setGID(_: *arch.Regs, gid: u16) i32 {
     tsk.current.gid = gid;
     return 0;
+}
+
+pub fn getPGID(_: *arch.Regs, pid_arg: u32) i32 {
+    const pid: i32 = @intCast(pid_arg);
+    if (pid < 0)
+        return -errors.EEXIST;
+    if (pid == 0)
+        return tsk.current.pgid;
+    if (tsk.current.findByPid(pid_arg)) |task| {
+        defer task.refcount.unref();
+        return task.pgid;
+    }
+    return -errors.ESRCH;
+}
+
+pub fn setPGID(_: *arch.Regs, pid_arg: u32, pgid_arg: u32) i32 {
+    const pid: i32 = @intCast(pid_arg);
+    const pgid: i32 = @intCast(pgid_arg);
+    if (pid < 0) {
+        return -errors.ESRCH;
+    } else if (pid == 0) {
+        tsk.current.pgid = @intCast(pgid_arg);
+        return 0;
+    }
+    if (tsk.current.findByPid(pid_arg)) |task| {
+        defer task.refcount.unref();
+        task.pgid = @intCast(pgid);
+        return 0;
+    }
+    return -errors.ESRCH;
 }
