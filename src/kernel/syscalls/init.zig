@@ -10,5 +10,7 @@ pub fn init() void {
     register(104, &@import("../sched/process.zig").getGID);
     register(105, &@import("../sched/process.zig").setUID);
     register(106, &@import("../sched/process.zig").setGID);
+    register(109, &@import("../sched/process.zig").setPGID);
     register(110, &@import("../sched/process.zig").getPPID);
+    register(121, &@import("../sched/process.zig").getPGID);
 }
