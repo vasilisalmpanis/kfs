@@ -79,7 +79,7 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
         stack,
         0,
         0,
-        0,
+        1,
         .KTHREAD
     );
     return new_task;
