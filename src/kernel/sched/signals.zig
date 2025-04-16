@@ -6,6 +6,10 @@ pub const SIG_COUNT: u8 = 32;
 
 const SigHandler = fn (signum: u8) void;
 
+const sigDFL: ?*SigHandler = @ptrFromInt(0);
+const sigIGN: ?*SigHandler = @ptrFromInt(1);
+const sigERR: ?*SigHandler = @ptrFromInt(-1);
+
 const Signal = enum(u8) {
     EMPTY = 0,      // Default action      comment                     posix
     SIGHUP = 1,     // Terminate   Hang up controlling terminal or      Yes
@@ -115,43 +119,43 @@ fn sigHup(_: u8) void {
 pub const SigAction = struct {
     processing: bool = false,
     pending: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
-    sig_handlers: std.EnumArray(Signal, *const SigHandler) =
-        std.EnumArray(Signal, *const SigHandler).init(.{
-            .EMPTY      = &sigHandler,
-            .SIGHUP     = &sigHup,
-            .SIGINT     = &sigHandler,
-            .SIGQUIT    = &sigHandler,
-            .SIGILL     = &sigHandler,
-            .SIGTRAP    = &sigHandler,
-            .SIGABRT    = &sigHandler,
-            .SIGIOT     = &sigHandler,
-            .SIGBUS     = &sigHandler,
-            .SIGFPE     = &sigHandler,
-            .SIGKILL    = &sigHandler,
-            .SIGUSR1    = &sigHandler,
-            .SIGSEGV    = &sigHandler,
-            .SIGUSR2    = &sigHandler,
-            .SIGPIPE    = &sigHandler,
-            .SIGALRM    = &sigHandler,
-            .SIGTERM    = &sigHandler,
-            .SIGSTKFLT  = &sigHandler,
-            .SIGCHLD    = &sigHandler,
-            .SIGCONT    = &sigHandler,
-            .SIGSTOP    = &sigHandler,
-            .SIGTSTP    = &sigHandler,
-            .SIGTTIN    = &sigHandler,
-            .SIGTTOU    = &sigHandler,
-            .SIGURG     = &sigHandler,
-            .SIGXCPU    = &sigHandler,
-            .SIGXFSZ    = &sigHandler,
-            .SIGVTALRM  = &sigHandler,
-            .SIGPROF    = &sigHandler,
-            .SIGWINCH   = &sigHandler,
-            .SIGIO      = &sigHandler,
-            .SIGPOLL    = &sigHandler,
-            .SIGPWR     = &sigHandler,
-            .SIGSYS     = &sigHandler,
-            .SIGUNUSED  = &sigHandler,
+    sig_handlers: std.EnumArray(Signal, ?*const SigHandler) =
+        std.EnumArray(Signal, ?*const SigHandler).init(.{
+            .EMPTY      = sigDFL,
+            .SIGHUP     = sigHup,
+            .SIGINT     = sigDFL,
+            .SIGQUIT    = sigDFL,
+            .SIGILL     = sigDFL,
+            .SIGTRAP    = sigDFL,
+            .SIGABRT    = sigDFL,
+            .SIGIOT     = sigDFL,
+            .SIGBUS     = sigDFL,
+            .SIGFPE     = sigDFL,
+            .SIGKILL    = sigDFL,
+            .SIGUSR1    = sigDFL,
+            .SIGSEGV    = sigDFL,
+            .SIGUSR2    = sigDFL,
+            .SIGPIPE    = sigDFL,
+            .SIGALRM    = sigDFL,
+            .SIGTERM    = sigDFL,
+            .SIGSTKFLT  = sigDFL,
+            .SIGCHLD    = sigDFL,
+            .SIGCONT    = sigDFL,
+            .SIGSTOP    = sigDFL,
+            .SIGTSTP    = sigDFL,
+            .SIGTTIN    = sigDFL,
+            .SIGTTOU    = sigDFL,
+            .SIGURG     = sigDFL,
+            .SIGXCPU    = sigDFL,
+            .SIGXFSZ    = sigDFL,
+            .SIGVTALRM  = sigDFL,
+            .SIGPROF    = sigDFL,
+            .SIGWINCH   = sigDFL,
+            .SIGIO      = sigDFL,
+            .SIGPOLL    = sigDFL,
+            .SIGPWR     = sigDFL,
+            .SIGSYS     = sigDFL,
+            .SIGUNUSED  = sigDFL,
         }),
     
     pub fn init() SigAction {
@@ -163,9 +167,13 @@ pub const SigAction = struct {
         while (it.next()) |i| {
             self.pending.toggle(i);
             const signal: Signal = @enumFromInt(i);
-            self.sig_handlers.get(signal)(@intCast(i));
+            if (self.sig_handlers.get(signal)) |handler| {
+                handler(@intCast(i));
                 if (SignalTerminated.get(signal) orelse false)
                     return true;
+            } else {
+                return false;
+            }
         }
         self.processing = false;
         return false;
