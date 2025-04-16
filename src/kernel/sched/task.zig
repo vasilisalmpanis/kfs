@@ -82,7 +82,7 @@ pub const Task = struct {
     virtual_space:  u32,
     uid:            u16,
     gid:            u16,
-    pgid:           u16             = 0,
+    pgid:           u16             = 1,
     stack_bottom:   u32,
     state:          TaskState       = TaskState.RUNNING,
     regs:           Regs            = Regs.init(),
@@ -194,6 +194,39 @@ pub const Task = struct {
         }
         return res;
     }
+
+    pub fn refcountChildren(self: *Task, pgid: u32, ref: bool) bool {
+        var result: bool = false;
+        if (self.tree.hasChildren()) {
+            var it = self.tree.child.?.siblingsIterator();
+            while (it.next()) |i| {
+                const res = i.curr.entry(Task, "tree");
+                if ((pgid > 0 and res.pgid == pgid) or pgid == 0) {
+                    result = true;
+                    if (ref) {
+                        res.refcount.ref();
+                    } else {
+                        res.refcount.unref();
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    pub fn findChildByPid(self: *Task, task_pid: u32) ?*Task {
+        if (self.tree.hasChildren()) {
+            var it = self.tree.child.?.siblingsIterator();
+            while (it.next()) |i| {
+                const res = i.curr.entry(Task, "tree");
+                if (res.pid == task_pid) {
+                    res.refcount.ref();
+                    return res;
+                }
+            }
+        }
+        return null;
+    }
 };
 
 pub fn sleep(millis: usize) void {
@@ -219,7 +252,7 @@ pub fn finishCurrentTask() void {
     while (true) {}
 }
 
-pub var initial_task = Task.init(0, 0, 0, 0, .KTHREAD);
+pub var initial_task = Task.init(0, 0, 0, 1, .KTHREAD);
 pub var current = &initial_task;
 pub var tasks_mutex: mutex = mutex.init();
 pub var stopped_tasks: ?*lst.ListHead = null;

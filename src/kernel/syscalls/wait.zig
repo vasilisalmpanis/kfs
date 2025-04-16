@@ -2,6 +2,7 @@ const tsk = @import("../sched/task.zig");
 const krn = @import("../main.zig");
 const arch = @import("arch");
 const errors = @import("../main.zig").errors;
+const sched = @import("../sched/scheduler.zig");
 
 const WNOHANG: u32 = 	0x00000001;
 const WUNTRACED: u32 =  0x00000002;
@@ -40,18 +41,72 @@ pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusag
     const rusage: ?*Rusage = @ptrFromInt(rusage_arg);
     _ = rusage;
     _ = stat_addr;
-    _ = options;
     krn.logger.DEBUG("waiting pid {d} from pid {d}", .{pid, tsk.current.pid});
     if (pid > 0) {
-        if (tsk.current.findByPid(pid_arg)) |task| {
+        if (tsk.current.findChildByPid(pid_arg)) |task| {
             defer task.refcount.unref();
-            if (task.pid == tsk.current.pid) {
-                return -errors.ECHILD;
+            while (task.state != .STOPPED) {
+                sched.reschedule();
             }
-            while (task.state != .STOPPED) {}
             return task.result;
         } else {
             return -errors.ECHILD;
+        }
+    } else if (pid == 0) {
+        if (!tsk.current.refcountChildren(tsk.current.pgid, true))
+            return -errors.ECHILD;
+        defer _ = tsk.current.refcountChildren(tsk.current.pgid, false);
+        if (tsk.current.tree.hasChildren()) {
+            while (true) {
+                var it = tsk.current.tree.child.?.siblingsIterator();
+                while (it.next()) |i| {
+                    const res = i.curr.entry(tsk.Task, "tree");
+                    if (res.state == .STOPPED and res.pgid == tsk.current.pgid) {
+                        return res.result;
+                    }
+                }
+                if (options & WNOHANG > 0)
+                    break;
+                sched.reschedule();
+            }
+        }
+    } else if (pid == -1) {
+        if (!tsk.current.refcountChildren(0, true))
+            return -errors.ECHILD;
+        defer _ = tsk.current.refcountChildren(0, false);
+        if (tsk.current.tree.hasChildren()) {
+            while (true) {
+                var it = tsk.current.tree.child.?.siblingsIterator();
+                while (it.next()) |i| {
+                    const res = i.curr.entry(tsk.Task, "tree");
+                    if (res.state == .STOPPED) {
+                        return res.result;
+                    }
+                }
+                if (options & WNOHANG > 0)
+                    break;
+                sched.reschedule();
+            }
+        }
+    } else {
+        const pgid: u32 = @intCast(-pid);
+        if (!tsk.current.refcountChildren(pgid, true))
+            return -errors.ECHILD;
+        defer _ = tsk.current.refcountChildren(pgid, false);
+        if (tsk.current.tree.hasChildren()) {
+            while (true) {
+                var it = tsk.current.tree.child.?.siblingsIterator();
+                while (it.next()) |i| {
+                    const res = i.curr.entry(tsk.Task, "tree");
+                    if (res.state == .STOPPED and pgid == res.pgid) {
+                        return res.result;
+                    }
+                }
+                if (options & WNOHANG > 0)
+                    break;
+                sched.reschedule();
+            }
+        } else {
         }
     }
     return 0;
