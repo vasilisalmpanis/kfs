@@ -1,8 +1,8 @@
 const register = @import("../irq/syscalls.zig").registerSyscall;
 
 pub fn init() void {
-    register(57, &@import("./fork.zig").fork);
     register(39, &@import("../sched/process.zig").getPID);
+    register(57, &@import("./fork.zig").fork);
     register(60, &@import("./exit.zig").exit);
     register(61, &@import("./wait.zig").wait);
     register(62, &@import("./kill.zig").kill);
