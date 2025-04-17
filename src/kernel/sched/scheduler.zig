@@ -38,7 +38,7 @@ fn processTasks() void {
         var end: bool = false;
         const curr = i.curr;
         const task = curr.entry(tsk.Task, "list");
-        if (task == tsk.current or !task.refcount.isFree())
+        if (task == tsk.current or !task.refcount.isFree() or task.state == .ZOMBIE)
             continue;
         if (curr.isEmpty()) {
             end = true;
@@ -71,7 +71,7 @@ fn findNextTask() *tsk.Task {
         const task = i.curr.entry(tsk.Task, "list");
         if (task.state == .UNINTERRUPTIBLE_SLEEP and currentMs() >= task.wakeup_time)
             task.state = .RUNNING;
-        if (task.state == .RUNNING or task.state == .ZOMBIE) {
+        if (task.state == .RUNNING) {
             return task;
         }
     }

@@ -14,7 +14,7 @@ pub const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
 fn threadWrapper() callconv(.c) noreturn {
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
-    tsk.finishCurrentTask();
+    tsk.current.finish();
     while (true) {}
 }
 

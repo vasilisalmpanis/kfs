@@ -48,6 +48,7 @@ pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusag
             while (task.state != .ZOMBIE) {
                 sched.reschedule();
             }
+            task.finish();
             return task.result;
         } else {
             return -errors.ECHILD;
@@ -57,11 +58,15 @@ pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusag
             return -errors.ECHILD;
         defer _ = tsk.current.refcountChildren(tsk.current.pgid, false);
         if (tsk.current.tree.hasChildren()) {
+            // this is problematic if current == 0 and it has children that are threads.
+            // It will block for ever. We should think about how to make userspace get pid1
+            // and all threads to be direct children of initial_task.
             while (true) {
                 var it = tsk.current.tree.child.?.siblingsIterator();
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
                     if (res.state == .ZOMBIE and res.pgid == tsk.current.pgid) {
+                        res.finish();
                         return res.result;
                     }
                 }
@@ -80,6 +85,7 @@ pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusag
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
                     if (res.state == .ZOMBIE) {
+                        res.finish();
                         return res.result;
                     }
                 }
@@ -99,6 +105,7 @@ pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusag
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
                     if (res.state == .ZOMBIE and pgid == res.pgid) {
+                        res.finish();
                         return res.result;
                     }
                 }

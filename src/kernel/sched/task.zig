@@ -227,6 +227,22 @@ pub const Task = struct {
         }
         return null;
     }
+
+    pub fn finish(self: *Task) void {
+        self.state = .STOPPED;
+        tasks_mutex.lock();
+        self.list.del();
+        if (stopped_tasks == null) {
+            stopped_tasks = &self.list;
+            stopped_tasks.?.setup();
+        } else {
+            stopped_tasks.?.addTail(&self.list);
+        }
+        tasks_mutex.unlock();
+        self.refcount.unref();
+        if (self == current)
+            reschedule(); 
+    }
 };
 
 pub fn sleep(millis: usize) void {
@@ -235,33 +251,6 @@ pub fn sleep(millis: usize) void {
     current.wakeup_time = currentMs() + millis;
     current.state = .UNINTERRUPTIBLE_SLEEP;
     reschedule();
-}
-
-pub fn finishCurrentTask() void {
-    current.state = .ZOMBIE;
-    if (current.tree.parent) |p| {
-        const ppid = p.entry(Task, "tree").*.pid;
-        asm volatile(
-            \\ mov $62, %eax
-            \\ mov $18, %ecx # SIGCHLD
-            \\ int $0x80
-            :: [ebx] "{ebx}" (ppid),
-        );
-    }
-    while (!current.refcount.isFree()) {
-        reschedule();
-    }
-    current.state = .STOPPED;
-    tasks_mutex.lock();
-    current.list.del();
-    if (stopped_tasks == null) {
-        stopped_tasks = &current.list;
-        stopped_tasks.?.setup();
-    } else {
-        stopped_tasks.?.addTail(&current.list);
-    }
-    tasks_mutex.unlock();
-    while (true) {}
 }
 
 pub var initial_task = Task.init(0, 0, 0, 1, .KTHREAD);
