@@ -174,7 +174,7 @@ pub const Task = struct {
     }
 
     pub fn delFromTree(self: *Task) void {
-        self.zombifyChildren();
+        // self.zombifyChildren();
         self.tree.del();
     }
 
@@ -238,8 +238,20 @@ pub fn sleep(millis: usize) void {
 }
 
 pub fn finishCurrentTask() void {
+    current.state = .ZOMBIE;
+    if (current.tree.parent) |p| {
+        const ppid = p.entry(Task, "tree").*.pid;
+        asm volatile(
+            \\ mov $62, %eax
+            \\ mov $18, %ecx # SIGCHLD
+            \\ int $0x80
+            :: [ebx] "{ebx}" (ppid),
+        );
+    }
+    while (!current.refcount.isFree()) {
+        reschedule();
+    }
     current.state = .STOPPED;
-    while (!current.refcount.isFree()) {}
     tasks_mutex.lock();
     current.list.del();
     if (stopped_tasks == null) {
