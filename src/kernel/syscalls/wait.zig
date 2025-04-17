@@ -45,7 +45,7 @@ pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusag
     if (pid > 0) {
         if (tsk.current.findChildByPid(pid_arg)) |task| {
             defer task.refcount.unref();
-            while (task.state != .STOPPED) {
+            while (task.state != .ZOMBIE) {
                 sched.reschedule();
             }
             return task.result;
@@ -61,7 +61,7 @@ pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusag
                 var it = tsk.current.tree.child.?.siblingsIterator();
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
-                    if (res.state == .STOPPED and res.pgid == tsk.current.pgid) {
+                    if (res.state == .ZOMBIE and res.pgid == tsk.current.pgid) {
                         return res.result;
                     }
                 }
@@ -79,7 +79,7 @@ pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusag
                 var it = tsk.current.tree.child.?.siblingsIterator();
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
-                    if (res.state == .STOPPED) {
+                    if (res.state == .ZOMBIE) {
                         return res.result;
                     }
                 }
@@ -98,7 +98,7 @@ pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusag
                 var it = tsk.current.tree.child.?.siblingsIterator();
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
-                    if (res.state == .STOPPED and pgid == res.pgid) {
+                    if (res.state == .ZOMBIE and pgid == res.pgid) {
                         return res.result;
                     }
                 }
