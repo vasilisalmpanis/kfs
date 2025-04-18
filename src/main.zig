@@ -56,6 +56,7 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
 
 fn go_userspace() void {
     const userspace = @embedFile("userspace");
+    krn.logger.INFO("userspace size: {x}", .{userspace.len});
 
     const code = krn.mm.uheap.alloc(
         userspace.len,
@@ -63,6 +64,11 @@ fn go_userspace() void {
     ) catch 0;
     const code_ptr: [*]u8 = @ptrFromInt(code);
     @memcpy(code_ptr[0..], userspace[0..]);
+
+    const ehdr: *std.elf.Elf32_Ehdr = @ptrFromInt(code);
+    krn.logger.INFO("ELF header: {any}", .{ehdr});
+    const programm_header: *std.elf.Elf32_Phdr = @ptrFromInt(code + ehdr.e_phoff);
+    krn.logger.INFO("Program_header: {any}", .{programm_header});
 
     const stack_size: u32 = 4096;
     const stack = krn.mm.uheap.alloc(
@@ -93,7 +99,7 @@ fn go_userspace() void {
         \\ iret
         \\
         ::
-        [uc] "r" (code),
+        [uc] "r" (code + ehdr.e_entry),
         [us] "r" (stack + stack_size),
     );
 }
@@ -136,7 +142,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     syscalls.initSyscalls();
 
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
-    _ = krn.kthreadCreate(&testp, null) catch null;
+    // _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});

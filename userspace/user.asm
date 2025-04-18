@@ -6,9 +6,9 @@ pid1:
 	call fork
 	cmp eax, 0
 	je child1
-infinite_wait:
 	mov ebx, 0 ; FIX: there is a bug with wait4. If we put -1 as pid @intCast causes an exception. Investigate.
 	call wait4
+infinite_wait:
 	jmp infinite_wait
 
 child1:
