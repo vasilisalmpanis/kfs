@@ -63,6 +63,7 @@ fn go_userspace() void {
     ) catch 0;
     const code_ptr: [*]u8 = @ptrFromInt(code);
     @memcpy(code_ptr[0..], userspace[0..]);
+    krn.USERSPACE_START = code;
 
     const ehdr: *std.elf.Elf32_Ehdr = @ptrFromInt(code);
     // const programm_header: *std.elf.Elf32_Phdr = @ptrFromInt(code + ehdr.e_phoff);
