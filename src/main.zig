@@ -56,7 +56,6 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
 
 fn go_userspace() void {
     const userspace = @embedFile("userspace");
-    krn.logger.INFO("userspace size: {x}", .{userspace.len});
 
     const code = krn.mm.uheap.alloc(
         userspace.len,
@@ -66,9 +65,7 @@ fn go_userspace() void {
     @memcpy(code_ptr[0..], userspace[0..]);
 
     const ehdr: *std.elf.Elf32_Ehdr = @ptrFromInt(code);
-    krn.logger.INFO("ELF header: {any}", .{ehdr});
-    const programm_header: *std.elf.Elf32_Phdr = @ptrFromInt(code + ehdr.e_phoff);
-    krn.logger.INFO("Program_header: {any}", .{programm_header});
+    // const programm_header: *std.elf.Elf32_Phdr = @ptrFromInt(code + ehdr.e_phoff);
 
     const stack_size: u32 = 4096;
     const stack = krn.mm.uheap.alloc(
@@ -77,6 +74,10 @@ fn go_userspace() void {
     ) catch 0;
     const stack_ptr: [*]u8 = @ptrFromInt(stack);
     @memset(stack_ptr[0..stack_size], 0);
+    
+    krn.logger.INFO("Userspace code:  0x{X:0>8} 0x{X:0>8}", .{code, code + userspace.len});
+    krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack, stack + stack_size});
+    krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{code + ehdr.e_entry});
 
     gdt.tss.esp0 = krn.task.current.regs.esp;
 
@@ -99,7 +100,8 @@ fn go_userspace() void {
         \\ iret
         \\
         ::
-        [uc] "r" (code + ehdr.e_entry),
+        // [uc] "r" (code + ehdr.e_entry),  // Should be like this, but libc initialization is not working now
+        [uc] "r" (code + 0x1000),           // main is always at 0x1000 from start
         [us] "r" (stack + stack_size),
     );
 }

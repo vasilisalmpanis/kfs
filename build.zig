@@ -81,15 +81,18 @@ pub fn build(b: *std.Build) !void {
 
         // Add userspace binary
         const userspace_bin_path = b.path("./zig-out/bin/userspace.bin");
+        target.abi = .musl;
+        target.os_tag = .linux;
         const userspace = b.addExecutable(.{
             .name = userspace_name,
             .root_source_file = b.path("./userspace/src/main.zig"),
             .target = b.resolveTargetQuery(target),
             .optimize = .ReleaseSmall,
-            .code_model = .small,
+            .code_model = .default,
             .strip = false,
             .error_tracing = false,
-            .link_libc = false,
+            .link_libc = true,
+            .linkage = .static,
         });
         userspace.setLinkerScript(b.path("./userspace/linker.ld"));
         b.installArtifact(userspace);

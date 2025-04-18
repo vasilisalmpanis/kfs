@@ -1,9 +1,9 @@
-ENTRY(_start)
-
 SECTIONS
 {
   . = 0x1000;
-
+  .text.main : {
+    *(.text.main)
+  }
   .text : {
     *(.text*)
   }
