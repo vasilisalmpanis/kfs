@@ -5,6 +5,8 @@ const name = "kfs.bin";
 const linker = "linker.ld";
 const kernel_src = "src/main.zig";
 
+const userspace_name = "userspace.bin";
+
 const archs = [_]std.Target.Cpu.Arch{
     std.Target.Cpu.Arch.x86,
     // std.Target.Cpu.Arch.x86_64,
@@ -78,17 +80,24 @@ pub fn build(b: *std.Build) !void {
         b.installArtifact(kernel);
 
         // Add userspace binary
-        const userspace_bin_path = b.path("./src/userspace/user.bin");
-        const userspace_src_path = b.path("./src/userspace/user.asm");
-        const userspace_asm = b.addSystemCommand(&.{
-            "nasm", "-f", "bin",
-            userspace_src_path.getPath(b),
-            "-o", userspace_bin_path.getPath(b)
+        const userspace_bin_path = b.path("./zig-out/bin/userspace.bin");
+        const userspace = b.addExecutable(.{
+            .name = userspace_name,
+            .root_source_file = b.path("./userspace/src/main.zig"),
+            .target = b.resolveTargetQuery(target),
+            .optimize = .ReleaseSmall,
+            .code_model = .small,
+            .strip = false,
+            .error_tracing = false,
+            .link_libc = false,
         });
+        userspace.setLinkerScript(b.path("./userspace/linker.ld"));
+        b.installArtifact(userspace);
+
         kernel.root_module.addAnonymousImport("userspace", .{
-            .root_source_file =userspace_bin_path,
+            .root_source_file = userspace_bin_path,
         });
-        kernel.step.dependOn(&userspace_asm.step);
+        kernel.step.dependOn(&userspace.step);
 
         const kernel_step = b.step(name, "Build the kernel");
         kernel_step.dependOn(&kernel.step);

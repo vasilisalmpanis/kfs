@@ -35,7 +35,7 @@
 .align 16
 .globl stack_bottom
 stack_bottom:
-.skip 16384 * 10# 16 KiB
+.skip 4096 * 1024
 .globl stack_top
 stack_top:
 
@@ -97,11 +97,13 @@ higher_half:
 .global initial_page_dir
 initial_page_dir:
     .long 0b10000011           # First entry in the page directory
-    .rept 768-1
+    .long 0b10000011           # First entry in the page directory
+    .rept 768-2
     .long 0                    # Fill remaining entries with 0s
     .endr
 
     .long (0 << 22) | 0b10000011   # Map page 0
-    .rept 256-1
+    .long (1 << 22) | 0b10000011   # Map page 0
+    .rept 256-2
     .long 0                    # Fill remaining entries with 0s
     .endr

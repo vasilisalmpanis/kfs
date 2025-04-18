@@ -7,12 +7,11 @@ SRC_DIR = src
 SRC = $(shell find $(SRC_DIR) -name '*.zig')
 ASM_SRC = $(shell find $(SRC_DIR) -name '*.s')
 GRUB_CFG = $(ISO_DIR)/boot/grub/grub.cfg
-USERSPACE_SRC = src/userspace/user.asm
 MKRESCUE = grub-mkrescue
 
 all: $(NAME)
 
-$(NAME): $(KERNEL) $(GRUB_CFG) $(USERSPACE_SRC)
+$(NAME): $(KERNEL) $(GRUB_CFG)
 	cp $(KERNEL) $(ISO_DIR)/boot/
 	$(MKRESCUE) --compress=xz -o $(NAME) $(ISO_DIR)
 

@@ -239,7 +239,6 @@ pub const Task = struct {
             stopped_tasks.?.addTail(&self.list);
         }
         tasks_mutex.unlock();
-        self.refcount.unref();
         if (self == current)
             reschedule(); 
     }
