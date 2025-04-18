@@ -1,4 +1,5 @@
 const os = @import("std").os;
+const std = @import("std");
 
 fn syscall(num: u32, arg1: u32, arg2: u32, arg3: u32, arg4: u32) i32 {
     asm volatile(
@@ -22,6 +23,7 @@ pub export fn main() linksection(".text.main") noreturn {
     } else {
         _ = os.linux.waitpid(@intCast(pid), &status, 0);
         _ = os.linux.kill(@intCast(pid), 1);
+        _ = os.linux.write(1, "hello from userspace\n", 21);
     }
     while (true) {}
 }
