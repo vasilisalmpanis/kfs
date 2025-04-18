@@ -35,7 +35,7 @@ const Rusage = packed struct {
     ru_nivcsw: usize,        // involuntary context switches
 };
 
-pub fn wait(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusage_arg: u32) i32 {
+pub fn wait4(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusage_arg: u32) i32 {
     const pid: i32 = @intCast(pid_arg);
     const stat_addr: ?*i32 = @ptrFromInt(stat_addr_arg);
     const rusage: ?*Rusage = @ptrFromInt(rusage_arg);
