@@ -4,8 +4,8 @@ const errors = @import("../main.zig").errors;
 const arch = @import("arch");
 const sched = @import("../sched/scheduler.zig");
 
-pub fn exit(_: *arch.Regs, error_code: u32) i32 {
-    tsk.current.result = @intCast(error_code);
+pub fn exit(_: *arch.Regs, error_code: i32) i32 {
+    tsk.current.result = error_code;
     tsk.current.state = .ZOMBIE;
     if (tsk.current.tree.parent) |p| {
         _ = p;
