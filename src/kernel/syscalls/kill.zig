@@ -4,8 +4,8 @@ const errors = @import("../main.zig").errors;
 const arch = @import("arch");
 
 pub fn kill(_: *arch.Regs, pid: u32, sig: u32) i32 {
-    const task_res = tsk.initial_task.findByPid(pid);
-    if (task_res) |task| {
+    if (tsk.initial_task.findByPid(pid)) |task| {
+        defer task.refcount.unref();
         task.sigaction.setSignal(@enumFromInt(sig));
         return 0;
     }
