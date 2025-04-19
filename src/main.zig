@@ -55,17 +55,26 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
 }
 
 fn go_userspace() void {
+    const userspace_offset: u32 = 0x1000;
     const userspace = @embedFile("userspace");
 
-    const code = krn.mm.uheap.alloc(
-        userspace.len,
-        true, true
-    ) catch 0;
-    const code_ptr: [*]u8 = @ptrFromInt(code);
-    @memcpy(code_ptr[0..], userspace[0..]);
-    krn.USERSPACE_START = code;
 
-    const ehdr: *std.elf.Elf32_Ehdr = @ptrFromInt(code);
+    const page_count: u32 = (userspace.len - userspace_offset) / krn.mm.PAGE_SIZE + 1;
+    var virt_addr = userspace_offset;
+    for (0..page_count) |_| {
+        const phys = krn.mm.virt_memory_manager.pmm.allocPage();
+        krn.mm.virt_memory_manager.mapPage(
+            virt_addr,
+            phys,
+            .{.user = true}
+        );
+        virt_addr += krn.mm.PAGE_SIZE;
+    }
+
+    const code_ptr: [*]u8 = @ptrFromInt(userspace_offset);
+    @memcpy(code_ptr[0..], userspace[userspace_offset..]);
+
+    const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
     // const programm_header: *std.elf.Elf32_Phdr = @ptrFromInt(code + ehdr.e_phoff);
 
     const stack_size: u32 = 4096;
@@ -75,10 +84,10 @@ fn go_userspace() void {
     ) catch 0;
     const stack_ptr: [*]u8 = @ptrFromInt(stack);
     @memset(stack_ptr[0..stack_size], 0);
-    
-    krn.logger.INFO("Userspace code:  0x{X:0>8} 0x{X:0>8}", .{code, code + userspace.len});
+
+    krn.logger.INFO("Userspace code:  0x{X:0>8} 0x{X:0>8}", .{userspace_offset, userspace.len});
     krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack, stack + stack_size});
-    krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{code + ehdr.e_entry});
+    krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{ehdr.e_entry});
 
     gdt.tss.esp0 = krn.task.current.regs.esp;
 
@@ -101,8 +110,8 @@ fn go_userspace() void {
         \\ iret
         \\
         ::
-        // [uc] "r" (code + ehdr.e_entry),  // Should be like this, but libc initialization is not working now
-        [uc] "r" (code + 0x1000),           // main is always at 0x1000 from start
+        // [uc] "r" (ehdr.e_entry),  // Should be like this, but libc initialization is not working now
+        [uc] "r" (userspace_offset),           // main is always at 0x1000 from start
         [us] "r" (stack + stack_size),
     );
 }
