@@ -9,9 +9,10 @@ pub const SyscallHandler = fn (
     a3: u32,
     a4: u32,
     a5: u32,
+    a6: u32,
 ) i32;
 
-fn notImpl(state: *arch.Regs, _: u32, _: u32, _: u32, _: u32, _: u32) i32 {
+fn notImpl(state: *arch.Regs, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) i32 {
     krn.logger.WARN("syscall {d} {s} is not implemented", .{
         state.eax,
         @tagName(@as(Syscall, @enumFromInt(state.eax)))
@@ -213,10 +214,12 @@ pub const SyscallTable = brk: {
         .SYS_getpmsg                    = &notImpl,
         .SYS_putpmsg                    = &notImpl,
         .SYS_vfork                      = &notImpl,
+        .SYS_ugetrlimit                 = &notImpl,
+        .SYS_mmap2                      = @ptrCast(&@import("mmap.zig").mmap2),
     });
 };
 
-pub const Syscall = enum(u8) {
+pub const Syscall = enum(u10) {
     SYS_setup = 0,                  // 00
     SYS_exit,                       // 01
     SYS_fork,                       // 02
@@ -408,5 +411,7 @@ pub const Syscall = enum(u8) {
     SYS_getpmsg,                    // 188
     SYS_putpmsg,                    // 189
     SYS_vfork,                      // 190
+    SYS_ugetrlimit = 191,
+    SYS_mmap2 = 192,
     _
 };

@@ -1,17 +1,22 @@
 const os = @import("std").os;
 const std = @import("std");
 
-fn syscall(num: u32, arg1: u32, arg2: u32, arg3: u32, arg4: u32) i32 {
-    asm volatile(
-        \\ int $0x80
-        ::
-            [_] "{eax}" (num),
-            [_] "{ebx}" (arg1),
-            [_] "{ecx}" (arg2),
-            [_] "{edx}" (arg3),
-            [_] "{esi}" (arg4),
-    );
-    return asm volatile("":[_] "={eax}" (-> i32));
+pub const std_options = std.Options{
+    .log_level = .debug,
+    .logFn = myLogFn,
+};
+
+pub fn myLogFn(
+    comptime level: std.log.Level,
+    comptime scope: @Type(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = scope;
+    var buf: [1000]u8 = undefined;
+    const prefix = "[" ++ comptime level.asText() ++ "] " ++ format;
+    const data = std.fmt.bufPrint(&buf, prefix, args) catch "";    
+    _ = os.linux.write(1, data.ptr, data.len);
 }
 
 pub export fn main() linksection(".text.main") noreturn {
@@ -24,6 +29,8 @@ pub export fn main() linksection(".text.main") noreturn {
         _ = os.linux.waitpid(@intCast(pid), &status, 0);
         _ = os.linux.kill(@intCast(pid), 1);
         _ = os.linux.write(1, "hello from userspace\n", 21);
+        _ = os.linux.syscall6(os.linux.syscalls.X86.mmap2, 1, 2, 3, 4, 5, 6);
+        std.log.info("test userspace logger {d}\n", .{5});
     }
     while (true) {}
 }

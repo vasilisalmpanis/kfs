@@ -33,5 +33,3 @@ pub var pit: PIT = undefined;
 pub var serial: Serial = undefined;
 pub var logger: Logger = undefined;
 pub var boot_info: *multiboot.MultibootInfo = undefined;
-
-pub var USERSPACE_START: u32 = undefined;

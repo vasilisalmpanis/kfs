@@ -8,16 +8,17 @@ pub fn syscallsManager(state: *arch.Regs) void {
     tsk.current.regs = state.*;
     asm volatile ("sti;");
     defer asm volatile ("cli;");
-    if (state.eax < 0 or state.eax >= arch.IDT_MAX_DESCRIPTORS) {
+    if (state.eax < 0) {
         state.eax = -1;
         return;
     }
+    const sys: systable.Syscall = @enumFromInt(state.eax);
     krn.logger.INFO("[PID {d:<2}]: {d:>4} {s}", .{
         tsk.current.pid,
         state.eax,
-        @tagName(@as(systable.Syscall, @enumFromInt(state.eax)))
+        @tagName(sys)
     });
-    if (systable.SyscallTable.get(@enumFromInt(state.eax))) |hndlr| {
+    if (systable.SyscallTable.get(sys)) |hndlr| {
         state.eax = hndlr(
             state,
             state.ebx,
@@ -25,6 +26,7 @@ pub fn syscallsManager(state: *arch.Regs) void {
             state.edx,
             state.esi,
             state.edi,
+            state.ebp,
         );
     }
 }
