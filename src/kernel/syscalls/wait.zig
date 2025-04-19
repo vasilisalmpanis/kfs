@@ -35,15 +35,12 @@ const Rusage = packed struct {
     ru_nivcsw: usize,        // involuntary context switches
 };
 
-pub fn wait4(_: *arch.Regs, pid_arg: u32, stat_addr_arg: u32, options: u32, rusage_arg: u32) i32 {
-    const pid: i32 = @intCast(pid_arg);
-    const stat_addr: ?*i32 = @ptrFromInt(stat_addr_arg);
-    const rusage: ?*Rusage = @ptrFromInt(rusage_arg);
+pub fn wait4(_: *arch.Regs, pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) i32 {
     _ = rusage;
     _ = stat_addr;
     krn.logger.DEBUG("waiting pid {d} from pid {d}", .{pid, tsk.current.pid});
     if (pid > 0) {
-        if (tsk.current.findChildByPid(pid_arg)) |task| {
+        if (tsk.current.findChildByPid(@intCast(pid))) |task| {
             defer task.refcount.unref();
             while (task.state != .ZOMBIE) {
                 sched.reschedule();

@@ -108,7 +108,7 @@ fn kill(_: *Shell, args: [][]const u8) void {
     }
     debug.printf("Killing PID: {d}\n", .{pid});
     asm volatile(
-        \\ mov $62, %eax
+        \\ mov $37, %eax
         \\ mov $1, %ecx
         \\ int $0x80
         :: [ebx] "{ebx}" (pid),

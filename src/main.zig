@@ -145,7 +145,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     syscalls.initSyscalls();
 
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
-    // _ = krn.kthreadCreate(&testp, null) catch null;
+    _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
