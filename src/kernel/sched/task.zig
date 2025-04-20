@@ -1,4 +1,6 @@
 const std = @import("std");
+const arch = @import("arch");
+const krn = @import("../main.zig");
 const vmm = @import("arch").vmm;
 const lst = @import("../utils/list.zig");
 const tree = @import("../utils/tree.zig");
@@ -128,7 +130,7 @@ pub const Task = struct {
         self: *Task,
         virt: u32,
         task_stack_top: u32,
-        stack_bottom: u32,
+        stack_btm: u32,
         uid: u16,
         gid: u16,
         pgid: u16,
@@ -149,7 +151,7 @@ pub const Task = struct {
         self.tree = tree.TreeNode.init();
         self.list = lst.ListHead.init();
         self.regs.esp = task_stack_top;
-        self.stack_bottom = stack_bottom;
+        self.stack_bottom = stack_btm;
         self.pid = pid;
         pid += 1;
         self.list.setup();
@@ -256,3 +258,16 @@ pub var initial_task = Task.init(0, 0, 0, 1, .KTHREAD);
 pub var current = &initial_task;
 pub var tasks_mutex: mutex = mutex.init();
 pub var stopped_tasks: ?*lst.ListHead = null;
+
+extern const stack_top: u32;
+extern const stack_bottom: u32;
+
+pub fn initMultitasking() void {
+    initial_task.setup(
+        @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET,
+        @intFromPtr(&stack_top),
+        @intFromPtr(&stack_bottom),
+    );
+    krn.irq.registerHandler(0, &krn.timerHandler);
+    arch.system.enableWriteProtect();
+}

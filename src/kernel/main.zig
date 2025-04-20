@@ -22,6 +22,7 @@ pub const sched = @import("./sched/scheduler.zig");
 pub const timerHandler = @import("./time/jiffies.zig").timerHandler;
 pub const sleep = @import("./sched/task.zig").sleep;
 pub const Mutex = @import("./sched/mutex.zig").Mutex;
+pub const goUserspace = @import("./userspace/userspace.zig").goUserspace;
 
 pub const getSecondsFromStart = @import("./time/jiffies.zig").getSecondsFromStart;
 pub const currentMs = @import("./time/jiffies.zig").currentMs;
@@ -33,3 +34,4 @@ pub var pit: PIT = undefined;
 pub var serial: Serial = undefined;
 pub var logger: Logger = undefined;
 pub var boot_info: *multiboot.MultibootInfo = undefined;
+pub var scr: screen.Screen = undefined;
