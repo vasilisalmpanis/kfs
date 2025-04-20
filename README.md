@@ -4,8 +4,8 @@ A minimalistic kernel written in Zig.
 
 - [x] kfs-1
 - [x] kfs-2
-- [ ] kfs-3
-- [ ] kfs-4
+- [x] kfs-3
+- [x] kfs-4
 - [ ] kfs-5
 - [ ] kfs-6
 - [ ] kfs-7
@@ -64,10 +64,10 @@ Run the kernel in QEMU using:
 make qemu
 ```
 
-### Multi-Monitor Support
-For multi-monitor testing, use:
+### Debug session
+For starting gdb session, use:
 ```sh
-make multimonitor
+make debug
 ```
 
 ## Project Structure
@@ -96,6 +96,32 @@ Contributions are welcome! If you want to contribute:
 ## License
 
 This project is licensed under [MIT License](LICENSE).
+
+## Resources
+
+- https://wiki.osdev.org/
+- https://github.com/dreamportdev/Osdev-Notes
+- http://www.osdever.net/tutorials/
+- https://operating-system-in-1000-lines.vercel.app/en/
+- http://www.brokenthorn.com/Resources/OSDevIndex.html
+- https://web.archive.org/web/20221206224127/http://www.jamesmolloy.co.uk/tutorial_html/1.-Environment%20setup.html
+- https://jsandler18.github.io/
+- https://samypesse.gitbook.io/how-to-create-an-operating-system/
+- https://github.com/cfenollosa/os-tutorial/blob/master/README.md
+- https://os.phil-opp.com/
+- https://littleosbook.github.io/
+- https://litux.nl/mirror/kerneldevelopment/0672327201/toc.html
+- https://linux-kernel-labs.github.io/refs/heads/master/index.html
+- https://pdos.csail.mit.edu/6.828/2024/schedule.html
+- https://kbd-project.org/index.html#documentation
+- https://www.gingerbill.org/series/memory-allocation-strategies/
+- https://krinkinmu.github.io/
+- https://0xax.gitbooks.io/linux-insides/content/
+- https://pages.cs.wisc.edu/~remzi/OSTEP/
+- https://greenteapress.com/thinkos/html/index.html
+- https://osblog.stephenmarz.com/index.html
+- https://www.bottomupcs.com/
+- https://www.singlix.com/trdos/archive/
 
 ## Acknowledgments
 

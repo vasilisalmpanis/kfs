@@ -48,11 +48,11 @@ pub fn wait4(_: *arch.Regs, pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*
             task.finish();
             return task.result;
         } else {
-            return -errors.ECHILD;
+            return errors.ECHILD;
         }
     } else if (pid == 0) {
         if (!tsk.current.refcountChildren(tsk.current.pgid, true))
-            return -errors.ECHILD;
+            return errors.ECHILD;
         defer _ = tsk.current.refcountChildren(tsk.current.pgid, false);
         if (tsk.current.tree.hasChildren()) {
             // this is problematic if current == 0 and it has children that are threads.
@@ -74,7 +74,7 @@ pub fn wait4(_: *arch.Regs, pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*
         }
     } else if (pid == -1) {
         if (!tsk.current.refcountChildren(0, true))
-            return -errors.ECHILD;
+            return errors.ECHILD;
         defer _ = tsk.current.refcountChildren(0, false);
         if (tsk.current.tree.hasChildren()) {
             while (true) {
@@ -94,7 +94,7 @@ pub fn wait4(_: *arch.Regs, pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*
     } else {
         const pgid: u32 = @intCast(-pid);
         if (!tsk.current.refcountChildren(pgid, true))
-            return -errors.ECHILD;
+            return errors.ECHILD;
         defer _ = tsk.current.refcountChildren(pgid, false);
         if (tsk.current.tree.hasChildren()) {
             while (true) {

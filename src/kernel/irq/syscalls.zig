@@ -13,11 +13,13 @@ pub fn syscallsManager(state: *arch.Regs) void {
         return;
     }
     const sys: systable.Syscall = @enumFromInt(state.eax);
-    krn.logger.INFO("[PID {d:<2}]: {d:>4} {s}", .{
-        tsk.current.pid,
-        state.eax,
-        @tagName(sys)
-    });
+    if (sys != .SYS_write) {
+        krn.logger.INFO("[PID {d:<2}]: {d:>4} {s}", .{
+            tsk.current.pid,
+            state.eax,
+            @tagName(sys)
+        });
+    }
     if (systable.SyscallTable.get(sys)) |hndlr| {
         state.eax = hndlr(
             state,

@@ -91,8 +91,9 @@ pub fn build(b: *std.Build) !void {
             .code_model = .default,
             .strip = false,
             .error_tracing = false,
-            .link_libc = true,
+            .link_libc = false,
             .linkage = .static,
+            .single_threaded = true,
         });
         userspace.setLinkerScript(b.path("./userspace/linker.ld"));
         b.installArtifact(userspace);
