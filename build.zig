@@ -81,6 +81,7 @@ pub fn build(b: *std.Build) !void {
 
         // Add userspace binary
         const userspace_bin_path = b.path("./zig-out/bin/userspace.bin");
+        // const userspace_bin_path = b.path("./userspace_c/userspace.bin");
         target.abi = .musl;
         target.os_tag = .linux;
         const userspace = b.addExecutable(.{

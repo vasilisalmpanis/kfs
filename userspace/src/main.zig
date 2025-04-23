@@ -68,6 +68,8 @@ pub export fn main() linksection(".text.main") noreturn {
         serial("waitpid 10: {any}\n", .{
             std.posix.waitpid(10, 0)
         });
+        std.posix.sigaction(5, null, null);
+        _ = os.linux.sigaction(5, null, null);
     }
     while (true) {}
 }

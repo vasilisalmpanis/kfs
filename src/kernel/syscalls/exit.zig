@@ -1,6 +1,5 @@
 const tsk = @import("../sched/task.zig");
-const signal = @import("../sched/signals.zig");
-const errors = @import("../main.zig").errors;
+const errors = @import("./error-codes.zig");
 const arch = @import("arch");
 const sched = @import("../sched/scheduler.zig");
 

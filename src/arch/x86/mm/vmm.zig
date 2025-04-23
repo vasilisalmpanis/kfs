@@ -265,8 +265,8 @@ pub const VMM = struct {
                     1, PAGE_OFFSET, 0xFFFFF000, false
                 );
                 self.mapPage(virt, new_page, .{.writable = true, .present = true});
-                const from_copy: [*]u8 = @ptrFromInt(self.pageTableToAddr(pd_idx, idx));
-                const to_copy: [*]u8 = @ptrFromInt(virt);
+                const from_copy: [*] allowzero u8 = @ptrFromInt(self.pageTableToAddr(pd_idx, idx));
+                const to_copy: [*] allowzero u8 = @ptrFromInt(virt);
                 @memcpy(to_copy[0..PAGE_SIZE], from_copy[0..PAGE_SIZE]);
                 const page_flags: u12 = @truncate(pt[idx] & 0xFFF);
                 temp_pt[idx] = new_page | page_flags;

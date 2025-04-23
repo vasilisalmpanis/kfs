@@ -1,7 +1,7 @@
 const tsk = @import("../sched/task.zig");
 const krn = @import("../main.zig");
 const arch = @import("arch");
-const errors = @import("../main.zig").errors;
+const errors = @import("./error-codes.zig");
 const sched = @import("../sched/scheduler.zig");
 
 const WNOHANG: u32 = 	0x00000001;

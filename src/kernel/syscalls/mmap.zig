@@ -1,4 +1,4 @@
-const errors = @import("../main.zig").errors;
+const errors = @import("./error-codes.zig");
 const arch = @import("arch");
 const krn = @import("../main.zig");
 

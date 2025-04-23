@@ -5,6 +5,11 @@ const krn = @import("../main.zig");
 pub fn goUserspace(userspace: []const u8) void {
     const userspace_offset: u32 = 0x1000;
 
+    krn.mm.virt_memory_manager.mapPage(
+        0,
+        krn.mm.virt_memory_manager.pmm.allocPage(),
+        .{.user = true}
+    );
     const page_count: u32 = (userspace.len - userspace_offset) / krn.mm.PAGE_SIZE + 1;
     var virt_addr = userspace_offset;
     for (0..page_count) |_| {
