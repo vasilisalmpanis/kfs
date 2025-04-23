@@ -5,3 +5,4 @@ zig-out
 .vscode
 load_img.py
 psf2arr*
+userspace_c
