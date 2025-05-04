@@ -70,10 +70,10 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     screen.initScreen(&krn.scr, boot_info);
 
     krn.pit = PIT.init(1000);
+    krn.task.initMultitasking();
     idt.idtInit();
     krn.logger.INFO("IDT initialized", .{});
 
-    krn.task.initMultitasking();
     irq.registerHandler(1, &keyboard.keyboardInterrupt);
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();

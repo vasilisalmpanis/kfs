@@ -47,6 +47,15 @@ fn test_wait() void {
         });
     }
 }
+fn restorer()  callconv(.c) noreturn{
+    screen("restorer\n", .{});
+    while (true) {
+    }
+}
+
+fn kill_handler(sig: i32) callconv(.c) void {
+    screen("testing {d} to screen\n", .{sig});
+}
 
 pub export fn main() linksection(".text.main") noreturn {
     test_wait();
@@ -68,8 +77,16 @@ pub export fn main() linksection(".text.main") noreturn {
         serial("waitpid 10: {any}\n", .{
             std.posix.waitpid(10, 0)
         });
-        std.posix.sigaction(5, null, null);
-        _ = os.linux.sigaction(5, null, null);
+        const action: std.posix.Sigaction = .{
+            .handler = .{ .handler = &kill_handler },
+            .restorer = &restorer,
+            .mask = .{0} ** 32,
+            .flags = os.linux.SA.SIGINFO | os.linux.SA.RESTORER,
+        };
+        screen("restorer addr {x} \n", .{@intFromPtr(&restorer)});
+        _ = os.linux.sigaction(1, &action, null);
+        _ = os.linux.kill(0, 1);
+        // _ = os.linux.sigaction(5, null, null);
     }
     while (true) {}
 }
