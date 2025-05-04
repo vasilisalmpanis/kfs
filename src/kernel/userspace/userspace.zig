@@ -28,7 +28,7 @@ pub fn goUserspace(userspace: []const u8) void {
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
     // const programm_header: *std.elf.Elf32_Phdr = @ptrFromInt(code + ehdr.e_phoff);
 
-    const stack_size: u32 = 4096;
+    const stack_size: u32 = 4 * 4096;
     const stack = krn.mm.uheap.alloc(
         stack_size,
         true, true

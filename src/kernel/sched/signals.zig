@@ -4,11 +4,98 @@ const std = @import("std");
 const arch = @import("arch");
 pub const SIG_COUNT: u8 = 32;
 
-const SigHandler = fn (signum: u8) void;
+pub const Sigval = union {
+    int: i32,
+    ptr: *anyopaque,
+};
 
-const sigDFL: ?*SigHandler = @ptrFromInt(0);
-const sigIGN: ?*SigHandler = @ptrFromInt(1);
-const sigERR: ?*SigHandler = @ptrFromInt(-1);
+const SiginfoFieldsUnion = union {
+    pad: [128 - 2 * @sizeOf(c_int) - @sizeOf(c_long)]u8,
+    common: struct {
+        first: union {
+            piduid: struct {
+                pid: u32,
+                uid: u32,
+            },
+            timer: struct {
+                timerid: i32,
+                overrun: i32,
+            },
+        },
+        second: union {
+            value: Sigval,
+            sigchld: struct {
+                status: i32,
+                utime: isize,
+                stime: isize,
+            },
+        },
+    },
+    sigfault: struct {
+        addr: *allowzero anyopaque,
+        addr_lsb: i16,
+        first: union {
+            addr_bnd: struct {
+                lower: *anyopaque,
+                upper: *anyopaque,
+            },
+            pkey: u32,
+        },
+    },
+    sigpoll: struct {
+        band: isize,
+        fd: i32,
+    },
+    sigsys: struct {
+        call_addr: *anyopaque,
+        syscall: i32,
+        native_arch: u32,
+    },
+};
+
+pub const Siginfo = struct {
+    signo: i32,
+    errno: i32,
+    code: i32,
+    fields: SiginfoFieldsUnion,
+};
+
+pub const sigset_t = [2]u32;
+
+pub const HandlerFn = *align(1) const fn (i32) callconv(.c) void;
+pub const SigactionFn = *const fn (i32, *const Siginfo, ?*anyopaque) callconv(.c) void;
+pub const RestorerFn = *const fn () callconv(.c) void;
+
+pub const Sigaction = struct {
+
+    handler: extern union {
+        handler: ?HandlerFn,
+        sigaction: ?SigactionFn,
+    },
+    flags: c_uint,
+    restorer: ?RestorerFn = null,
+    mask: sigset_t,
+};
+
+// const SigHandler = fn (signum: u8) void;
+
+const sigDFL: ?HandlerFn = @ptrFromInt(0);
+const sigIGN: ?HandlerFn = @ptrFromInt(1);
+const sigERR: ?HandlerFn = @ptrFromInt(-1);
+
+const default_sigaction: Sigaction = Sigaction{
+    .handler = .{ .handler = sigDFL },
+    .mask = .{0} ** 2,
+    .flags = 0,
+    .restorer = null,
+};
+
+const ignore_sigaction: Sigaction = Sigaction{
+    .handler = .{ .handler = sigIGN },
+    .mask = .{0} ** 2,
+    .flags = 0,
+    .restorer = null,
+};
 
 const Signal = enum(u8) {
     EMPTY = 0,      // Default action      comment                     posix       0
@@ -48,58 +135,9 @@ const Signal = enum(u8) {
     SIGUNUSED,      // Dump        Equivalent to SIGSYS                 No         34
 };
 
-const SignalTerminated = std.EnumMap(Signal, bool).init(.{
-    .EMPTY      = false,
-    .SIGHUP     = true,
-    .SIGINT     = true,
-    .SIGQUIT    = false,
-    .SIGILL     = false,
-    .SIGTRAP    = false,
-    .SIGABRT    = false,
-    .SIGIOT     = false,
-    .SIGBUS     = false,
-    .SIGFPE     = false,
-    .SIGKILL    = true,
-    .SIGUSR1    = true,
-    .SIGSEGV    = false,
-    .SIGUSR2    = true,
-    .SIGPIPE    = true,
-    .SIGALRM     = true,
-    .SIGTERM     = true,
-    .SIGSTKFLT  = true,
-    .SIGCHLD    = false,
-    .SIGCONT    = false,
-    .SIGSTOP    = false,
-    .SIGTSTP    = false,
-    .SIGTTIN    = false,
-    .SIGTTOU    = false,
-    .SIGURG     = false,
-    .SIGXCPU    = false,
-    .SIGXFSZ    = false,
-    .SIGVTALRM  = true,
-    .SIGPROF    = true,
-    .SIGWINCH   = false,
-    .SIGIO      = true,
-    .SIGPOLL    = true,
-    .SIGPWR     = true,
-    .SIGSYS     = false,
-    .SIGUNUSED  = false,
-});
-
 fn sigHandler(signum: u8) void {
     _ = signum;
     krn.logger.WARN("Default signal handler\n", .{});
-}
-
-pub fn signalWrapper() void {
-    asm volatile (arch.idt.push_regs);
-    var stack: u32 = 1;
-    stack +=1;
-    if (tsk.current.sigaction.deliverSignals()) {
-        while (true) {}
-    }
-    asm volatile (arch.idt.pop_regs);
-    return;
 }
 
 fn sigHup(_: u8) void {
@@ -120,74 +158,76 @@ fn sigIgn(_: u8) void {
     return;
 }
 
-pub const SigAction = struct {
+pub const SigHand = struct {
     processing: bool = false,
     pending: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
-    sig_handlers: std.EnumArray(Signal, ?*const SigHandler) =
-        std.EnumArray(Signal, ?*const SigHandler).init(.{
-            .EMPTY      = sigDFL,
-            .SIGHUP     = sigHup,
-            .SIGINT     = sigDFL,
-            .SIGQUIT    = sigDFL,
-            .SIGILL     = sigDFL,
-            .SIGTRAP    = sigDFL,
-            .SIGABRT    = sigDFL,
-            .SIGIOT     = sigDFL,
-            .SIGBUS     = sigDFL,
-            .SIGFPE     = sigDFL,
-            .SIGKILL    = sigDFL,
-            .SIGUSR1    = sigDFL,
-            .SIGSEGV    = sigDFL,
-            .SIGUSR2    = sigDFL,
-            .SIGPIPE    = sigDFL,
-            .SIGALRM    = sigDFL,
-            .SIGTERM    = sigDFL,
-            .SIGSTKFLT  = sigDFL,
-            .SIGCHLD    = sigIgn,
-            .SIGCONT    = sigDFL,
-            .SIGSTOP    = sigDFL,
-            .SIGTSTP    = sigDFL,
-            .SIGTTIN    = sigDFL,
-            .SIGTTOU    = sigDFL,
-            .SIGURG     = sigDFL,
-            .SIGXCPU    = sigDFL,
-            .SIGXFSZ    = sigDFL,
-            .SIGVTALRM  = sigDFL,
-            .SIGPROF    = sigDFL,
-            .SIGWINCH   = sigDFL,
-            .SIGIO      = sigDFL,
-            .SIGPOLL    = sigDFL,
-            .SIGPWR     = sigDFL,
-            .SIGSYS     = sigDFL,
-            .SIGUNUSED  = sigDFL,
+    context: arch.Regs = arch.Regs.init(),
+    actions: std.EnumArray(Signal, Sigaction) =
+        std.EnumArray(Signal, Sigaction).init(.{
+            .EMPTY      = default_sigaction,
+            .SIGHUP     = default_sigaction,
+            .SIGINT     = default_sigaction,
+            .SIGQUIT    = default_sigaction,
+            .SIGILL     = default_sigaction,
+            .SIGTRAP    = default_sigaction,
+            .SIGABRT    = default_sigaction,
+            .SIGIOT     = default_sigaction,
+            .SIGBUS     = default_sigaction,
+            .SIGFPE     = default_sigaction,
+            .SIGKILL    = default_sigaction,
+            .SIGUSR1    = default_sigaction,
+            .SIGSEGV    = default_sigaction,
+            .SIGUSR2    = default_sigaction,
+            .SIGPIPE    = default_sigaction,
+            .SIGALRM    = default_sigaction,
+            .SIGTERM    = default_sigaction,
+            .SIGSTKFLT  = default_sigaction,
+            .SIGCHLD    = ignore_sigaction,
+            .SIGCONT    = default_sigaction,
+            .SIGSTOP    = default_sigaction,
+            .SIGTSTP    = default_sigaction,
+            .SIGTTIN    = default_sigaction,
+            .SIGTTOU    = default_sigaction,
+            .SIGURG     = default_sigaction,
+            .SIGXCPU    = default_sigaction,
+            .SIGXFSZ    = default_sigaction,
+            .SIGVTALRM  = default_sigaction,
+            .SIGPROF    = default_sigaction,
+            .SIGWINCH   = default_sigaction,
+            .SIGIO      = default_sigaction,
+            .SIGPOLL    = default_sigaction,
+            .SIGPWR     = default_sigaction,
+            .SIGSYS     = default_sigaction,
+            .SIGUNUSED  = default_sigaction,
         }),
     
-    pub fn init() SigAction {
-        return SigAction{};
+    pub fn init() SigHand {
+        return SigHand{};
     }
 
-    pub fn deliverSignals(self: *SigAction) bool {
+    pub fn deliverSignal(self: *SigHand) Sigaction {
         var it = self.pending.iterator(.{});
         while (it.next()) |i| {
             self.pending.toggle(i);
             const signal: Signal = @enumFromInt(i);
-            if (self.sig_handlers.get(signal)) |handler| {
-                handler(@intCast(i));
-                if (SignalTerminated.get(signal) orelse false)
-                    return true;
+            const action = self.actions.get(signal);
+            if (action.handler.handler == sigIGN) {
+                continue;
+            } else if (action.handler.handler == sigDFL) {
+                return default_sigaction;
             } else {
-                return false;
+                return action;
             }
         }
         self.processing = false;
-        return false;
+        return default_sigaction;
     }
 
-    pub fn setSignal(self: *SigAction, signal: Signal) void {
+    pub fn setSignal(self: *SigHand, signal: Signal) void {
         self.pending.set(@intFromEnum(signal));
     }
 
-    pub fn isReady(self: *SigAction) bool {
+    pub fn isReady(self: *SigHand) bool {
         if (self.processing)
             return false;
         if (self.pending.count() != 0) {
@@ -199,26 +239,21 @@ pub const SigAction = struct {
 };
 
 pub fn processSignals(task: *tsk.Task) void {
-    if (task.sigaction.isReady()) {
+    if (task.sighand.isReady()) {
         const regs: *arch.Regs = @ptrFromInt(task.regs.esp);
-        const eip: u32 = regs.eip;
+        // const eip: u32 = regs.eip; // userspace eip
 
-        regs.eip = @intFromPtr(&signalWrapper);
+        const action = task.sighand.deliverSignal();
+        if (action.handler.handler == default_sigaction.handler.handler)
+            return;
+        task.sighand.context = regs.*;
+        regs.eip = @intFromPtr(action.handler.handler);
 
-        const kernelContextSize = @sizeOf(arch.Regs) - 8;
-        const returnAddrSize: u32 = 4;
+        const returnAddrSize: u32 = 4 + 4;
+        regs.useresp -= returnAddrSize;
 
-        const new: [*]u32 = @ptrFromInt(task.regs.esp - returnAddrSize);
-        const old: [*]u32 = @ptrFromInt(task.regs.esp);
-        std.mem.copyForwards(
-            u32,
-            new[0..kernelContextSize/4],
-            old[0..kernelContextSize/4],
-        );
-
-        task.regs.esp -= returnAddrSize;
-
-        const original_return: *u32 = @ptrFromInt(task.regs.esp + kernelContextSize);
-        original_return.* = eip;
+        const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
+        signal_stack[0] = @intFromPtr(action.restorer);
+        signal_stack[1] = 10;
     }
 }

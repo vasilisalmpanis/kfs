@@ -88,13 +88,14 @@ pub const Task = struct {
     stack_bottom:   u32,
     state:          TaskState       = TaskState.RUNNING,
     regs:           Regs            = Regs.init(),
+
     tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
     refcount:       RefCount        = RefCount.init(),
     wakeup_time:    usize           = 0,
 
     // signals
-    sigaction:      signal.SigAction        = signal.SigAction.init(),
+    sighand:      signal.SigHand        = signal.SigHand.init(),
     sigmask:        u32                     = 0,
 
     // only for kthreads
@@ -157,7 +158,7 @@ pub const Task = struct {
         self.list.setup();
         self.tree.setup();
 
-        self.sigaction = current.sigaction;
+        self.sighand = current.sighand;
         self.sigmask = 0;
 
         tasks_mutex.lock();
