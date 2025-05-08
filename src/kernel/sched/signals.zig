@@ -72,12 +72,17 @@ pub const Sigaction = struct {
         handler: ?HandlerFn,
         sigaction: ?SigactionFn,
     },
-    flags: c_uint,
+    flags: u32,
     restorer: ?RestorerFn = null,
     mask: sigset_t,
 };
 
-// const SigHandler = fn (signum: u8) void;
+const SA_NOCLDSTOP: u32  = 0x00000001; // Don't send SIGCHLD when children stop
+const SA_NOCLDWAIT: u32  = 0x00000002; // Don't create zombie processes
+const SA_NODEFER  : u32  = 0x40000000; // Don't block the signal during its handler
+const SA_RESETHAND: u32  = 0x80000000; // Reset handler to default after one use
+const SA_RESTART  : u32  = 0x10000000; // Restart syscall if possible after handler
+const SA_SIGINFO  : u32  = 0x00000004; // Use sa_sigaction instead of sa_handler
 
 const sigDFL: ?HandlerFn = @ptrFromInt(0);
 const sigIGN: ?HandlerFn = @ptrFromInt(1);
@@ -158,8 +163,12 @@ fn sigIgn(_: u8) void {
     return;
 }
 
+const SigRes = struct {
+    action: Sigaction,
+    signal: u32,
+};
+
 pub const SigHand = struct {
-    processing: bool = false,
     pending: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
     context: arch.Regs = arch.Regs.init(),
     actions: std.EnumArray(Signal, Sigaction) =
@@ -205,22 +214,29 @@ pub const SigHand = struct {
         return SigHand{};
     }
 
-    pub fn deliverSignal(self: *SigHand) Sigaction {
+    pub fn deliverSignal(self: *SigHand) SigRes {
         var it = self.pending.iterator(.{});
         while (it.next()) |i| {
             self.pending.toggle(i);
             const signal: Signal = @enumFromInt(i);
-            const action = self.actions.get(signal);
+            var action = self.actions.get(signal);
+            if (action.mask[0] & i > 0) {
+                self.pending.toggle(i);
+                continue;
+            }
             if (action.handler.handler == sigIGN) {
                 continue;
             } else if (action.handler.handler == sigDFL) {
-                return default_sigaction;
+                return .{.action = default_sigaction, .signal = i};
             } else {
-                return action;
+                if (action.flags & SA_NODEFER == 0) {
+                    action.mask[0] |= i;
+                    self.actions.set(signal, action);
+                }
+                return .{.action = action, .signal = i};
             }
         }
-        self.processing = false;
-        return default_sigaction;
+        return .{.action = default_sigaction, .signal = 0};
     }
 
     pub fn setSignal(self: *SigHand, signal: Signal) void {
@@ -228,32 +244,34 @@ pub const SigHand = struct {
     }
 
     pub fn isReady(self: *SigHand) bool {
-        if (self.processing)
-            return false;
         if (self.pending.count() != 0) {
-            self.processing = true;
             return true;
         }
         return false;
     }
 };
 
-pub fn processSignals(task: *tsk.Task) void {
+pub fn processSignals(regs: *arch.Regs) *arch.Regs {
+    const task = krn.task.current;
     if (task.sighand.isReady()) {
-        const regs: *arch.Regs = @ptrFromInt(task.regs.esp);
-        // const eip: u32 = regs.eip; // userspace eip
 
-        const action = task.sighand.deliverSignal();
-        if (action.handler.handler == default_sigaction.handler.handler)
-            return;
+        const result = task.sighand.deliverSignal();
+        if (result.signal == 0)
+            return regs;
+        if (result.action.handler.handler == default_sigaction.handler.handler) {
+            task.finish();
+            return regs;
+        }
         task.sighand.context = regs.*;
-        regs.eip = @intFromPtr(action.handler.handler);
-
-        const returnAddrSize: u32 = 4 + 4;
+        const returnAddrSize: u32 = 4 + 4 + @sizeOf(arch.Regs);
+        const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 8);
+        saved_regs.* = regs.*;
+        regs.eip = @intFromPtr(result.action.handler.handler);
         regs.useresp -= returnAddrSize;
 
         const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
-        signal_stack[0] = @intFromPtr(action.restorer);
-        signal_stack[1] = 10;
+        signal_stack[0] = @intFromPtr(result.action.restorer);
+        signal_stack[1] = result.signal;
     }
+    return regs;
 }

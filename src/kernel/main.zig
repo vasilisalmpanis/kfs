@@ -23,6 +23,7 @@ pub const timerHandler = @import("./time/jiffies.zig").timerHandler;
 pub const sleep = @import("./sched/task.zig").sleep;
 pub const Mutex = @import("./sched/mutex.zig").Mutex;
 pub const goUserspace = @import("./userspace/userspace.zig").goUserspace;
+pub const signals = @import("./sched/signals.zig");
 
 pub const getSecondsFromStart = @import("./time/jiffies.zig").getSecondsFromStart;
 pub const currentMs = @import("./time/jiffies.zig").currentMs;

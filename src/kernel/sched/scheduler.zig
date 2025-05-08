@@ -17,7 +17,6 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs = state.*;
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;
-    signals.processSignals(to);
     if (to == &tsk.initial_task) {
         gdt.tss.esp0 = @intFromPtr(&stack_top);
     } else {
