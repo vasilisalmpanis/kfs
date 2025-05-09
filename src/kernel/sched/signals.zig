@@ -233,6 +233,10 @@ pub const SigHand = struct {
                     action.mask[0] |= i;
                     self.actions.set(signal, action);
                 }
+                if (action.flags & SA_RESETHAND > 0) {
+                    action.handler.handler = sigDFL;
+                    self.actions.set(signal, action);
+                }
                 return .{.action = action, .signal = i};
             }
         }
