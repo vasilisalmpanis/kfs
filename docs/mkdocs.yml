@@ -1,0 +1,21 @@
+site_name: KFS
+Nav:
+  Home: 
+    - index.md
+  About: 
+    - about.md
+  Core:
+    - core.md
+  Locking:
+    - locking.md
+  Signals:
+    - Signals.md
+
+theme:
+  name: material
+  highlightjs: true
+  hljs_languages:
+    - zig
+    - bash
+  features:
+    - navigation.indexes
