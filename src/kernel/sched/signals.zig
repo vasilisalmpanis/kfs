@@ -9,6 +9,47 @@ pub const Sigval = union {
     ptr: *anyopaque,
 };
 
+const SigAltStack = struct {
+    sp: *anyopaque,
+    flags: i32,
+    size: usize,
+};
+
+const SigContext = struct {
+    gs: u16,
+	fs: u16,
+	es: u16,
+	ds: u16,
+	edi: u32,
+	esi: u32,
+	ebp: u32,
+	esp: u32,
+	ebx: u32,
+	edx: u32,
+	ecx: u32,
+	eax: u32,
+	trapno: u32,
+	err: u32,
+	eip: u32,
+	cs: u16,
+    __csh: u16,
+	eflags: u32,
+	esp_at_signal: u32,
+	ss: u16,
+    __ssh: u16,
+	fpstate: u32,
+	oldmask: u32,
+	cr2: u32,
+};
+
+const Ucontext = struct {
+    flags: u32,
+    link: *@This(),
+    stack: SigAltStack,
+    mcontext: SigContext,
+    mask: sigset_t,
+};
+
 const SiginfoFieldsUnion = union {
     pad: [128 - 2 * @sizeOf(c_int) - @sizeOf(c_long)]u8,
     common: struct {
@@ -77,16 +118,16 @@ pub const Sigaction = struct {
     mask: sigset_t,
 };
 
-const SA_NOCLDSTOP: u32  = 0x00000001; // Don't send SIGCHLD when children stop
-const SA_NOCLDWAIT: u32  = 0x00000002; // Don't create zombie processes
-const SA_NODEFER  : u32  = 0x40000000; // Don't block the signal during its handler
-const SA_RESETHAND: u32  = 0x80000000; // Reset handler to default after one use
-const SA_RESTART  : u32  = 0x10000000; // Restart syscall if possible after handler
-const SA_SIGINFO  : u32  = 0x00000004; // Use sa_sigaction instead of sa_handler
+pub const SA_NOCLDSTOP: u32  = 0x00000001; // Don't send SIGCHLD when children stop
+pub const SA_NOCLDWAIT: u32  = 0x00000002; // Don't create zombie processes
+pub const SA_NODEFER  : u32  = 0x40000000; // Don't block the signal during its handler
+pub const SA_RESETHAND: u32  = 0x80000000; // Reset handler to default after one use
+pub const SA_RESTART  : u32  = 0x10000000; // Restart syscall if possible after handler
+pub const SA_SIGINFO  : u32  = 0x00000004; // Use sa_sigaction instead of sa_handler
 
-const sigDFL: ?HandlerFn = @ptrFromInt(0);
-const sigIGN: ?HandlerFn = @ptrFromInt(1);
-const sigERR: ?HandlerFn = @ptrFromInt(-1);
+pub const sigDFL: ?HandlerFn = @ptrFromInt(0);
+pub const sigIGN: ?HandlerFn = @ptrFromInt(1);
+pub const sigERR: ?HandlerFn = @ptrFromInt(-1);
 
 const default_sigaction: Sigaction = Sigaction{
     .handler = .{ .handler = sigDFL },
@@ -170,7 +211,6 @@ const SigRes = struct {
 
 pub const SigHand = struct {
     pending: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
-    context: arch.Regs = arch.Regs.init(),
     actions: std.EnumArray(Signal, Sigaction) =
         std.EnumArray(Signal, Sigaction).init(.{
             .EMPTY      = default_sigaction,
@@ -255,6 +295,43 @@ pub const SigHand = struct {
     }
 };
 
+fn setupHadlerFnFrame(regs: *arch.Regs, result: SigRes) void {
+    const returnAddrSize: u32 = 4 + 4 + @sizeOf(arch.Regs);
+    const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 8);
+    saved_regs.* = regs.*;
+    regs.eip = @intFromPtr(result.action.handler.handler);
+    regs.useresp -= returnAddrSize;
+
+    const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
+    signal_stack[0] = @intFromPtr(result.action.restorer);
+    signal_stack[1] = result.signal;
+}
+
+fn setupSigactionFnFrame(regs: *arch.Regs, result: SigRes) void {
+    const returnAddrSize: u32 = 4 + 4 + 4 + 4 + @sizeOf(arch.Regs) + @sizeOf(Siginfo) + @sizeOf(Ucontext);
+    const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 16);
+    const regs_ptr: u32 = @intFromPtr(saved_regs);
+    saved_regs.* = regs.*;
+    regs.eip = @intFromPtr(result.action.handler.sigaction);
+    regs.useresp -= returnAddrSize;
+
+    const siginfo_ptr = regs_ptr + @sizeOf(arch.Regs);
+
+    const siginfo_cnt: [*]u8 = @ptrFromInt(siginfo_ptr);
+    @memset(siginfo_cnt[0..@sizeOf(Siginfo)], 0);
+
+    const ucontext_ptr = siginfo_ptr + @sizeOf(Siginfo);
+
+    const ucontext_cnt: [*]u8 = @ptrFromInt(ucontext_ptr);
+    @memset(ucontext_cnt[0..@sizeOf(Ucontext)], 0);
+
+    const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
+    signal_stack[0] = @intFromPtr(result.action.restorer);
+    signal_stack[1] = result.signal;
+    signal_stack[2] = siginfo_ptr;
+    signal_stack[3] = 0;
+}
+
 pub fn processSignals(regs: *arch.Regs) *arch.Regs {
     const task = krn.task.current;
     if (task.sighand.isReady()) {
@@ -266,16 +343,11 @@ pub fn processSignals(regs: *arch.Regs) *arch.Regs {
             task.finish();
             return regs;
         }
-        task.sighand.context = regs.*;
-        const returnAddrSize: u32 = 4 + 4 + @sizeOf(arch.Regs);
-        const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 8);
-        saved_regs.* = regs.*;
-        regs.eip = @intFromPtr(result.action.handler.handler);
-        regs.useresp -= returnAddrSize;
-
-        const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
-        signal_stack[0] = @intFromPtr(result.action.restorer);
-        signal_stack[1] = result.signal;
+        if (result.action.flags & SA_SIGINFO == 0) {
+            setupHadlerFnFrame(regs, result);
+        } else {
+            setupSigactionFnFrame(regs, result);
+        }
     }
     return regs;
 }

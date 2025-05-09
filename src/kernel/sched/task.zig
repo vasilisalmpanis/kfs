@@ -243,7 +243,7 @@ pub const Task = struct {
         }
         tasks_mutex.unlock();
         if (self == current)
-            reschedule(); 
+            reschedule();
     }
 };
 
