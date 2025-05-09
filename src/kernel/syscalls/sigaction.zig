@@ -12,10 +12,14 @@ pub fn sigaction(_: *arch.Regs, sig: u32, act: ?*signals.Sigaction, oact: ?*sign
 
 pub fn sigreturn(state: *arch.Regs) i32 {
     const signal: *u32 = @ptrFromInt(state.useresp);
-    const saved_regs: *arch.Regs = @ptrFromInt(state.useresp + 4);
-    state.* = saved_regs.*;
     var action = tsk.current.sighand.actions.get(@enumFromInt(signal.*));
+    var regs_offset: u32 = 4;
+    if (action.flags & signals.SA_SIGINFO != 0) {
+        regs_offset += 8;
+    }
+    const saved_regs: *arch.Regs = @ptrFromInt(state.useresp + regs_offset);
+    state.* = saved_regs.*;
     action.mask[0] &= ~signal.*;
     tsk.current.sighand.actions.set(@enumFromInt(signal.*), action);
     return 0;
- }
+}
