@@ -1,7 +1,7 @@
 # Signals
 
 KFS implements standard **POSIX** signals. Signals cannot be queued but 
-while a signal is executing another can arrive and and steal it's execution time
+while a signal is executing another can arrive and and steal its execution time
 if the the currently executing signal is not blocking it.
 
 KFS implements the following flags for sigaction
