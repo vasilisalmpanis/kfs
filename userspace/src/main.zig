@@ -78,15 +78,27 @@ fn siginfo_hand(a: i32, b: *const os.linux.siginfo_t, c: ?*anyopaque) callconv(.
 }
 
 pub export fn main() linksection(".text.main") noreturn {
-    test_wait();
+    // test_wait();
     // var status: u32 = undefined;
-    // const pid= os.linux.fork();
-    // if (pid == 0) {
-    //     _ = os.linux.syscall0(os.linux.syscalls.X86.getpid); // FIXME
-    //     // serial("child", .{});
-    //     // while (true) {}
-    //     os.linux.exit(5);
-    // } else {
+    const pid= os.linux.fork();
+    if (pid == 0) {
+        const action: std.posix.Sigaction = .{
+            .handler = .{ .handler = &empty_func },
+            .mask = .{0} ** 32,
+            .flags = os.linux.SA.RESTORER | os.linux.SA.NODEFER,
+        };
+        _ = os.linux.sigaction(1, &action, null);
+        _ = os.linux.syscall0(os.linux.syscalls.X86.sigpending); // FIXME
+        // serial("child after {d}\n", .{ret});
+        os.linux.exit(5);
+    } else {
+        var i: u32 = 0;
+        while (i < 1000000000) {
+            i += 1;
+        }
+        _ = os.linux.kill(@intCast(pid), 1);
+        serial("parent after\n", .{});
+    }
     //     _ = os.linux.kill(@intCast(pid), 1);
     //     _ = os.linux.waitpid(@intCast(pid), &status, 0);
     //     _ = os.linux.write(1, "hello from userspace\n", 21);
@@ -99,19 +111,19 @@ pub export fn main() linksection(".text.main") noreturn {
     //     serial("waitpid 10: {any}\n", .{
     //         std.posix.waitpid(10, 0)
     //     });
-    var action: std.posix.Sigaction = .{
-        // .handler = .{ .sigaction = &siginfo_hand },
-        .handler = .{ .handler = &kill_handler },
-        .mask = .{0} ** 32,
-        .flags = os.linux.SA.SIGINFO | os.linux.SA.RESTORER | os.linux.SA.NODEFER,
-    };
-    idx = 0;
-    _ = os.linux.sigaction(1, &action, null);
-    // action.handler.handler = &empty_func;
-    // _ = os.linux.sigaction(2, &action, null);
-    serial("before kill", .{});
-    _ = os.linux.kill(0, 1);
-    serial("after kill", .{});
+    // var action: std.posix.Sigaction = .{
+    //     // .handler = .{ .sigaction = &siginfo_hand },
+    //     .handler = .{ .handler = &kill_handler },
+    //     .mask = .{0} ** 32,
+    //     .flags = os.linux.SA.SIGINFO | os.linux.SA.RESTORER | os.linux.SA.NODEFER,
+    // };
+    // idx = 0;
+    // _ = os.linux.sigaction(1, &action, null);
+    // // action.handler.handler = &empty_func;
+    // // _ = os.linux.sigaction(2, &action, null);
+    // serial("before kill", .{});
+    // _ = os.linux.kill(0, 1);
+    // serial("after kill", .{});
     // }
     while (true) {}
 }

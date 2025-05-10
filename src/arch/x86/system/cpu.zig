@@ -64,6 +64,12 @@ pub const Regs = struct {
         krn.logger.INFO("cs {X:0>8}\n", .{self.cs});
         krn.logger.INFO("ss {X:0>8}\n", .{self.ss});
     }
+
+    pub fn isRing3(self: *Regs) bool {
+        if (self.cs == KERNEL_CODE_SEGMENT)
+            return false;
+        return true;
+    }
 };
 
 pub fn setupStack(

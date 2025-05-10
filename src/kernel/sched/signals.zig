@@ -108,7 +108,6 @@ pub const SigactionFn = *const fn (i32, *const Siginfo, ?*anyopaque) callconv(.c
 pub const RestorerFn = *const fn () callconv(.c) void;
 
 pub const Sigaction = struct {
-
     handler: extern union {
         handler: ?HandlerFn,
         sigaction: ?SigactionFn,
@@ -143,7 +142,7 @@ const ignore_sigaction: Sigaction = Sigaction{
     .restorer = null,
 };
 
-const Signal = enum(u8) {
+pub const Signal = enum(u8) {
     EMPTY = 0,      // Default action      comment                     posix       0
     SIGHUP = 1,     // Terminate   Hang up controlling terminal or      Yes        1
     SIGINT,         // Terminate   Interrupt from keyboard, Control-C   Yes        2
@@ -332,21 +331,52 @@ fn setupSigactionFnFrame(regs: *arch.Regs, result: SigRes) void {
     signal_stack[3] = 0;
 }
 
+pub fn setupRegs(regs: *arch.Regs) *arch.Regs {
+    if (!regs.isRing3()) {
+        const uregs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
+        regs.* = uregs.*;
+        if (regs.int_no == arch.idt.SYSCALL_INTERRUPT) {
+            regs.eax = krn.errors.EINTR;
+        }
+    }
+    return regs;
+}
+
 pub fn processSignals(regs: *arch.Regs) *arch.Regs {
     const task = krn.task.current;
     if (task.sighand.isReady()) {
-
         const result = task.sighand.deliverSignal();
         if (result.signal == 0)
             return regs;
-        if (result.action.handler.handler == default_sigaction.handler.handler) {
-            task.finish();
-            return regs;
-        }
+        if (result.action.handler.handler == default_sigaction.handler.handler)
+            return defaultHandler(@enumFromInt(result.signal), regs);
+        regs.* = setupRegs(regs).*;
         if (result.action.flags & SA_SIGINFO == 0) {
             setupHadlerFnFrame(regs, result);
         } else {
             setupSigactionFnFrame(regs, result);
+        }
+        return regs;
+    }
+    return regs;
+}
+
+fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
+    const task = krn.task.current;
+    switch (signal) {
+        .SIGSTOP,
+        .SIGTSTP,
+        .SIGTTIN,
+        .SIGTTOU => {
+            task.state = .INTERRUPTIBLE_SLEEP;
+            krn.sched.reschedule();
+        },
+        .SIGCONT => {},
+        .SIGCHLD,
+        .SIGURG,
+        .SIGWINCH => {},
+        else => {
+            task.finish();
         }
     }
     return regs;
