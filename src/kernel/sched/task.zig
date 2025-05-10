@@ -1,4 +1,6 @@
 const std = @import("std");
+const arch = @import("arch");
+const krn = @import("../main.zig");
 const vmm = @import("arch").vmm;
 const lst = @import("../utils/list.zig");
 const tree = @import("../utils/tree.zig");
@@ -25,6 +27,49 @@ const TaskType = enum(u8) {
     PROCESS,
 };
 
+pub const RefCount = struct {
+    count: std.atomic.Value(usize),
+    dropFn: *const fn (*RefCount) void,
+
+    pub fn init() RefCount {
+        return .{
+            .count = std.atomic.Value(usize).init(0),
+            .dropFn = RefCount.noop,
+        };
+    }
+
+    pub fn ref(rc: *RefCount) void {
+        // no synchronization necessary; just updating a counter.
+        _ = rc.count.fetchAdd(1, .monotonic);
+    }
+
+    pub fn unref(rc: *RefCount) void {
+        // release ensures code before unref() happens-before the
+        // count is decremented as dropFn could be called by then.
+        if (rc.count.fetchSub(1, .release) == 1) {
+            // seeing 1 in the counter means that other unref()s have happened,
+            // but it doesn't mean that uses before each unref() are visible.
+            // The load acquires the release-sequence created by previous unref()s
+            // in order to ensure visibility of uses before dropping.
+            _ = rc.count.load(.acquire);
+            (rc.dropFn)(rc);
+        }
+    }
+
+    pub fn getValue(rc: *RefCount) usize {
+        return rc.count.load(.monotonic);
+    }
+
+    pub fn isFree(rc: *RefCount) bool {
+        return rc.getValue() == 0;
+    }
+
+    fn noop(rc: *RefCount) void {
+        _ = rc;
+    }
+};
+
+
 // Task is the basic unit of scheduling
 // both threads and processes are tasks
 // and threads share 
@@ -39,16 +84,18 @@ pub const Task = struct {
     virtual_space:  u32,
     uid:            u16,
     gid:            u16,
+    pgid:           u16             = 1,
     stack_bottom:   u32,
     state:          TaskState       = TaskState.RUNNING,
     regs:           Regs            = Regs.init(),
+
     tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
-    refcount:       u32             = 0,
+    refcount:       RefCount        = RefCount.init(),
     wakeup_time:    usize           = 0,
 
     // signals
-    sigaction:      signal.SigAction        = signal.SigAction.init(),
+    sighand:      signal.SigHand        = signal.SigHand.init(),
     sigmask:        u32                     = 0,
 
     // only for kthreads
@@ -57,39 +104,43 @@ pub const Task = struct {
     result:         i32                  = 0,
     should_stop:    bool                 = false,
 
-    pub fn init(virt: u32, uid: u16, gid: u16, tp: TaskType) Task {
+    pub fn init(virt: u32, uid: u16, gid: u16, pgid: u16, tp: TaskType) Task {
         return Task{
             .pid = 0,
             .virtual_space = virt,
             .uid = uid,
             .gid = gid,
+            .pgid = pgid,
             .stack_bottom = 0,
             .tsktype = tp,
         };
     }
 
-    pub fn setup(self: *Task, virt: u32, task_stack_top: u32) void {
+    pub fn setup(self: *Task, virt: u32, task_stack_top: u32, task_stack_bottom: u32) void {
         self.virtual_space = virt;
         self.pid = pid;
         pid += 1;
         self.regs.esp = task_stack_top;
+        self.stack_bottom = task_stack_bottom;
         self.list.setup();
         self.tree.setup();
-        self.refcount = 0;
+        self.refcount = RefCount.init();
     }
 
     pub fn initSelf(
         self: *Task,
         virt: u32,
         task_stack_top: u32,
-        stack_bottom: u32,
+        stack_btm: u32,
         uid: u16,
         gid: u16,
+        pgid: u16,
         tp: TaskType
     ) void {
-        const tmp = Task.init(virt, uid, gid, tp);
+        const tmp = Task.init(virt, uid, gid, pgid, tp);
         self.uid = tmp.uid;
         self.gid = tmp.gid;
+        self.pgid = tmp.pgid;
         self.state = tmp.state;
         self.refcount = tmp.refcount;
         self.wakeup_time = tmp.wakeup_time;
@@ -101,13 +152,13 @@ pub const Task = struct {
         self.tree = tree.TreeNode.init();
         self.list = lst.ListHead.init();
         self.regs.esp = task_stack_top;
-        self.stack_bottom = stack_bottom;
+        self.stack_bottom = stack_btm;
         self.pid = pid;
         pid += 1;
         self.list.setup();
         self.tree.setup();
 
-        self.sigaction = current.sigaction;
+        self.sighand = current.sighand;
         self.sigmask = 0;
 
         tasks_mutex.lock();
@@ -126,13 +177,15 @@ pub const Task = struct {
     }
 
     pub fn delFromTree(self: *Task) void {
-        self.zombifyChildren();
+        // self.zombifyChildren();
         self.tree.del();
     }
 
     pub fn findByPid(self: *Task, task_pid: u32) ?*Task {
-        if (self.pid == task_pid)
+        if (self.pid == task_pid) {
+            self.refcount.ref();
             return self;
+        }
         var res: ?*Task = null;
         if (self.tree.hasChildren()) {
             var it = self.tree.child.?.siblingsIterator();
@@ -144,6 +197,54 @@ pub const Task = struct {
         }
         return res;
     }
+
+    pub fn refcountChildren(self: *Task, pgid: u32, ref: bool) bool {
+        var result: bool = false;
+        if (self.tree.hasChildren()) {
+            var it = self.tree.child.?.siblingsIterator();
+            while (it.next()) |i| {
+                const res = i.curr.entry(Task, "tree");
+                if ((pgid > 0 and res.pgid == pgid) or pgid == 0) {
+                    result = true;
+                    if (ref) {
+                        res.refcount.ref();
+                    } else {
+                        res.refcount.unref();
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    pub fn findChildByPid(self: *Task, task_pid: u32) ?*Task {
+        if (self.tree.hasChildren()) {
+            var it = self.tree.child.?.siblingsIterator();
+            while (it.next()) |i| {
+                const res = i.curr.entry(Task, "tree");
+                if (res.pid == task_pid) {
+                    res.refcount.ref();
+                    return res;
+                }
+            }
+        }
+        return null;
+    }
+
+    pub fn finish(self: *Task) void {
+        self.state = .STOPPED;
+        tasks_mutex.lock();
+        self.list.del();
+        if (stopped_tasks == null) {
+            stopped_tasks = &self.list;
+            stopped_tasks.?.setup();
+        } else {
+            stopped_tasks.?.addTail(&self.list);
+        }
+        tasks_mutex.unlock();
+        if (self == current)
+            reschedule();
+    }
 };
 
 pub fn sleep(millis: usize) void {
@@ -154,7 +255,20 @@ pub fn sleep(millis: usize) void {
     reschedule();
 }
 
-pub var initial_task = Task.init(0, 0, 0, .KTHREAD);
+pub var initial_task = Task.init(0, 0, 0, 1, .KTHREAD);
 pub var current = &initial_task;
 pub var tasks_mutex: mutex = mutex.init();
 pub var stopped_tasks: ?*lst.ListHead = null;
+
+extern const stack_top: u32;
+extern const stack_bottom: u32;
+
+pub fn initMultitasking() void {
+    initial_task.setup(
+        @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET,
+        @intFromPtr(&stack_top),
+        @intFromPtr(&stack_bottom),
+    );
+    krn.irq.registerHandler(0, &krn.timerHandler);
+    arch.system.enableWriteProtect();
+}

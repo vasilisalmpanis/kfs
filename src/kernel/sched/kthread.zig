@@ -14,17 +14,7 @@ pub const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
 fn threadWrapper() callconv(.c) noreturn {
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
-    tsk.tasks_mutex.lock();
-    const curr = tsk.current;
-    curr.state = .STOPPED;
-    curr.list.del();
-    if (tsk.stopped_tasks == null) {
-        tsk.stopped_tasks = &curr.list;
-        tsk.stopped_tasks.?.setup();
-    } else {
-        tsk.stopped_tasks.?.addTail(&curr.list);
-    }
-    tsk.tasks_mutex.unlock();
+    tsk.current.finish();
     while (true) {}
 }
 
@@ -89,16 +79,17 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
         stack,
         0,
         0,
+        1,
         .KTHREAD
     );
     return new_task;
 }
 
 pub fn kthreadStop(thread: *tsk.Task) i32 {
-    thread.refcount += 1;
+    thread.refcount.ref();
     thread.should_stop = true;
     while (thread.state != .STOPPED) {}
     const result = thread.result;
-    thread.refcount -= 1;
+    thread.refcount.unref();
     return result;
 }

@@ -29,3 +29,8 @@ pub const Screen = struct {
         current_tty.?.render();
     }
 };
+
+pub fn initScreen(scr: *Screen, boot_info: *multiboot.MultibootInfo) void {
+    scr.* = Screen.init(boot_info);
+    current_tty = &scr.tty[0];
+}

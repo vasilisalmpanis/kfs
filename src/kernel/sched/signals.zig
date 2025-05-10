@@ -4,98 +4,185 @@ const std = @import("std");
 const arch = @import("arch");
 pub const SIG_COUNT: u8 = 32;
 
-const SigHandler = fn (signum: u8) void;
-
-const Signal = enum(u8) {
-    EMPTY = 0,      // Default action      comment                     posix
-    SIGHUP = 1,     // Terminate   Hang up controlling terminal or      Yes
-    SIGINT,         // Terminate   Interrupt from keyboard, Control-C   Yes
-    SIGQUIT,        // Dump        Quit from keyboard, Control-\        Yes
-    SIGILL,         // Dump        Illegal instruction                  Yes
-    SIGTRAP,        // Dump        Breakpoint for debugging             No
-    SIGABRT,        // Dump        Abnormal termination                 Yes
-    SIGIOT,         // Dump        Equivalent to SIGABRT                No
-    SIGBUS,         // Dump        Bus error                            No
-    SIGFPE,         // Dump        Floating-point exception           .EMPTY  Yes
-    SIGKILL,        // Terminate   Forced-process termination           Yes
-    SIGUSR1,        // Terminate   Available to processes               Yes
-    SIGSEGV,        // Dump        Invalid memory reference             Yes
-    SIGUSR2,        // Terminate   Available to processes               Yes
-    SIGPIPE,        // Terminate   Write to pipe with no readers        Yes
-    SIGALRM,        // Terminate   Real-timer clock                     Yes
-    SIGTERM,        // Terminate   Process termination                  Yes
-    SIGSTKFLT,      // Terminate   Coprocessor stack error              No
-    SIGCHLD,        // Ignore      Child process stopped or terminated  Yes
-    SIGCONT,        // Continue    Resume execution, if stopped         Yes
-    SIGSTOP,        // Stop        Stop process execution, Ctrl-Z       Yes
-    SIGTSTP,        // Stop        Stop process issued from tty         Yes
-    SIGTTIN,        // Stop        Background process requires input    Yes
-    SIGTTOU,        // Stop        Background process requires output   Yes
-    SIGURG,         // Ignore      Urgent condition on socket           No
-    SIGXCPU,        // Dump        CPU time limit exceeded              No
-    SIGXFSZ,        // Dump        File size limit exceeded             No
-    SIGVTALRM,      // Terminate   Virtual timer clock                  No
-    SIGPROF,        // Terminate   Profile timer clock                  No
-    SIGWINCH,       // Ignore      Window resizing                      No
-    SIGIO,          // Terminate   I/O now possible                     No
-    SIGPOLL,        // Terminate   Equivalent to SIGIO                  No
-    SIGPWR,         // Terminate   Power supply failure                 No
-    SIGSYS,         // Dump        Bad system call                      No
-    SIGUNUSED,      // Dump        Equivalent to SIGSYS                 No
+pub const Sigval = union {
+    int: i32,
+    ptr: *anyopaque,
 };
 
-const SignalTerminated = std.EnumMap(Signal, bool).init(.{
-    .EMPTY      = false,
-    .SIGHUP     = true,
-    .SIGINT     = true,
-    .SIGQUIT    = false,
-    .SIGILL     = false,
-    .SIGTRAP    = false,
-    .SIGABRT    = false,
-    .SIGIOT     = false,
-    .SIGBUS     = false,
-    .SIGFPE     = false,
-    .SIGKILL    = true,
-    .SIGUSR1    = true,
-    .SIGSEGV    = false,
-    .SIGUSR2    = true,
-    .SIGPIPE    = true,
-    .SIGALRM     = true,
-    .SIGTERM     = true,
-    .SIGSTKFLT  = true,
-    .SIGCHLD    = false,
-    .SIGCONT    = false,
-    .SIGSTOP    = false,
-    .SIGTSTP    = false,
-    .SIGTTIN    = false,
-    .SIGTTOU    = false,
-    .SIGURG     = false,
-    .SIGXCPU    = false,
-    .SIGXFSZ    = false,
-    .SIGVTALRM  = true,
-    .SIGPROF    = true,
-    .SIGWINCH   = false,
-    .SIGIO      = true,
-    .SIGPOLL    = true,
-    .SIGPWR     = true,
-    .SIGSYS     = false,
-    .SIGUNUSED  = false,
-});
+const SigAltStack = struct {
+    sp: *anyopaque,
+    flags: i32,
+    size: usize,
+};
+
+const SigContext = struct {
+    gs: u16,
+	fs: u16,
+	es: u16,
+	ds: u16,
+	edi: u32,
+	esi: u32,
+	ebp: u32,
+	esp: u32,
+	ebx: u32,
+	edx: u32,
+	ecx: u32,
+	eax: u32,
+	trapno: u32,
+	err: u32,
+	eip: u32,
+	cs: u16,
+    __csh: u16,
+	eflags: u32,
+	esp_at_signal: u32,
+	ss: u16,
+    __ssh: u16,
+	fpstate: u32,
+	oldmask: u32,
+	cr2: u32,
+};
+
+const Ucontext = struct {
+    flags: u32,
+    link: *@This(),
+    stack: SigAltStack,
+    mcontext: SigContext,
+    mask: sigset_t,
+};
+
+const SiginfoFieldsUnion = union {
+    pad: [128 - 2 * @sizeOf(c_int) - @sizeOf(c_long)]u8,
+    common: struct {
+        first: union {
+            piduid: struct {
+                pid: u32,
+                uid: u32,
+            },
+            timer: struct {
+                timerid: i32,
+                overrun: i32,
+            },
+        },
+        second: union {
+            value: Sigval,
+            sigchld: struct {
+                status: i32,
+                utime: isize,
+                stime: isize,
+            },
+        },
+    },
+    sigfault: struct {
+        addr: *allowzero anyopaque,
+        addr_lsb: i16,
+        first: union {
+            addr_bnd: struct {
+                lower: *anyopaque,
+                upper: *anyopaque,
+            },
+            pkey: u32,
+        },
+    },
+    sigpoll: struct {
+        band: isize,
+        fd: i32,
+    },
+    sigsys: struct {
+        call_addr: *anyopaque,
+        syscall: i32,
+        native_arch: u32,
+    },
+};
+
+pub const Siginfo = struct {
+    signo: i32,
+    errno: i32,
+    code: i32,
+    fields: SiginfoFieldsUnion,
+};
+
+pub const sigset_t = [2]u32;
+
+pub const HandlerFn = *align(1) const fn (i32) callconv(.c) void;
+pub const SigactionFn = *const fn (i32, *const Siginfo, ?*anyopaque) callconv(.c) void;
+pub const RestorerFn = *const fn () callconv(.c) void;
+
+pub const Sigaction = struct {
+    handler: extern union {
+        handler: ?HandlerFn,
+        sigaction: ?SigactionFn,
+    },
+    flags: u32,
+    restorer: ?RestorerFn = null,
+    mask: sigset_t,
+};
+
+pub const SA_NOCLDSTOP: u32  = 0x00000001; // Don't send SIGCHLD when children stop
+pub const SA_NOCLDWAIT: u32  = 0x00000002; // Don't create zombie processes
+pub const SA_NODEFER  : u32  = 0x40000000; // Don't block the signal during its handler
+pub const SA_RESETHAND: u32  = 0x80000000; // Reset handler to default after one use
+pub const SA_RESTART  : u32  = 0x10000000; // Restart syscall if possible after handler
+pub const SA_SIGINFO  : u32  = 0x00000004; // Use sa_sigaction instead of sa_handler
+
+pub const sigDFL: ?HandlerFn = @ptrFromInt(0);
+pub const sigIGN: ?HandlerFn = @ptrFromInt(1);
+pub const sigERR: ?HandlerFn = @ptrFromInt(-1);
+
+const default_sigaction: Sigaction = Sigaction{
+    .handler = .{ .handler = sigDFL },
+    .mask = .{0} ** 2,
+    .flags = 0,
+    .restorer = null,
+};
+
+const ignore_sigaction: Sigaction = Sigaction{
+    .handler = .{ .handler = sigIGN },
+    .mask = .{0} ** 2,
+    .flags = 0,
+    .restorer = null,
+};
+
+pub const Signal = enum(u8) {
+    EMPTY = 0,      // Default action      comment                     posix       0
+    SIGHUP = 1,     // Terminate   Hang up controlling terminal or      Yes        1
+    SIGINT,         // Terminate   Interrupt from keyboard, Control-C   Yes        2
+    SIGQUIT,        // Dump        Quit from keyboard, Control-\        Yes        3
+    SIGILL,         // Dump        Illegal instruction                  Yes        4
+    SIGTRAP,        // Dump        Breakpoint for debugging             No         5
+    SIGABRT,        // Dump        Abnormal termination                 Yes        6
+    SIGIOT,         // Dump        Equivalent to SIGABRT                No         7
+    SIGBUS,         // Dump        Bus error                            No         8
+    SIGFPE,         // Dump        Floating-point exception           .EMPTY  Yes  9
+    SIGKILL,        // Terminate   Forced-process termination           Yes        10
+    SIGUSR1,        // Terminate   Available to processes               Yes        11
+    SIGSEGV,        // Dump        Invalid memory reference             Yes        12
+    SIGUSR2,        // Terminate   Available to processes               Yes        13
+    SIGPIPE,        // Terminate   Write to pipe with no readers        Yes        14
+    SIGALRM,        // Terminate   Real-timer clock                     Yes        15
+    SIGTERM,        // Terminate   Process termination                  Yes        16
+    SIGSTKFLT,      // Terminate   Coprocessor stack error              No         17
+    SIGCHLD,        // Ignore      Child process stopped or terminated  Yes        18
+    SIGCONT,        // Continue    Resume execution, if stopped         Yes        19
+    SIGSTOP,        // Stop        Stop process execution, Ctrl-Z       Yes        20
+    SIGTSTP,        // Stop        Stop process issued from tty         Yes        21
+    SIGTTIN,        // Stop        Background process requires input    Yes        22
+    SIGTTOU,        // Stop        Background process requires output   Yes        23
+    SIGURG,         // Ignore      Urgent condition on socket           No         24
+    SIGXCPU,        // Dump        CPU time limit exceeded              No         25
+    SIGXFSZ,        // Dump        File size limit exceeded             No         26
+    SIGVTALRM,      // Terminate   Virtual timer clock                  No         27
+    SIGPROF,        // Terminate   Profile timer clock                  No         28
+    SIGWINCH,       // Ignore      Window resizing                      No         29
+    SIGIO,          // Terminate   I/O now possible                     No         30
+    SIGPOLL,        // Terminate   Equivalent to SIGIO                  No         31
+    SIGPWR,         // Terminate   Power supply failure                 No         32
+    SIGSYS,         // Dump        Bad system call                      No         33
+    SIGUNUSED,      // Dump        Equivalent to SIGSYS                 No         34
+};
 
 fn sigHandler(signum: u8) void {
     _ = signum;
     krn.logger.WARN("Default signal handler\n", .{});
-}
-
-pub fn signalWrapper() void {
-    asm volatile (arch.idt.push_regs);
-    var stack: u32 = 1;
-    stack +=1;
-    if (tsk.current.sigaction.deliverSignals()) {
-        while (true) {}
-    }
-    asm volatile (arch.idt.pop_regs);
-    return;
 }
 
 fn sigHup(_: u8) void {
@@ -112,101 +199,185 @@ fn sigHup(_: u8) void {
     tsk.tasks_mutex.unlock();
 }
 
-pub const SigAction = struct {
-    processing: bool = false,
+fn sigIgn(_: u8) void {
+    return;
+}
+
+const SigRes = struct {
+    action: Sigaction,
+    signal: u32,
+};
+
+pub const SigHand = struct {
     pending: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
-    sig_handlers: std.EnumArray(Signal, *const SigHandler) =
-        std.EnumArray(Signal, *const SigHandler).init(.{
-            .EMPTY      = &sigHandler,
-            .SIGHUP     = &sigHup,
-            .SIGINT     = &sigHandler,
-            .SIGQUIT    = &sigHandler,
-            .SIGILL     = &sigHandler,
-            .SIGTRAP    = &sigHandler,
-            .SIGABRT    = &sigHandler,
-            .SIGIOT     = &sigHandler,
-            .SIGBUS     = &sigHandler,
-            .SIGFPE     = &sigHandler,
-            .SIGKILL    = &sigHandler,
-            .SIGUSR1    = &sigHandler,
-            .SIGSEGV    = &sigHandler,
-            .SIGUSR2    = &sigHandler,
-            .SIGPIPE    = &sigHandler,
-            .SIGALRM    = &sigHandler,
-            .SIGTERM    = &sigHandler,
-            .SIGSTKFLT  = &sigHandler,
-            .SIGCHLD    = &sigHandler,
-            .SIGCONT    = &sigHandler,
-            .SIGSTOP    = &sigHandler,
-            .SIGTSTP    = &sigHandler,
-            .SIGTTIN    = &sigHandler,
-            .SIGTTOU    = &sigHandler,
-            .SIGURG     = &sigHandler,
-            .SIGXCPU    = &sigHandler,
-            .SIGXFSZ    = &sigHandler,
-            .SIGVTALRM  = &sigHandler,
-            .SIGPROF    = &sigHandler,
-            .SIGWINCH   = &sigHandler,
-            .SIGIO      = &sigHandler,
-            .SIGPOLL    = &sigHandler,
-            .SIGPWR     = &sigHandler,
-            .SIGSYS     = &sigHandler,
-            .SIGUNUSED  = &sigHandler,
+    actions: std.EnumArray(Signal, Sigaction) =
+        std.EnumArray(Signal, Sigaction).init(.{
+            .EMPTY      = default_sigaction,
+            .SIGHUP     = default_sigaction,
+            .SIGINT     = default_sigaction,
+            .SIGQUIT    = default_sigaction,
+            .SIGILL     = default_sigaction,
+            .SIGTRAP    = default_sigaction,
+            .SIGABRT    = default_sigaction,
+            .SIGIOT     = default_sigaction,
+            .SIGBUS     = default_sigaction,
+            .SIGFPE     = default_sigaction,
+            .SIGKILL    = default_sigaction,
+            .SIGUSR1    = default_sigaction,
+            .SIGSEGV    = default_sigaction,
+            .SIGUSR2    = default_sigaction,
+            .SIGPIPE    = default_sigaction,
+            .SIGALRM    = default_sigaction,
+            .SIGTERM    = default_sigaction,
+            .SIGSTKFLT  = default_sigaction,
+            .SIGCHLD    = ignore_sigaction,
+            .SIGCONT    = default_sigaction,
+            .SIGSTOP    = default_sigaction,
+            .SIGTSTP    = default_sigaction,
+            .SIGTTIN    = default_sigaction,
+            .SIGTTOU    = default_sigaction,
+            .SIGURG     = default_sigaction,
+            .SIGXCPU    = default_sigaction,
+            .SIGXFSZ    = default_sigaction,
+            .SIGVTALRM  = default_sigaction,
+            .SIGPROF    = default_sigaction,
+            .SIGWINCH   = default_sigaction,
+            .SIGIO      = default_sigaction,
+            .SIGPOLL    = default_sigaction,
+            .SIGPWR     = default_sigaction,
+            .SIGSYS     = default_sigaction,
+            .SIGUNUSED  = default_sigaction,
         }),
     
-    pub fn init() SigAction {
-        return SigAction{};
+    pub fn init() SigHand {
+        return SigHand{};
     }
 
-    pub fn deliverSignals(self: *SigAction) bool {
+    pub fn deliverSignal(self: *SigHand) SigRes {
         var it = self.pending.iterator(.{});
         while (it.next()) |i| {
             self.pending.toggle(i);
             const signal: Signal = @enumFromInt(i);
-            self.sig_handlers.get(signal)(@intCast(i));
-                if (SignalTerminated.get(signal) orelse false)
-                    return true;
+            var action = self.actions.get(signal);
+            if (action.mask[0] & i > 0) {
+                self.pending.toggle(i);
+                continue;
+            }
+            if (action.handler.handler == sigIGN) {
+                continue;
+            } else if (action.handler.handler == sigDFL) {
+                return .{.action = default_sigaction, .signal = i};
+            } else {
+                if (action.flags & SA_NODEFER == 0) {
+                    action.mask[0] |= i;
+                    self.actions.set(signal, action);
+                }
+                if (action.flags & SA_RESETHAND > 0) {
+                    action.handler.handler = sigDFL;
+                    self.actions.set(signal, action);
+                }
+                return .{.action = action, .signal = i};
+            }
         }
-        self.processing = false;
-        return false;
+        return .{.action = default_sigaction, .signal = 0};
     }
 
-    pub fn setSignal(self: *SigAction, signal: Signal) void {
+    pub fn setSignal(self: *SigHand, signal: Signal) void {
         self.pending.set(@intFromEnum(signal));
     }
 
-    pub fn isReady(self: *SigAction) bool {
-        if (self.processing)
-            return false;
+    pub fn isReady(self: *SigHand) bool {
         if (self.pending.count() != 0) {
-            self.processing = true;
             return true;
         }
         return false;
     }
 };
 
-pub fn processSignals(task: *tsk.Task) void {
-    if (task.sigaction.isReady()) {
-        const regs: *arch.Regs = @ptrFromInt(task.regs.esp);
-        const eip: u32 = regs.eip;
+fn setupHadlerFnFrame(regs: *arch.Regs, result: SigRes) void {
+    const returnAddrSize: u32 = 4 + 4 + @sizeOf(arch.Regs);
+    const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 8);
+    saved_regs.* = regs.*;
+    regs.eip = @intFromPtr(result.action.handler.handler);
+    regs.useresp -= returnAddrSize;
 
-        regs.eip = @intFromPtr(&signalWrapper);
+    const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
+    signal_stack[0] = @intFromPtr(result.action.restorer);
+    signal_stack[1] = result.signal;
+}
 
-        const kernelContextSize = @sizeOf(arch.Regs) - 8;
-        const returnAddrSize: u32 = 4;
+fn setupSigactionFnFrame(regs: *arch.Regs, result: SigRes) void {
+    const returnAddrSize: u32 = 4 + 4 + 4 + 4 + @sizeOf(arch.Regs) + @sizeOf(Siginfo) + @sizeOf(Ucontext);
+    const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 16);
+    const regs_ptr: u32 = @intFromPtr(saved_regs);
+    saved_regs.* = regs.*;
+    regs.eip = @intFromPtr(result.action.handler.sigaction);
+    regs.useresp -= returnAddrSize;
 
-        const new: [*]u32 = @ptrFromInt(task.regs.esp - returnAddrSize);
-        const old: [*]u32 = @ptrFromInt(task.regs.esp);
-        std.mem.copyForwards(
-            u32,
-            new[0..kernelContextSize/4],
-            old[0..kernelContextSize/4],
-        );
+    const siginfo_ptr = regs_ptr + @sizeOf(arch.Regs);
 
-        task.regs.esp -= returnAddrSize;
+    const siginfo_cnt: [*]u8 = @ptrFromInt(siginfo_ptr);
+    @memset(siginfo_cnt[0..@sizeOf(Siginfo)], 0);
 
-        const original_return: *u32 = @ptrFromInt(task.regs.esp + kernelContextSize);
-        original_return.* = eip;
+    const ucontext_ptr = siginfo_ptr + @sizeOf(Siginfo);
+
+    const ucontext_cnt: [*]u8 = @ptrFromInt(ucontext_ptr);
+    @memset(ucontext_cnt[0..@sizeOf(Ucontext)], 0);
+
+    const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
+    signal_stack[0] = @intFromPtr(result.action.restorer);
+    signal_stack[1] = result.signal;
+    signal_stack[2] = siginfo_ptr;
+    signal_stack[3] = 0;
+}
+
+pub fn setupRegs(regs: *arch.Regs) *arch.Regs {
+    if (!regs.isRing3()) {
+        const uregs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
+        regs.* = uregs.*;
+        if (regs.int_no == arch.idt.SYSCALL_INTERRUPT) {
+            regs.eax = krn.errors.EINTR;
+        }
     }
+    return regs;
+}
+
+pub fn processSignals(regs: *arch.Regs) *arch.Regs {
+    const task = krn.task.current;
+    if (task.sighand.isReady()) {
+        const result = task.sighand.deliverSignal();
+        if (result.signal == 0)
+            return regs;
+        if (result.action.handler.handler == default_sigaction.handler.handler)
+            return defaultHandler(@enumFromInt(result.signal), regs);
+        regs.* = setupRegs(regs).*;
+        if (result.action.flags & SA_SIGINFO == 0) {
+            setupHadlerFnFrame(regs, result);
+        } else {
+            setupSigactionFnFrame(regs, result);
+        }
+        return regs;
+    }
+    return regs;
+}
+
+fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
+    const task = krn.task.current;
+    switch (signal) {
+        .SIGSTOP,
+        .SIGTSTP,
+        .SIGTTIN,
+        .SIGTTOU => {
+            task.state = .INTERRUPTIBLE_SLEEP;
+            krn.sched.reschedule();
+        },
+        .SIGCONT => {},
+        .SIGCHLD,
+        .SIGURG,
+        .SIGWINCH => {},
+        else => {
+            task.finish();
+        }
+    }
+    return regs;
 }

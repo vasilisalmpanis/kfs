@@ -56,12 +56,19 @@ pub const Regs = struct {
         krn.logger.INFO("EAX: {X:0>8} EBX: {X:0>8} ECX: {X:0>8} EDX: {X:0>8}\n", .{ self.eax, self.ebx, self.ecx, self.edx });
         krn.logger.INFO("ESI: {X:0>8} EDI: {X:0>8} EBP: {X:0>8} ESP: {X:0>8}\n", .{ self.esi, self.edi, self.ebp, self.esp });
         krn.logger.INFO("EFLAGS: {X:0>8}\n", .{self.eflags});
+        krn.logger.INFO("USERESP: {X:0>8}\n", .{self.useresp});
         krn.logger.INFO("gs {X:0>8}\n", .{self.gs});
         krn.logger.INFO("fs {X:0>8}\n", .{self.fs});
         krn.logger.INFO("es {X:0>8}\n", .{self.es});
         krn.logger.INFO("ds {X:0>8}\n", .{self.ds});
         krn.logger.INFO("cs {X:0>8}\n", .{self.cs});
         krn.logger.INFO("ss {X:0>8}\n", .{self.ss});
+    }
+
+    pub fn isRing3(self: *Regs) bool {
+        if (self.cs == KERNEL_CODE_SEGMENT)
+            return false;
+        return true;
     }
 };
 

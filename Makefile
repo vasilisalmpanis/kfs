@@ -3,16 +3,17 @@ KERNEL = zig-out/bin/kfs.bin
 
 ISO_DIR = iso
 SRC_DIR = src
+USERSPACE_DIR = userspace
 
 SRC = $(shell find $(SRC_DIR) -name '*.zig')
+SRC += $(shell find $(USERSPACE_DIR) -name '*.zig')
 ASM_SRC = $(shell find $(SRC_DIR) -name '*.s')
 GRUB_CFG = $(ISO_DIR)/boot/grub/grub.cfg
-USERSPACE_SRC = src/userspace/user.asm
 MKRESCUE = grub-mkrescue
 
 all: $(NAME)
 
-$(NAME): $(KERNEL) $(GRUB_CFG) $(USERSPACE_SRC)
+$(NAME): $(KERNEL) $(GRUB_CFG)
 	cp $(KERNEL) $(ISO_DIR)/boot/
 	$(MKRESCUE) --compress=xz -o $(NAME) $(ISO_DIR)
 
@@ -31,7 +32,10 @@ qemu: $(NAME)
 
 debug: $(NAME)
 	qemu-system-i386 -cdrom $(NAME) -s -S &
-	gdb $(KERNEL) -ex "target remote localhost:1234"
+	gdb $(KERNEL) -ex "target remote localhost:1234" \
+		-ex "layout split src asm" \
+		-ex "b kernel_main" \
+		-ex "c"
 
 multimonitor: $(NAME)
 	qemu-system-i386 -enable-kvm -device virtio-vga,max_outputs=2 -cdrom $(NAME) -serial stdio

@@ -11,12 +11,17 @@ const std = @import("std");
 const gdt = @import("arch").gdt;
 const krn = @import("../main.zig");
 
+extern const stack_top: u32;
+
 fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs = state.*;
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;
-    signals.processSignals(to);
-    gdt.tss.esp0 = to.stack_bottom + STACK_SIZE; // this needs fixing
+    if (to == &tsk.initial_task) {
+        gdt.tss.esp0 = @intFromPtr(&stack_top);
+    } else {
+        gdt.tss.esp0 = to.stack_bottom + STACK_SIZE; // this needs fixing
+    }
     asm volatile("mov %[pd], %cr3"::[pd] "r" (to.virtual_space));
     return @ptrFromInt(to.regs.esp);
 }
@@ -32,7 +37,7 @@ fn processTasks() void {
         var end: bool = false;
         const curr = i.curr;
         const task = curr.entry(tsk.Task, "list");
-        if (task == tsk.current or task.refcount != 0)
+        if (task == tsk.current or !task.refcount.isFree() or task.state == .ZOMBIE)
             continue;
         if (curr.isEmpty()) {
             end = true;
@@ -44,6 +49,7 @@ fn processTasks() void {
         }
         curr.del();
         task.delFromTree();
+        krn.mm.virt_memory_manager.deinitVirtualSpace(task.virtual_space);
         kthreadStackFree(task.stack_bottom);
         km.kfree(@intFromPtr(task));
         if (end)
@@ -64,7 +70,7 @@ fn findNextTask() *tsk.Task {
         const task = i.curr.entry(tsk.Task, "list");
         if (task.state == .UNINTERRUPTIBLE_SLEEP and currentMs() >= task.wakeup_time)
             task.state = .RUNNING;
-        if (task.state == .RUNNING or task.state == .ZOMBIE) {
+        if (task.state == .RUNNING) {
             return task;
         }
     }
