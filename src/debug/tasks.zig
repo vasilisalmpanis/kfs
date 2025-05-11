@@ -22,12 +22,13 @@ fn printTask(task: *tsk.Task) void {
         );
         break :else_lbl &buffer;
     };
-    printf("{d}: {s} {s} {s} {s} | refs: {d}\n", .{
+    printf("{d}: {s} {s} {s} {s} {d} | refs: {d}\n", .{
         task.pid,
         @tagName(task.state),
         @tagName(task.tsktype),
         if (task.regs.cs == arch.idt.KERNEL_CODE_SEGMENT) "KRN" else "USR",
         name,
+        task.result,
         task.refcount.getValue(),
     });
 }
