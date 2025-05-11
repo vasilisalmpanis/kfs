@@ -150,34 +150,32 @@ pub const Signal = enum(u8) {
     SIGILL,         // Dump        Illegal instruction                  Yes        4
     SIGTRAP,        // Dump        Breakpoint for debugging             No         5
     SIGABRT,        // Dump        Abnormal termination                 Yes        6
-    SIGIOT,         // Dump        Equivalent to SIGABRT                No         7
-    SIGBUS,         // Dump        Bus error                            No         8
-    SIGFPE,         // Dump        Floating-point exception           .EMPTY  Yes  9
-    SIGKILL,        // Terminate   Forced-process termination           Yes        10
-    SIGUSR1,        // Terminate   Available to processes               Yes        11
-    SIGSEGV,        // Dump        Invalid memory reference             Yes        12
-    SIGUSR2,        // Terminate   Available to processes               Yes        13
-    SIGPIPE,        // Terminate   Write to pipe with no readers        Yes        14
-    SIGALRM,        // Terminate   Real-timer clock                     Yes        15
-    SIGTERM,        // Terminate   Process termination                  Yes        16
-    SIGSTKFLT,      // Terminate   Coprocessor stack error              No         17
-    SIGCHLD,        // Ignore      Child process stopped or terminated  Yes        18
-    SIGCONT,        // Continue    Resume execution, if stopped         Yes        19
-    SIGSTOP,        // Stop        Stop process execution, Ctrl-Z       Yes        20
-    SIGTSTP,        // Stop        Stop process issued from tty         Yes        21
-    SIGTTIN,        // Stop        Background process requires input    Yes        22
-    SIGTTOU,        // Stop        Background process requires output   Yes        23
-    SIGURG,         // Ignore      Urgent condition on socket           No         24
-    SIGXCPU,        // Dump        CPU time limit exceeded              No         25
-    SIGXFSZ,        // Dump        File size limit exceeded             No         26
-    SIGVTALRM,      // Terminate   Virtual timer clock                  No         27
-    SIGPROF,        // Terminate   Profile timer clock                  No         28
-    SIGWINCH,       // Ignore      Window resizing                      No         29
-    SIGIO,          // Terminate   I/O now possible                     No         30
-    SIGPOLL,        // Terminate   Equivalent to SIGIO                  No         31
-    SIGPWR,         // Terminate   Power supply failure                 No         32
-    SIGSYS,         // Dump        Bad system call                      No         33
-    SIGUNUSED,      // Dump        Equivalent to SIGSYS                 No         34
+    SIGBUS,         // Dump        Bus error                            No         7
+    SIGFPE,         // Dump        Floating-point exception           .EMPTY  Yes  8
+    SIGKILL,        // Terminate   Forced-process termination           Yes        9
+    SIGUSR1,        // Terminate   Available to processes               Yes        10
+    SIGSEGV,        // Dump        Invalid memory reference             Yes        11
+    SIGUSR2,        // Terminate   Available to processes               Yes        12
+    SIGPIPE,        // Terminate   Write to pipe with no readers        Yes        13
+    SIGALRM,        // Terminate   Real-timer clock                     Yes        14
+    SIGTERM,        // Terminate   Process termination                  Yes        15
+    SIGSTKFLT,      // Terminate   Coprocessor stack error              No         16
+    SIGCHLD,        // Ignore      Child process stopped or terminated  Yes        17
+    SIGCONT,        // Continue    Resume execution, if stopped         Yes        18
+    SIGSTOP,        // Stop        Stop process execution, Ctrl-Z       Yes        19
+    SIGTSTP,        // Stop        Stop process issued from tty         Yes        20
+    SIGTTIN,        // Stop        Background process requires input    Yes        21
+    SIGTTOU,        // Stop        Background process requires output   Yes        22
+    SIGURG,         // Ignore      Urgent condition on socket           No         23
+    SIGXCPU,        // Dump        CPU time limit exceeded              No         24
+    SIGXFSZ,        // Dump        File size limit exceeded             No         25
+    SIGVTALRM,      // Terminate   Virtual timer clock                  No         26
+    SIGPROF,        // Terminate   Profile timer clock                  No         27
+    SIGWINCH,       // Ignore      Window resizing                      No         28
+    SIGIO,          // Terminate   I/O now possible                     No         29
+    SIGPOLL,        // Terminate   Equivalent to SIGIO                  No         30
+    SIGPWR,         // Terminate   Power supply failure                 No         31
+    SIGSYS,         // Dump        Bad system call                      No         32
 };
 
 fn sigHandler(signum: u8) void {
@@ -219,7 +217,6 @@ pub const SigHand = struct {
             .SIGILL     = default_sigaction,
             .SIGTRAP    = default_sigaction,
             .SIGABRT    = default_sigaction,
-            .SIGIOT     = default_sigaction,
             .SIGBUS     = default_sigaction,
             .SIGFPE     = default_sigaction,
             .SIGKILL    = default_sigaction,
@@ -246,7 +243,6 @@ pub const SigHand = struct {
             .SIGPOLL    = default_sigaction,
             .SIGPWR     = default_sigaction,
             .SIGSYS     = default_sigaction,
-            .SIGUNUSED  = default_sigaction,
         }),
     
     pub fn init() SigHand {
@@ -259,6 +255,7 @@ pub const SigHand = struct {
             self.pending.toggle(i);
             const signal: Signal = @enumFromInt(i);
             var action = self.actions.get(signal);
+            // TODO: not deliver based on mask for currently running signals.
             if (action.mask[0] & i > 0) {
                 self.pending.toggle(i);
                 continue;
@@ -376,7 +373,8 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         .SIGURG,
         .SIGWINCH => {},
         else => {
-            task.finish();
+            task.state = .ZOMBIE;
+            task.result = 128 + @intFromEnum(signal);
         }
     }
     return regs;

@@ -6,6 +6,7 @@ const krn = @import("kernel");
 const printf = @import("debug").printf;
 const Regs = @import("system/cpu.zig").Regs;
 const signals = @import("kernel").signals;
+const tsk = @import("kernel").task;
 
 pub const IDT_MAX_DESCRIPTORS   = 256;
 pub const CPU_EXCEPTION_COUNT   = 32;
@@ -48,7 +49,8 @@ pub export fn irqHandler(state: *Regs) callconv(.C) *Regs {
     if (state.int_no == TIMER_INTERRUPT) {
         new_state = krn.sched.schedule(state);
     }
-    new_state = signals.processSignals(new_state);
+    if (tsk.current.tsktype != .KTHREAD)
+        new_state = signals.processSignals(new_state);
     return new_state;
 }
 

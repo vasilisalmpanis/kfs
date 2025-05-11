@@ -96,7 +96,7 @@ pub export fn main() linksection(".text.main") noreturn {
         while (i < 1000000000) {
             i += 1;
         }
-        _ = os.linux.kill(@intCast(pid), 1);
+        _ = os.linux.kill(0, 2);
         serial("parent after\n", .{});
     }
     //     _ = os.linux.kill(@intCast(pid), 1);
