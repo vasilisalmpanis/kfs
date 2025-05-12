@@ -62,7 +62,13 @@ fn kill_handler(sig: i32) callconv(.c) void {
 }
 
 fn empty_func(_: i32) callconv(.c) void {
-    serial("empty func\n", .{});
+    serial("SIGUSR1\n", .{});
+    while (true) {}
+}
+
+fn empty_func2(_: i32) callconv(.c) void {
+    serial("SIGUSR2\n", .{});
+    while (true) {}
 }
 
 fn siginfo_hand(a: i32, b: *const os.linux.siginfo_t, c: ?*anyopaque) callconv(.c) void {
@@ -84,19 +90,31 @@ pub export fn main() linksection(".text.main") noreturn {
     if (pid == 0) {
         const action: std.posix.Sigaction = .{
             .handler = .{ .handler = &empty_func },
-            .mask = .{0} ** 32,
-            .flags = os.linux.SA.RESTORER | os.linux.SA.NODEFER,
+            .mask = .{@as(u32,1) << std.c.SIG.TRAP - 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+            // .mask = {@bitCast(std.c.SIG.TRAP)},
+            .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
         };
-        _ = os.linux.sigaction(1, &action, null);
-        _ = os.linux.syscall0(os.linux.syscalls.X86.sigpending); // FIXME
+        // action.mask[std.c.SIG.TRAP] = 1;
+        _ = os.linux.sigaction(std.c.SIG.USR1, &action, null);
+        // action.handler.handler = &empty_func2;
+        // action.mask[std.c.SIG.TRAP] = 0;
+        const action2: std.posix.Sigaction = .{
+            .handler = .{ .handler = &empty_func2 },
+            .mask = .{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+            // .mask = {@bitCast(std.c.SIG.TRAP)},
+            .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
+        };
+        _ = os.linux.sigaction(std.c.SIG.USR2, &action2, null);
+        _ = os.linux.kill(3, std.c.SIG.USR1);
+        // _ = os.linux.syscall0(os.linux.syscalls.X86.sigpending); // FIXME
         // serial("child after {d}\n", .{ret});
         os.linux.exit(5);
     } else {
-        var i: u32 = 0;
-        while (i < 1000000000) {
-            i += 1;
-        }
-        _ = os.linux.kill(0, 2);
+        // var i: u32 = 0;
+        // while (i < 1000000000) {
+        //     i += 1;
+        // }
+        // _ = os.linux.kill(0, 2);
         serial("parent after\n", .{});
     }
     //     _ = os.linux.kill(@intCast(pid), 1);

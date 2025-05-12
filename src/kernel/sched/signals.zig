@@ -115,6 +115,24 @@ pub const Sigaction = struct {
     flags: u32,
     restorer: ?RestorerFn = null,
     mask: sigset_t,
+
+    pub fn sigAddSet(self: *Sigaction, signal: Signal) void {
+        const num: u32 = @intFromEnum(signal);
+        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
+        self.mask[0] |= bit_index;
+    }
+
+    pub fn sigDelSet(self: *Sigaction, signal: Signal) void {
+        const num: u32 = @intFromEnum(signal);
+        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
+        self.mask[0] &= ~bit_index;
+    }
+
+    pub fn sigIsSet(self: *const Sigaction, signal: Signal) bool {
+        const num: u32 = @intFromEnum(signal);
+        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
+        return self.mask[0] & bit_index != 0;
+    }
 };
 
 pub const SA_NOCLDSTOP: u32  = 0x00000001; // Don't send SIGCHLD when children stop
@@ -249,14 +267,25 @@ pub const SigHand = struct {
         return SigHand{};
     }
 
+
+    pub fn isBlocked(self: *SigHand, signal: Signal) bool {
+        for(1..32) |idx| {
+            const action = self.actions.get(@enumFromInt(idx));
+            if (action.sigIsSet(@enumFromInt(idx))) {
+                if (action.sigIsSet(signal))
+                    return true;
+            }
+        }
+        return false;
+    }
+
     pub fn deliverSignal(self: *SigHand) SigRes {
         var it = self.pending.iterator(.{});
         while (it.next()) |i| {
             self.pending.toggle(i);
             const signal: Signal = @enumFromInt(i);
             var action = self.actions.get(signal);
-            // TODO: not deliver based on mask for currently running signals.
-            if (action.mask[0] & i > 0) {
+            if (self.isBlocked(signal)) {
                 self.pending.toggle(i);
                 continue;
             }
@@ -266,7 +295,7 @@ pub const SigHand = struct {
                 return .{.action = default_sigaction, .signal = i};
             } else {
                 if (action.flags & SA_NODEFER == 0) {
-                    action.mask[0] |= i;
+                    action.sigAddSet(signal);
                     self.actions.set(signal, action);
                 }
                 if (action.flags & SA_RESETHAND > 0) {

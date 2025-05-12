@@ -97,21 +97,25 @@ fn help(self: *Shell, args: [][]const u8) void {
 }
 
 fn kill(_: *Shell, args: [][]const u8) void {
-    if (args.len < 1) {
-        debug.printf("Usage: kill <pid>\n", .{});
+    if (args.len < 2) {
+        debug.printf("Usage: kill <signal> <pid>\n", .{});
         return;
     }
-    const pid = std.fmt.parseInt(u8, args[0], 10) catch 0;
+    const sig: u32 = std.fmt.parseInt(u8, args[0], 10) catch 0;
+    if (sig == 0 or sig >= 31) {
+        debug.printf("Invalid signal: {s}\n", .{args[0]});
+        return;
+    }
+    const pid = std.fmt.parseInt(u8, args[1], 10) catch 0;
     if (pid == 0) {
-        debug.printf("Invalid PID: {s}\n", .{args[0]});
+        debug.printf("Invalid PID: {s}\n", .{args[1]});
         return;
     }
-    debug.printf("Killing PID: {d}\n", .{pid});
     asm volatile(
         \\ mov $37, %eax
-        \\ mov $1, %ecx
         \\ int $0x80
-        :: [ebx] "{ebx}" (pid),
+        :
+        : [ebx] "{ebx}" (pid), [ecx] "{ecx}" (sig),
     );
 }
 
