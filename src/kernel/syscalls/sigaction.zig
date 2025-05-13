@@ -29,7 +29,7 @@ pub fn sigreturn(state: *arch.Regs) i32 {
     }
     const saved_regs: *arch.Regs = @ptrFromInt(state.useresp + regs_offset);
     state.* = saved_regs.*;
-    action.sigDelSet(signal);
+    action.mask.sigDelSet(signal);
     tsk.current.sighand.actions.set(signal, action);
     return 0;
 }
