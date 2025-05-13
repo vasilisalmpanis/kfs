@@ -34,31 +34,56 @@ pub fn sigreturn(state: *arch.Regs) i32 {
     return 0;
 }
 
+const SIG_BLOCK  : i32 = 1;	// for blocking signals
+const SIG_UNBLOCK: i32 = 2;	// for unblocking signals
+const SIG_SETMASK: i32 = 3;     // for setting the signal mask
+
 pub fn rt_sigprocmask(
     state: *arch.Regs,
     how: i32,
-    set: *signals.sigset_t,
-    oset: *signals.sigset_t,
+    set: ?*signals.sigset_t,
+    oset: ?*signals.sigset_t,
     sigsetsize: usize,
 ) i32 {
-    _ = state;
-    _ = how;
-    _ = set;
-    _ = oset;
-    _ = sigsetsize;
-    return 0;
+    if (sigsetsize != @sizeOf(signals.sigset_t))
+        return -errors.EINVAL;
+    return sigprocmask(state, how, set, oset);
 }
 
 pub fn sigprocmask(
-    state: *arch.Regs,
+    _: *arch.Regs,
     how: i32,
-    set: *signals.sigset_t,
-    oset: *signals.sigset_t,
+    set: ?*signals.sigset_t,
+    oset: ?*signals.sigset_t,
 ) i32 {
-    _ = state;
-    _ = how;
-    _ = set;
-    _ = oset;
+    var oldset: u32 = 0;
+    var newset: u32 = 0;
+    var new_blocked: signals.sigset_t = signals.sigset_t.init();
+    oldset = tsk.current.sigmask._bits[0];
+    if (set) |_set| {
+        newset = _set._bits[0];
+        new_blocked = tsk.current.sigmask;
+        switch (how) {
+            SIG_BLOCK => {
+                new_blocked._bits[0] |= newset;
+            },
+            SIG_UNBLOCK => {
+                new_blocked._bits[0] &= ~newset;
+            },
+            SIG_SETMASK => {
+                new_blocked._bits[0] = newset;
+            },
+            else => {
+                return -errors.EINVAL;
+            }
+        }
+        new_blocked.sigDelSet(signals.Signal.SIGKILL);
+        new_blocked.sigDelSet(signals.Signal.SIGSTOP);
+        tsk.current.sigmask = new_blocked;
+    }
+    if (oset) |_oset| {
+        _oset._bits[0] = oldset;
+    }
     return 0;
 }
 
