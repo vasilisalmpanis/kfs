@@ -98,13 +98,13 @@ pub export fn main() linksection(".text.main") noreturn {
         _ = os.linux.sigaction(std.c.SIG.USR1, &action, null);
         // action.handler.handler = &empty_func2;
         // action.mask[std.c.SIG.TRAP] = 0;
-        // const action2: std.posix.Sigaction = .{
-        //     .handler = .{ .handler = &empty_func2 },
-        //     .mask = .{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        //     // .mask = {@bitCast(std.c.SIG.TRAP)},
-        //     .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
-        // };
-        _ = os.linux.sigaction(std.c.SIG.USR2, null, null);
+        const action2: std.posix.Sigaction = .{
+            .handler = .{ .handler = &empty_func2 },
+            .mask = .{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+            // .mask = {@bitCast(std.c.SIG.TRAP)},
+            .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
+        };
+        _ = os.linux.sigaction(std.c.SIG.USR2, &action2, null);
         _ = os.linux.kill(3, std.c.SIG.USR1);
         // _ = os.linux.syscall0(os.linux.syscalls.X86.sigpending); // FIXME
         // serial("child after {d}\n", .{ret});

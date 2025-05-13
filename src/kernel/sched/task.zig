@@ -95,8 +95,8 @@ pub const Task = struct {
     wakeup_time:    usize           = 0,
 
     // signals
-    sighand:      signal.SigHand        = signal.SigHand.init(),
-    sigmask:        u32                     = 0,
+    sighand:        signal.SigHand       = signal.SigHand.init(),
+    sigmask:        signal.sigset_t      = signal.sigset_t.init(),
 
     // only for kthreads
     threadfn:       ?ThreadHandler       = null,
@@ -159,7 +159,6 @@ pub const Task = struct {
         self.tree.setup();
 
         self.sighand = current.sighand;
-        self.sigmask = 0;
 
         tasks_mutex.lock();
         current.tree.addChild(&self.tree);

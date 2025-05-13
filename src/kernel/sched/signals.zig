@@ -101,7 +101,33 @@ pub const Siginfo = struct {
     fields: SiginfoFieldsUnion,
 };
 
-pub const sigset_t = [2]u32;
+pub const sigset_t = struct {
+    _bits: [2]u32,
+
+    pub fn init() sigset_t {
+        return sigset_t {
+            ._bits = .{0} ** 2,
+        };
+    }
+
+    pub fn sigAddSet(self: *sigset_t, signal: Signal) void {
+        const num: u32 = @intFromEnum(signal);
+        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
+        self._bits[0] |= bit_index;
+    }
+
+    pub fn sigDelSet(self: *sigset_t, signal: Signal) void {
+        const num: u32 = @intFromEnum(signal);
+        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
+        self._bits[0] &= ~bit_index;
+    }
+
+    pub fn sigIsSet(self: *const sigset_t, signal: Signal) bool {
+        const num: u32 = @intFromEnum(signal);
+        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
+        return self._bits[0] & bit_index != 0;
+    }
+};
 
 pub const HandlerFn = *align(1) const fn (i32) callconv(.c) void;
 pub const SigactionFn = *const fn (i32, *const Siginfo, ?*anyopaque) callconv(.c) void;
@@ -114,26 +140,15 @@ pub const Sigaction = struct {
     },
     flags: u32,
     restorer: ?RestorerFn = null,
-    mask: sigset_t,
+    mask: sigset_t = sigset_t.init(),
 
-    pub fn sigAddSet(self: *Sigaction, signal: Signal) void {
-        const num: u32 = @intFromEnum(signal);
-        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
-        self.mask[0] |= bit_index;
-    }
-
-    pub fn sigDelSet(self: *Sigaction, signal: Signal) void {
-        const num: u32 = @intFromEnum(signal);
-        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
-        self.mask[0] &= ~bit_index;
-    }
-
-    pub fn sigIsSet(self: *const Sigaction, signal: Signal) bool {
-        const num: u32 = @intFromEnum(signal);
-        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
-        return self.mask[0] & bit_index != 0;
-    }
 };
+
+pub fn sigmask(sig: u32) u32 {
+        const num: u32 = sig;
+        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
+        return bit_index;
+}
 
 pub const SA_NOCLDSTOP: u32  = 0x00000001; // Don't send SIGCHLD when children stop
 pub const SA_NOCLDWAIT: u32  = 0x00000002; // Don't create zombie processes
@@ -148,14 +163,12 @@ pub const sigERR: ?HandlerFn = @ptrFromInt(-1);
 
 const default_sigaction: Sigaction = Sigaction{
     .handler = .{ .handler = sigDFL },
-    .mask = .{0} ** 2,
     .flags = 0,
     .restorer = null,
 };
 
 const ignore_sigaction: Sigaction = Sigaction{
     .handler = .{ .handler = sigIGN },
-    .mask = .{0} ** 2,
     .flags = 0,
     .restorer = null,
 };
@@ -271,8 +284,8 @@ pub const SigHand = struct {
     pub fn isBlocked(self: *SigHand, signal: Signal) bool {
         for(1..32) |idx| {
             const action = self.actions.get(@enumFromInt(idx));
-            if (action.sigIsSet(@enumFromInt(idx))) {
-                if (action.sigIsSet(signal))
+            if (action.mask.sigIsSet(@enumFromInt(idx))) {
+                if (action.mask.sigIsSet(signal))
                     return true;
             }
         }
@@ -295,7 +308,7 @@ pub const SigHand = struct {
                 return .{.action = default_sigaction, .signal = i};
             } else {
                 if (action.flags & SA_NODEFER == 0) {
-                    action.sigAddSet(signal);
+                    action.mask.sigAddSet(signal);
                     self.actions.set(signal, action);
                 }
                 if (action.flags & SA_RESETHAND > 0) {
