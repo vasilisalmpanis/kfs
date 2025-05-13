@@ -125,7 +125,7 @@ pub const SyscallTable = brk: {
         .SYS_statfs                     = &notImpl,
         .SYS_fstatfs                    = &notImpl,
         .SYS_ioperm                     = &notImpl,
-        .SYS_socketcall                 = &notImpl,
+        .SYS_socketcall                 = @ptrCast(&@import("socketcall.zig").socketcall),
         .SYS_syslog                     = &notImpl,
         .SYS_setitimer                  = &notImpl,
         .SYS_getitimer                  = &notImpl,
@@ -216,6 +216,7 @@ pub const SyscallTable = brk: {
         .SYS_vfork                      = &notImpl,
         .SYS_ugetrlimit                 = &notImpl,
         .SYS_mmap2                      = @ptrCast(&@import("mmap.zig").mmap2),
+        .SYS_socketpair                 = @ptrCast(&@import("socketcall.zig").socketpair),
     });
 };
 
