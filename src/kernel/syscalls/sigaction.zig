@@ -89,27 +89,26 @@ pub fn sigprocmask(
 
 pub fn rt_sigpending(
     state: *arch.Regs,
-    set: *signals.sigset_t,
+    uset: *signals.sigset_t,
     sigsetsize: usize,
 ) i32 {
-    _ = state;
-    _ = set;
-    _ = sigsetsize;
-    return 0;
+    if (sigsetsize != @sizeOf(signals.sigset_t))
+        return -errors.EINVAL;
+    return sigpending(state, uset);
 }
 
 pub fn sigpending(
-    state: *arch.Regs,
-    set: *signals.sigset_t,
+    _: *arch.Regs,
+    uset: ?*signals.sigset_t,
 ) i32 {
-    _ = state;
-    _ = set;
-
-    var i: u32 = 0;
-    while (true) {
-        i +%= 1;
-        if (i % 10000 == 0)
-            krn.logger.WARN("sigpending...", .{});
+    var set = signals.sigset_t.init();
+    for (1..32) |idx| {
+        if (tsk.current.sighand.pending.isSet(idx)) {
+            set.sigAddSet(@enumFromInt(idx));
+        }
+    }
+    if (uset) |_uset| {
+        _uset.* = set;
     }
     return 0;
 }
