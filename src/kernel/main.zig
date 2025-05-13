@@ -30,6 +30,8 @@ pub const currentMs = @import("./time/jiffies.zig").currentMs;
 pub const jiffies = @import("./time/jiffies.zig");
 pub const errors = @import("./syscalls/error-codes.zig");
 
+pub const socket = @import("./net/socket.zig");
+
 pub var keyboard: Keyboard = undefined;
 pub var pit: PIT = undefined;
 pub var serial: Serial = undefined;

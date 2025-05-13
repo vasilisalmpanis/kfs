@@ -86,6 +86,8 @@ fn siginfo_hand(a: i32, b: *const os.linux.siginfo_t, c: ?*anyopaque) callconv(.
 pub export fn main() linksection(".text.main") noreturn {
     // test_wait();
     // var status: u32 = undefined;
+    var fds: [2]i32 = .{0, 0};
+    _ = os.linux.socketpair(os.linux.AF.UNIX, os.linux.SOCK.STREAM, 0, &fds);
     const pid= os.linux.fork();
     if (pid == 0) {
         const action: std.posix.Sigaction = .{
