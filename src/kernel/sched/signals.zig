@@ -111,21 +111,15 @@ pub const sigset_t = struct {
     }
 
     pub fn sigAddSet(self: *sigset_t, signal: Signal) void {
-        const num: u32 = @intFromEnum(signal);
-        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
-        self._bits[0] |= bit_index;
+        self._bits[0] |= sigmask(signal);
     }
 
     pub fn sigDelSet(self: *sigset_t, signal: Signal) void {
-        const num: u32 = @intFromEnum(signal);
-        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
-        self._bits[0] &= ~bit_index;
+        self._bits[0] &= ~sigmask(signal);
     }
 
     pub fn sigIsSet(self: *const sigset_t, signal: Signal) bool {
-        const num: u32 = @intFromEnum(signal);
-        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
-        return self._bits[0] & bit_index != 0;
+        return self._bits[0] & sigmask(signal) != 0;
     }
 };
 
@@ -144,8 +138,8 @@ pub const Sigaction = struct {
 
 };
 
-pub fn sigmask(sig: u32) u32 {
-        const num: u32 = sig;
+pub fn sigmask(sig: Signal) u32 {
+        const num: u32 = @intFromEnum(sig);
         const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
         return bit_index;
 }
@@ -282,6 +276,8 @@ pub const SigHand = struct {
 
 
     pub fn isBlocked(self: *SigHand, signal: Signal) bool {
+        if (tsk.current.sigmask.sigIsSet(signal))
+            return true;
         for(1..32) |idx| {
             const action = self.actions.get(@enumFromInt(idx));
             if (action.mask.sigIsSet(@enumFromInt(idx))) {
