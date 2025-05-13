@@ -13,7 +13,9 @@ pub fn sigaction(_: *arch.Regs, sig: u32, act: ?*signals.Sigaction, oact: ?*sign
     if (oact) |old_act| {
         old_act.* = tsk.current.sighand.actions.get(signal);
     }
-    tsk.current.sighand.actions.set(signal, act.?.*);
+    if (act) |_act| {
+        tsk.current.sighand.actions.set(signal, _act.*);
+    }
     return 0;
 }
 
