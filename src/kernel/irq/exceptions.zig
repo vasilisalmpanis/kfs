@@ -128,6 +128,7 @@ pub fn hPageFault(regs: *Regs) void {
             regs.err_code & 0x8,
             regs.err_code & 0x10,
         });
+    regs.dump();
     @panic("hPageFault");
 }
 

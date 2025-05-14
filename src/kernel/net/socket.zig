@@ -1,15 +1,23 @@
+const std = @import("std");
 const krn = @import("../main.zig");
 const lst = @import("../utils/list.zig");
 
 pub const Socket = struct {
     id: u32,
-    buffer: [128]u8,
+    _buffer: [128]u8,
+    ringbuf: std.RingBuffer,
     conn: ?*Socket,
     list: lst.ListHead,
 
     pub fn setup(self: *Socket, id: u32) void {
         self.id = id;
-        self.buffer = .{0} ** 128;
+        self._buffer = .{0} ** 128;
+        var fbe = std.heap.FixedBufferAllocator.init(&self._buffer);
+        self.ringbuf = std.RingBuffer.init(fbe.allocator(), 128) catch std.RingBuffer{
+            .data = &self._buffer,
+            .read_index =  0,
+            .write_index = 0,
+        };
         self.conn = null;
         self.list.next = &self.list;
         self.list.prev = &self.list;
