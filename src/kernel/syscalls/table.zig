@@ -3,7 +3,6 @@ const arch = @import("arch");
 const krn = @import("../main.zig");
 
 pub const SyscallHandler = fn (
-    state: *arch.Regs,
     a1: u32,
     a2: u32,
     a3: u32,
@@ -12,7 +11,8 @@ pub const SyscallHandler = fn (
     a6: u32,
 ) i32;
 
-fn notImpl(state: *arch.Regs, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) i32 {
+fn notImpl(_: u32, _: u32, _: u32, _: u32, _: u32, _: u32) i32 {
+    const state: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
     krn.logger.WARN("syscall {d} {s} is not implemented", .{
         state.eax,
         @tagName(@as(Syscall, @enumFromInt(state.eax)))

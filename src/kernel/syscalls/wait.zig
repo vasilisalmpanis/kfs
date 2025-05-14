@@ -35,7 +35,7 @@ const Rusage = packed struct {
     ru_nivcsw: usize,        // involuntary context switches
 };
 
-pub fn wait4(_: *arch.Regs, pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) i32 {
+pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) i32 {
     _ = rusage;
     _ = stat_addr;
     krn.logger.DEBUG("waiting pid {d} from pid {d}", .{pid, tsk.current.pid});

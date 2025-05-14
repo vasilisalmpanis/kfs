@@ -3,7 +3,6 @@ const arch = @import("arch");
 const krn = @import("../main.zig");
 
 pub fn mmap2(
-    _: *arch.Regs,
     a1: u32,
     a2: u32,
     a3: u32,

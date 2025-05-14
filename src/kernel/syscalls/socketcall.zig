@@ -27,7 +27,7 @@ const CallType = enum(u8) {
     _
 };
 
-pub fn socketcall(regs: *arch.Regs, call: i32, args: [*]u32) i32 {
+pub fn socketcall(call: i32, args: [*]u32) i32 {
     krn.logger.INFO("socketcall: {d} {any}", .{call, args});
     if (call < 1 or call > 20) {
         return -errors.EINVAL;
@@ -35,14 +35,12 @@ pub fn socketcall(regs: *arch.Regs, call: i32, args: [*]u32) i32 {
     const call_type: CallType = @enumFromInt(call);
     switch (call_type) {
         .SYS_SOCKETPAIR => return socketpair(
-            regs,
             @intCast(args[0]),
             @intCast(args[1]),
             @intCast(args[2]),
             @ptrFromInt(args[3]),
         ),
         .SYS_RECVFROM => return recvfrom(
-            regs,
             @intCast(args[0]),
             @ptrFromInt(args[1]),
             args[2],
@@ -51,7 +49,6 @@ pub fn socketcall(regs: *arch.Regs, call: i32, args: [*]u32) i32 {
             @intCast(args[5]),
         ),
         .SYS_SENDTO => return sendto(
-            regs,
             @intCast(args[0]),
             @ptrFromInt(args[1]),
             args[2],
@@ -66,7 +63,7 @@ pub fn socketcall(regs: *arch.Regs, call: i32, args: [*]u32) i32 {
     return 0;
 }
 
-pub fn socketpair(_: *arch.Regs, family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) i32 {
+pub fn socketpair(family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) i32 {
     krn.logger.INFO("socketpair: {d} {d} {d} {any}", .{family, s_type, protocol, usockvec});
     if (krn.socket.newSocket()) |sock_a| {
         if (krn.socket.newSocket()) |sock_b| {
@@ -85,7 +82,6 @@ pub fn socketpair(_: *arch.Regs, family: i32, s_type: i32, protocol: i32, usockv
 }
 
 pub fn recvfrom(
-    _: *arch.Regs,
     fd: i32,
     ubuff: ?*anyopaque,
     size: u32,
@@ -111,7 +107,7 @@ pub fn recvfrom(
     return 0;
 }
 
-pub fn sendto(_: *arch.Regs, fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, addr_len: i32) i32 {
+pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, addr_len: i32) i32 {
     _ = flags;
     _ = addr;
     _ = addr_len;

@@ -4,7 +4,7 @@ const errors = @import("./error-codes.zig");
 const arch = @import("arch");
 const krn = @import("../main.zig");
 
-pub fn sigaction(_: *arch.Regs, sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) i32 {
+pub fn sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) i32 {
     if (sig > 31)
         return errors.EINVAL;
     const signal: signals.Signal = @enumFromInt(sig);
@@ -19,16 +19,17 @@ pub fn sigaction(_: *arch.Regs, sig: u32, act: ?*signals.Sigaction, oact: ?*sign
     return 0;
 }
 
-pub fn sigreturn(state: *arch.Regs) i32 {
-    const num: *u32 = @ptrFromInt(state.useresp);
+pub fn sigreturn() i32 {
+    const signal_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
+    const num: *u32 = @ptrFromInt(signal_regs.useresp);
     const signal: signals.Signal = @enumFromInt(num.*);
     var action = tsk.current.sighand.actions.get(signal);
     var regs_offset: u32 = 4;
     if (action.flags & signals.SA_SIGINFO != 0) {
         regs_offset += 8;
     }
-    const saved_regs: *arch.Regs = @ptrFromInt(state.useresp + regs_offset);
-    state.* = saved_regs.*;
+    const saved_regs: *arch.Regs = @ptrFromInt(signal_regs.useresp + regs_offset);
+    signal_regs.* = saved_regs.*;
     action.mask.sigDelSet(signal);
     tsk.current.sighand.actions.set(signal, action);
     return 0;
@@ -39,7 +40,6 @@ const SIG_UNBLOCK: i32 = 2;	// for unblocking signals
 const SIG_SETMASK: i32 = 3;     // for setting the signal mask
 
 pub fn rt_sigprocmask(
-    state: *arch.Regs,
     how: i32,
     set: ?*signals.sigset_t,
     oset: ?*signals.sigset_t,
@@ -47,11 +47,10 @@ pub fn rt_sigprocmask(
 ) i32 {
     if (sigsetsize != @sizeOf(signals.sigset_t))
         return -errors.EINVAL;
-    return sigprocmask(state, how, set, oset);
+    return sigprocmask(how, set, oset);
 }
 
 pub fn sigprocmask(
-    _: *arch.Regs,
     how: i32,
     set: ?*signals.sigset_t,
     oset: ?*signals.sigset_t,
@@ -88,19 +87,15 @@ pub fn sigprocmask(
 }
 
 pub fn rt_sigpending(
-    state: *arch.Regs,
     uset: *signals.sigset_t,
     sigsetsize: usize,
 ) i32 {
     if (sigsetsize != @sizeOf(signals.sigset_t))
         return -errors.EINVAL;
-    return sigpending(state, uset);
+    return sigpending(uset);
 }
 
-pub fn sigpending(
-    _: *arch.Regs,
-    uset: ?*signals.sigset_t,
-) i32 {
+pub fn sigpending(uset: ?*signals.sigset_t) i32 {
     var set = signals.sigset_t.init();
     for (1..32) |idx| {
         if (tsk.current.sighand.pending.isSet(idx)) {
