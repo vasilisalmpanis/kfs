@@ -94,25 +94,25 @@ pub export fn main() linksection(".text.main") noreturn {
         while (i < 1000000) {
             i += 1;
         }
-        // const action: std.posix.Sigaction = .{
-        //     .handler = .{ .handler = &empty_func },
-        //     .mask = .{@as(u32,1) << std.c.SIG.TRAP - 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        //     // .mask = {@bitCast(std.c.SIG.TRAP)},
-        //     .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
-        // };
-        // action.mask[std.c.SIG.TRAP] = 1;
-        // _ = os.linux.sigaction(std.c.SIG.USR1, &action, null);
-        // action.handler.handler = &empty_func2;
-        // action.mask[std.c.SIG.TRAP] = 0;
-        // const action2: std.posix.Sigaction = .{
-        //     .handler = .{ .handler = &empty_func2 },
-        //     .mask = .{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-        //     // .mask = {@bitCast(std.c.SIG.TRAP)},
-        //     .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
-        // };
-        // _ = os.linux.sigaction(std.c.SIG.USR2, &action2, null);
-        // _ = os.linux.kill(3, std.c.SIG.USR1);
-        // _ = os.linux.syscall0(os.linux.syscalls.X86.sigpending); // FIXME
+        var action: std.posix.Sigaction = .{
+            .handler = .{ .handler = &empty_func },
+            .mask = .{@as(u32,1) << std.c.SIG.TRAP - 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+            // .mask = {@bitCast(std.c.SIG.TRAP)},
+            .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
+        };
+        action.mask[std.c.SIG.TRAP] = 1;
+        _ = os.linux.sigaction(std.c.SIG.USR1, &action, null);
+        action.handler.handler = &empty_func2;
+        action.mask[std.c.SIG.TRAP] = 0;
+        var action2: std.posix.Sigaction = .{
+            .handler = .{ .handler = &empty_func2 },
+            .mask = .{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+            // .mask = {@bitCast(std.c.SIG.TRAP)},
+            .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
+        };
+        _ = os.linux.sigaction(std.c.SIG.USR2, &action2, null);
+        _ = os.linux.kill(3, std.c.SIG.USR1);
+        _ = os.linux.syscall0(os.linux.syscalls.X86.sigpending); // FIXME
         // serial("child after {d}\n", .{ret});
         var buf: [10]u8 = .{0} ** 10;
         // @memcpy(buf[0..10], "1234567890");

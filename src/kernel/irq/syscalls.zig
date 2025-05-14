@@ -22,7 +22,6 @@ pub fn syscallsManager(state: *arch.Regs) void {
     }
     if (systable.SyscallTable.get(sys)) |hndlr| {
         state.eax = hndlr(
-            state,
             state.ebx,
             state.ecx,
             state.edx,
