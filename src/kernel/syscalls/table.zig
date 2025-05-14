@@ -217,6 +217,8 @@ pub const SyscallTable = brk: {
         .SYS_ugetrlimit                 = &notImpl,
         .SYS_mmap2                      = @ptrCast(&@import("mmap.zig").mmap2),
         .SYS_socketpair                 = @ptrCast(&@import("socketcall.zig").socketpair),
+        .SYS_sendto                     = @ptrCast(&@import("socketcall.zig").sendto),
+        .SYS_recvfrom                   = @ptrCast(&@import("socketcall.zig").recvfrom),
     });
 };
 

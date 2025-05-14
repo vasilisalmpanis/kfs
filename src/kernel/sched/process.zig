@@ -21,13 +21,10 @@ pub fn doFork(state: *arch.Regs) i32 {
         km.kfree(@intFromPtr(child));
         return -errors.ENOMEM;
     }
-    const stack_top: u32 = arch.setupStack(
-        stack + kthread.STACK_SIZE,
-        state.eip,
-        state.useresp,
-        arch.idt.USER_CODE_SEGMENT | 3,
-        arch.idt.USER_DATA_SEGMENT | 3,
-    );
+    const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
+    var new_regs: *arch.Regs = @ptrFromInt(stack_top);
+    new_regs.* = state.*;
+    new_regs.eax = 0;
     child.?.initSelf(
         page_directory,
         stack_top,

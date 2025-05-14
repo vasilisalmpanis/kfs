@@ -63,12 +63,12 @@ fn kill_handler(sig: i32) callconv(.c) void {
 
 fn empty_func(_: i32) callconv(.c) void {
     serial("SIGUSR1\n", .{});
-    while (true) {}
+    // while (true) {}
 }
 
 fn empty_func2(_: i32) callconv(.c) void {
     serial("SIGUSR2\n", .{});
-    while (true) {}
+    // while (true) {}
 }
 
 fn siginfo_hand(a: i32, b: *const os.linux.siginfo_t, c: ?*anyopaque) callconv(.c) void {
@@ -90,34 +90,50 @@ pub export fn main() linksection(".text.main") noreturn {
     _ = os.linux.socketpair(os.linux.AF.UNIX, os.linux.SOCK.STREAM, 0, &fds);
     const pid= os.linux.fork();
     if (pid == 0) {
-        const action: std.posix.Sigaction = .{
-            .handler = .{ .handler = &empty_func },
-            .mask = .{@as(u32,1) << std.c.SIG.TRAP - 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-            // .mask = {@bitCast(std.c.SIG.TRAP)},
-            .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
-        };
+        var i: u32 = 0;
+        while (i < 1000000) {
+            i += 1;
+        }
+        // const action: std.posix.Sigaction = .{
+        //     .handler = .{ .handler = &empty_func },
+        //     .mask = .{@as(u32,1) << std.c.SIG.TRAP - 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        //     // .mask = {@bitCast(std.c.SIG.TRAP)},
+        //     .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
+        // };
         // action.mask[std.c.SIG.TRAP] = 1;
-        _ = os.linux.sigaction(std.c.SIG.USR1, &action, null);
+        // _ = os.linux.sigaction(std.c.SIG.USR1, &action, null);
         // action.handler.handler = &empty_func2;
         // action.mask[std.c.SIG.TRAP] = 0;
-        const action2: std.posix.Sigaction = .{
-            .handler = .{ .handler = &empty_func2 },
-            .mask = .{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-            // .mask = {@bitCast(std.c.SIG.TRAP)},
-            .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
-        };
-        _ = os.linux.sigaction(std.c.SIG.USR2, &action2, null);
-        _ = os.linux.kill(3, std.c.SIG.USR1);
+        // const action2: std.posix.Sigaction = .{
+        //     .handler = .{ .handler = &empty_func2 },
+        //     .mask = .{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        //     // .mask = {@bitCast(std.c.SIG.TRAP)},
+        //     .flags = os.linux.SA.RESTORER,// | os.linux.SA.NODEFER,
+        // };
+        // _ = os.linux.sigaction(std.c.SIG.USR2, &action2, null);
+        // _ = os.linux.kill(3, std.c.SIG.USR1);
         // _ = os.linux.syscall0(os.linux.syscalls.X86.sigpending); // FIXME
         // serial("child after {d}\n", .{ret});
+        var buf: [10]u8 = .{0} ** 10;
+        // @memcpy(buf[0..10], "1234567890");
+        var ret = os.linux.recvfrom(fds[1], @ptrCast(&buf), 10, 0, null, null);
+        while (ret == 0) {
+            ret = os.linux.recvfrom(fds[1], @ptrCast(&buf), 10, 0, null, null);
+        }
+        serial("received: {s}\n", .{buf[0..10]});
         os.linux.exit(5);
     } else {
+        const res = std.posix.sendto(fds[0], "test send", 0, null, 0) catch |err| brk: {
+            serial("error: {any}", .{err});
+            break :brk 0;
+        };
+        // const res = os.linux.sendto(fds[0], "test send", 10, 0, null, 0);
         // var i: u32 = 0;
         // while (i < 1000000000) {
         //     i += 1;
         // }
         // _ = os.linux.kill(0, 2);
-        serial("parent after\n", .{});
+        serial("parent after {d}\n", .{res});
     }
     //     _ = os.linux.kill(@intCast(pid), 1);
     //     _ = os.linux.waitpid(@intCast(pid), &status, 0);

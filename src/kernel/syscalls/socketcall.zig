@@ -41,8 +41,16 @@ pub fn socketcall(regs: *arch.Regs, call: i32, args: [*]u32) i32 {
             @intCast(args[2]),
             @ptrFromInt(args[3]),
         ),
-        .SYS_RECV => return recv(),
-        .SYS_SEND => return sendto(
+        .SYS_RECVFROM => return recvfrom(
+            regs,
+            @intCast(args[0]),
+            @ptrFromInt(args[1]),
+            args[2],
+            args[3],
+            args[4],
+            @intCast(args[5]),
+        ),
+        .SYS_SENDTO => return sendto(
             regs,
             @intCast(args[0]),
             @ptrFromInt(args[1]),
@@ -76,11 +84,34 @@ pub fn socketpair(_: *arch.Regs, family: i32, s_type: i32, protocol: i32, usockv
     return 0;
 }
 
-fn recv() i32 {
+pub fn recvfrom(
+    _: *arch.Regs,
+    fd: i32,
+    ubuff: ?*anyopaque,
+    size: u32,
+    flags: u32,
+    addr: u32,
+    addr_len: i32
+) i32 {
+    _ = addr;
+    _ = addr_len;
+    _ = flags;
+    if (ubuff == null) {
+        return -errors.EFAULT;
+    }
+    if (krn.socket.findById(@intCast(fd))) |sock| {
+        const u_buff: [*]u8 = @ptrCast(ubuff);
+        const avail = sock.ringbuf.len();
+        const to_read = if (avail > size) size else avail;
+        sock.ringbuf.readFirstAssumeLength(u_buff[0..to_read], to_read);
+        return @intCast(to_read);
+    } else {
+        return -errors.EBADF;
+    }
     return 0;
 }
 
-fn sendto(_: *arch.Regs, fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, addr_len: i32) i32 {
+pub fn sendto(_: *arch.Regs, fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, addr_len: i32) i32 {
     _ = flags;
     _ = addr;
     _ = addr_len;
@@ -93,8 +124,11 @@ fn sendto(_: *arch.Regs, fd: i32, buff: ?*anyopaque, len: usize, flags: u32, add
     if (krn.socket.findById(@intCast(fd))) |sock| {
         if (sock.conn) |remote| {
             const ubuff: [*]u8 = @ptrCast(buff);
-            @memcpy(remote.buffer[0..], ubuff[0..len]);
-            return @intCast(len);
+            const free_space = remote.ringbuf.data.len - remote.ringbuf.len();
+            const to_write = if (free_space > len) len else free_space;
+            remote.ringbuf.writeSliceAssumeCapacity(ubuff[0..to_write]);
+            // return @intCast(len);
+            return -errors.ENOTCONN;
         } else {
             return -errors.ENOTCONN;
         }
