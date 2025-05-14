@@ -14,7 +14,7 @@ fn send_signal(task: *tsk.Task, signal: signals.Signal) i32 {
     return 0;
 }
 
-pub fn kill(_: *arch.Regs, pid: i32, sig: u32) i32 {
+pub fn kill(pid: i32, sig: u32) i32 {
     const signal: signals.Signal = @enumFromInt(sig);
     if (pid == 0 or pid < -1) {
         tsk.tasks_mutex.lock();
