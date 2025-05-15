@@ -4,26 +4,26 @@ const krn = @import("../main.zig");
 const arch = @import("arch");
 
 const CallType = enum(u8) {
-    SYS_SOCKET = 1,	    // 1  sys_socket(2)
-    SYS_BIND,	        // 2  sys_bind(2)
-    SYS_CONNECT,	    // 3  sys_connect(2)
-    SYS_LISTEN,	        // 4  sys_listen(2)
-    SYS_ACCEPT,	        // 5  sys_accept(2)
-    SYS_GETSOCKNAME,	// 6  sys_getsockname(2)
-    SYS_GETPEERNAME,	// 7  sys_getpeername(2)
-    SYS_SOCKETPAIR,	    // 8  sys_socketpair(2)
-    SYS_SEND,	        // 9  sys_send(2))
+    SYS_SOCKET = 1,	// 1   sys_socket(2)
+    SYS_BIND,	        // 2   sys_bind(2)
+    SYS_CONNECT,	// 3   sys_connect(2)
+    SYS_LISTEN,	        // 4   sys_listen(2)
+    SYS_ACCEPT,	        // 5   sys_accept(2)
+    SYS_GETSOCKNAME,	// 6   sys_getsockname(2)
+    SYS_GETPEERNAME,	// 7   sys_getpeername(2)
+    SYS_SOCKETPAIR,	// 8   sys_socketpair(2)
+    SYS_SEND,	        // 9   sys_send(2))
     SYS_RECV,	        // 10  sys_recv(2))
     SYS_SENDTO,	        // 11  sys_sendto(2)
-    SYS_RECVFROM,	    // 12  sys_recvfrom(2)
-    SYS_SHUTDOWN,	    // 13  sys_shutdown(2)
-    SYS_SETSOCKOPT,	    // 14  sys_setsockopt(2)
-    SYS_GETSOCKOPT,	    // 15  sys_getsockopt(2)
-    SYS_SENDMSG,	    // 16  sys_sendmsg(2)
-    SYS_RECVMSG,	    // 17  sys_recvmsg(2)
-    SYS_ACCEPT4,	    // 18  sys_accept4(2)
-    SYS_RECVMMSG,	    // 19  sys_recvmmsg(2)
-    SYS_SENDMMSG,	    // 20  sys_sendmmsg(2)
+    SYS_RECVFROM,	// 12  sys_recvfrom(2)
+    SYS_SHUTDOWN,	// 13  sys_shutdown(2)
+    SYS_SETSOCKOPT,	// 14  sys_setsockopt(2)
+    SYS_GETSOCKOPT,	// 15  sys_getsockopt(2)
+    SYS_SENDMSG,	// 16  sys_sendmsg(2)
+    SYS_RECVMSG,	// 17  sys_recvmsg(2)
+    SYS_ACCEPT4,	// 18  sys_accept4(2)
+    SYS_RECVMMSG,	// 19  sys_recvmmsg(2)
+    SYS_SENDMMSG,	// 20  sys_sendmmsg(2)
     _
 };
 
@@ -97,8 +97,10 @@ pub fn recvfrom(
     }
     if (krn.socket.findById(@intCast(fd))) |sock| {
         const u_buff: [*]u8 = @ptrCast(ubuff);
+        sock.lock.lock();
         const avail = sock.ringbuf.len();
         const to_read = if (avail > size) size else avail;
+        defer sock.lock.unlock();
         sock.ringbuf.readFirstAssumeLength(u_buff[0..to_read], to_read);
         return @intCast(to_read);
     } else {
@@ -120,6 +122,8 @@ pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, add
     if (krn.socket.findById(@intCast(fd))) |sock| {
         if (sock.conn) |remote| {
             const ubuff: [*]u8 = @ptrCast(buff);
+            remote.lock.lock();
+            defer remote.lock.unlock();
             const free_space = remote.ringbuf.data.len - remote.ringbuf.len();
             const to_write = if (free_space > len) len else free_space;
             remote.ringbuf.writeSliceAssumeCapacity(ubuff[0..to_write]);
