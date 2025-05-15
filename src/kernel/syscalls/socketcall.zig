@@ -123,8 +123,7 @@ pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, add
             const free_space = remote.ringbuf.data.len - remote.ringbuf.len();
             const to_write = if (free_space > len) len else free_space;
             remote.ringbuf.writeSliceAssumeCapacity(ubuff[0..to_write]);
-            // return @intCast(len);
-            return -errors.ENOTCONN;
+            return @intCast(len);
         } else {
             return -errors.ENOTCONN;
         }
