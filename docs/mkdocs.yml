@@ -10,6 +10,8 @@ Nav:
     - locking.md
   Signals:
     - Signals.md
+  LibC:
+    - Signals.md
 
 theme:
   name: material
@@ -19,3 +21,10 @@ theme:
     - bash
   features:
     - navigation.indexes
+
+markdown_extensions:
+  - pymdownx.tasklist
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
