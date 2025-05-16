@@ -73,8 +73,8 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
     );
     new_task.threadfn = f;
     new_task.arg = arg;
+    new_task.mm = &mm.proc_mm.init_mm;
     new_task.initSelf(
-        @intFromPtr(&arch.vmm.initial_page_dir) - mm.PAGE_OFFSET,
         stack_top,
         stack,
         0,

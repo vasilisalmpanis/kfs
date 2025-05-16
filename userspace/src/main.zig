@@ -127,6 +127,8 @@ pub export fn main() linksection(".text.main") noreturn {
             serial("error: {any}", .{err});
             break :brk 0;
         };
+        var status: u32 = 0;
+        _ = os.linux.wait4(@intCast(pid), &status, 0, null);
         // const res = os.linux.sendto(fds[0], "test send", 10, 0, null, 0);
         // var i: u32 = 0;
         // while (i < 1000000000) {

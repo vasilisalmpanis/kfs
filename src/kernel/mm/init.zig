@@ -9,6 +9,9 @@ const heap = @import("./heap.zig");
 const printf = @import("debug").printf;
 const dbg = @import("debug");
 
+pub const proc_mm = @import("./proc_mm.zig");
+pub const MM = @import("./proc_mm.zig").MM;
+
 pub const kmalloc = @import("./kmalloc.zig").kmalloc;
 pub const kfree = @import("./kmalloc.zig").kfree;
 pub const ksize = @import("./kmalloc.zig").ksize;
