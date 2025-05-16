@@ -5,6 +5,14 @@ const STACK_SIZE = mm.PAGE_SIZE * 2000;
 const STACK_TOP = mm.PAGE_OFFSET;
 const STACK_BOTTOM = STACK_TOP - STACK_SIZE;
 
+pub const PROT_READ	 :u32 = 0x1;		// page can be read
+pub const PROT_WRITE	 :u32 = 0x2;		// page can be written
+pub const PROT_EXEC	 :u32 = 0x4;		// page can be executed
+pub const PROT_SEM	 :u32 = 0x8;		// page may be used for atomic ops
+pub const PROT_NONE	 :u32 = 0x0;		// page can not be accessed
+pub const PROT_GROWSDOWN :u32 = 0x01000000;	// mprotect flag: extend change to start of growsdown vma
+pub const PROT_GROWSUP   :u32 = 0x02000000;	// mprotect flag: extend change to end of growsup vma
+
 const VMA = struct {
     start: u32,
     end: u32,
