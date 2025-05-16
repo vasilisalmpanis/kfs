@@ -11,6 +11,7 @@ const printf = @import("debug").printf;
 const mutex = @import("./mutex.zig").Mutex;
 const signal = @import("./signals.zig");
 const ThreadHandler = @import("./kthread.zig").ThreadHandler;
+const mm = @import("../mm/init.zig");
 
 var pid: u32 = 0;
 
@@ -81,7 +82,6 @@ pub const RefCount = struct {
 pub const Task = struct {
     pid:            u32,
     tsktype:        TaskType,
-    virtual_space:  u32,
     uid:            u16,
     gid:            u16,
     pgid:           u16             = 1,
@@ -94,6 +94,8 @@ pub const Task = struct {
     refcount:       RefCount        = RefCount.init(),
     wakeup_time:    usize           = 0,
 
+    mm:             ?*mm.MM              = null,
+
     // signals
     sighand:        signal.SigHand       = signal.SigHand.init(),
     sigmask:        signal.sigset_t      = signal.sigset_t.init(),
@@ -104,10 +106,9 @@ pub const Task = struct {
     result:         i32                  = 0,
     should_stop:    bool                 = false,
 
-    pub fn init(virt: u32, uid: u16, gid: u16, pgid: u16, tp: TaskType) Task {
+    pub fn init(uid: u16, gid: u16, pgid: u16, tp: TaskType) Task {
         return Task{
             .pid = 0,
-            .virtual_space = virt,
             .uid = uid,
             .gid = gid,
             .pgid = pgid,
@@ -117,7 +118,6 @@ pub const Task = struct {
     }
 
     pub fn setup(self: *Task, virt: u32, task_stack_top: u32, task_stack_bottom: u32) void {
-        self.virtual_space = virt;
         self.pid = pid;
         pid += 1;
         self.regs.esp = task_stack_top;
@@ -125,11 +125,12 @@ pub const Task = struct {
         self.list.setup();
         self.tree.setup();
         self.refcount = RefCount.init();
+        self.mm = &mm.proc_mm.init_mm;
+        mm.proc_mm.init_mm.vas = virt;
     }
 
     pub fn initSelf(
         self: *Task,
-        virt: u32,
         task_stack_top: u32,
         stack_btm: u32,
         uid: u16,
@@ -137,14 +138,13 @@ pub const Task = struct {
         pgid: u16,
         tp: TaskType
     ) void {
-        const tmp = Task.init(virt, uid, gid, pgid, tp);
+        const tmp = Task.init(uid, gid, pgid, tp);
         self.uid = tmp.uid;
         self.gid = tmp.gid;
         self.pgid = tmp.pgid;
         self.state = tmp.state;
         self.refcount = tmp.refcount;
         self.wakeup_time = tmp.wakeup_time;
-        self.virtual_space = tmp.virtual_space;
         self.stack_bottom = tmp.stack_bottom;
         self.tsktype = tmp.tsktype;
 
@@ -254,7 +254,7 @@ pub fn sleep(millis: usize) void {
     reschedule();
 }
 
-pub var initial_task = Task.init(0, 0, 0, 1, .KTHREAD);
+pub var initial_task = Task.init(0, 0, 1, .KTHREAD);
 pub var current = &initial_task;
 pub var tasks_mutex: mutex = mutex.init();
 pub var stopped_tasks: ?*lst.ListHead = null;

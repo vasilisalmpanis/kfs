@@ -22,7 +22,7 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     } else {
         gdt.tss.esp0 = to.stack_bottom + STACK_SIZE; // this needs fixing
     }
-    asm volatile("mov %[pd], %cr3"::[pd] "r" (to.virtual_space));
+    asm volatile("mov %[pd], %cr3"::[pd] "r" (to.mm.?.vas));
     return @ptrFromInt(to.regs.esp);
 }
 
@@ -49,7 +49,7 @@ fn processTasks() void {
         }
         curr.del();
         task.delFromTree();
-        krn.mm.virt_memory_manager.deinitVirtualSpace(task.virtual_space);
+        task.mm.?.delete();
         kthreadStackFree(task.stack_bottom);
         km.kfree(@intFromPtr(task));
         if (end)

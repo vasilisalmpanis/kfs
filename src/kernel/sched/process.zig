@@ -7,18 +7,19 @@ const arch = @import("arch");
 
 pub fn doFork() i32 {
     var child: ?*tsk.Task = null;
-    const page_directory: u32 = mm.virt_memory_manager.cloneVirtualSpace(); // it clones all memory including stack
-    if (page_directory == 0)
-        return -errors.ENOMEM;
     child = @ptrFromInt(km.kmalloc(@sizeOf(tsk.Task)));
     if (child == null) {
-        // TODO: we need to free page directory
         return -errors.ENOMEM;
     }
     const stack: u32 = kthread.kthreadStackAlloc(kthread.STACK_PAGES);
     if (stack == 0) {
-        // TODO: we need to free page directory
         km.kfree(@intFromPtr(child));
+        return -errors.ENOMEM;
+    }
+    child.?.mm = tsk.current.mm.?.dup();
+    if (child.?.mm == null) {
+        km.kfree(stack);
+        mm.kfree(@intFromPtr(child));
         return -errors.ENOMEM;
     }
     const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
@@ -27,7 +28,6 @@ pub fn doFork() i32 {
     child_regs.* = parent_regs.*;
     child_regs.eax = 0;
     child.?.initSelf(
-        page_directory,
         stack_top,
         stack,
         0, 
