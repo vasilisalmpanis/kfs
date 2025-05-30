@@ -27,7 +27,6 @@ pub fn goUserspace(userspace: []const u8) void {
 
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
     // const programm_header: *std.elf.Elf32_Phdr = @ptrFromInt(code + ehdr.e_phoff);
-
     const stack_size: u32 = 40 * 4096;
     const stack = krn.mm.uheap.alloc(
         stack_size,
@@ -41,6 +40,10 @@ pub fn goUserspace(userspace: []const u8) void {
     krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{ehdr.e_entry});
 
     arch.gdt.tss.esp0 = krn.task.current.regs.esp;
+    var heap_start = stack + stack_size;
+    heap_start = arch.pageAlign(heap_start, false);
+    krn.logger.INFO("heap_start {x}\n", .{heap_start});
+    krn.mm.proc_mm.init_mm.heap = heap_start;
 
     asm volatile(
         \\ cli
