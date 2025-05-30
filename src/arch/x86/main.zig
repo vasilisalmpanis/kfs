@@ -11,6 +11,7 @@ pub const archReschedule = @import("system/cpu.zig").archReschedule;
 pub const setupStack = @import("system/cpu.zig").setupStack;
 
 pub const PAGE_SIZE = @import("mm/pmm.zig").PAGE_SIZE;
+pub const pageAlign = @import("mm/pmm.zig").pageAlign;
 pub const IDT_MAX_DESCRIPTORS = @import("idt.zig").IDT_MAX_DESCRIPTORS;
 pub const CPU_EXCEPTION_COUNT = @import("idt.zig").CPU_EXCEPTION_COUNT;
 pub const SYSCALL_INTERRUPT = @import("idt.zig").SYSCALL_INTERRUPT;
