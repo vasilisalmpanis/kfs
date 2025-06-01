@@ -36,7 +36,7 @@ pub fn mmap2(
         krn.logger.INFO("heap_start mmap {x}\n", .{krn.task.current.mm.?.heap});
         // look through mappings and just give back one.
     }
-    const area: i32 = krn.task.current.mm.?.mmap_area(hint, length, prot, flags);
+    const area: i32 = krn.task.current.mm.?.mmap_area(hint, arch.pageAlign(length, false), prot, flags);
     const temp: i32 = @intCast(length);
     krn.logger.INFO("allocated area {x}-{x}\n", .{area, area + temp});
     return area;

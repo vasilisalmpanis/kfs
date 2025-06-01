@@ -84,6 +84,17 @@ const VMA = struct {
             );
         }
     }
+    pub fn new(addr: u32, end: u32, owner: *MM, flags: MAP, prot: u32) ?*VMA {
+        const num: u32 = mm.kmalloc(@sizeOf(VMA));
+        if (num == 0)
+            return null;
+        const vma: *VMA = @ptrFromInt(num);
+        vma.setup(addr, end, owner, flags, prot) catch {
+            krn.mm.kfree(num);
+            return null;
+        };
+        return @ptrFromInt(num);
+    }
 };
 
 pub const MM = struct {
@@ -114,31 +125,63 @@ pub const MM = struct {
         return @ptrFromInt(num);
     }
 
+    pub fn mergable(self: *VMA, addr: u32, length: u32, prot: u32, flags: MAP) bool {
+        if (prot != self.prot)
+            return false;
+        if (self.flags.ANONYMOUS != flags.ANONYMOUS)
+            return false;
+        if (self.flags.TYPE != flags.TYPE)
+            return false;
+        if (addr + length == self.start)
+            return true;
+        if (addr == self.end)
+            return true;
+        return false;
+
+        // TODO: File backed mappings.
+    }
+
     pub fn mmap_area(self: *MM, addr: u32, length: u32, prot: u32, flags: MAP) i32
     {
         // 1. check if this addr is taken.
         //  - if free or map fixed, create mappings or replace mappings
         //  - if not free and map fixed replace
         //  - if not free and not map fixed, select random address.
-        const end = arch.pageAlign(addr + length, false);
+        var hint: u32 = addr;
+        const end = arch.pageAlign(hint + length, false);
         if (self.vmas) |list| {
             var it = list.list.iterator();
             while (it.next()) |node| {
                 const vma: *VMA = node.curr.entry(VMA, "list");
-                _ = vma;
+                if (vma.end < hint)
+                    continue;
+                if (vma.start >= hint + length) {
+                    // TODO: check mergable for previous, if yes merge previous
+                    // check mergable for current, if yes extend previous to current.end, free current
+                    // connect previous to current next. (when current is first node we cannot take prev).
+                    const mapping: ?*VMA = VMA.new(hint, end, self, flags, prot);
+                    if (mapping == null)
+                        return -errors.ENOMEM;
+                    it.curr.addTail(&mapping.?.list);
+                    return @intCast(mapping.?.start);
+                }
+                if (flags.FIXED == false) {
+                    hint = vma.end;
+                    continue;
+                }
+                // 1. begin before, end inside
+                // 2. begin before, end after
+                // 3. begin inside, end inside
+                // 4. begin inside, end after
+                // Implemente for FIXED
+                // remap, or split mapping in two and remap etc.
             }
         } else {
-            const new_map: u32 = mm.kmalloc(@sizeOf(VMA));
-            if (new_map == 0) {
+            const mapping: ?*VMA = VMA.new(hint, end, self, flags, prot);
+            if (mapping == null)
                 return -errors.ENOMEM;
-            }
-            const mapping: *VMA = @ptrFromInt(new_map);
-            mapping.setup(addr, end, self, flags, prot) catch {
-                krn.mm.kfree(new_map);
-                return -errors.ENOMEM;
-            };
             self.vmas = mapping;
-            return @intCast(mapping.start);
+            return @intCast(mapping.?.start);
             // allocate physical pages.
         }
         return 0;
