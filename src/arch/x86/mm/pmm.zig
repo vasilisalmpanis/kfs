@@ -4,7 +4,9 @@ const std = @import("std");
 pub const PAGE_SIZE = 4096;
 
 pub fn pageAlign(addr: u32, down: bool) u32 {
-    const result: u32 = addr & 0xFFFFF000;
+    if (addr & (PAGE_SIZE - 1) == 0)
+        return addr;
+    const result: u32 = addr & (0xFFFFFFFF - PAGE_SIZE + 1);
     if (down) {
         return result;
     }

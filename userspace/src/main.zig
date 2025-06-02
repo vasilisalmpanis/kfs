@@ -127,12 +127,18 @@ pub export fn main() linksection(".text.main") noreturn {
             serial("error: {any}", .{err});
             break :brk 0;
         };
-        const num: usize = os.linux.mmap(null, 4096, os.linux.PROT.WRITE, .{.ANONYMOUS = true, .TYPE = os.linux.MAP_TYPE.PRIVATE}, -1, 0);
+        var num: usize = os.linux.mmap(@ptrFromInt(0xb0000), 4096, os.linux.PROT.WRITE, .{.ANONYMOUS = true, .TYPE = os.linux.MAP_TYPE.PRIVATE}, -1, 0);
+        serial("allocated mem {x}\n", .{num});
+        num = os.linux.mmap(@ptrFromInt(0xb0000), 4096, os.linux.PROT.WRITE, .{.ANONYMOUS = true, .TYPE = os.linux.MAP_TYPE.PRIVATE}, -1, 0);
+        serial("allocated mem {x}\n", .{num});
+        num = os.linux.mmap(@ptrFromInt(0xc0000), 4096, os.linux.PROT.WRITE, .{.ANONYMOUS = true, .TYPE = os.linux.MAP_TYPE.PRIVATE}, -1, 0);
+        serial("allocated mem {x}\n", .{num});
+        num = os.linux.mmap(@ptrFromInt(0xbe000), 2 * 4096, os.linux.PROT.WRITE, .{.ANONYMOUS = true, .TYPE = os.linux.MAP_TYPE.PRIVATE}, -1, 0);
+        serial("allocated mem {x}\n", .{num});
+        num = os.linux.mmap(@ptrFromInt(0xa7000), 2 * 4096, os.linux.PROT.WRITE, .{.ANONYMOUS = true, .TYPE = os.linux.MAP_TYPE.PRIVATE}, -1, 0);
+        serial("allocated mem {x}\n", .{num});
         // serial("num {x}\n", .{num});
-        const obj: *u32 = @ptrFromInt(num + 120);
-        obj.* = 5;
 
-        serial("allocated mem {d} {x}\n", .{obj.*, num});
         var status: u32 = 0;
         _ = os.linux.wait4(@intCast(pid), &status, 0, null);
         // const res = os.linux.sendto(fds[0], "test send", 10, 0, null, 0);

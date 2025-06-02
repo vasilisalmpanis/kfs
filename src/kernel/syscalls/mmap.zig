@@ -21,13 +21,14 @@ pub fn mmap2(
         return -errors.EINVAL;
     // addr specifies the wanted virtual address (suggestion)
     // length is the size of the mapping
+    const len: u32 = arch.pageAlign(length, false);
     var hint: u32 = @intFromPtr(addr);
     if (addr != null) {
-        if (hint & arch.PAGE_SIZE > 0) {
+        if (hint & (arch.PAGE_SIZE - 1) > 0) {
             if (flags.FIXED) {
                 return -errors.EINVAL;
             }
-            hint &= arch.PAGE_SIZE;
+            hint = arch.pmm.pageAlign(hint, false);
         }
         if (hint < krn.task.current.mm.?.heap)
             hint = krn.task.current.mm.?.heap;
@@ -36,8 +37,6 @@ pub fn mmap2(
         krn.logger.INFO("heap_start mmap {x}\n", .{krn.task.current.mm.?.heap});
         // look through mappings and just give back one.
     }
-    const area: i32 = krn.task.current.mm.?.mmap_area(hint, arch.pageAlign(length, false), prot, flags);
-    const temp: i32 = @intCast(length);
-    krn.logger.INFO("allocated area {x}-{x}\n", .{area, area + temp});
+    const area: i32 = krn.task.current.mm.?.mmap_area(hint, len, prot, flags);
     return area;
 }

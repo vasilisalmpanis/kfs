@@ -1,6 +1,7 @@
 const printf = @import("./printf.zig").printf;
 const multiboot = @import("arch").multiboot;
 const mm = @import("kernel").mm;
+const krn = @import("kernel");
 
 const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
@@ -255,4 +256,21 @@ pub fn printMapped() void {
         unit = "KB";
     }
     printf("Total: {d} {s} ({d} B)\n", .{size_friendly, unit, total});
+}
+
+
+pub fn printTaskVMAs(pid: u32) void {
+    if (krn.task.initial_task.findByPid(pid)) |tsk| {
+        if (tsk.mm.?.vmas) |vma| {
+            var it = vma.list.iterator();
+            while (it.next()) |i| {
+                const curr = i.curr.entry(krn.proc_mm.VMA, "list");
+                printf("0x{x:0>8} - 0x{x:0>8}\n", .{curr.start, curr.end});
+            }
+        } else {
+            printf("No VMAs!\n", .{});
+        }
+    } else {
+        printf("No such task!\n", .{});
+    }
 }

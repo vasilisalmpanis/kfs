@@ -61,6 +61,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "mm", .desc = "Walk page tables", .hndl = &mm });
         self.registerCommand(.{ .name = "mm-usage", .desc = "Show memory usage", .hndl = &mmUsage });
         self.registerCommand(.{ .name = "sym", .desc = "Lookup symbol name by address", .hndl = &sym });
+        self.registerCommand(.{ .name = "vmas", .desc = "Print task's VMAs", .hndl = &vmas });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -229,5 +230,20 @@ fn sym(_: *Shell, args: [][]const u8) void {
         addr,
         if (debug.lookupSymbol(addr)) |s| s else "?"
     });
+    return;
+}
+
+fn vmas(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf(
+            \\Usage: vmas <task pid>
+            \\  Example: vmas 3
+            \\
+            , .{}
+        );
+        return ;
+    }
+    const pid: u32 = std.fmt.parseInt(u32, args[0], 10) catch 0;
+    debug.printTaskVMAs(pid);
     return;
 }
