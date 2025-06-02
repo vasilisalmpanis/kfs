@@ -16,6 +16,7 @@ pub const PROT_NONE	 :u32 = 0x0;		// page can not be accessed
 pub const PROT_GROWSDOWN :u32 = 0x01000000;	// mprotect flag: extend change to start of growsdown vma
 pub const PROT_GROWSUP   :u32 = 0x02000000;	// mprotect flag: extend change to end of growsup vma
 
+
 pub const MAP_TYPE = enum(u4) {
     SHARED = 0x01,
     PRIVATE = 0x02,
@@ -45,7 +46,7 @@ pub const MAP = packed struct(u32) {
         _: u5 = 0,
 };
 
-const VMA = struct {
+pub const VMA = struct {
     start: u32,
     end: u32,
     mm: ?*MM,
@@ -60,16 +61,16 @@ const VMA = struct {
         self.flags = flags;
         self.prot = prot;
         self.list.setup();
-        try self.allocatePages();
+        try self.allocFullVMA();
     }
 
-    pub fn allocatePages(self: *VMA) !void {
-        const num_of_pages = (self.end - self.start) / arch.PAGE_SIZE;
+    pub fn allocatePages(self: *VMA, start: u32, end: u32) !void {
+        const num_of_pages = (end - start) / arch.PAGE_SIZE;
         for (0..num_of_pages) |index| {
             const page: u32 = krn.mm.virt_memory_manager.pmm.allocPage();
             if (page == 0) {
                 for (0..index) |idx| {
-                    mm.virt_memory_manager.unmapPage(self.start + idx * arch.PAGE_SIZE, true);
+                    mm.virt_memory_manager.unmapPage(start + idx * arch.PAGE_SIZE, true);
                 }
                 return error.OutOfMemory;
             }
@@ -78,12 +79,17 @@ const VMA = struct {
                 .user = true,
                 .present = true,
             };
-            krn.mm.virt_memory_manager.mapPage(self.start + index * arch.PAGE_SIZE,
+            krn.mm.virt_memory_manager.mapPage(start + index * arch.PAGE_SIZE,
                 page,
                 flags
             );
         }
     }
+
+    pub fn allocFullVMA(self: *VMA) !void {
+        return try allocatePages(self, self.start, self.end);
+    }
+
     pub fn new(addr: u32, end: u32, owner: *MM, flags: MAP, prot: u32) ?*VMA {
         const num: u32 = mm.kmalloc(@sizeOf(VMA));
         if (num == 0)
@@ -94,6 +100,22 @@ const VMA = struct {
             return null;
         };
         return @ptrFromInt(num);
+    }
+
+    pub fn mergable(self: *VMA, addr: u32, length: u32, prot: u32, flags: MAP) bool {
+        if (prot != self.prot)
+            return false;
+        if (self.flags.ANONYMOUS != flags.ANONYMOUS)
+            return false;
+        if (self.flags.TYPE != flags.TYPE)
+            return false;
+        if (addr + length == self.start)
+            return true;
+        if (addr == self.end)
+            return true;
+        return false;
+
+        // TODO: File backed mappings.
     }
 };
 
@@ -125,20 +147,58 @@ pub const MM = struct {
         return @ptrFromInt(num);
     }
 
-    pub fn mergable(self: *VMA, addr: u32, length: u32, prot: u32, flags: MAP) bool {
-        if (prot != self.prot)
-            return false;
-        if (self.flags.ANONYMOUS != flags.ANONYMOUS)
-            return false;
-        if (self.flags.TYPE != flags.TYPE)
-            return false;
-        if (addr + length == self.start)
-            return true;
-        if (addr == self.end)
-            return true;
-        return false;
-
-        // TODO: File backed mappings.
+    pub fn add_vma(
+        self: *MM,
+        curr: ?*lst.ListHead,
+        addr: u32,
+        length: u32,
+        prot: u32,
+        flags: MAP
+    ) !?*VMA {
+        var new_vma: ?*VMA = null;
+        if (curr) |c| {
+            const vma: *VMA = c.entry(VMA, "list");
+            const prev = c.prev.?.entry(VMA, "list");
+            const next = c.next.?.entry(VMA, "list");
+            if (
+                prev.start < vma.start
+                and prev.mergable(addr, length, prot, flags)
+            ) {
+                try prev.allocatePages(prev.end, prev.end + length);
+                prev.end += length;
+                new_vma = prev;
+                if (
+                    next.start > vma.start
+                    and next.mergable(addr, length, prot, flags)
+                ) {
+                    new_vma.?.end = next.end;
+                    next.list.del();
+                    krn.mm.kfree(@intFromPtr(next));
+                }
+                return new_vma;
+            } else if (
+                next.start > vma.start
+                and next.mergable(addr, length, prot, flags)
+            ) {
+                try next.allocatePages(addr, next.start);
+                next.start = addr;
+                return next;
+            } else if (vma.mergable(addr, length, prot, flags)) {
+                if (vma.end == addr) {
+                    try vma.allocatePages(vma.end, vma.end + length);
+                    vma.end += length;
+                } else {
+                    try vma.allocatePages(addr, vma.start);
+                    vma.start = addr;
+                }
+                return vma;
+            }
+        }
+        new_vma = VMA.new(addr, addr + length, self, flags, prot);
+        if (new_vma == null)
+            return error.OutOfMemory;
+        if (curr) |c| c.addTail(&new_vma.?.list);
+        return new_vma;
     }
 
     pub fn mmap_area(self: *MM, addr: u32, length: u32, prot: u32, flags: MAP) i32
@@ -148,7 +208,8 @@ pub const MM = struct {
         //  - if not free and map fixed replace
         //  - if not free and not map fixed, select random address.
         var hint: u32 = addr;
-        const end = arch.pageAlign(hint + length, false);
+        var end = hint + length;
+        var new_vma: ?*VMA = null;
         if (self.vmas) |list| {
             var it = list.list.iterator();
             while (it.next()) |node| {
@@ -156,17 +217,22 @@ pub const MM = struct {
                 if (vma.end < hint)
                     continue;
                 if (vma.start >= hint + length) {
-                    // TODO: check mergable for previous, if yes merge previous
-                    // check mergable for current, if yes extend previous to current.end, free current
-                    // connect previous to current next. (when current is first node we cannot take prev).
-                    const mapping: ?*VMA = VMA.new(hint, end, self, flags, prot);
-                    if (mapping == null)
-                        return -errors.ENOMEM;
-                    it.curr.addTail(&mapping.?.list);
-                    return @intCast(mapping.?.start);
+                    new_vma = self.add_vma(
+                        node.curr,
+                        hint,
+                        length,
+                        prot,
+                        flags
+                    ) catch |err| switch (err) {
+                        error.OutOfMemory => return -errors.ENOMEM
+                    };
+                    if (hint < self.vmas.?.start)
+                        self.vmas = new_vma;
+                    return @intCast(hint);
                 }
                 if (flags.FIXED == false) {
                     hint = vma.end;
+                    end = hint + length;
                     continue;
                 }
                 // 1. begin before, end inside
@@ -176,15 +242,20 @@ pub const MM = struct {
                 // Implemente for FIXED
                 // remap, or split mapping in two and remap etc.
             }
-        } else {
-            const mapping: ?*VMA = VMA.new(hint, end, self, flags, prot);
-            if (mapping == null)
-                return -errors.ENOMEM;
-            self.vmas = mapping;
-            return @intCast(mapping.?.start);
-            // allocate physical pages.
         }
-        return 0;
+        new_vma = self.add_vma(
+            if (self.vmas == null) null else self.vmas.?.list.prev,
+            hint,
+            length,
+            prot,
+            flags
+        ) catch |err| switch (err) {
+            error.OutOfMemory => return -errors.ENOMEM
+        };
+        if (self.vmas == null or hint < self.vmas.?.start) {
+            self.vmas = new_vma;
+        }
+        return @intCast(hint);
     }
 
     pub fn dup(self: *MM) ?*MM {
@@ -215,4 +286,3 @@ pub const MM = struct {
 };
 
 pub var init_mm: MM = MM.init();
-
