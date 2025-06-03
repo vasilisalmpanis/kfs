@@ -123,8 +123,9 @@ pub const MM = struct {
     stack_top: u32 = 0,     // Higher
     stack_bottom: u32 = 0,  // Lower
     code: u32 = 0,
-    heap: u32 = 0,
+    data: u32 = 0,
     bss: u32 = 0,
+    heap: u32 = 0,
     vas: u32 = 0,
     vmas: ?*VMA = null,
 
