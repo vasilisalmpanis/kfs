@@ -16,6 +16,7 @@ const HeaderFlags = packed struct (u32) {
 };
 
 pub fn goUserspace(userspace: []const u8) void {
+    const stack_pages: u32 = 40;
     const userspace_offset: u32 = 0x1000;
     var heap_start: u32 = 0;
 
@@ -25,58 +26,65 @@ pub fn goUserspace(userspace: []const u8) void {
         .{.user = true}
     );
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
-    const programm_header_size: u32 = ehdr.e_phentsize;
-    const programm_header_num: u32 = ehdr.e_phnum;
-    for (0..programm_header_num) |i| {
-        const program_header: *std.elf.Elf32_Phdr = @ptrCast(@constCast(@alignCast(&userspace[ehdr.e_phoff + (programm_header_size * i)])));
-        const header_type: PT_TYPE = @enumFromInt(program_header.p_type);
+    for (0..ehdr.e_phnum) |i| {
+        const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
+            @constCast(@alignCast(&userspace[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
+        );
+        const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
         if (header_type != PT_TYPE.PT_LOAD) {
             continue;
         }
-        const virt_addr = program_header.p_vaddr;
-        const flags: HeaderFlags = @bitCast(program_header.p_flags);
-        var num_pages = program_header.p_memsz / arch.PAGE_SIZE;
-        if (program_header.p_memsz < arch.PAGE_SIZE)
-            num_pages = 1;
+        var num_pages = p_hdr.p_memsz / arch.PAGE_SIZE;
+        if (!arch.isPageAligned(p_hdr.p_memsz))
+            num_pages += 1;
         const phys = krn.mm.virt_memory_manager.pmm.allocPages(num_pages);
         if (phys == 0)
             @panic("Cannot go to userspace");
         for (0..num_pages) |idx| {
-            krn.mm.virt_memory_manager.mapPage(virt_addr + (idx * arch.PAGE_SIZE), phys + (idx * arch.PAGE_SIZE), .{
-                .user = true,
-            });
+            krn.mm.virt_memory_manager.mapPage(
+                p_hdr.p_vaddr + (idx * arch.PAGE_SIZE),
+                phys + (idx * arch.PAGE_SIZE),
+                .{ .user = true, }
+            );
         }
-        const code_ptr: [*]u8 = @ptrFromInt(program_header.p_vaddr);
-        if (flags.write == false) {
-            // allocate and memcpy
-            @memcpy(code_ptr[0..program_header.p_memsz], userspace[program_header.p_paddr..program_header.p_paddr + program_header.p_memsz]);
-        } else {
-            // allocate and set to 0
-            @memset(code_ptr[0..program_header.p_memsz], 0);
-            krn.task.current.mm.?.bss = program_header.p_vaddr;
+        const section_ptr: [*]u8 = @ptrFromInt(p_hdr.p_vaddr);
+        if (p_hdr.p_filesz > 0) {
+            @memcpy(
+                section_ptr[0..p_hdr.p_filesz],
+                userspace[p_hdr.p_offset..p_hdr.p_offset + p_hdr.p_filesz]
+            );
         }
-        if (program_header.p_vaddr + program_header.p_memsz > heap_start)
-            heap_start = program_header.p_vaddr + program_header.p_memsz;
+        if (p_hdr.p_memsz > p_hdr.p_filesz) {
+            @memset(section_ptr[p_hdr.p_filesz..p_hdr.p_memsz], 0);
+        }
+        if (p_hdr.p_vaddr + p_hdr.p_memsz > heap_start)
+            heap_start = p_hdr.p_vaddr + p_hdr.p_memsz;
     }
-    // while (true) {}
-    const stack_size: u32 = 40 * 4096;
+    const stack_size: u32 = stack_pages * arch.PAGE_SIZE;
     const stack_phys: u32 = krn.mm.virt_memory_manager.pmm.allocPages(stack_size / arch.PAGE_SIZE);
     if (stack_phys == 0)
         @panic("cannot allocate stack\n");
-    for (0..40) |idx| {
-        krn.mm.virt_memory_manager.mapPage(0xC0000000 - ((40 - idx) * arch.PAGE_SIZE), stack_phys + (idx * arch.PAGE_SIZE), .{ .user = true });
+    const stack_bottom: u32 = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE;
+    for (0..stack_pages) |idx| {
+        krn.mm.virt_memory_manager.mapPage(
+            stack_bottom + idx * arch.PAGE_SIZE,
+            stack_phys + (idx * arch.PAGE_SIZE),
+            .{ .user = true }
+        );
     }
-    const stack_ptr: [*]u8 = @ptrFromInt(0xC0000000 - (40 * arch.PAGE_SIZE));
+    const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
     @memset(stack_ptr[0..stack_size], 0);
 
-    krn.logger.INFO("Userspace code:  0x{X:0>8} 0x{X:0>8}", .{userspace_offset, userspace.len});
-    krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{0xC0000000 - 40 * arch.PAGE_SIZE, 0xC0000000});
+    krn.logger.INFO("Userspace code:  0x{X:0>8}", .{userspace_offset});
+    krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack_bottom, stack_bottom + stack_size});
     krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{ehdr.e_entry});
 
     arch.gdt.tss.esp0 = krn.task.current.regs.esp;
     heap_start = arch.pageAlign(heap_start, false);
-    krn.logger.INFO("heap_start {x}\n", .{heap_start});
+    krn.logger.INFO("heap_start 0x{X:0>8}\n", .{heap_start});
     krn.mm.proc_mm.init_mm.heap = heap_start;
+    krn.mm.proc_mm.init_mm.stack_bottom = stack_bottom;
+    krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size - arch.PAGE_SIZE;
 
     asm volatile(
         \\ cli
@@ -99,6 +107,6 @@ pub fn goUserspace(userspace: []const u8) void {
         ::
         // [uc] "r" (ehdr.e_entry),  // Should be like this, but libc initialization is not working now
         [uc] "r" (userspace_offset),           // main is always at 0x1000 from start
-        [us] "r" (0xC0000000),
+        [us] "r" (stack_bottom + stack_size - arch.PAGE_SIZE),
     );
 }

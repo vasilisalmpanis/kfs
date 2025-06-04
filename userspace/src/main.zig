@@ -48,6 +48,11 @@ fn test_wait() void {
     }
 }
 
+export var global: u32 = 53;
+
+export var to_bss: [100]u32 = undefined;
+var to_bss_another: u32 = undefined;
+
 var idx: u32 = 0;
 
 fn kill_handler(sig: i32) callconv(.c) void {
@@ -86,6 +91,7 @@ fn siginfo_hand(a: i32, b: *const os.linux.siginfo_t, c: ?*anyopaque) callconv(.
 pub export fn main() linksection(".text.main") noreturn {
     // test_wait();
     // var status: u32 = undefined;
+    serial("global: {d}, to_bss: {any}\n", .{global, to_bss});
     var fds: [2]i32 = .{0, 0};
     _ = os.linux.socketpair(os.linux.AF.UNIX, os.linux.SOCK.STREAM, 0, &fds);
     const pid= os.linux.fork();
@@ -148,6 +154,16 @@ pub export fn main() linksection(".text.main") noreturn {
         // }
         // _ = os.linux.kill(0, 2);
         serial("parent after {d}\n", .{res});
+
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+
+        const allocator = arena.allocator();
+
+        const ptr = allocator.create(i32) catch null;
+        ptr.?.* = 77;
+        std.debug.print("ptr={*} {d}\n", .{ptr, ptr.?.*});
+
     }
     //     _ = os.linux.kill(@intCast(pid), 1);
     //     _ = os.linux.waitpid(@intCast(pid), &status, 0);
