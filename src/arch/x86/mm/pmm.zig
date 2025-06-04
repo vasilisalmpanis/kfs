@@ -3,14 +3,18 @@ const std = @import("std");
 
 pub const PAGE_SIZE = 4096;
 
-pub fn pageAlign(addr: u32, down: bool) u32 {
-    if (addr & (PAGE_SIZE - 1) == 0)
+pub inline fn pageAlign(addr: u32, down: bool) u32 {
+    if (isPageAligned(addr))
         return addr;
     const result: u32 = addr & (0xFFFFFFFF - PAGE_SIZE + 1);
     if (down) {
         return result;
     }
     return result + PAGE_SIZE;
+}
+
+pub inline fn isPageAligned(addr: u32) bool {
+    return addr & (PAGE_SIZE - 1) == 0;
 }
 
 const PagesChunk = struct {
