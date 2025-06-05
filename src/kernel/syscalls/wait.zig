@@ -37,7 +37,6 @@ const Rusage = packed struct {
 
 pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) i32 {
     _ = rusage;
-    _ = stat_addr;
     krn.logger.DEBUG("waiting pid {d} from pid {d}", .{pid, tsk.current.pid});
     if (pid > 0) {
         if (tsk.current.findChildByPid(@intCast(pid))) |task| {
@@ -46,8 +45,12 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) i32 {
                 sched.reschedule();
             }
             task.finish();
-            return task.result;
+            if (stat_addr != null) {
+                stat_addr.?.* = task.result;
+            }
+            return 0;
         } else {
+            krn.logger.INFO("ERROR\n", .{});
             return errors.ECHILD;
         }
     } else if (pid == 0) {
@@ -64,7 +67,10 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) i32 {
                     const res = i.curr.entry(tsk.Task, "tree");
                     if (res.state == .ZOMBIE and res.pgid == tsk.current.pgid) {
                         res.finish();
-                        return res.result;
+                        if (stat_addr != null) {
+                            stat_addr.?.* = res.result;
+                        }
+                        return 0;
                     }
                 }
                 if (options & WNOHANG > 0)
@@ -83,7 +89,10 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) i32 {
                     const res = i.curr.entry(tsk.Task, "tree");
                     if (res.state == .ZOMBIE) {
                         res.finish();
-                        return res.result;
+                        if (stat_addr != null) {
+                            stat_addr.?.* = res.result;
+                        }
+                        return 0;
                     }
                 }
                 if (options & WNOHANG > 0)
@@ -103,7 +112,10 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) i32 {
                     const res = i.curr.entry(tsk.Task, "tree");
                     if (res.state == .ZOMBIE and pgid == res.pgid) {
                         res.finish();
-                        return res.result;
+                        if (stat_addr != null) {
+                            stat_addr.?.* = res.result;
+                        }
+                        return 0;
                     }
                 }
                 if (options & WNOHANG > 0)
