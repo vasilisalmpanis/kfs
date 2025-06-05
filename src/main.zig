@@ -59,7 +59,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.boot_info = boot_info;
 
     krn.serial = Serial.init();
-    krn.logger = Logger.init(.DEBUG);
+    krn.logger = Logger.init(.WARN);
     dbg.initSymbolTable(boot_info);
     gdt.gdtInit();
     krn.logger.INFO("GDT initialized", .{});

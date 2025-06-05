@@ -219,6 +219,7 @@ pub const SyscallTable = brk: {
         .SYS_socketpair                 = @ptrCast(&@import("socketcall.zig").socketpair),
         .SYS_sendto                     = @ptrCast(&@import("socketcall.zig").sendto),
         .SYS_recvfrom                   = @ptrCast(&@import("socketcall.zig").recvfrom),
+        .SYS_getuid32                   = @ptrCast(&@import("../sched/process.zig").getUID),
     });
 };
 
