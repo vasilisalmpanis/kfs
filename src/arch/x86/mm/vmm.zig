@@ -219,13 +219,15 @@ pub const VMM = struct {
         const new_page: u32 = self.pmm.allocPage();
         const current_pd: [*]u32 = @ptrCast(current_page_dir);
         var free_index: u32 = 0;
-        while (current_pd[free_index] != 0 and free_index < 1024) : (free_index += 1) {} // TODO: improve
-        if (free_index == 1024)
+        while (free_index < 1024 and current_pd[free_index] != 0) : (free_index += 1) {} // TODO: improve
+        if (free_index == 1024) {
+            self.pmm.freePage(new_page);
             return 0;
+        }
         current_pd[free_index] = new_page | PAGE_WRITE | PAGE_PRESENT;
         var pt: [*]u32 = @ptrCast(first_page_table);
         pt += (0x400 * free_index);
-        @memset(pt[0..1024], 0); // sets the whole PT to 0.
+        invalidatePage(@intFromPtr(pt));
         pd[pd_idx] = new_page | @as(u12, @bitCast(flags));
         return free_index;
     }
@@ -271,6 +273,8 @@ pub const VMM = struct {
                 const page_flags: u12 = @truncate(pt[idx] & 0xFFF);
                 temp_pt[idx] = new_page | page_flags;
                 self.unmapPage(virt, false);
+            } else {
+                temp_pt[idx] = 0;
             }
         }
         pd[free_index] = 0;
@@ -287,19 +291,19 @@ pub const VMM = struct {
         // recursive mapping
         new_pd[1023] = new_pd_ph_addr | PAGE_PRESENT | PAGE_WRITE;
         
-        var pd_idx: u32 = 0;
         const kernel_pd: u32 = PAGE_OFFSET >> 22;
         const pd: [*]u32 = @ptrCast(current_page_dir);
-        while (pd_idx < 1023) : (pd_idx += 1) {
+        for (kernel_pd..1023) |pd_idx| {
+            // KERNEL_SPACE
+            new_pd[pd_idx] = pd[pd_idx];
+        }
+        for (0..kernel_pd) |pd_idx| {
+            // USER_SPACE
             if (pd[pd_idx] == 0) {
                 continue ;
             }
             if (pd[pd_idx] & PAGE_4MB == 0) {
-                if (pd_idx >= kernel_pd) {
-                    new_pd[pd_idx] = pd[pd_idx];
-                } else {
-                    _ = self.cloneTable(pd_idx, new_pd);
-                }
+                _ = self.cloneTable(pd_idx, new_pd);
             } else {
                 new_pd[pd_idx] = pd[pd_idx];
             }
