@@ -272,7 +272,9 @@ pub const MM = struct {
             _mmap.stack_top = self.stack_top;
             _mmap.stack_bottom = self.stack_bottom;
             _mmap.bss = self.bss;
-
+            _mmap.code = self.code;
+            _mmap.data = self.data;
+            _mmap.heap = self.heap;
         }
         return mmap;
     }
