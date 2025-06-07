@@ -29,25 +29,24 @@ fn screen(comptime format: []const u8, args: anytype) void {
     _ = std.io.getStdOut().writer().print(format, args) catch null;
 }
 
-fn test_wait() void {
-    serial("waitpid  first {d}\n", .{1234});
+fn testWait() void {
     const pid = std.posix.fork() catch |err| {
         serial("fork error {any}\n", .{err});
         return;
     };
-    serial("waitpid  first {d}\n", .{pid});
     if (pid == 0) {
-        std.posix.exit(1);
+        std.posix.exit(11);
     } else {
-        serial("waitpid {any} result: {any}\n", .{
+        serial("[CHILD] waitpid {any} result: {any}\n", .{
             pid,
             std.posix.waitpid(pid, 0)
         });
     }
 }
 
-fn custom_handler(_: i32) callconv(.c) void {
-    serial("Custom handler for child process\n", .{});
+fn customHandler(_: i32) callconv(.c) void {
+    serial("[CHILD] Custom handler for child process\n", .{});
+    std.posix.exit(55);
 }
 
 // var idx: u32 = 0;
@@ -63,7 +62,7 @@ fn custom_handler(_: i32) callconv(.c) void {
 //     serial("exiting handler\n", .{});
 // }
 
-fn allocate_memory() void {
+fn allocateMemory() void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
 
@@ -71,71 +70,113 @@ fn allocate_memory() void {
 
     const ptr = allocator.create(i32) catch null;
     ptr.?.* = 77;
-    std.debug.print("Child process mapped memory: ptr={*} {d}\n", .{ptr, ptr.?.*});
+    std.debug.print(
+        "[CHILD] Child process mapped memory: ptr={*} {d}\n",
+        .{ptr, ptr.?.*}
+    );
 }
 
-fn IPC(fds: [2]i32) void {
+fn ipc(sock_fd: i32) void {
     var message: [10]u8 = .{0} ** 10;
-    var ret = os.linux.recvfrom(fds[1], @ptrCast(&message), 10, 0, null, null);
-    while (ret == 0) {
-        ret = os.linux.recvfrom(fds[1], @ptrCast(&message), 10, 0, null, null);
-    }
-    serial("received: {s}\n", .{message[0..10]});
+    while (os.linux.recvfrom(
+        sock_fd,
+        @ptrCast(&message),
+        10,
+        0,
+        null,
+        null
+    ) == 0)
+    {}
+    serial("[CHILD] received: {s}\n", .{message[0..10]});
 }
 
-fn PID_UID(task: [] const u8) void {
+fn pidUid(task: [] const u8) void {
     const uid: u32 = os.linux.getuid();  
     const pid: i32 = os.linux.getpid();  
-    serial("{s} UID: {d} PID: {d}", .{task, uid, pid});
+    serial("{s} UID: {d} PID: {d}\n", .{task, uid, pid});
 }
 
 fn setAction() void {
     const action: std.posix.Sigaction = .{
-        .handler = .{ .handler = &custom_handler },
-        .mask = .{@as(u32,1) << std.c.SIG.TRAP - 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        .handler = .{ .handler = &customHandler },
+        .mask = .{@as(u32,1) << std.c.SIG.TRAP - 1} ++ .{0} ** 31,
         .flags = 0,
     };
     _ = os.linux.sigaction(std.c.SIG.ABRT, &action, null);
 }
 
-fn child_process(fds: [2]i32) void {
-    test_wait();
+fn childProcess(sock_fd: i32) void {
+    testWait();
+    pidUid("[CHILD]");
     setAction();
-    IPC(fds);
-    PID_UID("Child");
-    allocate_memory();
+    ipc(sock_fd);
+    allocateMemory();
 
+    _ = std.posix.sendto(
+        sock_fd,
+        "test send",
+        0,
+        null,
+        0
+    ) catch |err| brk: {
+        serial("[CHILD] error: {any}", .{err});
+        break :brk 0;
+    };
     // Child Process dies.
+    while (true) {}
     os.linux.exit(5); 
 }
 
 pub export fn main() linksection(".text.main") noreturn {
     var fds: [2]i32 = .{0, 0};
-    _ = os.linux.socketpair(os.linux.AF.UNIX, os.linux.SOCK.STREAM, 0, &fds);
+    _ = os.linux.socketpair(
+        os.linux.AF.UNIX,
+        os.linux.SOCK.STREAM,
+        0,
+        &fds
+    );
     const pid= os.linux.fork();
     if (pid == 0) {
-        child_process(fds);
+        childProcess(fds[1]);
     } else { 
         // Parent
+        // PID / UID
+        serial("[PARENT] PID of new Child {d}\n", .{pid});
+        pidUid("[PARENT]");
 
         // IPC in parent
-        const res = std.posix.sendto(fds[0], "test send", 0, null, 0) catch |err| brk: {
-            serial("error: {any}", .{err});
+        const res = std.posix.sendto(
+            fds[0],
+            "test send",
+            0,
+            null,
+            0
+        ) catch |err| brk: {
+            serial("[PARENT] error: {any}", .{err});
             break :brk 0;
         };
-        serial("Parent sent {d} bytes to child process\n", .{res});
+        serial("[PARENT] Parent sent {d} bytes to child process\n", .{res});
+        
 
-        // PID / UID
-        serial("PID of new Child {d}\n", .{pid});
-        PID_UID("Parent");
+        // Waiting for child to send message
+        var buf: [10]u8 = .{0} ** 10;
+        while (
+            std.posix.recvfrom(
+                fds[0],
+                @ptrCast(&buf),
+                0,
+                null,
+                null
+            ) catch 0 == 0
+        ) {}
 
         // Signaling
+        serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
-
         // waiting.
         var status: u32 = 0;
         _ = os.linux.wait4(@intCast(pid), &status, 0, null);
-        serial("Child process exited with status: {d}\n", .{status});
+        serial("[PARENT] Child process exited with status: {d}\n", .{status});
     }
     while (true) {}
 }

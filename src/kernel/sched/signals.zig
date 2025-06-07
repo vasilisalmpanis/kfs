@@ -413,6 +413,8 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         else => {
             task.state = .ZOMBIE;
             task.result = 128 + @intFromEnum(signal);
+            // krn.sched.reschedule();
+            return krn.sched.schedule(regs);
         }
     }
     return regs;

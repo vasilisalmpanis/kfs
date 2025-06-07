@@ -160,6 +160,7 @@ pub const Task = struct {
         self.tree.setup();
 
         self.sighand = current.sighand;
+        self.sighand.pending = std.StaticBitSet(32).initEmpty();
 
         tasks_mutex.lock();
         current.tree.addChild(&self.tree);
