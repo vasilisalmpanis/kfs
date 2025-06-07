@@ -20,11 +20,11 @@ pub fn goUserspace(userspace: []const u8) void {
     const userspace_offset: u32 = 0x1000;
     var heap_start: u32 = 0;
 
-    krn.mm.virt_memory_manager.mapPage(
-        0,
-        krn.mm.virt_memory_manager.pmm.allocPage(),
-        .{.user = true}
-    );
+    // krn.mm.virt_memory_manager.mapPage(
+    //     0,
+    //     krn.mm.virt_memory_manager.pmm.allocPage(),
+    //     .{.user = true}
+    // );
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
     for (0..ehdr.e_phnum) |i| {
         const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
