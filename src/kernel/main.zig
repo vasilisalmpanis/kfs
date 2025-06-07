@@ -1,5 +1,5 @@
 const TTY = @import("drivers").tty.TTY;
-const Keyboard = @import("drivers").Keyboard;
+const kbd = @import("drivers").keyboard;
 const PIT = @import("drivers").pit.PIT;
 const system = @import("arch").system;
 const gdt = @import("arch").gdt;
@@ -32,7 +32,7 @@ pub const errors = @import("./syscalls/error-codes.zig");
 
 pub const socket = @import("./net/socket.zig");
 
-pub var keyboard: Keyboard = undefined;
+pub var keyboard: *kbd.Keyboard = &kbd.keyboard;
 pub var pit: PIT = undefined;
 pub var serial: Serial = undefined;
 pub var logger: Logger = undefined;

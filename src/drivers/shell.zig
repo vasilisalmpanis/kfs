@@ -6,6 +6,7 @@ const screen = @import("screen.zig");
 const tty = @import("tty-fb.zig");
 const krn = @import("kernel");
 const std = @import("std");
+const keymaps = @import("./keymaps.zig");
 
 const ShellCommandHandler = fn (self: *Shell, args: [][]const u8) void;
 
@@ -62,6 +63,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "mm-usage", .desc = "Show memory usage", .hndl = &mmUsage });
         self.registerCommand(.{ .name = "sym", .desc = "Lookup symbol name by address", .hndl = &sym });
         self.registerCommand(.{ .name = "vmas", .desc = "Print task's VMAs", .hndl = &vmas });
+        self.registerCommand(.{ .name = "layout", .desc = "Change keyboard layout", .hndl = &layout });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -245,5 +247,28 @@ fn vmas(_: *Shell, args: [][]const u8) void {
     }
     const pid: u32 = std.fmt.parseInt(u32, args[0], 10) catch 0;
     debug.printTaskVMAs(pid);
+    return;
+}
+
+fn layout(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf(
+            \\Usage: layout <language>
+            \\  Available languages: us, de
+            \\  Example: layout de
+            \\
+            , .{}
+        );
+        return ;
+    }
+    if (std.mem.eql(u8, args[0], "us")) {
+        krn.keyboard.setKeymap(&keymaps.keymap_us);
+    }
+    else if (std.mem.eql(u8, args[0], "de")) {
+        krn.keyboard.setKeymap(&keymaps.keymap_de);
+    }
+    else {
+        debug.printf("Unknown layout!\n", .{});
+    }
     return;
 }
