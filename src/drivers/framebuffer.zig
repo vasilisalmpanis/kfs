@@ -43,7 +43,7 @@ pub const FrameBuffer = struct {
             virt_addr += mm.PAGE_SIZE;
             addr += mm.PAGE_SIZE;
         }
-        const buffer: ?[*]u32 = mm.kmallocArray(u32, fb_info.?.width * fb_info.?.height * @sizeOf(u32));
+        const buffer: ?[*]u32 = mm.kmallocArray(u32, fb_info.?.width * fb_info.?.height);
         if (buffer) |_buffer| {
             var fb = FrameBuffer{
                 .fb_info = fb_info.?,

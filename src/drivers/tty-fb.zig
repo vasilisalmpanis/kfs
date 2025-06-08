@@ -100,29 +100,21 @@ pub const TTY = struct {
     shell: Shell,
 
     pub fn init(width: u32, height: u32) TTY {
-        const buffer: ?[*]u8 = mm.kmallocArray(u8, width * height);
-        const prev_buffer: ?[*]u8 = mm.kmallocArray(u8, width * height);
-        const line: ?[*]u8 = mm.kmallocArray(u8, width);
-        if (buffer != null and
-            prev_buffer != null and
-            line != null
-            ) 
-        {
+        const buffer: [*]u8 = if (mm.kmallocArray(u8, width * height)) |buf| buf else @panic("buffer");
+        const prev_buffer: [*]u8 = if (mm.kmallocArray(u8, width * height)) |buf| buf else @panic("prev_buffer");
+        const line: [*]u8 = if (mm.kmallocArray(u8, width)) |_line| _line else @panic("line");
             var tty = TTY{
                 .width = width,
                 .height = height,
-                ._buffer = buffer.?,
-                ._prev_buffer = prev_buffer.?,
-                ._line = line.?,
+                ._buffer = buffer,
+                ._prev_buffer = prev_buffer,
+                ._line = line,
                 .shell = Shell.init(),
             };
             @memset(tty._buffer[0..width * height], 0);
             @memset(tty._prev_buffer[0..width * height], 0);
             tty.clear();
             return tty;
-        } else {
-            @panic("Cannot create initial TTY");
-        }
     }
 
     fn renderCursor(self: *TTY) void {
