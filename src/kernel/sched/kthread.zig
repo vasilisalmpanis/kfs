@@ -52,37 +52,36 @@ pub fn kthreadStackFree(addr: u32) void {
 }
 
 pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
-    const addr = km.kmalloc(@sizeOf(tsk.Task));
     var stack: u32 = undefined;
-    if (addr == 0)
-        return error.MemoryAllocation;
-    const new_task: *tsk.Task = @ptrFromInt(
-        addr
-    );
-    stack = kthreadStackAlloc(STACK_PAGES);
-    if (stack == 0) {
-        km.kfree(addr);
+    const new_task: ?*tsk.Task = km.kmalloc(tsk.Task);
+    if (new_task) |task| {
+        stack = kthreadStackAlloc(STACK_PAGES);
+        if (stack == 0) {
+            km.kfree(task);
+            return error.MemoryAllocation;
+        }
+        const stack_top: u32 = arch.setupStack(
+            stack + STACK_SIZE,
+            @intFromPtr(&threadWrapper),
+            0,
+            arch.idt.KERNEL_CODE_SEGMENT,
+            arch.idt.KERNEL_DATA_SEGMENT,
+        );
+        task.threadfn = f;
+        task.arg = arg;
+        task.mm = &mm.proc_mm.init_mm;
+        task.initSelf(
+            stack_top,
+            stack,
+            0,
+            0,
+            1,
+            .KTHREAD
+        );
+        return task;
+    } else {
         return error.MemoryAllocation;
     }
-    const stack_top: u32 = arch.setupStack(
-        stack + STACK_SIZE,
-        @intFromPtr(&threadWrapper),
-        0,
-        arch.idt.KERNEL_CODE_SEGMENT,
-        arch.idt.KERNEL_DATA_SEGMENT,
-    );
-    new_task.threadfn = f;
-    new_task.arg = arg;
-    new_task.mm = &mm.proc_mm.init_mm;
-    new_task.initSelf(
-        stack_top,
-        stack,
-        0,
-        0,
-        1,
-        .KTHREAD
-    );
-    return new_task;
 }
 
 pub fn kthreadStop(thread: *tsk.Task) i32 {

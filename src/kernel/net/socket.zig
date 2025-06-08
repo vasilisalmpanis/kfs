@@ -34,26 +34,24 @@ pub const Socket = struct {
         if (self.conn) |remote| {
             remote.conn = null;
         }
-        krn.mm.kfree(@intFromPtr(self));
+        krn.mm.kfree(self);
     }
 };
 
 pub fn newSocket() ?*Socket {
-    const new_ptr = krn.mm.kmalloc(@sizeOf(Socket));
-    if (new_ptr == 0) {
-        return null;
+    const sock: ?*Socket = krn.mm.kmalloc(Socket);
+    if (sock) |_sock| {
+        sockets_lock.lock();
+        if (sockets) |first| {
+            const id = first.prev.?.entry(Socket, "list").*.id;
+            _sock.setup(id + 1);
+            first.addTail(&_sock.list);
+        } else {
+            _sock.setup(1);
+            sockets = &_sock.list;
+        }
+        sockets_lock.unlock();
     }
-    var sock: *Socket = @ptrFromInt(new_ptr);
-    sockets_lock.lock();
-    if (sockets) |first| {
-        const id = first.prev.?.entry(Socket, "list").*.id;
-        sock.setup(id + 1);
-        first.addTail(&sock.list);
-    } else {
-        sock.setup(1);
-        sockets = &sock.list;
-    }
-    sockets_lock.unlock();
     return sock;
 }
 

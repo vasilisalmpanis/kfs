@@ -51,7 +51,7 @@ fn processTasks() void {
         task.delFromTree();
         task.mm.?.delete();
         kthreadStackFree(task.stack_bottom);
-        km.kfree(@intFromPtr(task));
+        km.kfree(task);
         if (end)
             break;
     }

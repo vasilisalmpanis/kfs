@@ -4,14 +4,24 @@ const mm = @import("init.zig");
 /// kmalloc - allocate memory
 /// size:
 ///     how many bytes of memory are required.
-pub fn kmalloc(size: u32) u32 {
-    return mm.kheap.alloc(size, true, false) catch 0;
+pub fn ksize(addr: *anyopaque) u32 {
+    return mm.kheap.getSize(@intFromPtr(addr));
 }
 
-pub fn kfree(addr: u32) void {
-    mm.kheap.free(addr);
+pub fn kmalloc(comptime T: type) ?*T {
+    const size = @sizeOf(T);
+    const addr = mm.kheap.alloc(size, true, false) catch return null;
+    if (addr == 0) return null;
+    return @ptrFromInt(addr);
 }
 
-pub fn ksize(addr: u32) u32 {
-    return mm.kheap.getSize(addr);
+pub fn kmallocArray(comptime T: type, count: u32) ?[*]T {
+    const size = @sizeOf(T) * count;
+    const addr = mm.kheap.alloc(size, true, false) catch return null;
+    if (addr == 0) return null;
+    return @ptrFromInt(addr);
+}
+
+pub fn kfree(addr: *anyopaque) void {
+    mm.kheap.free(@intFromPtr(addr));
 }
