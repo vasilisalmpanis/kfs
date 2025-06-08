@@ -43,16 +43,21 @@ pub const FrameBuffer = struct {
             virt_addr += mm.PAGE_SIZE;
             addr += mm.PAGE_SIZE;
         }
-        var fb = FrameBuffer{
-            .fb_info = fb_info.?,
-            .fb_ptr = @ptrFromInt(first_addr),
-            .cwidth = (fb_info.?.pitch / 4) / font.width,
-            .cheight = fb_info.?.height / font.height,
-            .virtual_buffer = @ptrFromInt(mm.kmalloc(fb_info.?.width * fb_info.?.height * @sizeOf(u32))),
-            .font = font,
-        };
-        fb.clear(0);
-        return fb;
+        const buffer: ?[*]u32 = mm.kmallocArray(u32, fb_info.?.width * fb_info.?.height * @sizeOf(u32));
+        if (buffer) |_buffer| {
+            var fb = FrameBuffer{
+                .fb_info = fb_info.?,
+                .fb_ptr = @ptrFromInt(first_addr),
+                .cwidth = (fb_info.?.pitch / 4) / font.width,
+                .cheight = fb_info.?.height / font.height,
+                .virtual_buffer = _buffer,
+                .font = font,
+            };
+            fb.clear(0);
+            return fb;
+        } else {
+            @panic("out of memory");
+        }
     }
 
     pub fn render(self: *FrameBuffer) void {

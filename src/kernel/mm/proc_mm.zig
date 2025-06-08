@@ -91,15 +91,14 @@ pub const VMA = struct {
     }
 
     pub fn new(addr: u32, end: u32, owner: *MM, flags: MAP, prot: u32) ?*VMA {
-        const num: u32 = mm.kmalloc(@sizeOf(VMA));
-        if (num == 0)
-            return null;
-        const vma: *VMA = @ptrFromInt(num);
-        vma.setup(addr, end, owner, flags, prot) catch {
-            krn.mm.kfree(num);
-            return null;
-        };
-        return @ptrFromInt(num);
+        const vma: ?*VMA = mm.kmalloc(VMA);
+        if (vma) |_vma| {
+            _vma.setup(addr, end, owner, flags, prot) catch {
+                krn.mm.kfree(_vma);
+                return null;
+            };
+        }
+        return vma;
     }
 
     pub fn mergable(self: *VMA, addr: u32, length: u32, prot: u32, flags: MAP) bool {
@@ -140,12 +139,11 @@ pub const MM = struct {
     }
 
     pub fn new() ?*MM {
-        const num: u32 = mm.kmalloc(@sizeOf(MM));
-        if (num == 0)
-            return null;
-        const mmap: *MM = @ptrFromInt(num);
-        mmap.* = MM.init();
-        return @ptrFromInt(num);
+        const mmap: ?*MM = mm.kmalloc(MM);
+        if (mmap) |_mmap| {
+            _mmap.* = MM.init();
+        }
+        return mmap;
     }
 
     pub fn add_vma(
@@ -174,7 +172,7 @@ pub const MM = struct {
                 ) {
                     new_vma.?.end = next.end;
                     next.list.del();
-                    krn.mm.kfree(@intFromPtr(next));
+                    krn.mm.kfree(next);
                 }
                 return new_vma;
             } else if (
@@ -265,7 +263,7 @@ pub const MM = struct {
             // TODO: Clone mappings.
             const vas: u32 = mm.virt_memory_manager.cloneVirtualSpace(); // it needs to take mappings into account
             if (vas == 0) {
-                mm.kfree(@intFromPtr(_mmap));
+                mm.kfree(_mmap);
                 return null;
             }
             _mmap.vas = vas;
@@ -284,7 +282,7 @@ pub const MM = struct {
             return ;
         mm.virt_memory_manager.deinitVirtualSpace(self.vas);
         // TODO: free vmas
-        mm.kfree(@intFromPtr(self));
+        mm.kfree(self);
     }
 };
 

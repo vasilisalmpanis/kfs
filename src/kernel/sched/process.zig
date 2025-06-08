@@ -6,20 +6,19 @@ const kthread = @import("./kthread.zig");
 const arch = @import("arch");
 
 pub fn doFork() i32 {
-    var child: ?*tsk.Task = null;
-    child = @ptrFromInt(km.kmalloc(@sizeOf(tsk.Task)));
+    var child: ?*tsk.Task = km.kmalloc(tsk.Task);
     if (child == null) {
         return -errors.ENOMEM;
     }
     const stack: u32 = kthread.kthreadStackAlloc(kthread.STACK_PAGES);
     if (stack == 0) {
-        km.kfree(@intFromPtr(child));
+        km.kfree(child.?);
         return -errors.ENOMEM;
     }
     child.?.mm = tsk.current.mm.?.dup();
     if (child.?.mm == null) {
-        km.kfree(stack);
-        mm.kfree(@intFromPtr(child));
+        kthread.kthreadStackFree(stack);
+        mm.kfree(child.?);
         return -errors.ENOMEM;
     }
     const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
