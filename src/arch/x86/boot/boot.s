@@ -6,29 +6,37 @@
 
 # Video mode preferences
 .set GRAPHICS_MODE,	1        	# 0 = linear text, 1 = graphics mode
-.set WIDTH,			1920      	# desired width
-.set HEIGHT,		1080      	# desired height
+.set WIDTH,			0      	# desired width
+.set HEIGHT,			0      	# desired height
 .set DEPTH,			32       	# desired bits per pixel
 
-.set MAGIC,    0x1BADB002       # 'magic number' lets bootloader find the header
-.set CHECKSUM, -(MAGIC + FLAGS) # checksum of above, to prove we are multiboot
+.set MAGIC,    0xE85250D6       # 'magic number' lets bootloader find the header
+.set LEN,	header_end - multiboot_header
+.set CHECKSUM, -(MAGIC + LEN) # checksum of above, to prove we are multiboot
 
 # Declare a multiboot header that marks the program as a kernel.
 .section .multiboot.data, "aw"
-	.align 4
+multiboot_header:
+	.align 8
 	.long MAGIC
-	.long FLAGS
+	.long 0
+	.long LEN
 	.long CHECKSUM
 	# Video mode fields
-	.long 0                     # header_addr
-	.long 0                     # load_addr
-	.long 0                     # load_end_addr
-	.long 0                     # bss_end_addr
-	.long 0                     # entry_addr
-	.long GRAPHICS_MODE         # indicates graphics mode
-	.long WIDTH
-	.long HEIGHT
-	.long DEPTH
+	# --- Framebuffer Tag ---
+    	.short 5                # tag type (framebuffer)
+    	.short 0                # reserved
+    	.long 20                # size of tag
+    	.long WIDTH             # width
+    	.long HEIGHT            # height
+    	.long DEPTH             # depth (bpp)
+
+    	# --- End Tag ---
+    	.align 8
+    	.short 0                # tag type = 0 (end)
+    	.short 0                # reserved
+    	.long 8                 # size
+header_end:
 
 # Allocate the initial stack.
 .section .bootstrap_stack, "aw", @nobits
