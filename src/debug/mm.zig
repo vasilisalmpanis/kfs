@@ -5,7 +5,7 @@ const krn = @import("kernel");
 
 const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
-pub fn printMmap(info: *multiboot.MultibootInfo) void {
+pub fn printMmap(info: *multiboot.MultibootInfo1) void {
     var i: u32 = 0;
     printf("type\tmem region\t\tsize\n", .{});
     while (i < info.mmap_length) : (i += @sizeOf(multiboot.MultibootMemoryMap)) {

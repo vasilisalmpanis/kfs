@@ -12,7 +12,7 @@ pub const Screen = struct {
     tty : [1] tty.TTY = undefined,
     frmb: fb.FrameBuffer,
     
-    pub fn init(boot_info: *multiboot.MultibootInfo) Screen {
+    pub fn init(boot_info: *multiboot.Multiboot) Screen {
         const frm = fb.FrameBuffer.init(boot_info, &fonts.VGA16x32);
         var scr = Screen{
             .frmb = frm,
@@ -30,7 +30,7 @@ pub const Screen = struct {
     }
 };
 
-pub fn initScreen(scr: *Screen, boot_info: *multiboot.MultibootInfo) void {
+pub fn initScreen(scr: *Screen, boot_info: *multiboot.Multiboot) void {
     scr.* = Screen.init(boot_info);
     current_tty = &scr.tty[0];
 }
