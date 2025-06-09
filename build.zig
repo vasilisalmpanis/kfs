@@ -50,7 +50,7 @@ pub fn build(b: *std.Build) !void {
         kernel.root_module.addImport("drivers", drivers);
 
         kernel.addAssemblyFile(b.path(multiboot));
-        kernel.setLinkerScriptPath(b.path(linker));
+        kernel.setLinkerScript(b.path(linker));
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
 
