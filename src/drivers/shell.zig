@@ -49,7 +49,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "ps", .desc = "Show tasks", .hndl = &ps });
         self.registerCommand(.{ .name = "pstree", .desc = "Show tasks tree", .hndl = &psTree });
         self.registerCommand(.{ .name = "stack", .desc = "Print the stack trace", .hndl = &stack });
-        self.registerCommand(.{ .name = "neofetch", .desc = "Show system info", .hndl = &neofetch });
+        // self.registerCommand(.{ .name = "neofetch", .desc = "Show system info", .hndl = &neofetch });
         self.registerCommand(.{ .name = "jiffies", .desc = "Show jiffies", .hndl = &jiffies });
         self.registerCommand(.{ .name = "uptime", .desc = "Show uptime in seconds", .hndl = &uptime });
         self.registerCommand(.{ .name = "gdt", .desc = "Print GDT", .hndl = &gdt });
@@ -134,9 +134,9 @@ fn stack(_: *Shell, _: [][]const u8) void {
     debug.traceStackTrace(20);
 }
 
-fn neofetch(_: *Shell, _: [][]const u8) void {
-    debug.neofetch(screen.current_tty.?, krn.boot_info);
-}
+// fn neofetch(_: *Shell, _: [][]const u8) void {
+//     debug.neofetch(screen.current_tty.?, krn.boot_info);
+// }
 
 fn jiffies(_: *Shell, _: [][]const u8) void {
     debug.printf("{d}\n", .{krn.jiffies.jiffies});

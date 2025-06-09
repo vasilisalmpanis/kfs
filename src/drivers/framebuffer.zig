@@ -1,6 +1,7 @@
 const multiboot = @import("arch").multiboot;
 const mm = @import("kernel").mm;
 const dbg = @import("debug");
+const krn = @import("kernel");
 
 pub const Img = struct {
     width: u32,
@@ -15,7 +16,7 @@ pub const Font = struct {
 };
 
 pub const FrameBuffer = struct {
-    fb_info: multiboot.FramebufferInfo,
+    fb_info: *multiboot.TagFrameBufferInfo,
     fb_ptr: [*]u32,
     cwidth: u32,
     cheight: u32,
@@ -23,46 +24,54 @@ pub const FrameBuffer = struct {
     font: *const Font,
 
     pub fn init(
-        boot_info: *multiboot.MultibootInfo,
+        boot_info: *multiboot.Multiboot,
         font: *const Font
     ) FrameBuffer {
-        const fb_info: ?multiboot.FramebufferInfo = multiboot.getFBInfo(boot_info);
-        const fb_size: u32 = fb_info.?.height * fb_info.?.pitch;
-        const num_pages = (fb_size + 0xFFF) / mm.PAGE_SIZE;
-        var i: u32 = 0;
-        var addr = fb_info.?.address & 0xFFFFF000;
-        var virt_addr: u32 = mm.virt_memory_manager.findFreeSpace(
-            num_pages,
-            mm.PAGE_OFFSET,
-            0xFFFFF000,
-            false
-        );
-        const first_addr: u32 = virt_addr;
-        while (i < num_pages) : (i += 1) {
-            mm.virt_memory_manager.mapPage(virt_addr, addr, .{});
-            virt_addr += mm.PAGE_SIZE;
-            addr += mm.PAGE_SIZE;
-        }
-        const buffer: ?[*]u32 = mm.kmallocArray(u32, fb_info.?.width * fb_info.?.height);
-        if (buffer) |_buffer| {
-            var fb = FrameBuffer{
-                .fb_info = fb_info.?,
-                .fb_ptr = @ptrFromInt(first_addr),
-                .cwidth = (fb_info.?.pitch / 4) / font.width,
-                .cheight = fb_info.?.height / font.height,
-                .virtual_buffer = _buffer,
-                .font = font,
-            };
-            fb.clear(0);
-            return fb;
+        if (boot_info.getTag(multiboot.TagFrameBufferInfo)) |tag| {
+            // const fb_info: ?multiboot.FramebufferInfo = multiboot.getFBInfo(boot_info);
+            
+            const fb_size: u32 = tag.height * tag.pitch;
+            const num_pages = (fb_size + 0xFFF) / mm.PAGE_SIZE;
+            var i: u32 = 0;
+            var addr: u32 = @truncate(tag.addr);
+            addr &= 0xFFFFF000;
+            var virt_addr: u32 = mm.virt_memory_manager.findFreeSpace(
+                num_pages,
+                mm.PAGE_OFFSET,
+                0xFFFFF000,
+                false
+            );
+            const first_addr: u32 = virt_addr;
+            while (i < num_pages) : (i += 1) {
+                mm.virt_memory_manager.mapPage(virt_addr, addr, .{});
+                virt_addr += mm.PAGE_SIZE;
+                addr += mm.PAGE_SIZE;
+            }
+            const buffer: ?[*]u32 = mm.kmallocArray(u32, tag.width * tag.height);
+            if (buffer) |_buffer| {
+                var fb = FrameBuffer{
+                    .fb_info = tag,
+                    .fb_ptr = @ptrFromInt(first_addr),
+                    .cwidth = (tag.pitch / 4) / font.width,
+                    .cheight = tag.height / font.height,
+                    .virtual_buffer = _buffer,
+                    .font = font,
+                };
+                fb.clear(0);
+                return fb;
+            } else {
+                @panic("out of memory");
+            }
         } else {
-            @panic("out of memory");
+            @panic("no framebuffer info provided!");
         }
     }
 
     pub fn render(self: *FrameBuffer) void {
         const max_index = self.fb_info.height * self.fb_info.width;
+        // krn.logger.INFO("HERE", .{});
         @memcpy(self.fb_ptr[0..max_index], self.virtual_buffer[0..max_index]);
+        // krn.logger.INFO("NOT HERE", .{});
     }
 
     pub fn clear(self: *FrameBuffer, bg: u32) void {

@@ -24,8 +24,8 @@ pub fn panic(
     stack: ?*builtin.StackTrace,
     first_trace_addr: ?usize
 ) noreturn {
-    dbg.printf(
-        "\nPANIC: {s}\nfirst_trace_addr {?}\nstack: {?}\n",
+    krn.logger.ERROR(
+        "\nPANIC: {s}\nfirst_trace_addr {?x}\nstack: {?}\n",
         .{msg, first_trace_addr, stack}
     );
     dbg.traceStackTrace(20);
@@ -52,22 +52,21 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
 }
 
 export fn kernel_main(magic: u32, address: u32) noreturn {
-    if (magic != 0x2BADB002) {
+    if (magic != 0x36d76289) {
         system.halt();
     }
-    const boot_info: *multiboot.MultibootInfo = @ptrFromInt(address + mm.PAGE_OFFSET);
-    krn.boot_info = boot_info;
 
     krn.serial = Serial.init();
-    krn.logger = Logger.init(.WARN);
-    dbg.initSymbolTable(boot_info);
+    krn.logger = Logger.init(.DEBUG);
+    var boot_info: multiboot.Multiboot = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
+    dbg.initSymbolTable(&boot_info);
     gdt.gdtInit();
     krn.logger.INFO("GDT initialized", .{});
 
-    mm.mmInit(boot_info);
+    mm.mmInit(&boot_info);
     krn.logger.INFO("Memory initialized", .{});
 
-    screen.initScreen(&krn.scr, boot_info);
+    screen.initScreen(&krn.scr, &boot_info);
 
     krn.pit = PIT.init(1000);
     krn.task.initMultitasking();
