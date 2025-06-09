@@ -62,7 +62,7 @@ fn formatMemorySize(bytes: u64, buffer: []u8) []u8 {
     }
 }
 
-pub fn neofetch(tty: *TTY, boot_info: *multiboot.MultibootInfo) void {
+pub fn neofetch(tty: *TTY, boot_info: *multiboot.MultibootInfo1) void {
     const original_fg = tty._fg_colour;
     
     const total_mem_kb = boot_info.mem_lower + boot_info.mem_upper;

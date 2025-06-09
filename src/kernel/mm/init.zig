@@ -1,5 +1,4 @@
-const multiboot_info = @import("arch").multiboot.MultibootInfo;
-const multiboot_memory_map = @import("arch").multiboot.MultibootMemoryMap;
+const multiboot = @import("arch").multiboot;
 const std = @import("std");
 const arch = @import("arch");
 
@@ -44,53 +43,56 @@ pub var vheap: heap.FreeList = undefined;
 pub var uheap: heap.FreeList = undefined;
 
 // get the first availaanle address and put metadata there
-pub fn mmInit(info: *multiboot_info) void {
-    var i: u32 = 0;
-
-    // Find the biggest memory region in memory map provided by multiboot
-    while (i < info.mmap_length) : (i += @sizeOf(multiboot_memory_map)) {
-        const mmap: *multiboot_memory_map = @ptrFromInt(info.mmap_addr + i);
-        if (mmap.len[0] > 0 and mmap.type == 1 and mmap.len[0] > mem_size) {
-            mem_size = mmap.len[0];
-            base = mmap.addr[0];
+pub fn mmInit(info: *multiboot.Multiboot) void {
+    // var i: u32 = 0;
+    if (info.getTag(multiboot.TagMemoryMap)) |tag| {
+        const num_entries: u32 = (tag.size - @sizeOf(multiboot.TagMemoryMap)) / tag.entry_size;
+        const entries = tag.getMemMapEntries();
+        // Find the biggest memory region in memory map provided by multiboot
+        for (0..num_entries) |idx| {
+            const len: u32 = @truncate(entries[idx].length);
+            if (len > 0 and entries[idx].type == 1 and len > mem_size) {
+                mem_size = len;
+                base = @truncate(entries[idx].base_addr);
+            }
         }
+        const kernel_end: u32 = @intFromPtr(&_kernel_end) - 0xC0000000;
+        if (base < kernel_end) {
+            mem_size -= kernel_end - base;
+            base = kernel_end;
+        }
+        if ((base % PAGE_SIZE) > 0) {
+            mem_size = mem_size - (base & 0xfff);
+            base = (base & 0xfffff000) + PAGE_SIZE;
+        }
+        // At this point we have page aligned
+        // memory base and size.
+        // At this point we need to make sure that the memory we are
+        // accesing is mapped inside our virtual address space. !!!
+        phys_memory_manager = pmm.PMM.init(base, mem_size);
+        virt_memory_manager = vmm.VMM.init(&phys_memory_manager);
+        kheap = heap.FreeList.init(
+            &phys_memory_manager,
+            &virt_memory_manager,
+            PAGE_OFFSET,
+            0xFFFFF000,
+            16
+        );
+        vheap = heap.FreeList.init(
+            &phys_memory_manager,
+            &virt_memory_manager,
+            PAGE_OFFSET,
+            0xFFFFF000,
+            16
+        );
+        uheap = heap.FreeList.init(
+            &phys_memory_manager,
+            &virt_memory_manager,
+            PAGE_SIZE,
+            PAGE_OFFSET,
+            16
+        );
     }
-    const kernel_end: u32 = @intFromPtr(&_kernel_end) - 0xC0000000;
-    if (base < kernel_end) {
-        mem_size -= kernel_end - base;
-        base = kernel_end;
-    }
-    if ((base % PAGE_SIZE) > 0) {
-        mem_size = mem_size - (base & 0xfff);
-        base = (base & 0xfffff000) + PAGE_SIZE;
-    }
-    // At this point we have page aligned
-    // memory base and size.
-    // At this point we need to make sure that the memory we are
-    // accesing is mapped inside our virtual address space. !!!
-    phys_memory_manager = pmm.PMM.init(base, mem_size);
-    virt_memory_manager = vmm.VMM.init(&phys_memory_manager);
-    kheap = heap.FreeList.init(
-        &phys_memory_manager,
-        &virt_memory_manager,
-        PAGE_OFFSET,
-        0xFFFFF000,
-        16
-    );
-    vheap = heap.FreeList.init(
-        &phys_memory_manager,
-        &virt_memory_manager,
-        PAGE_OFFSET,
-        0xFFFFF000,
-        16
-    );
-    uheap = heap.FreeList.init(
-        &phys_memory_manager,
-        &virt_memory_manager,
-        PAGE_SIZE,
-        PAGE_OFFSET,
-        16
-    );
 }
 
 // create page

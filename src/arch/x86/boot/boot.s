@@ -1,34 +1,60 @@
-# Declare constants for the multiboot header.
-.set ALIGN,    1<<0             # align loaded modules on page boundaries
-.set MEMINFO,  1<<1             # provide memory map
-.set VIDEO,    1<<2  
-.set FLAGS,    ALIGN | MEMINFO | VIDEO # this is the Multiboot 'flag' field
+# Multiboot2 header constants
+.set MULTIBOOT2_MAGIC,           0xe85250d6
+.set MULTIBOOT2_ARCHITECTURE,    0          # i386 protected mode
+.set MULTIBOOT2_HEADER_LENGTH,   (multiboot2_header_end - multiboot2_header_start)
+.set MULTIBOOT2_CHECKSUM,        -(MULTIBOOT2_MAGIC + MULTIBOOT2_ARCHITECTURE + MULTIBOOT2_HEADER_LENGTH)
 
-# Video mode preferences
-.set GRAPHICS_MODE,	1        	# 0 = linear text, 1 = graphics mode
-.set WIDTH,			1920      	# desired width
-.set HEIGHT,		1080      	# desired height
-.set DEPTH,			32       	# desired bits per pixel
+# Video mode preferences  
+.set WIDTH,             0     # desired width
+.set HEIGHT,            0     # desired height
+.set DEPTH,             32       # desired bits per pixel
 
-.set MAGIC,    0x1BADB002       # 'magic number' lets bootloader find the header
-.set CHECKSUM, -(MAGIC + FLAGS) # checksum of above, to prove we are multiboot
+# Tag types
+.set MULTIBOOT2_TAG_END,              0
+.set MULTIBOOT2_TAG_INFORMATION,      1
+.set MULTIBOOT2_TAG_FRAMEBUFFER,      5
 
-# Declare a multiboot header that marks the program as a kernel.
+# Tag flags
+.set MULTIBOOT2_TAG_OPTIONAL,         1
+
+# Declare a multiboot2 header that marks the program as a kernel
 .section .multiboot.data, "aw"
-	.align 4
-	.long MAGIC
-	.long FLAGS
-	.long CHECKSUM
-	# Video mode fields
-	.long 0                     # header_addr
-	.long 0                     # load_addr
-	.long 0                     # load_end_addr
-	.long 0                     # bss_end_addr
-	.long 0                     # entry_addr
-	.long GRAPHICS_MODE         # indicates graphics mode
-	.long WIDTH
-	.long HEIGHT
-	.long DEPTH
+    .align 8
+multiboot2_header_start:
+    # Multiboot2 header
+    .long MULTIBOOT2_MAGIC
+    .long MULTIBOOT2_ARCHITECTURE  
+    .long MULTIBOOT2_HEADER_LENGTH
+    .long MULTIBOOT2_CHECKSUM
+    
+    # Information request tag (equivalent to MEMINFO flag)
+    .align 8
+information_tag_start:
+    .word MULTIBOOT2_TAG_INFORMATION    # type
+    .word 0                             # flags (required)
+    .long (information_tag_end - information_tag_start)  # size
+    .long 4                             # memory map request
+    .long 6                             # memory info request
+information_tag_end:
+    
+    # Framebuffer tag (equivalent to VIDEO flag and mode settings)
+    .align 8
+framebuffer_tag_start:
+    .word MULTIBOOT2_TAG_FRAMEBUFFER    # type
+    .word MULTIBOOT2_TAG_OPTIONAL       # flags (optional)
+    .long (framebuffer_tag_end - framebuffer_tag_start)  # size
+    .long WIDTH                         # width
+    .long HEIGHT                        # height
+    .long DEPTH                         # depth (bits per pixel)
+framebuffer_tag_end:
+    
+    # End tag
+    .align 8
+    .word MULTIBOOT2_TAG_END            # type
+    .word 0                             # flags
+    .long 8                             # size
+    
+multiboot2_header_end:
 
 # Allocate the initial stack.
 .section .bootstrap_stack, "aw", @nobits
