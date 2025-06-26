@@ -12,9 +12,9 @@ pub inline fn inb(port: u16) u8 {
 /// port (0 to 65535), specified in the DX register, into the word
 /// memory address pointed to by the AX register
 pub inline fn inw(port: u16) u16 {
-    return asm volatile ("inb %[port], %[result]"
-        : [result] "={ax}" (-> u16),
-        : [port] "N{dx}" (port),
+    return asm volatile ("in %[port], %[result]"
+        : [result] "={eax}" (-> u16),
+        : [port] "N{edx}" (port),
     );
 }
 

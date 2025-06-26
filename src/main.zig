@@ -77,6 +77,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();
 
+    @import("drivers").ata.ata_init();  
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
 
@@ -84,8 +85,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     // _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
 
-    krn.logger.INFO("Go usermode", .{});
-    krn.goUserspace(@embedFile("userspace"));
+    // krn.logger.INFO("Go usermode", .{});
+    // krn.goUserspace(@embedFile("userspace"));
     
     while (true) {
         asm volatile ("hlt");
