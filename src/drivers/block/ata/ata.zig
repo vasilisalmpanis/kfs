@@ -39,8 +39,8 @@ const ATA_CMD_PACKET           = 0xA0;
 const ATA_CMD_IDENTIFY_PACKET  = 0xA1;
 const ATA_CMD_IDENTIFY         = 0xEC;
 
-const      ATAPI_CMD_READ   = 0xA8;
-const      ATAPI_CMD_EJECT  = 0x1B;
+const ATAPI_CMD_READ   = 0xA8;
+const ATAPI_CMD_EJECT  = 0x1B;
 
 const ATA_IDENT_DEVICETYPE   =  0;
 const ATA_IDENT_CYLINDERS    =  2;
@@ -54,11 +54,11 @@ const ATA_IDENT_MAX_LBA      =  120;
 const ATA_IDENT_COMMANDSETS  =  164;
 const ATA_IDENT_MAX_LBA_EXT  =  200;
 
-const IDE_ATA         = 0x00;
-const IDE_ATAPI       = 0x01;
+const IDE_ATA    = 0x00;
+const IDE_ATAPI  = 0x01;
  
-const ATA_MASTER      = 0x00;
-const ATA_SLAVE       = 0x01;
+const ATA_MASTER = 0x00;
+const ATA_SLAVE  = 0x01;
 
 const ATA_REG_DATA        = 0x00;
 const ATA_REG_ERROR       = 0x01;
@@ -79,35 +79,37 @@ const ATA_REG_ALTSTATUS   = 0x0C;
 const ATA_REG_DEVADDRESS  = 0x0D;
 
 // Channels:
-const      ATA_PRIMARY   =     0x00;
-const      ATA_SECONDARY =     0x01;
+const ATA_PRIMARY   = 0x00;
+const ATA_SECONDARY = 0x01;
  
 // Directions:
-const      ATA_READ  =      0x00;
-const      ATA_WRITE =      0x013;
+const ATA_READ  = 0x00;
+const ATA_WRITE = 0x013;
 
 var ide_buf: [*]u16 = undefined;
 
 pub fn ata_primary() void {
+    kernel.logger.INFO("primary\n", .{});
 }
 
 pub fn ata_secondary() void {
+    kernel.logger.INFO("secondary\n", .{});
 }
 
 fn ide_select_drive(bus: u8, i: u8) void {
 	if(bus == ATA_PRIMARY) {
-		if(i == ATA_MASTER) {
-			arch.io.outb(ATA_PRIMARY_IO + ATA_REG_HDDEVSEL, 0xA0);
-                } else {
-                    arch.io.outb(ATA_PRIMARY_IO + ATA_REG_HDDEVSEL, 0xB0);
-                }
+            if(i == ATA_MASTER) {
+                arch.io.outb(ATA_PRIMARY_IO + ATA_REG_HDDEVSEL, 0xA0);
+            } else {
+                arch.io.outb(ATA_PRIMARY_IO + ATA_REG_HDDEVSEL, 0xB0);
+            }
         }
-	else {
-		if(i == ATA_MASTER) {
-			arch.io.outb(ATA_SECONDARY_IO + ATA_REG_HDDEVSEL, 0xA0);
-                } else {
-                    arch.io.outb(ATA_SECONDARY_IO + ATA_REG_HDDEVSEL, 0xB0);
-                }
+        else {
+            if(i == ATA_MASTER) {
+                arch.io.outb(ATA_SECONDARY_IO + ATA_REG_HDDEVSEL, 0xA0);
+            } else {
+                arch.io.outb(ATA_SECONDARY_IO + ATA_REG_HDDEVSEL, 0xB0);
+            }
         }
 }
 
@@ -128,6 +130,7 @@ fn ata_identify(bus: u8, drive: u8) u8 {
    arch.io.outb(io + ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
    // dbg.printf("Sent IDENTIFY\n", .{});
    // Now, read status port */
+   kernel.logger.INFO("ident start bus {d}, drive {d}\n", .{bus, drive});
    var status: u8 = arch.io.inb(io + ATA_REG_STATUS);
    if(status != 0)
    {
@@ -137,6 +140,7 @@ fn ata_identify(bus: u8, drive: u8) u8 {
        while(!(status & ATA_SR_DRQ != 0)) {
            if(status & ATA_SR_ERR != 0)
            {
+               kernel.logger.INFO("ERROR bus {d}, drive {d}\n", .{bus, drive});
                return 0;
            }
            status = arch.io.inb(io + ATA_REG_STATUS);
@@ -145,6 +149,7 @@ fn ata_identify(bus: u8, drive: u8) u8 {
            ide_buf[i*2] = arch.io.inw(io + ATA_REG_DATA);
        }
    }
+   kernel.logger.INFO("ident start bus {d}, drive {d}\n", .{bus, drive});
    return 1;
 }
 
@@ -156,17 +161,34 @@ fn ata_probe() void {
     if(ata_identify(ATA_PRIMARY, ATA_MASTER) != 0)
     {
         const not_str: ?[*]u8 = kernel.mm.kmallocArray(u8, 40);
-        if (not_str) |str| { 
-            for (0..40) |i| {
-                str[i] = @truncate(ide_buf[ATA_IDENT_MODEL + i + 1]);
-                str[i + 1] = @truncate(ide_buf[ATA_IDENT_MODEL + i]);
+        if (not_str) |str| {
+            for (0..20) |i| {
+                const word_idx = ATA_IDENT_MODEL + i;
+                const word = ide_buf[word_idx];
+
+                str[i * 2] = @truncate(word >> 8);
+                str[i * 2 + 1] = @truncate(word & 0xFF);
             }
             kernel.logger.INFO("ide name {s}\n", .{str[0..40]});
         } else {
-            dbg.printf("string allocation failed\n", .{});
+            kernel.logger.INFO("string allocation failed\n", .{});
         }
     }
-    _ = ata_identify(ATA_PRIMARY, ATA_SLAVE);
+    if (ata_identify(ATA_PRIMARY, ATA_SLAVE) != 0) {
+        const not_str: ?[*]u8 = kernel.mm.kmallocArray(u8, 40);
+        if (not_str) |str| {
+            for (0..20) |i| {
+                const word_idx = ATA_IDENT_MODEL + i;
+                const word = ide_buf[word_idx];
+
+                str[i * 2] = @truncate(word >> 8);
+                str[i * 2 + 1] = @truncate(word & 0xFF);
+            }
+            kernel.logger.INFO("ide name {s}\n", .{str[0..40]});
+        } else {
+            kernel.logger.INFO("string allocation failed\n", .{});
+        }
+    }
 }
 
 pub fn ata_init() void {
