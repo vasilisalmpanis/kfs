@@ -2,6 +2,7 @@ const dbg = @import("debug");
 const kernel = @import("kernel");
 const irq = kernel.irq;
 const arch = @import("arch");
+const lst = kernel.list;
 
 const ATA_PRIMARY_IRQ:      u16 = 14;
 const ATA_SECONDARY_IRQ:    u16 = 15;
@@ -86,14 +87,85 @@ const ATA_SECONDARY = 0x01;
 const ATA_READ  = 0x00;
 const ATA_WRITE = 0x013;
 
+const ATA_Operation = enum(u8) {
+    ATA_OP_NONE = 0,
+    ATA_OP_READ,
+    ATA_OP_WRITE,
+    ATA_OP_IDENTIFY
+};
+
+const ATA_Status = enum(u8) {
+    ATA_STATUS_IDLE = 0,
+    ATA_STATUS_BUSY,
+    ATA_STATUS_COMPLETE,
+    ATA_STATUS_ERROR,
+    ATA_STATUS_TIMEOUT
+};
+
+var channels: ?*PataChannel = null;
+
+const PataChannel = struct {
+    name: [41]u8,
+
+    io_base: u16,
+    irq_num: u32,
+
+    current_op: ATA_Operation   = .ATA_OP_NONE,
+    status:     ATA_Status      = .ATA_STATUS_IDLE,
+
+    buffer: [*]u8 = undefined,
+    buffer_size: u32 = 512,
+
+    lba: u32,
+    sector_count: u8,
+    drive: u8,
+
+    irq_enabled: bool = false,
+
+    list: lst.ListHead,
+
+    fn add(io_base: u16, irq_num: u32, name: [41]u8) ?*PataChannel {
+        const new_channel: ?*PataChannel = kernel.mm.kmalloc(PataChannel);
+        if (new_channel) |channel| {
+            channel.buffer_size = 512;
+            if (kernel.mm.kmallocArray(u8, channel.buffer_size)) |array| {
+                channel.buffer = array;
+            } else {
+                kernel.mm.kfree(channel);
+                return null;
+            }
+
+            channel.io_base = io_base;
+            channel.irq_num = irq_num;
+            channel.list.setup();
+            channel.irq_enabled = false;
+            @memset(channel.name[0..41],0);
+            @memcpy(channel.name[0..41], name[0..41]);
+            if (channels) |head| {
+                head.list.add(&channel.list);
+            } else {
+                channels = channel;
+            }
+        }
+        return new_channel;
+    }
+
+    inline fn ata_write_reg(channel: *PataChannel, reg: u8, value: u8) void {
+        arch.io.outb(channel.io_base + reg, value);
+    }
+    inline fn ata_read_reg(channel: *PataChannel, reg: u8) u8 {
+        return arch.io.inb(channel.io_base + reg);
+    }
+};
+
 var ide_buf: [*]u16 = undefined;
 
 pub fn ata_primary() void {
-    kernel.logger.INFO("primary\n", .{});
+    kernel.logger.DEBUG("primary\n", .{});
 }
 
 pub fn ata_secondary() void {
-    kernel.logger.INFO("secondary\n", .{});
+    kernel.logger.DEBUG("secondary\n", .{});
 }
 
 fn ide_select_drive(bus: u8, i: u8) void {
@@ -126,11 +198,11 @@ fn ata_identify(bus: u8, drive: u8) u8 {
    arch.io.outb(io + ATA_REG_LBA0, 0);
    arch.io.outb(io + ATA_REG_LBA1, 0);
    arch.io.outb(io + ATA_REG_LBA2, 0);
+
    // Now, send IDENTIFY */
    arch.io.outb(io + ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
-   // dbg.printf("Sent IDENTIFY\n", .{});
+
    // Now, read status port */
-   kernel.logger.INFO("ident start bus {d}, drive {d}\n", .{bus, drive});
    var status: u8 = arch.io.inb(io + ATA_REG_STATUS);
    if(status != 0)
    {
@@ -140,7 +212,7 @@ fn ata_identify(bus: u8, drive: u8) u8 {
        while(!(status & ATA_SR_DRQ != 0)) {
            if(status & ATA_SR_ERR != 0)
            {
-               kernel.logger.INFO("ERROR bus {d}, drive {d}\n", .{bus, drive});
+               kernel.logger.ERROR("ERROR bus {d}, drive {d}\n", .{bus, drive});
                return 0;
            }
            status = arch.io.inb(io + ATA_REG_STATUS);
@@ -149,46 +221,32 @@ fn ata_identify(bus: u8, drive: u8) u8 {
            ide_buf[i*2] = arch.io.inw(io + ATA_REG_DATA);
        }
    }
-   kernel.logger.INFO("ident start bus {d}, drive {d}\n", .{bus, drive});
    return 1;
 }
 
-fn ata_probe() void {
-    // First check the primary bus,
-    // and inside the master drive.
-    //
-	
-    if(ata_identify(ATA_PRIMARY, ATA_MASTER) != 0)
+fn ata_probe_channel(bus: u8, channel: u8) void {
+    var str: [41]u8 = .{0} ** 41;
+    const io: u16 = if (bus == ATA_PRIMARY) ATA_PRIMARY_IO else ATA_SECONDARY_IO;
+    if(ata_identify(bus, channel) != 0)
     {
-        const not_str: ?[*]u8 = kernel.mm.kmallocArray(u8, 40);
-        if (not_str) |str| {
-            for (0..20) |i| {
-                const word_idx = ATA_IDENT_MODEL + i;
-                const word = ide_buf[word_idx];
+        for (0..20) |i| {
+            const word_idx = ATA_IDENT_MODEL + i;
+            const word = ide_buf[word_idx];
 
-                str[i * 2] = @truncate(word >> 8);
-                str[i * 2 + 1] = @truncate(word & 0xFF);
-            }
-            kernel.logger.INFO("ide name {s}\n", .{str[0..40]});
-        } else {
-            kernel.logger.INFO("string allocation failed\n", .{});
+            str[i * 2] = @truncate(word >> 8);
+            str[i * 2 + 1] = @truncate(word & 0xFF);
+        }
+        if (PataChannel.add(io, 14, str)) |_channel| {
+            kernel.logger.WARN("ide name {s}\n", .{_channel.name});
         }
     }
-    if (ata_identify(ATA_PRIMARY, ATA_SLAVE) != 0) {
-        const not_str: ?[*]u8 = kernel.mm.kmallocArray(u8, 40);
-        if (not_str) |str| {
-            for (0..20) |i| {
-                const word_idx = ATA_IDENT_MODEL + i;
-                const word = ide_buf[word_idx];
+}
 
-                str[i * 2] = @truncate(word >> 8);
-                str[i * 2 + 1] = @truncate(word & 0xFF);
-            }
-            kernel.logger.INFO("ide name {s}\n", .{str[0..40]});
-        } else {
-            kernel.logger.INFO("string allocation failed\n", .{});
-        }
-    }
+fn ata_probe() void {
+    ata_probe_channel(ATA_PRIMARY, ATA_MASTER);
+    ata_probe_channel(ATA_PRIMARY, ATA_SLAVE);
+    ata_probe_channel(ATA_SECONDARY, ATA_MASTER);
+    ata_probe_channel(ATA_SECONDARY, ATA_SLAVE);
 }
 
 pub fn ata_init() void {
