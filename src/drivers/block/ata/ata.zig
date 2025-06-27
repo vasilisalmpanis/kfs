@@ -1,3 +1,7 @@
+// Keep current drive saved 
+// Only select another if we need to use another
+// The suggestion is to read the Status register FIFTEEN TIMES, and only pay attention to the value returned by the last one -- after selecting a new master or slave device
+
 const dbg = @import("debug");
 const kernel = @import("kernel");
 const irq = kernel.irq;
@@ -8,6 +12,9 @@ const ATA_PRIMARY_IRQ:      u16 = 14;
 const ATA_SECONDARY_IRQ:    u16 = 15;
 const ATA_PRIMARY_IO:       u16 = 0x1F0;
 const ATA_SECONDARY_IO:     u16 =  0x170;
+
+const ATA_PRIMARY_STATUS    = 0x3F6;
+const ATA_SECONDARY_STATUS  = 0x376;
 
 const ATA_SR_BSY   = 0x80;
 const ATA_SR_DRDY  = 0x40;
@@ -61,8 +68,8 @@ const IDE_ATAPI  = 0x01;
 const ATA_MASTER = 0x00;
 const ATA_SLAVE  = 0x01;
 
+// IO Port Inputs
 const ATA_REG_DATA        = 0x00;
-const ATA_REG_ERROR       = 0x01;
 const ATA_REG_FEATURES    = 0x01;
 const ATA_REG_SECCOUNT0   = 0x02;
 const ATA_REG_LBA0        = 0x03;
@@ -70,7 +77,12 @@ const ATA_REG_LBA1        = 0x04;
 const ATA_REG_LBA2        = 0x05;
 const ATA_REG_HDDEVSEL    = 0x06;
 const ATA_REG_COMMAND     = 0x07;
+
+// IO Port Outputs
+const ATA_REG_ERROR       = 0x01;
 const ATA_REG_STATUS      = 0x07;
+
+
 const ATA_REG_SECCOUNT1   = 0x08;
 const ATA_REG_LBA3        = 0x09;
 const ATA_REG_LBA4        = 0x0A;
@@ -116,7 +128,8 @@ const PataChannel = struct {
     buffer: [*]u8 = undefined,
     buffer_size: u32 = 512,
 
-    lba: u32,
+    lba28: u32 = 0,
+    lba48: u64 = 0,
     sector_count: u8,
     drive: u8,
 
@@ -128,6 +141,8 @@ const PataChannel = struct {
         const new_channel: ?*PataChannel = kernel.mm.kmalloc(PataChannel);
         if (new_channel) |channel| {
             channel.buffer_size = 512;
+            channel.status = .ATA_STATUS_IDLE;
+            channel.current_op = .ATA_OP_NONE;
             if (kernel.mm.kmallocArray(u8, channel.buffer_size)) |array| {
                 channel.buffer = array;
             } else {
@@ -146,8 +161,48 @@ const PataChannel = struct {
             } else {
                 channels = channel;
             }
+            channel.lba28 = @as(*u32, @ptrCast(@alignCast(&ide_buf[60]))).*;
+            channel.lba48 = @as(*u64, @ptrCast(@alignCast(&ide_buf[100]))).*;
         }
         return new_channel;
+    }
+
+    fn poll_ide(self: *PataChannel) void {
+        for (0..4) |_| {
+            _ = self.ata_read_reg(ATA_REG_ALTSTATUS);
+        }
+        while (self.ata_read_reg(ATA_REG_STATUS) & ATA_SR_BSY != 0) {}
+        var status: u8 = 0xff;
+        while (status & ATA_SR_DRQ == 0) {
+            status = self.ata_read_reg(ATA_REG_STATUS);
+            if (status & ATA_SR_ERR != 0) {
+                return;
+            }
+        }
+
+    }
+
+    fn read_sector(self: *PataChannel, lba: u32) void {
+        kernel.logger.INFO("start reading ...", .{});
+        const device_cmd: u8 = 0xE0 | @as(u8, @truncate(lba >> 24 & 0x0F));
+        self.ata_write_reg(ATA_REG_SECCOUNT0, 0);
+        self.ata_write_reg(ATA_REG_LBA0, @truncate(lba));
+        self.ata_write_reg(ATA_REG_LBA1, @truncate(lba >> 8));
+        self.ata_write_reg(ATA_REG_LBA2, @truncate(lba >> 16));
+        self.ata_write_reg(ATA_REG_HDDEVSEL, device_cmd);
+        self.ata_write_reg(ATA_REG_COMMAND, ATA_CMD_READ_PIO);
+        self.poll_ide();
+        kernel.logger.INFO("after poll ...", .{});
+        for (0..256) |_| {
+            for (0..256) |i| {
+                const word = arch.io.inw(self.io_base + ATA_REG_DATA);
+                self.buffer[i * 2] = @truncate(word);
+                self.buffer[i * 2 + 1] = @truncate(word >> 8);
+                // kernel.logger.INFO("we got: {x}", .{ptr.*});
+            }
+            kernel.serial.print(self.buffer[0..512]);
+            kernel.logger.INFO("buffer: {s}", .{self.buffer[0..512]});
+        }
     }
 
     inline fn ata_write_reg(channel: *PataChannel, reg: u8, value: u8) void {
@@ -186,42 +241,44 @@ fn ide_select_drive(bus: u8, i: u8) void {
 }
 
 fn ata_identify(bus: u8, drive: u8) u8 {
-   var io: u16 = 0; 
-   ide_select_drive(bus, drive);
-   if(bus == ATA_PRIMARY) {
-       io = ATA_PRIMARY_IO;
-   } else {
-       io = ATA_SECONDARY_IO;
-   }
-   // ATA specs say these values must be zero before sending IDENTIFY */
-   arch.io.outb(io + ATA_REG_SECCOUNT0, 0);
-   arch.io.outb(io + ATA_REG_LBA0, 0);
-   arch.io.outb(io + ATA_REG_LBA1, 0);
-   arch.io.outb(io + ATA_REG_LBA2, 0);
-
-   // Now, send IDENTIFY */
-   arch.io.outb(io + ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
-
-   // Now, read status port */
-   var status: u8 = arch.io.inb(io + ATA_REG_STATUS);
-   if(status != 0)
-   {
-       // Now, poll untill BSY is clear. */
-       while(arch.io.inb(io + ATA_REG_STATUS) & ATA_SR_BSY != 0) {}
-       status = arch.io.inb(io + ATA_REG_STATUS);
-       while(!(status & ATA_SR_DRQ != 0)) {
-           if(status & ATA_SR_ERR != 0)
-           {
-               kernel.logger.ERROR("ERROR bus {d}, drive {d}\n", .{bus, drive});
-               return 0;
-           }
-           status = arch.io.inb(io + ATA_REG_STATUS);
-       }
-       for(0..256) |i| {
-           ide_buf[i*2] = arch.io.inw(io + ATA_REG_DATA);
-       }
-   }
-   return 1;
+    var io: u16 = 0; 
+    if(bus == ATA_PRIMARY) {
+        io = ATA_PRIMARY_IO;
+    } else {
+        io = ATA_SECONDARY_IO;
+    }
+    // Check if any drive present and ready
+    var status = arch.io.inb(io + ATA_REG_STATUS);
+    if (status == 0 or status == 0xFF) {
+        return 0;
+    }
+    ide_select_drive(bus, drive);
+    // ATA specs say these values must be zero before sending IDENTIFY */
+    arch.io.outb(io + ATA_REG_SECCOUNT0, 0);
+    arch.io.outb(io + ATA_REG_LBA0, 0);
+    arch.io.outb(io + ATA_REG_LBA1, 0);
+    arch.io.outb(io + ATA_REG_LBA2, 0);
+    // Now, send IDENTIFY */
+    arch.io.outb(io + ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
+    // Now, poll untill BSY is clear. */
+    while(arch.io.inb(io + ATA_REG_STATUS) & ATA_SR_BSY != 0) {}
+    status = arch.io.inb(io + ATA_REG_STATUS);
+    while(!(status & ATA_SR_DRQ != 0)) {
+        if(status & ATA_SR_ERR != 0)
+        {
+            kernel.logger.ERROR("ERROR bus {d}, drive {d}\n", .{bus, drive});
+            return 0;
+        }
+        status = arch.io.inb(io + ATA_REG_STATUS);
+    }
+    for(0..256) |i| {
+        ide_buf[i] = arch.io.inw(io + ATA_REG_DATA);
+    }
+    irq.registerHandler(
+        if (bus == ATA_PRIMARY) ATA_PRIMARY_IRQ else ATA_SECONDARY_IRQ,
+        if (bus == ATA_PRIMARY) ata_primary else ata_secondary
+    );
+    return 1;
 }
 
 fn ata_probe_channel(bus: u8, channel: u8) void {
@@ -230,14 +287,18 @@ fn ata_probe_channel(bus: u8, channel: u8) void {
     if(ata_identify(bus, channel) != 0)
     {
         for (0..20) |i| {
-            const word_idx = ATA_IDENT_MODEL + i;
+            const word_idx = ATA_IDENT_MODEL / 2 + i;
             const word = ide_buf[word_idx];
 
             str[i * 2] = @truncate(word >> 8);
             str[i * 2 + 1] = @truncate(word & 0xFF);
         }
         if (PataChannel.add(io, 14, str)) |_channel| {
-            kernel.logger.WARN("ide name {s}\n", .{_channel.name});
+            kernel.logger.WARN("ide name {s} {any}\n", .{_channel.name, _channel});
+            for (0.._channel.lba28 / 256) |i| {
+                const lba = i * 256 * 512;
+                _channel.read_sector(lba);
+            }
         }
     }
 }
@@ -259,7 +320,5 @@ pub fn ata_init() void {
     }
     @memset(ide_buf[0..256], 0);
     dbg.printf("Initializing ATA device\n", .{});
-    irq.registerHandler(ATA_PRIMARY_IRQ, ata_primary);
-    irq.registerHandler(ATA_SECONDARY_IRQ, ata_secondary);
     ata_probe();
 }

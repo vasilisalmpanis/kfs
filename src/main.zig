@@ -57,7 +57,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     }
 
     krn.serial = Serial.init();
-    krn.logger = Logger.init(.DEBUG);
+    krn.logger = Logger.init(.ERROR);
     var boot_info: multiboot.Multiboot = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
     dbg.initSymbolTable(&boot_info);
     gdt.gdtInit();
