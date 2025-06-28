@@ -8,3 +8,4 @@ pub const keyboard = @import("./kbd.zig");
 pub const pit = @import("./pit.zig");
 
 pub const ata = @import("./block/ata/ata.zig");
+pub const pci = @import("./pci.zig");
