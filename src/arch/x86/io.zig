@@ -22,7 +22,7 @@ pub inline fn inw(port: u16) u16 {
 /// port (0 to 65535), specified in the DX register, into the byte
 /// memory address pointed to by the EAX register
 pub inline fn inl(port: u16) u32 {
-    return asm volatile ("inb %[port], %[result]"
+    return asm volatile ("inl %[port], %[result]"
         : [result] "={eax}" (-> u32),
         : [port] "N{dx}" (port),
     );
