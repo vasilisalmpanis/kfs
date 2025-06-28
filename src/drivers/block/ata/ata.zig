@@ -16,6 +16,14 @@ const ATA_SECONDARY_IO:     u16 =  0x170;
 const ATA_PRIMARY_STATUS    = 0x3F6;
 const ATA_SECONDARY_STATUS  = 0x376;
 
+const BMIDE_PRIMARY_REG     = 0xC000;
+const BMIDE_SECONDARY_REG   = 0xC00F;
+
+const BMIDE_COMMAND     = 0x00;
+const BMIDE_STATUS      = 0x01;
+const BMIDE_RESERVED    = 0x02;
+const BMIDE_PRDT_ADDR   = 0x04;
+
 const ATA_SR_BSY   = 0x80;
 const ATA_SR_DRDY  = 0x40;
 const ATA_SR_DF    = 0x20;
@@ -169,15 +177,20 @@ const PataChannel = struct {
         return new_channel;
     }
 
-    fn poll_ide(self: *PataChannel) void {
+    fn delay(self: *PataChannel) void {
         for (0..4) |_| {
             _ = self.ata_read_reg(ATA_REG_ALTSTATUS);
         }
+    }
+
+    fn poll_ide(self: *PataChannel) void {
+        self.delay();
         while (self.ata_read_reg(ATA_REG_STATUS) & ATA_SR_BSY != 0) {}
         var status: u8 = 0;
         while (status & ATA_SR_DRQ == 0) {
             status = self.ata_read_reg(ATA_REG_STATUS);
             if (status & ATA_SR_ERR != 0) {
+                kernel.logger.INFO("error in polling", .{});
                 return;
             }
         }
@@ -198,21 +211,69 @@ const PataChannel = struct {
             self.buffer[i*2]     = @truncate(word);
             self.buffer[i*2 + 1] = @truncate(word >> 8);
         }
+        self.delay();
         return self.buffer[0..512 * sectors];
+    }
+
+    fn read_sectors_dma(self: *PataChannel, lba: u32, num_sectors: u8) void {
+        const device_cmd: u8 = self.device_cmd | @as(u8, @truncate((lba >> 24) & 0x0F));
+        self.ata_write_reg(ATA_REG_SECCOUNT0, num_sectors);
+        self.ata_write_reg(ATA_REG_LBA0, @truncate(lba));
+        self.ata_write_reg(ATA_REG_LBA1, @truncate(lba >> 8));
+        self.ata_write_reg(ATA_REG_LBA2, @truncate(lba >> 16));
+        self.ata_write_reg(ATA_REG_HDDEVSEL, device_cmd);
+        self.ata_write_reg(ATA_REG_COMMAND, ATA_CMD_READ_DMA);
+        arch.io.outb(BMIDE_PRIMARY_REG + BMIDE_COMMAND, 0x01);
+        self.poll_ide();
+        // const sectors: u32 = if (num_sectors == 0) 256 else num_sectors;
+        self.delay();
+        return;
     }
 
     inline fn ata_write_reg(channel: *PataChannel, reg: u8, value: u8) void {
         arch.io.outb(channel.io_base + reg, value);
     }
+
     inline fn ata_read_reg(channel: *PataChannel, reg: u8) u8 {
         return arch.io.inb(channel.io_base + reg);
+    }
+
+    pub fn read_full_drive(self: *PataChannel) void {
+        const num_sec: u32 = 1;
+        for (0..self.lba28 / num_sec) |i| {
+            const lba = i * num_sec;
+            const sector = self.read_sectors(lba, num_sec);
+            if (!std.mem.allEqual(u8, sector, 0)) {
+                kernel.logger.INFO("{d}: {s}", .{ lba, sector });
+            }
+        }
+    }
+
+    pub fn read_full_drive_dma(self: *PataChannel) void {
+        const num_sec: u32 = 1;
+        for (0..7) |i| {
+            const lba = i * num_sec;
+            self.read_sectors_dma(lba, num_sec);
+            self.poll_ide();
+            self.poll_ide();
+            self.poll_ide();
+            self.poll_ide();
+            self.poll_ide();
+            self.poll_ide();
+            self.poll_ide();
+            self.poll_ide();
+            self.poll_ide();
+            self.poll_ide();
+            self.poll_ide();
+            kernel.logger.INFO("{d}: {s}", .{ lba, dma[0..512] });
+        }
     }
 };
 
 var ide_buf: [*]u16 = undefined;
 
 pub fn ata_primary() void {
-    // kernel.logger.DEBUG("primary\n", .{});
+    kernel.logger.DEBUG("primary\n", .{});
 }
 
 pub fn ata_secondary() void {
@@ -290,27 +351,53 @@ fn ata_probe_channel(bus: u8, channel: u8) void {
         }
         if (PataChannel.add(io, 14, str)) |_channel| {
             kernel.logger.WARN("ide name {s} {any}\n", .{_channel.name, _channel});
-            
-            const num_sec: u32 = 1;
-            for (0.._channel.lba28 / num_sec) |i| {
-                const lba = i * num_sec;
-                const sector = _channel.read_sectors(lba, num_sec);
-                if (!std.mem.allEqual(u8, sector, 0)) {
-                    kernel.logger.INFO("{d}: {s}", .{ lba, sector });
-                }
-            }
         }
     }
 }
 
+const PRDEntry = struct {
+    phys: u32,
+    size: u16,
+    flags: u16,
+};
+
+var dma: [*]u8 = undefined;
+
+fn alloc_prdt() u32 {
+    const phys = kernel.mm.virt_memory_manager.pmm.allocPage();
+    const virt: u32 = 0xE0000000;
+    kernel.mm.virt_memory_manager.mapPage(virt, phys, .{});
+    @memset(@as([*]u8, @ptrFromInt(virt))[0..4096], 0);
+    dma = @ptrFromInt(virt + @sizeOf(PRDEntry));
+    const prde: *PRDEntry = @ptrFromInt(virt);
+    prde.phys = phys + @sizeOf(PRDEntry);
+    prde.size = 512 * 7;
+    prde.flags = 0x8000;
+    return phys;
+}
+
+fn init_dma() void {
+    const prde_addr = alloc_prdt();
+    arch.io.outb(BMIDE_PRIMARY_REG + BMIDE_STATUS, 0x10);
+    arch.io.outb(BMIDE_PRIMARY_REG + BMIDE_COMMAND, 0x00);
+    arch.io.outl(BMIDE_PRIMARY_REG + BMIDE_PRDT_ADDR, prde_addr);
+    const status = arch.io.inb(BMIDE_PRIMARY_REG + BMIDE_STATUS);
+    kernel.logger.INFO("BMI status: {x}", .{status});
+    arch.io.outb(BMIDE_PRIMARY_REG + BMIDE_STATUS, status & 0xFC);
+}
+
 fn ata_probe() void {
     ata_probe_channel(ATA_PRIMARY, ATA_MASTER);
-    ata_probe_channel(ATA_PRIMARY, ATA_SLAVE);
-    ata_probe_channel(ATA_SECONDARY, ATA_MASTER);
-    ata_probe_channel(ATA_SECONDARY, ATA_SLAVE);
+    // ata_probe_channel(ATA_PRIMARY, ATA_SLAVE);
+    // ata_probe_channel(ATA_SECONDARY, ATA_MASTER);
+    // ata_probe_channel(ATA_SECONDARY, ATA_SLAVE);
 }
 
 pub fn ata_init() void {
+    if (@import("../../pci.zig").getDevice(0x01, 0x01)) |ide_device| {
+        kernel.logger.INFO("FOUND IDE DEVICE", .{});
+        ide_device.print();
+    }
     const temp: ?[*]u16 = kernel.mm.kmallocArray(u16, 256);
     if (temp) |buf| {
         ide_buf = buf;
@@ -321,4 +408,7 @@ pub fn ata_init() void {
     @memset(ide_buf[0..256], 0);
     dbg.printf("Initializing ATA device\n", .{});
     ata_probe();
+    init_dma();
+    // kernel.logger.INFO("{any}", .{channels});
+    channels.?.read_full_drive_dma();
 }
