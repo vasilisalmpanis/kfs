@@ -1,7 +1,7 @@
 // Keep current drive saved 
 // Only select another if we need to use another
 // The suggestion is to read the Status register FIFTEEN TIMES, and only pay attention to the value returned by the last one -- after selecting a new master or slave device
-
+const std = @import("std");
 const dbg = @import("debug");
 const kernel = @import("kernel");
 const irq = kernel.irq;
@@ -124,6 +124,7 @@ const PataChannel = struct {
 
     current_op: ATA_Operation   = .ATA_OP_NONE,
     status:     ATA_Status      = .ATA_STATUS_IDLE,
+    device_cmd: u8,
 
     buffer: [*]u8 = undefined,
     buffer_size: u32 = 512,
@@ -140,7 +141,7 @@ const PataChannel = struct {
     fn add(io_base: u16, irq_num: u32, name: [41]u8) ?*PataChannel {
         const new_channel: ?*PataChannel = kernel.mm.kmalloc(PataChannel);
         if (new_channel) |channel| {
-            channel.buffer_size = 512;
+            channel.buffer_size = 512 * 256;
             channel.status = .ATA_STATUS_IDLE;
             channel.current_op = .ATA_OP_NONE;
             if (kernel.mm.kmallocArray(u8, channel.buffer_size)) |array| {
@@ -150,6 +151,7 @@ const PataChannel = struct {
                 return null;
             }
 
+            channel.device_cmd = if (io_base == ATA_PRIMARY_IO) 0xE0 else 0xF0;
             channel.io_base = io_base;
             channel.irq_num = irq_num;
             channel.list.setup();
@@ -172,37 +174,31 @@ const PataChannel = struct {
             _ = self.ata_read_reg(ATA_REG_ALTSTATUS);
         }
         while (self.ata_read_reg(ATA_REG_STATUS) & ATA_SR_BSY != 0) {}
-        var status: u8 = 0xff;
+        var status: u8 = 0;
         while (status & ATA_SR_DRQ == 0) {
             status = self.ata_read_reg(ATA_REG_STATUS);
             if (status & ATA_SR_ERR != 0) {
                 return;
             }
         }
-
     }
 
-    fn read_sector(self: *PataChannel, lba: u32) void {
-        kernel.logger.INFO("start reading ...", .{});
-        const device_cmd: u8 = 0xE0 | @as(u8, @truncate(lba >> 24 & 0x0F));
-        self.ata_write_reg(ATA_REG_SECCOUNT0, 0);
+    fn read_sectors(self: *PataChannel, lba: u32, num_sectors: u8) []const u8 {
+        const device_cmd: u8 = self.device_cmd | @as(u8, @truncate((lba >> 24) & 0x0F));
+        self.ata_write_reg(ATA_REG_SECCOUNT0, num_sectors);
         self.ata_write_reg(ATA_REG_LBA0, @truncate(lba));
         self.ata_write_reg(ATA_REG_LBA1, @truncate(lba >> 8));
         self.ata_write_reg(ATA_REG_LBA2, @truncate(lba >> 16));
         self.ata_write_reg(ATA_REG_HDDEVSEL, device_cmd);
         self.ata_write_reg(ATA_REG_COMMAND, ATA_CMD_READ_PIO);
         self.poll_ide();
-        kernel.logger.INFO("after poll ...", .{});
-        for (0..256) |_| {
-            for (0..256) |i| {
-                const word = arch.io.inw(self.io_base + ATA_REG_DATA);
-                self.buffer[i * 2] = @truncate(word);
-                self.buffer[i * 2 + 1] = @truncate(word >> 8);
-                // kernel.logger.INFO("we got: {x}", .{ptr.*});
-            }
-            kernel.serial.print(self.buffer[0..512]);
-            kernel.logger.INFO("buffer: {s}", .{self.buffer[0..512]});
+        const sectors: u32 = if (num_sectors == 0) 256 else num_sectors;
+        for (0..256 * sectors) |i| {
+            const word = arch.io.inw(self.io_base + ATA_REG_DATA);
+            self.buffer[i*2]     = @truncate(word);
+            self.buffer[i*2 + 1] = @truncate(word >> 8);
         }
+        return self.buffer[0..512 * sectors];
     }
 
     inline fn ata_write_reg(channel: *PataChannel, reg: u8, value: u8) void {
@@ -216,7 +212,7 @@ const PataChannel = struct {
 var ide_buf: [*]u16 = undefined;
 
 pub fn ata_primary() void {
-    kernel.logger.DEBUG("primary\n", .{});
+    // kernel.logger.DEBUG("primary\n", .{});
 }
 
 pub fn ata_secondary() void {
@@ -225,19 +221,18 @@ pub fn ata_secondary() void {
 
 fn ide_select_drive(bus: u8, i: u8) void {
 	if(bus == ATA_PRIMARY) {
-            if(i == ATA_MASTER) {
-                arch.io.outb(ATA_PRIMARY_IO + ATA_REG_HDDEVSEL, 0xA0);
-            } else {
-                arch.io.outb(ATA_PRIMARY_IO + ATA_REG_HDDEVSEL, 0xB0);
-            }
+        if(i == ATA_MASTER) {
+            arch.io.outb(ATA_PRIMARY_IO + ATA_REG_HDDEVSEL, 0xA0);
+        } else {
+            arch.io.outb(ATA_PRIMARY_IO + ATA_REG_HDDEVSEL, 0xB0);
         }
-        else {
-            if(i == ATA_MASTER) {
-                arch.io.outb(ATA_SECONDARY_IO + ATA_REG_HDDEVSEL, 0xA0);
-            } else {
-                arch.io.outb(ATA_SECONDARY_IO + ATA_REG_HDDEVSEL, 0xB0);
-            }
+    } else {
+        if(i == ATA_MASTER) {
+            arch.io.outb(ATA_SECONDARY_IO + ATA_REG_HDDEVSEL, 0xA0);
+        } else {
+            arch.io.outb(ATA_SECONDARY_IO + ATA_REG_HDDEVSEL, 0xB0);
         }
+    }
 }
 
 fn ata_identify(bus: u8, drive: u8) u8 {
@@ -295,9 +290,14 @@ fn ata_probe_channel(bus: u8, channel: u8) void {
         }
         if (PataChannel.add(io, 14, str)) |_channel| {
             kernel.logger.WARN("ide name {s} {any}\n", .{_channel.name, _channel});
-            for (0.._channel.lba28 / 256) |i| {
-                const lba = i * 256 * 512;
-                _channel.read_sector(lba);
+            
+            const num_sec: u32 = 1;
+            for (0.._channel.lba28 / num_sec) |i| {
+                const lba = i * num_sec;
+                const sector = _channel.read_sectors(lba, num_sec);
+                if (!std.mem.allEqual(u8, sector, 0)) {
+                    kernel.logger.INFO("{d}: {s}", .{ lba, sector });
+                }
             }
         }
     }
