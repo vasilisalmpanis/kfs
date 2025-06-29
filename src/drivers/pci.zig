@@ -1,45 +1,46 @@
+const std = @import("std");
 const arch = @import("arch");
 const krn = @import("kernel");
 const identifyDevice = @import("./pci-vendors.zig").identifyDevice;
 const identifyClass = @import("./pci-vendors.zig").identifyClass;
 
-const CONFIG_ADDRESS = 0xCF8;
-const CONFIG_DATA = 0xCFC;
+const CONFIG_ADDRESS               = 0xCF8;
+const CONFIG_DATA                  = 0xCFC;
 
-const PCI_VENDOR_ID            = 0x00;
-const PCI_DEVICE_ID            = 0x02;
-const PCI_COMMAND              = 0x04;
-const PCI_STATUS               = 0x06;
-const PCI_REVISION_ID          = 0x08;
-const PCI_PROG_IF              = 0x09;
-const PCI_SUBCLASS             = 0x0a;
-const PCI_CLASS                = 0x0b;
-const PCI_CACHE_LINE_SIZE      = 0x0c;
-const PCI_LATENCY_TIMER        = 0x0d;
-const PCI_HEADER_TYPE          = 0x0e;
-const PCI_BIST                 = 0x0f;
-const PCI_BAR0                 = 0x10;
-const PCI_BAR1                 = 0x14;
-const PCI_BAR2                 = 0x18;
-const PCI_BAR3                 = 0x1C;
-const PCI_BAR4                 = 0x20;
-const PCI_BAR5                 = 0x24;
-const PCI_CARDBUS_CIS          = 0x28;
-const PCI_SUBSYSTEM_VENDOR_ID  = 0x2C;
-const PCI_SUBSYSTEM_ID         = 0x2E;
-const PCI_EXPANSION_ROM        = 0x30;
-const PCI_CAPABILITIES         = 0x34;
-const PCI_INTERRUPT_LINE       = 0x3C;
-const PCI_INTERRUPT_PIN        = 0x3D;
-const PCI_MIN_GRANT            = 0x3E;
-const PCI_MAX_LATENCY          = 0x3F;
+pub const PCI_VENDOR_ID            = 0x00;
+pub const PCI_DEVICE_ID            = 0x02;
+pub const PCI_COMMAND              = 0x04;
+pub const PCI_STATUS               = 0x06;
+pub const PCI_REVISION_ID          = 0x08;
+pub const PCI_PROG_IF              = 0x09;
+pub const PCI_SUBCLASS             = 0x0a;
+pub const PCI_CLASS                = 0x0b;
+pub const PCI_CACHE_LINE_SIZE      = 0x0c;
+pub const PCI_LATENCY_TIMER        = 0x0d;
+pub const PCI_HEADER_TYPE          = 0x0e;
+pub const PCI_BIST                 = 0x0f;
+pub const PCI_BAR0                 = 0x10;
+pub const PCI_BAR1                 = 0x14;
+pub const PCI_BAR2                 = 0x18;
+pub const PCI_BAR3                 = 0x1C;
+pub const PCI_BAR4                 = 0x20;
+pub const PCI_BAR5                 = 0x24;
+pub const PCI_CARDBUS_CIS          = 0x28;
+pub const PCI_SUBSYSTEM_VENDOR_ID  = 0x2C;
+pub const PCI_SUBSYSTEM_ID         = 0x2E;
+pub const PCI_EXPANSION_ROM        = 0x30;
+pub const PCI_CAPABILITIES         = 0x34;
+pub const PCI_INTERRUPT_LINE       = 0x3C;
+pub const PCI_INTERRUPT_PIN        = 0x3D;
+pub const PCI_MIN_GRANT            = 0x3E;
+pub const PCI_MAX_LATENCY          = 0x3F;
 
 
-const PCI_SECONDARY_BUS        = 0x09;
+const PCI_SECONDARY_BUS            = 0x09;
 
-const PCI_TYPE_BRIDGE         = 0x0604;
-const PCI_TYPE_SATA           = 0x0106;
-const PCI_NONE                = 0xFFFF;
+const PCI_TYPE_BRIDGE              = 0x0604;
+const PCI_TYPE_SATA                = 0x0106;
+const PCI_NONE                     = 0xFFFF;
 
 
 const HeaderType = enum(u8) {
@@ -48,7 +49,7 @@ const HeaderType = enum(u8) {
     PCI_TO_CARDBUS_BRIDGE = 0x2,
 };
 
-const PCIDevice = struct {
+pub const PCIDevice = struct {
     vendor_id: u16 = 0,
     device_id: u16 = 0,
     command: u16 = 0,
@@ -127,11 +128,11 @@ const PCIDevice = struct {
         );
     }
 
-    pub fn read(self: *PCIDevice, offset: u8) u32 {
+    pub fn read(self: *const PCIDevice, offset: u8) u32 {
         return readPCI(self.pci_cmd, offset);
     }
 
-    pub fn write(self: *PCIDevice, offset: u8, value: u32) void {
+    pub fn write(self: *const PCIDevice, offset: u8, value: u32) void {
         writePCI(self.pci_cmd, offset, value);
     }
 };
@@ -236,36 +237,6 @@ fn readPCIDev(cmd: ConfigCommand) ?PCIDevice {
     return dev;
 }
 
-pub fn scanDevices() void {
-    for (0..4) |bus_num| {
-        for (0..32) |dev_num| {
-            const cmd = ConfigCommand{
-                .bus_num = @truncate(bus_num),
-                .dev_num = @truncate(dev_num),
-            };
-            if (readPCIDev(cmd)) |device| {
-                if ((device.header_type & 0x80) != 0) {
-                    for (0..8) |func_num| {
-                        var _cmd = cmd;
-                        _cmd.func_num = @truncate(func_num);
-                        if (readPCIDev(_cmd)) |dev| {
-                            krn.logger.INFO("DEVICE {d} ON BUS {d} FUNC {d}", .{
-                                dev_num, bus_num, func_num
-                            });
-                            dev.print();
-                        }
-                    }
-                } else {
-                    krn.logger.INFO("DEVICE {d} ON BUS {d}", .{
-                        dev_num, bus_num
-                    });
-                    device.print();
-                }
-            }
-        }
-    }
-}
-
 pub fn getDevice(class: u8, subclass: u8) ?PCIDevice {
     for (0..4) |bus_num| {
         for (0..32) |dev_num| {
@@ -295,6 +266,124 @@ pub fn getDevice(class: u8, subclass: u8) ?PCIDevice {
     return null;
 }
 
+pub const Iterator = struct {
+    devices: *const std.ArrayList(PCIDevice),
+    indices: []const usize,
+    current: usize,
+    
+    pub fn next(self: *Iterator) ?*const PCIDevice {
+        if (self.current >= self.indices.len) return null;
+        const device = &self.devices.items[self.indices[self.current]];
+        self.current += 1;
+        return device;
+    }
+};
+
+pub const PCIManager = struct {
+    buffer: [12000]u8 = .{0} ** 12000,
+    fba: std.heap.FixedBufferAllocator = undefined,
+    devices: std.ArrayList(PCIDevice) = undefined,
+    class_index: std.AutoHashMap(u16, std.ArrayList(usize)) = undefined,
+
+    pub fn init() PCIManager {
+        var manager = PCIManager{};
+        manager.fba = std.heap.FixedBufferAllocator.init(&manager.buffer);
+        manager.devices = std.ArrayList(PCIDevice).init(
+            manager.fba.allocator(),
+        );
+        manager.class_index = std.AutoHashMap(u16, std.ArrayList(usize)).init(
+            manager.fba.allocator()
+        );
+        return manager;
+    }
+
+    pub fn addDevice(self: *PCIManager, device: PCIDevice) !void {
+        const idx = self.devices.items.len;
+        try self.devices.append(device);
+        const key: u16 = (@as(u16, @intCast(device.class_code)) << 8) | device.subclass;
+        var class_list = self.class_index.get(key)
+            orelse std.ArrayList(usize).init(self.devices.allocator);
+        try class_list.append(idx);
+        try self.class_index.put(key, class_list);
+
+    }
+
+    pub fn findByClass(
+        self: *const PCIManager,
+        class_code: u8,
+        subclass: u8
+    ) ?[]const usize {
+        const key: u16 = (@as(u16, @intCast(class_code)) << 8) | subclass;
+        if (self.class_index.get(key)) |indices| {
+            return indices.items;
+        }
+        return null;
+    }
+
+    pub fn iterateByClass(
+        self: *const PCIManager,
+        class_code: u8,
+        subclass: u8
+    ) Iterator {
+        const indices = self.findByClass(
+            class_code,
+            subclass
+        ) orelse &[_]usize{};
+        return Iterator{
+            .devices = &self.devices,
+            .indices = indices,
+            .current = 0,
+        };
+    }
+
+    pub fn iterate(self: *const PCIManager) Iterator {
+        return Iterator{
+            .devices = &self.devices,
+            .indices = self.devices.items,
+            .current = 0,
+        };
+    }
+
+    pub fn scanDevices(self: *PCIManager) void {
+        for (0..4) |bus_num| {
+            for (0..32) |dev_num| {
+                const cmd = ConfigCommand{
+                    .bus_num = @truncate(bus_num),
+                    .dev_num = @truncate(dev_num),
+                };
+                if (readPCIDev(cmd)) |device| {
+                    if ((device.header_type & 0x80) != 0) {
+                        for (0..8) |func_num| {
+                            var _cmd = cmd;
+                            _cmd.func_num = @truncate(func_num);
+                            if (readPCIDev(_cmd)) |dev| {
+                                krn.logger.INFO("DEVICE {d} ON BUS {d} FUNC {d}", .{
+                                    dev_num, bus_num, func_num
+                                });
+                                self.addDevice(dev) catch {
+                                    krn.logger.ERROR("Failer to add PCI device", .{});
+                                };
+                                dev.print();
+                            }
+                        }
+                    } else {
+                        krn.logger.INFO("DEVICE {d} ON BUS {d}", .{
+                            dev_num, bus_num
+                        });
+                        self.addDevice(device) catch {
+                            krn.logger.ERROR("Failer to add PCI device", .{});
+                        };
+                        device.print();
+                    }
+                }
+            }
+        }
+    }
+};
+
+pub var pci_manager: PCIManager = undefined;
+
 pub fn init() void {
-    scanDevices();
+    pci_manager = PCIManager.init();
+    pci_manager.scanDevices();
 }
