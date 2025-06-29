@@ -257,7 +257,12 @@ const ATADrive = struct {
             phys, phys + (DMA_BUFFER_PAGES + 1) * kernel.mm.PAGE_SIZE
         });
 
-        const virt = 0xD0000000;
+        const virt = kernel.mm.virt_memory_manager.findFreeSpace(
+            DMA_BUFFER_PAGES + 1,
+            0xD0000000,
+            0xE0000000,
+            false
+        );
         kernel.mm.virt_memory_manager.mapPage(virt, phys, .{});
         @memset(@as([*]u8, @ptrFromInt(virt))[0..4096], 0);
 
@@ -484,12 +489,12 @@ fn ideSelectChannel(ch_type: ChannelType) void {
 
 fn ata_identify(ch_type: ChannelType) u8 {
     const io_base: u16 = ch_type.getIOReg();
+    ideSelectChannel(ch_type);
     // Check if any drive present and ready
     var status = arch.io.inb(io_base + ATA_REG_STATUS);
     if (status == 0 or status == 0xFF) {
         return 0;
     }
-    ideSelectChannel(ch_type);
     // ATA specs say these values must be zero before sending IDENTIFY */
     arch.io.outb(io_base + ATA_REG_SECCOUNT0, 0);
     arch.io.outb(io_base + ATA_REG_LBA0, 0);
@@ -576,6 +581,9 @@ pub const ATAManager = struct {
     }
 
     pub fn addDevice(self: *ATAManager, device: ATADrive) !void {
+        kernel.logger.INFO("Adding drive {s} {s}",
+            .{@tagName(device.channel), device.name}
+        );
         try self.drives.append(device);
     }
 
@@ -608,28 +616,31 @@ pub fn ata_init() void {
         )) |ata_drive| {
             ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
         }
-        // if (ata_probe_channel(
-        //     .PRIMARY_SLAVE,
-        //     ide_dev
-        // )) |ata_drive| {
-        //     ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
-        // }
-        // if (ata_probe_channel(
-        //     .SECONDARY_MASTER, 
-        //     ide_dev
-        // )) |ata_drive| {
-        //     ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
-        // }
-        // if (ata_probe_channel(
-        //     .SECONDARY_SLAVE,
-        //     ide_dev
-        // )) |ata_drive| {
-        //     ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
-        // }
+        if (ata_probe_channel(
+            .PRIMARY_SLAVE,
+            ide_dev
+        )) |ata_drive| {
+            ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
+        }
+        if (ata_probe_channel(
+            .SECONDARY_MASTER, 
+            ide_dev
+        )) |ata_drive| {
+            ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
+        }
+        if (ata_probe_channel(
+            .SECONDARY_SLAVE,
+            ide_dev
+        )) |ata_drive| {
+            ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
+        }
     }
     var ata_iter = ata_manager.iterate();
     while (ata_iter.next()) |ata| {
-        kernel.logger.INFO("READING DRIVE", .{});
+        kernel.logger.INFO(
+            "READING DRIVE {s} {s}", 
+            .{@tagName(ata.channel), ata.name}
+        );
         ata.read_full_drive_dma();
     }
 }
