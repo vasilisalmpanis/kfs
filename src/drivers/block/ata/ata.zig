@@ -503,15 +503,12 @@ pub const Iterator = struct {
 };
 
 pub const ATAManager = struct {
-    buffer: [10000]u8 = .{0} ** 10000,
-    fba: std.heap.FixedBufferAllocator = undefined,
     drives: std.ArrayList(ATADrive) = undefined,
 
     pub fn init() ATAManager {
         var manager = ATAManager{};
-        manager.fba = std.heap.FixedBufferAllocator.init(&manager.buffer);
         manager.drives = std.ArrayList(ATADrive).init(
-            manager.fba.allocator(),
+            kernel.mm.arena_allocator.allocator(),
         );
         return manager;
     }
