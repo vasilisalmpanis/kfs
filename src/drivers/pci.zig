@@ -280,19 +280,16 @@ pub const Iterator = struct {
 };
 
 pub const PCIManager = struct {
-    buffer: [12000]u8 = .{0} ** 12000,
-    fba: std.heap.FixedBufferAllocator = undefined,
     devices: std.ArrayList(PCIDevice) = undefined,
     class_index: std.AutoHashMap(u16, std.ArrayList(usize)) = undefined,
 
     pub fn init() PCIManager {
         var manager = PCIManager{};
-        manager.fba = std.heap.FixedBufferAllocator.init(&manager.buffer);
         manager.devices = std.ArrayList(PCIDevice).init(
-            manager.fba.allocator(),
+            krn.mm.arena_allocator.allocator()
         );
         manager.class_index = std.AutoHashMap(u16, std.ArrayList(usize)).init(
-            manager.fba.allocator()
+            krn.mm.arena_allocator.allocator()
         );
         return manager;
     }

@@ -1,6 +1,7 @@
 const multiboot = @import("arch").multiboot;
 const std = @import("std");
 const arch = @import("arch");
+const krn = @import("../main.zig");
 
 const pmm = @import("arch").pmm;
 const vmm = @import("arch").vmm;
@@ -40,7 +41,9 @@ var phys_memory_manager: pmm.PMM = undefined;
 pub var virt_memory_manager: vmm.VMM = undefined;
 pub var kheap: heap.FreeList = undefined;
 pub var vheap: heap.FreeList = undefined;
-pub var uheap: heap.FreeList = undefined;
+
+var fba: std.heap.FixedBufferAllocator = undefined;
+pub var arena_allocator: std.heap.ArenaAllocator = undefined;
 
 // get the first availaanle address and put metadata there
 pub fn mmInit(info: *multiboot.Multiboot) void {
@@ -85,13 +88,14 @@ pub fn mmInit(info: *multiboot.Multiboot) void {
             0xFFFFF000,
             16
         );
-        uheap = heap.FreeList.init(
-            &phys_memory_manager,
-            &virt_memory_manager,
-            PAGE_SIZE,
-            PAGE_OFFSET,
-            16
-        );
+    }
+
+    const arena_size: u32 = 4096 * 20;
+    if (kmallocArray(u8, arena_size)) |arena| {
+        fba = std.heap.FixedBufferAllocator.init(arena[0..arena_size]);
+        arena_allocator = std.heap.ArenaAllocator.init(fba.allocator());
+    } else {
+        krn.logger.ERROR("Memory initialization failed!", .{});
     }
 }
 
