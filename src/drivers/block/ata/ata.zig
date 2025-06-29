@@ -10,9 +10,6 @@ const lst = kernel.list;
 const pci = @import("../../pci.zig");
 
 // BUS MASTER IDE
-const BMIDE_PRIMARY_REG         = 0xC040;
-const BMIDE_SECONDARY_REG       = 0xC048;
-
 const BMIDE_COMMAND             = 0x00;
 const BMIDE_STATUS              = 0x02;
 const BMIDE_PRDT_ADDR           = 0x04;
@@ -28,11 +25,10 @@ const BMIDE_STATUS_DMA1_CAPABLE = 0x40;
 const BMIDE_STATUS_SIMPLEX      = 0x80;
 
 // 
-const ATA_PRIMARY_IRQ:      u16 = 14;
-const ATA_SECONDARY_IRQ:    u16 = 15;
-const ATA_PRIMARY_IO:       u16 = 0x1F0;
-const ATA_SECONDARY_IO:     u16 =  0x170;
-
+const ATA_PRIMARY_IRQ       = 14;
+const ATA_SECONDARY_IRQ     = 15;
+const ATA_PRIMARY_IO        = 0x1F0;
+const ATA_SECONDARY_IO      =  0x170;
 const ATA_PRIMARY_STATUS    = 0x3F6;
 const ATA_SECONDARY_STATUS  = 0x376;
 
@@ -44,6 +40,7 @@ const ATA_SR_DRQ   = 0x08;
 const ATA_SR_CORR  = 0x04;
 const ATA_SR_IDX   = 0x02;
 const ATA_SR_ERR   = 0x01;
+
 const ATA_ER_BBK   = 0x80;
 const ATA_ER_UNC   = 0x40;
 const ATA_ER_MC    = 0x20;
@@ -102,7 +99,6 @@ const ATA_REG_COMMAND     = 0x07;
 const ATA_REG_ERROR       = 0x01;
 const ATA_REG_STATUS      = 0x07;
 
-
 const ATA_REG_SECCOUNT1   = 0x08;
 const ATA_REG_LBA3        = 0x09;
 const ATA_REG_LBA4        = 0x0A;
@@ -134,8 +130,61 @@ const ATA_Status = enum(u8) {
     ATA_STATUS_TIMEOUT
 };
 
+const PRDEntry = struct {
+    phys: u32,
+    size: u16,
+    reserved: u8,
+    eot: u8,
+};
+
+const ChannelType = enum {
+    PRIMARY_MASTER,
+    PRIMARY_SLAVE,
+    SECONDARY_MASTER,
+    SECONDARY_SLAVE,
+
+    pub fn isMaster(self: ChannelType) bool {
+        return self == .PRIMARY_MASTER or self == .SECONDARY_MASTER;
+    }
+
+    pub fn isPrimary(self: ChannelType) bool {
+        return self == .PRIMARY_MASTER or self == .PRIMARY_SLAVE;
+    }
+
+    pub fn getBus(self: ChannelType) u8 {
+        return if (self.isPrimary()) ATA_PRIMARY else ATA_SECONDARY;
+    }
+
+    pub fn getChannel(self: ChannelType) u8 {
+        return if (self.isMaster()) ATA_MASTER else ATA_SLAVE;
+    }
+
+    pub fn getIOReg(self: ChannelType) u16 {
+        return if (self.isPrimary()) ATA_PRIMARY_IO else ATA_SECONDARY_IO;
+    }
+
+    pub fn getStatusReg(self: ChannelType) u16 {
+        return if (self.isPrimary()) ATA_PRIMARY_STATUS else ATA_SECONDARY_STATUS;
+    }
+
+    pub fn getIRQ(self: ChannelType) u32 {
+        return if (self.isPrimary()) ATA_PRIMARY_IRQ else ATA_SECONDARY_IRQ;
+    }
+
+    pub fn getBMIDEOffset(self: ChannelType) u8 {
+        return if (self.isPrimary()) 0 else 0x08;
+    }
+
+    pub fn getDevCmd(self: ChannelType) u8 {
+        return if (self.isPrimary()) 0xE0 else 0xF0;
+    }
+};
+
+var current_channel: ChannelType = .PRIMARY_MASTER;
+
 const ATADrive = struct {
     name: [41]u8 = .{0} ** 41,
+    channel: ChannelType = .PRIMARY_MASTER,
 
     io_base: u16 = 0,
     ctrl_base: u16 = 0,
@@ -147,8 +196,7 @@ const ATADrive = struct {
     status:     ATA_Status      = .ATA_STATUS_IDLE,
     device_cmd: u8 = 0,
 
-    buffer: [*]u8 = undefined,
-    buffer_size: u32 = 512,
+    buffer: []u8 = undefined,
 
     lba28: u32 = 0,
     lba48: u64 = 0,
@@ -163,40 +211,50 @@ const ATADrive = struct {
     dma_buff_virt: u32 = 0,
     dma_initialized: bool = false,
 
-    fn add(io_base: u16, bmide_base: u16, irq_num: u32, name: [41]u8) ?ATADrive {
-        var channel: ATADrive = ATADrive{};
-        channel.buffer_size = 512;
-        channel.status = .ATA_STATUS_IDLE;
-        channel.current_op = .ATA_OP_NONE;
-        if (kernel.mm.kmallocArray(u8, channel.buffer_size)) |array| {
-            channel.buffer = array;
+    const SECTOR_SIZE = 512;
+    const DMA_BUFFER_PAGES = 8;
+    const TIMEOUT_READY = 10000;
+    const TIMEOUT_DMA = 1000000;
+    const STATUS_READ_COUNT = 15;
+
+    fn init(
+        ch_type: ChannelType,
+        bmide_base: u16,
+        name: [41]u8
+    ) ?ATADrive {
+        var drv = ATADrive{
+            .channel = ch_type,
+            .io_base = ch_type.getIOReg(),
+            .ctrl_base = ch_type.getStatusReg(),
+            .bmide_base = bmide_base + ch_type.getBMIDEOffset(),
+            .irq_num = ch_type.getIRQ(),
+            .device_cmd = ch_type.getDevCmd(),
+        };
+        if (kernel.mm.kmallocArray(u8, SECTOR_SIZE)) |array| {
+            drv.buffer = array[0..SECTOR_SIZE];
         } else {
             return null;
         }
+        @memcpy(drv.name[0..41], name[0..41]);
+        drv.lba28 = @as(*u32, @ptrCast(@alignCast(&ide_buf[60]))).*;
+        drv.lba48 = @as(*u64, @ptrCast(@alignCast(&ide_buf[100]))).*;
 
-        channel.device_cmd = if (io_base == ATA_PRIMARY_IO) 0xE0 else 0xF0;
+        drv.initDMA();
+        return drv;
+    }
 
-        channel.io_base = io_base;
-        channel.ctrl_base = if (io_base == ATA_PRIMARY_IO) ATA_PRIMARY_STATUS else ATA_SECONDARY_STATUS;
-        channel.bmide_base = if (io_base == ATA_PRIMARY_IO) bmide_base else bmide_base + 0x0008;
-        
-        channel.irq_num = irq_num;
-        channel.irq_enabled = false;
-        @memset(channel.name[0..41],0);
-        @memcpy(channel.name[0..41], name[0..41]);
-        channel.lba28 = @as(*u32, @ptrCast(@alignCast(&ide_buf[60]))).*;
-        channel.lba48 = @as(*u64, @ptrCast(@alignCast(&ide_buf[100]))).*;
-
-        channel.initDMA();
-        return channel;
+    fn selectChannel(self: *const ATADrive) void {
+        if (self.channel != current_channel) {
+            ideSelectChannel(self.channel);
+        }
     }
 
     fn initDMA(self: *ATADrive) void {
-        const phys = kernel.mm.virt_memory_manager.pmm.allocPages(9);
+        const phys = kernel.mm.virt_memory_manager.pmm.allocPages(DMA_BUFFER_PAGES + 1);
         const buff_phys = phys + kernel.mm.PAGE_SIZE;
 
         kernel.logger.INFO("DMA PHYS: 0x{X:0>8} - 0x{X:0>8}", .{
-            phys, phys + 9 * kernel.mm.PAGE_SIZE
+            phys, phys + (DMA_BUFFER_PAGES + 1) * kernel.mm.PAGE_SIZE
         });
 
         const virt = 0xD0000000;
@@ -205,7 +263,7 @@ const ATADrive = struct {
 
         const buff_virt = virt + kernel.mm.PAGE_SIZE;
 
-        for (0..8) |i| {
+        for (0..DMA_BUFFER_PAGES) |i| {
             const vrt = buff_virt + i * kernel.mm.PAGE_SIZE;
             const phs = buff_phys + i * kernel.mm.PAGE_SIZE;
             kernel.mm.virt_memory_manager.mapPage(
@@ -273,8 +331,20 @@ const ATADrive = struct {
         return self.buffer[0..512 * sectors];
     }
 
+    fn waitNotBusy(self: *const ATADrive) bool {
+        var timeout: u32 = TIMEOUT_READY;
+        while (timeout > 0) {
+            const status = self.ata_read_reg(ATA_REG_STATUS);
+            if (status & ATA_SR_BSY == 0) {
+                return true;
+            }
+            timeout -= 1;
+        }
+        return false;
+    }
+
     fn waitReady(self: *const ATADrive) bool {
-        var timeout: u32 = 10000;
+        var timeout: u32 = TIMEOUT_READY;
         while (timeout > 0) {
             const status = self.ata_read_reg(ATA_REG_STATUS);
             if (status & ATA_SR_BSY == 0 and status & ATA_SR_DRDY != 0) {
@@ -285,8 +355,23 @@ const ATADrive = struct {
         return false;
     }
 
-    fn read_sectors_dma(self: *const ATADrive, lba: u32, num_sectors: u8) void {
-        if (!self.waitReady()) {
+    fn waitDataReady(self: *const ATADrive) bool {
+        if (!self.waitNotBusy()) return false;
+        var timeout: u32 = TIMEOUT_READY;
+        while (timeout > 0) {
+            const status = self.ataReadReg(ATA_REG_STATUS);
+            if (status & ATA_SR_ERR != 0) {
+                const err = self.ataReadReg(ATA_REG_ERROR);
+                kernel.logger.ERROR("ATA Error: status=0x{X}, error=0x{X}", .{status, err});
+                return false;
+            }
+            if (status & ATA_SR_DRQ != 0) return true;
+            timeout -= 1;
+        }
+    }
+
+    fn readSectorsDMA(self: *const ATADrive, lba: u32, num_sectors: u8) void {
+        if (!self.dma_initialized or !self.waitReady()) {
             kernel.logger.ERROR("Drive not ready", .{});
             return;
         }
@@ -315,7 +400,7 @@ const ATADrive = struct {
     }
 
     fn waitDMA(self: *const ATADrive) void {
-        var timeout: u32 = 1000000;
+        var timeout: u32 = TIMEOUT_DMA;
         
         while (timeout > 0) {
             const bmide_status = arch.io.inb(self.bmide_base + BMIDE_STATUS);
@@ -359,6 +444,7 @@ const ATADrive = struct {
     }
 
     pub fn read_full_drive(self: *const ATADrive) void {
+        self.selectChannel();
         const num_sec: u32 = 1;
         for (0..self.lba28 / num_sec) |i| {
             const lba = i * num_sec;
@@ -370,10 +456,11 @@ const ATADrive = struct {
     }
 
     pub fn read_full_drive_dma(self: *const ATADrive) void {
+        self.selectChannel();
         const num_sec: u32 = 1;
         for (0..self.lba28 / num_sec) |i| {
             const lba = i * num_sec;
-            self.read_sectors_dma(lba, 1);
+            self.readSectorsDMA(lba, 1);
         }
     }
 };
@@ -388,72 +475,55 @@ pub fn ata_secondary() void {
     kernel.logger.DEBUG("secondary\n", .{});
 }
 
-fn ide_select_drive(bus: u8, i: u8) void {
-	if(bus == ATA_PRIMARY) {
-        if(i == ATA_MASTER) {
-            arch.io.outb(ATA_PRIMARY_IO + ATA_REG_HDDEVSEL, 0xA0);
-        } else {
-            arch.io.outb(ATA_PRIMARY_IO + ATA_REG_HDDEVSEL, 0xB0);
-        }
-    } else {
-        if(i == ATA_MASTER) {
-            arch.io.outb(ATA_SECONDARY_IO + ATA_REG_HDDEVSEL, 0xA0);
-        } else {
-            arch.io.outb(ATA_SECONDARY_IO + ATA_REG_HDDEVSEL, 0xB0);
-        }
-    }
+fn ideSelectChannel(ch_type: ChannelType) void {
+    const io_base: u16 = ch_type.getIOReg();
+    const cmd: u8 = if (ch_type.isMaster()) 0xA0 else 0xB0;
+    current_channel = ch_type;
+    arch.io.outb(io_base + ATA_REG_HDDEVSEL, cmd);
 }
 
-fn ata_identify(bus: u8, drive: u8) u8 {
-    var io: u16 = 0; 
-    if(bus == ATA_PRIMARY) {
-        io = ATA_PRIMARY_IO;
-    } else {
-        io = ATA_SECONDARY_IO;
-    }
+fn ata_identify(ch_type: ChannelType) u8 {
+    const io_base: u16 = ch_type.getIOReg();
     // Check if any drive present and ready
-    var status = arch.io.inb(io + ATA_REG_STATUS);
+    var status = arch.io.inb(io_base + ATA_REG_STATUS);
     if (status == 0 or status == 0xFF) {
         return 0;
     }
-    ide_select_drive(bus, drive);
+    ideSelectChannel(ch_type);
     // ATA specs say these values must be zero before sending IDENTIFY */
-    arch.io.outb(io + ATA_REG_SECCOUNT0, 0);
-    arch.io.outb(io + ATA_REG_LBA0, 0);
-    arch.io.outb(io + ATA_REG_LBA1, 0);
-    arch.io.outb(io + ATA_REG_LBA2, 0);
+    arch.io.outb(io_base + ATA_REG_SECCOUNT0, 0);
+    arch.io.outb(io_base + ATA_REG_LBA0, 0);
+    arch.io.outb(io_base + ATA_REG_LBA1, 0);
+    arch.io.outb(io_base + ATA_REG_LBA2, 0);
     // Now, send IDENTIFY */
-    arch.io.outb(io + ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
+    arch.io.outb(io_base + ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
     // Now, poll untill BSY is clear. */
-    while(arch.io.inb(io + ATA_REG_STATUS) & ATA_SR_BSY != 0) {}
-    status = arch.io.inb(io + ATA_REG_STATUS);
+    while(arch.io.inb(io_base + ATA_REG_STATUS) & ATA_SR_BSY != 0) {}
+    status = arch.io.inb(io_base + ATA_REG_STATUS);
     while(!(status & ATA_SR_DRQ != 0)) {
         if(status & ATA_SR_ERR != 0)
         {
-            kernel.logger.ERROR("ERROR bus {d}, drive {d}\n", .{bus, drive});
+            kernel.logger.ERROR("{s} status 0x{x}\n", .{@tagName(ch_type), status});
             return 0;
         }
-        status = arch.io.inb(io + ATA_REG_STATUS);
+        status = arch.io.inb(io_base + ATA_REG_STATUS);
     }
     for(0..256) |i| {
-        ide_buf[i] = arch.io.inw(io + ATA_REG_DATA);
+        ide_buf[i] = arch.io.inw(io_base + ATA_REG_DATA);
     }
     irq.registerHandler(
-        if (bus == ATA_PRIMARY) ATA_PRIMARY_IRQ else ATA_SECONDARY_IRQ,
-        if (bus == ATA_PRIMARY) ata_primary else ata_secondary
+        ch_type.getIRQ(),
+        if (ch_type.isPrimary()) ata_primary else ata_secondary
     );
     return 1;
 }
 
 fn ata_probe_channel(
-    bus: u8,
-    channel: u8,
-    ide_device:
-    *const pci.PCIDevice
+    ch_type: ChannelType,
+    ide_device: *const pci.PCIDevice
 ) ?ATADrive {
     var str: [41]u8 = .{0} ** 41;
-    const io: u16 = if (bus == ATA_PRIMARY) ATA_PRIMARY_IO else ATA_SECONDARY_IO;
-    if(ata_identify(bus, channel) != 0)
+    if(ata_identify(ch_type) != 0)
     {
         for (0..20) |i| {
             const word_idx = ATA_IDENT_MODEL / 2 + i;
@@ -470,10 +540,9 @@ fn ata_probe_channel(
             ide_device.write(pci.PCI_COMMAND, pci_cmd);
         }
 
-        if (ATADrive.add(
-            io,
+        if (ATADrive.init(
+            ch_type,
             @truncate(ide_device.bar4 & 0xFFF0),
-            14,
             str
         )) |drv| {
             kernel.logger.INFO("ATA DRIVE {s}\n{any}\n", .{drv.name, drv});
@@ -482,13 +551,6 @@ fn ata_probe_channel(
     }
     return null;
 }
-
-const PRDEntry = struct {
-    phys: u32,
-    size: u16,
-    reserved: u8,
-    eot: u8,
-};
 
 pub const Iterator = struct {
     drives: *const std.ArrayList(ATADrive),
@@ -540,31 +602,26 @@ pub fn ata_init() void {
     // Iterate over all PCI IDE Inerfaces (0x01 class = mass storage, 0x01 subclass = IDE Intereface)
     var ide_iter = pci.pci_manager.iterateByClass(0x01, 0x01);
     while (ide_iter.next()) |ide_dev| {
-        dbg.printf("Initializing ATA device\n", .{});
         if (ata_probe_channel(
-            ATA_PRIMARY,
-            ATA_MASTER,
+            .PRIMARY_MASTER,
             ide_dev
         )) |ata_drive| {
             ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
         }
         // if (ata_probe_channel(
-        //     ATA_PRIMARY,
-        //     ATA_SLAVE,
+        //     .PRIMARY_SLAVE,
         //     ide_dev
         // )) |ata_drive| {
         //     ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
         // }
         // if (ata_probe_channel(
-        //     ATA_SECONDARY, 
-        //     ATA_MASTER, 
+        //     .SECONDARY_MASTER, 
         //     ide_dev
         // )) |ata_drive| {
         //     ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
         // }
         // if (ata_probe_channel(
-        //     ATA_SECONDARY,
-        //     ATA_SLAVE,
+        //     .SECONDARY_SLAVE,
         //     ide_dev
         // )) |ata_drive| {
         //     ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
