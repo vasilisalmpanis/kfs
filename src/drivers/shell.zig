@@ -20,15 +20,12 @@ pub const ShellCommand = struct {
 
 pub const Shell = struct {
     arg_buf: [MAX_ARGS][]const u8 = undefined,
-    buffer: [3000]u8 = .{0} ** 3000,
-    fba: std.heap.FixedBufferAllocator = undefined,
     commands: std.StringHashMap(ShellCommand) = undefined,
 
     pub fn init() Shell {
         var shell = Shell{};
-        shell.fba = std.heap.FixedBufferAllocator.init(&shell.buffer);
         shell.commands = std.StringHashMap(ShellCommand).init(
-            shell.fba.allocator(),
+            krn.mm.arena_allocator.allocator()
         );
         shell.registerBuiltins();
         return shell;
