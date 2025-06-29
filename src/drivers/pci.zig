@@ -79,6 +79,7 @@ const PCIDevice = struct {
     int_pin: u8 = 0,
     min_grant: u8 = 0,
     max_latency: u8 = 0,
+    pci_cmd: ConfigCommand = ConfigCommand{},
 
     pub fn print(self: *const PCIDevice) void {
         krn.logger.INFO(
@@ -125,6 +126,14 @@ const PCIDevice = struct {
             }
         );
     }
+
+    pub fn read(self: *PCIDevice, offset: u8) u32 {
+        return readPCI(self.pci_cmd, offset);
+    }
+
+    pub fn write(self: *PCIDevice, offset: u8, value: u32) void {
+        writePCI(self.pci_cmd, offset, value);
+    }
 };
 
 const ConfigCommand = packed struct {
@@ -136,6 +145,16 @@ const ConfigCommand = packed struct {
     reserved: u7 = 0,
     enable: bool = false,
 };
+
+fn writePCI(cmd: ConfigCommand, reg_offset: u8, value: u32) void {
+    var _cmd = cmd;
+    _cmd.always_zero = 0;
+    _cmd.reserved = 0;
+    _cmd.reg_offset = @truncate(reg_offset >> 2);
+    _cmd.enable = true;
+    arch.io.outl(CONFIG_ADDRESS, @as(u32, @bitCast(_cmd)));
+    arch.io.outl(CONFIG_DATA, value);
+}
 
 fn readPCI(cmd: ConfigCommand, reg_offset: u8) u32 {
     var _cmd = cmd;
@@ -210,6 +229,8 @@ fn readPCIDev(cmd: ConfigCommand) ?PCIDevice {
         dev.int_pin = readPCI8(cmd, PCI_INTERRUPT_PIN);
         dev.min_grant = readPCI8(cmd, PCI_MIN_GRANT);
         dev.max_latency = readPCI8(cmd, PCI_MAX_LATENCY);
+
+        dev.pci_cmd = cmd;
     }
 
     return dev;
