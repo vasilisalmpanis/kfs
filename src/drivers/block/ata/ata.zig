@@ -645,6 +645,7 @@ pub export fn ata_init() void {
     }
 }
 
+export var ata_g: *const fn() callconv(.c) void linksection(".init_call.early") = ata_init;
 // comptime {
 //     kernel.deviceInitcall(ata_init);
 // }

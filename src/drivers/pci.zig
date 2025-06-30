@@ -385,6 +385,4 @@ pub export fn init() void {
     pci_manager.scanDevices();
 }
 
-comptime {
-    krn.earlyInitcall(init);
-}
+export var exported_data: *const fn() callconv(.c) void linksection(".init_call.early") = init;

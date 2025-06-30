@@ -48,7 +48,15 @@ pub fn ps() void {
 }
 
 fn psTreeHelper(task: *tsk.Task, level: u32, last_child: bool) void {
-    const len = printfLen("{d} ", .{task.pid});
+    var len: u32 = 0;
+    if (task.pid != 0) {
+        if (task.tsktype == .KTHREAD) {
+            len = printfLen("[{d}] ", .{task.pid});
+        } else {
+            len = printfLen("{d} ", .{task.pid});
+        }
+    }
+
     if (task.tree.hasChildren()) {
         var it = task.tree.child.?.siblingsIterator();
         while (it.next()) |i| {

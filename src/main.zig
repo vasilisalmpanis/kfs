@@ -53,6 +53,10 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
 }
 
 pub fn init_rest(_: ?*const anyopaque) i32 {
+    _ = krn.kthreadCreate(&tty_thread, null) catch null;
+    krn.logger.INFO("TTY thread started", .{});
+    _ = krn.kthreadCreate(&testp, null) catch null;
+
     while (krn.task.current.should_stop != true) {
         // If PID 1 dies it should be respawned.
         krn.goUserspace(@embedFile("userspace"));
