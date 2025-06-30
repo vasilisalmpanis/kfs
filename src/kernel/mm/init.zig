@@ -43,7 +43,47 @@ pub var kheap: heap.FreeList = undefined;
 pub var vheap: heap.FreeList = undefined;
 
 var fba: std.heap.FixedBufferAllocator = undefined;
-pub var arena_allocator: std.heap.ArenaAllocator = undefined;
+pub var kernel_allocator: KernelAllocator = undefined;
+
+const Allocator = @import("std").mem.Allocator;
+const Alignment = @import("std").mem.Alignment;
+
+pub const KernelAllocator = struct {
+    pub fn allocator(self: *KernelAllocator) Allocator {
+        return .{
+            .ptr = self,
+            .vtable = &.{
+                .alloc = alloc,
+                .resize = resize,
+                .remap = remap,
+                .free = free,
+            },
+        };
+    }
+
+    fn alloc(_: *anyopaque, n: usize, _: Alignment, _: usize) ?[*]u8 {
+        return kmallocArray(u8, n);
+    }
+    fn free(_: *anyopaque, buf: []u8, alignment: Alignment, ret_addr: usize) void {
+        _ = alignment;
+        _ = ret_addr;
+        kfree(buf.ptr);
+    }
+
+    fn resize(_: *anyopaque, _: []u8, _: Alignment, _: usize, _: usize) bool {
+        return false;
+    }
+
+    fn remap(
+        context: *anyopaque,
+        memory: []u8,
+        alignment: Alignment,
+        new_len: usize,
+        return_address: usize,
+    ) ?[*]u8 {
+        return if (resize(context, memory, alignment, new_len, return_address)) memory.ptr else null;
+    }
+};
 
 // get the first availaanle address and put metadata there
 pub fn mmInit(info: *multiboot.Multiboot) void {
@@ -90,13 +130,7 @@ pub fn mmInit(info: *multiboot.Multiboot) void {
         );
     }
 
-    const arena_size: u32 = 4096 * 20;
-    if (kmallocArray(u8, arena_size)) |arena| {
-        fba = std.heap.FixedBufferAllocator.init(arena[0..arena_size]);
-        arena_allocator = std.heap.ArenaAllocator.init(fba.allocator());
-    } else {
-        krn.logger.ERROR("Memory initialization failed!", .{});
-    }
+    kernel_allocator = KernelAllocator{};
 }
 
 // create page

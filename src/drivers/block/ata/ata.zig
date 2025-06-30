@@ -575,7 +575,7 @@ pub const ATAManager = struct {
     pub fn init() ATAManager {
         var manager = ATAManager{};
         manager.drives = std.ArrayList(ATADrive).init(
-            kernel.mm.arena_allocator.allocator(),
+            kernel.mm.kernel_allocator.allocator(),
         );
         return manager;
     }
