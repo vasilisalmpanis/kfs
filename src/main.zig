@@ -1,14 +1,15 @@
-const TTY = @import("drivers").tty.TTY;
-const keyboard = @import("drivers").keyboard;
-const PIT = @import("drivers").pit.PIT;
+const drivers = @import("drivers");
+const TTY = drivers.tty.TTY;
+const keyboard = drivers.keyboard;
+const PIT = drivers.pit.PIT;
 const system = @import("arch").system;
 const gdt = @import("arch").gdt;
 const multiboot = @import("arch").multiboot;
-const screen = @import("drivers").screen;
+const screen = drivers.screen;
 const dbg = @import("debug");
 const builtin = @import("std").builtin;
 const idt = @import("arch").idt;
-const Serial = @import("drivers").Serial;
+const Serial = drivers.Serial;
 const Logger = @import("debug").Logger;
 pub const mm = @import("kernel").mm;
 pub const vmm = @import("arch").vmm;
@@ -51,6 +52,14 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
     return 0;
 }
 
+pub fn init_rest(_: ?*const anyopaque) i32 {
+    while (krn.task.current.should_stop != true) {
+        // If PID 1 dies it should be respawned.
+        krn.goUserspace(@embedFile("userspace"));
+    }
+    return 0;
+}
+
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x36d76289) {
         system.halt();
@@ -82,18 +91,10 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
         dbg.printf("Failed to mount root\n",.{});
     };
 
-    // @import("drivers").pci.init();
-    // @import("drivers").ata.ata_init();
-    _ = krn.kthreadCreate(&tty_thread, null) catch null;
-    krn.logger.INFO("TTY thread started", .{});
+    krn.do_initcalls();
+    _ = krn.kthreadCreate(&init_rest, null) catch null;
 
-    _ = krn.kthreadCreate(&testp, null) catch null;
-    // _ = krn.kthreadCreate(&testp, null) catch null;
-    // _ = krn.kthreadCreate(&testp, null) catch null;
-
-    // krn.logger.INFO("Go usermode", .{});
-    // krn.goUserspace(@embedFile("userspace"));
-    
+    // IDLE TASK
     while (true) {
         asm volatile ("hlt");
     }

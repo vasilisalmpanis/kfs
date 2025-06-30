@@ -380,7 +380,11 @@ pub const PCIManager = struct {
 
 pub var pci_manager: PCIManager = undefined;
 
-pub fn init() void {
+pub export fn init() void {
     pci_manager = PCIManager.init();
     pci_manager.scanDevices();
+}
+
+comptime {
+    krn.earlyInitcall(init);
 }
