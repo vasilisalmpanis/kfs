@@ -25,7 +25,7 @@ pub const Shell = struct {
     pub fn init() Shell {
         var shell = Shell{};
         shell.commands = std.StringHashMap(ShellCommand).init(
-            krn.mm.arena_allocator.allocator()
+            krn.mm.kernel_allocator.allocator()
         );
         shell.registerBuiltins();
         return shell;
