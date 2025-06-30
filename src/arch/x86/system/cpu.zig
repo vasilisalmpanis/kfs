@@ -124,6 +124,10 @@ pub fn areIntEnabled() bool {
     return false;
 }
 
+pub inline fn IRQenable() void {
+    asm volatile ("sti;");
+}
+
 pub inline fn archReschedule() void {
     asm volatile(
         \\ pushf

@@ -380,7 +380,7 @@ pub const PCIManager = struct {
 
 pub var pci_manager: PCIManager = undefined;
 
-pub export fn init() void {
+pub export fn init() linksection(".init.text") void {
     pci_manager = PCIManager.init();
     pci_manager.scanDevices();
 }

@@ -597,7 +597,7 @@ pub const ATAManager = struct {
 
 pub var ata_manager: ATAManager = undefined;
 
-pub export fn ata_init() void {
+pub export fn ata_init() linksection(".init.text") void {
     const temp: ?[*]u16 = kernel.mm.kmallocArray(u16, 256);
     if (temp) |buf| {
         ide_buf = buf;

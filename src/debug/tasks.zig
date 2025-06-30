@@ -53,7 +53,7 @@ fn psTreeHelper(task: *tsk.Task, level: u32, last_child: bool) void {
         if (task.tsktype == .KTHREAD) {
             len = printfLen("[{d}] ", .{task.pid});
         } else {
-            len = printfLen("{d} ", .{task.pid});
+            len = printfLen(" {d}  ", .{task.pid});
         }
     }
 

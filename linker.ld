@@ -38,6 +38,10 @@ SECTIONS
 		/* Overall section end */
 		__init_call_end = .;
 	}
+	.init.text ALIGN (4K) : AT (ADDR (.init.text) - 0xC0000000)
+	{
+		*(.init.text)
+	}
 	.text ALIGN (4K) : AT (ADDR (.text) - 0xC0000000)
 	{
 		*(.text)

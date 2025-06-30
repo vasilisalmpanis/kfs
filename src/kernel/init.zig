@@ -1,6 +1,8 @@
 const std = @import("std");
+const arch = @import("arch");
+const kernel = @import("./main.zig");
+
 const PAGE_OFFSET = @import("./main.zig").mm.PAGE_OFFSET;
-// Import the linker symbols
 extern var __init_call_start: u32;
 extern var __init_call_end: u32;
 extern var __init_call_early_start: u32;
@@ -42,6 +44,10 @@ fn call_early_init() void {
 
     for (0..num_functions) |i| {
         init_functions[i]();
+        if (!arch.cpu.areIntEnabled()) {
+            kernel.logger.WARN("Early init call left IRQs disabled {x}\n", .{init_functions[i]});
+            arch.cpu.IRQenable();
+        }
     }
 }
 
@@ -55,12 +61,17 @@ fn call_device_init() void {
     
     for (0..num_functions) |i| {
         init_functions[i]();
+        if (!arch.cpu.areIntEnabled()) {
+            kernel.logger.WARN("Device init call left IRQs disabled {x}\n", .{init_functions[i]});
+            arch.cpu.IRQenable();
+        }
     }
 }
 
 pub fn do_initcall() void {
-    @import("./main.zig").logger.INFO("doing early calls\n", .{});
+    kernel.logger.INFO("doing early calls\n", .{});
     call_early_init();
-    @import("./main.zig").logger.INFO("doing device calls\n", .{});
+    kernel.logger.INFO("doing device calls\n", .{});
     call_device_init();
+    // TODO: Free the memory for both the pointers and the functions
 }
