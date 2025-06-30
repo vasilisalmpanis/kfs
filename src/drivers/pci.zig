@@ -286,10 +286,10 @@ pub const PCIManager = struct {
     pub fn init() PCIManager {
         var manager = PCIManager{};
         manager.devices = std.ArrayList(PCIDevice).init(
-            krn.mm.arena_allocator.allocator()
+            krn.mm.kernel_allocator.allocator()
         );
         manager.class_index = std.AutoHashMap(u16, std.ArrayList(usize)).init(
-            krn.mm.arena_allocator.allocator()
+            krn.mm.kernel_allocator.allocator()
         );
         return manager;
     }
