@@ -1,7 +1,86 @@
-const kernel = @import("../../main.zig");
+const kernel = @import("../main.zig");
 const TreeNode = @import("../utils/tree.zig").TreeNode;
 const mount = @import("mount.zig");
 const Refcount = @import("../sched/task.zig").RefCount;
+
+
+pub const IFileFields = struct {
+    name: []const u8,
+    size: u64,
+    permissions: u16,
+    fd: u32 = 0,
+};
+
+pub const IFile = struct {
+    ptr: *anyopaque,
+    vtable: *const VTable,
+
+    pub const VTable = struct {
+        open: *const fn (ptr: *anyopaque, data: []const u8) anyerror!u32,
+        release: *const fn (ptr: *anyopaque) anyerror!u32,
+        read: *const fn (ptr: *anyopaque, buff: [*]u8, size: u32, off: *u32) anyerror!u32,
+        write: *const fn (ptr: *anyopaque, buff: [*]const u8, size: u32, off: *u32) anyerror!u32,
+    };
+
+    pub fn init(ptr: anytype) IFile {
+        const T = @TypeOf(ptr);
+        const Ptr = switch (@typeInfo(T)) {
+            .pointer => |pointer| pointer,
+            else => @compileError("Expected pointer type for IFile.init"),
+        };
+        
+        const impl = struct {
+            pub fn open(pointer: *anyopaque, data: []const u8) anyerror!u32 {
+                const self: T = @ptrCast(@alignCast(pointer));
+                return @call(.always_inline, Ptr.child.open, .{ self, data });
+            }
+            
+            pub fn release(pointer: *anyopaque) anyerror!u32{
+                const self: T = @ptrCast(@alignCast(pointer));
+                return @call(.always_inline, Ptr.child.release, .{self});
+            }
+            
+            pub fn read(pointer: *anyopaque, buff: [*]u8, size: u32, off: *u32) anyerror!u32 {
+                const self: T = @ptrCast(@alignCast(pointer));
+                return @call(.always_inline, Ptr.child.read, .{ self, buff, size, off });
+            }
+
+            pub fn write(pointer: *anyopaque, buff: [*]const u8, size: u32, off: *u32) anyerror!u32 {
+                const self: T = @ptrCast(@alignCast(pointer));
+                return @call(.always_inline, Ptr.child.write, .{ self, buff, size, off });
+            }
+        };
+
+        const vtable = &VTable{
+            .open = impl.open,
+            .release = impl.release,
+            .write = impl.write,
+            .read = impl.read,
+        };
+
+        return .{
+            .ptr = ptr,
+            .vtable = vtable,
+        };
+    }
+
+    pub fn open(self: IFile, path: []const u8) !u32 {
+        return self.vtable.open(self.ptr, path);
+    }
+    
+    pub fn release(self: IFile) !u32 {
+        return self.vtable.release(self.ptr);
+    }
+    
+    pub fn write(self: IFile, buff: [*]const u8, size: u32, off: *u32) !u32 {
+        return self.vtable.write(self.ptr, buff, size, off);
+    }
+    
+    pub fn read(self: IFile, buff: [*]u8, size: u32, off: *u32) !u32 {
+        return self.vtable.read(self.ptr, buff, size, off);
+    }
+};
+
 
 pub const Inode = struct {
     ops: *InodeOps,
@@ -24,7 +103,7 @@ pub const SuperBlock = struct {
 pub const File = struct {
     ops: *FileOps,
     dentry: *DEntry,
-    vfsmount: *mount.VFSmount,
+    vfsmount: *mount.VFSMount,
     ref: Refcount,
 };
 

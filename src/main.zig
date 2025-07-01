@@ -83,6 +83,10 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("TTY thread started", .{});
 
     _ = krn.kthreadCreate(&testp, null) catch null;
+
+    krn.test_file() catch |err| {
+        krn.logger.ERROR("Error in test_file: {!}", .{err});
+    };
     // _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
 
