@@ -77,8 +77,10 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();
 
-    @import("drivers").pci.init();
-    @import("drivers").ata.ata_init();  
+    krn.fs.init_example();
+
+    // @import("drivers").pci.init();
+    // @import("drivers").ata.ata_init();
     _ = krn.kthreadCreate(&tty_thread, null) catch null;
     krn.logger.INFO("TTY thread started", .{});
 

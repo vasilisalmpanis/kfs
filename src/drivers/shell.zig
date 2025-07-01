@@ -61,6 +61,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "sym", .desc = "Lookup symbol name by address", .hndl = &sym });
         self.registerCommand(.{ .name = "vmas", .desc = "Print task's VMAs", .hndl = &vmas });
         self.registerCommand(.{ .name = "layout", .desc = "Change keyboard layout", .hndl = &layout });
+        self.registerCommand(.{ .name = "filesystems", .desc = "Print available filesystems", .hndl = &filesystems });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -268,4 +269,18 @@ fn layout(_: *Shell, args: [][]const u8) void {
         debug.printf("Unknown layout!\n", .{});
     }
     return;
+}
+
+fn filesystems(_: *Shell, _: [][]const u8) void {
+    krn.filesystem.filesystem_mutex.lock();
+    defer krn.filesystem.filesystem_mutex.unlock();
+    if (krn.filesystem.fs_list) |head| {
+        var it = head.list.iterator();
+        while (it.next()) |node| {
+            const fs = node.curr.entry(krn.filesystem.FileSystem, "list");
+            debug.printf("Filesystem : {s}\n", .{fs.name});
+        }
+    } else {
+        debug.printf("No registered filesystems\n", .{});
+    }
 }
