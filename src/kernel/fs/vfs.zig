@@ -2,6 +2,7 @@ const kernel = @import("../../main.zig");
 const TreeNode = @import("../utils/tree.zig").TreeNode;
 const mount = @import("mount.zig");
 const Refcount = @import("../sched/task.zig").RefCount;
+const lst = @import("../utils/list.zig");
 
 pub const Inode = struct {
     ops: *InodeOps,
@@ -18,6 +19,7 @@ pub const DEntry = struct {
 };
 
 pub const SuperBlock = struct {
+    fs_node: lst.ListHead,
     ops: *SuperOps,
 };
 
