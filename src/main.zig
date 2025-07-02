@@ -77,7 +77,10 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();
 
-    krn.fs.init_example();
+    krn.examplefs.init_example();
+    _ = krn.mount.Mount.mount("/dev/sda1", "/", &krn.examplefs.example_fs) catch {
+        dbg.printf("Failed to mount root\n",.{});
+    };
 
     // @import("drivers").pci.init();
     // @import("drivers").ata.ata_init();

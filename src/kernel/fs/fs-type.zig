@@ -1,6 +1,7 @@
 const lst = @import("../utils/list.zig");
 const Mutex = @import("../sched/mutex.zig").Mutex;
 const std = @import("std");
+const vfs = @import("vfs.zig");
 
 pub var filesystem_mutex: Mutex = Mutex.init(); 
 pub var fs_list: ?*FileSystem = null;
@@ -9,6 +10,8 @@ pub const FileSystem = struct {
     name: []const u8,
     list: lst.ListHead,
     sbs: lst.ListHead,
+
+    getSB: * const fn (source: []const u8) anyerror!*vfs.SuperBlock,
 
     // mount: ?* const fn () void,
     // destroy_sb: ?* const fn () void,
