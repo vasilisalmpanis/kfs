@@ -62,6 +62,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "vmas", .desc = "Print task's VMAs", .hndl = &vmas });
         self.registerCommand(.{ .name = "layout", .desc = "Change keyboard layout", .hndl = &layout });
         self.registerCommand(.{ .name = "filesystems", .desc = "Print available filesystems", .hndl = &filesystems });
+        self.registerCommand(.{ .name = "mount", .desc = "Print mount points", .hndl = &mount });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -272,15 +273,32 @@ fn layout(_: *Shell, args: [][]const u8) void {
 }
 
 fn filesystems(_: *Shell, _: [][]const u8) void {
-    krn.filesystem.filesystem_mutex.lock();
-    defer krn.filesystem.filesystem_mutex.unlock();
-    if (krn.filesystem.fs_list) |head| {
+    krn.fs.filesystem_mutex.lock();
+    defer krn.fs.filesystem_mutex.unlock();
+    if (krn.fs.fs_list) |head| {
         var it = head.list.iterator();
         while (it.next()) |node| {
-            const fs = node.curr.entry(krn.filesystem.FileSystem, "list");
+            const fs = node.curr.entry(krn.fs.FileSystem, "list");
             debug.printf("Filesystem : {s}\n", .{fs.name});
         }
     } else {
         debug.printf("No registered filesystems\n", .{});
+    }
+}
+
+fn mount(_: *Shell, _: [][]const u8) void {
+
+    debug.printf("MOUNT\n", .{});
+    krn.mount.mnt_lock.lock();
+    defer krn.mount.mnt_lock.unlock();
+    if (krn.mount.mountpoints) |head| {
+        var it = head.list.iterator();
+        while (it.next()) |node| {
+            const mnt = node.curr.entry(krn.mount.Mount, "list");
+            debug.printf("Mount :{s} type : {s}\n", .{mnt.root.name, mnt.sb.fs.name});
+            // debug.printf("Mount : {x}\n", .{@intFromPtr(mnt.root)});
+        }
+    } else {
+        debug.printf("No mounts\n", .{});
     }
 }

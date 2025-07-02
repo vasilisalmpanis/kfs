@@ -40,5 +40,7 @@ pub var boot_info: multiboot.Multiboot = undefined;
 pub var scr: screen.Screen = undefined;
 
 pub const proc_mm = @import("./mm/proc_mm.zig");
-pub const fs = @import("fs/example/super.zig");
-pub const filesystem = @import("fs/fs-type.zig");
+pub const fs = @import("./fs/fs-type.zig");
+pub const mount = @import("fs/mount.zig");
+pub const vfs = @import("fs/vfs.zig");
+pub const examplefs = @import("fs/example/super.zig");
