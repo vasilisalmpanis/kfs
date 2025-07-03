@@ -4,6 +4,7 @@ const mount = @import("mount.zig");
 const Refcount = @import("../sched/task.zig").RefCount;
 const lst = @import("../utils/list.zig");
 const fs = @import("./fs-type.zig");
+const std = @import("std");
 
 // pub const Inode = struct {
 //     ops: *InodeOps,
@@ -68,6 +69,8 @@ pub const SuperBlock = struct {
     fs: *fs.FileSystem,
     ref: Refcount,
     list: lst.ListHead,
+
+    
 };
 
 // pub const File = struct {
@@ -119,3 +122,50 @@ pub const SuperBlock = struct {
 //         shutdown: *const fn (ptr: *anyopaque, file: *File, buff: [*]u8, size: u32, off: *u32) anyerror!u32,
 //     };
 // };
+
+pub var last_ino: u32 = 0;
+var last_ino_lock = kernel.Mutex.init();
+
+pub fn get_ino() u32 {
+    last_ino_lock.lock();
+    defer last_ino_lock.unlock();
+    const tmp = last_ino;
+    last_ino += 1;
+    return tmp;
+}
+
+pub const UMode = struct {
+    grp: u4 = 0,
+    usr: u4 = 0,
+    other: u4 = 0,
+    _unsed: u4 = 0
+};
+
+pub const Inode = struct {
+    i_no: u32 = 0,
+    sb: *SuperBlock,
+    ref: Refcount = Refcount.init(),
+    mode: UMode = UMode{},
+    is_dirty: bool = false,
+    size: u32 = 0,
+
+    pub fn alloc() !*Inode {
+        if (kernel.mm.kmalloc(Inode)) |node| {
+            // node.setup(null);
+            return node;
+        }
+        return error.OutOfMemory;
+    }
+
+    pub fn setup(
+        self: *Inode,
+        sb: *SuperBlock,
+    ) void {
+        self.i_no = get_ino();
+        self.sb = sb;
+        self.ref = Refcount.init();
+        self.size = 0;
+        self.mode = UMode{};
+        self.is_dirty = false;
+    }
+};
