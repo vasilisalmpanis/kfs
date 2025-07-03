@@ -22,7 +22,13 @@ fn getSB(source: []const u8) !*vfs.SuperBlock {
     } else {
         // alloc
         if (kernel.mm.kmalloc(vfs.SuperBlock)) |sb| {
-            const dntry = vfs.DEntry.alloc(source,sb) catch {
+            const root_inode = vfs.Inode.alloc() catch |err| {
+                kernel.mm.kfree(sb);
+                return err;
+            };
+            _ = root_inode;
+            _ = source;
+            const dntry = vfs.DEntry.alloc("/", sb) catch {
                 kernel.mm.kfree(sb);
                 return error.OutOfMemory;
             };
