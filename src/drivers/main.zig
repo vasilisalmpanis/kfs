@@ -8,6 +8,7 @@ pub const keyboard = @import("./kbd.zig");
 pub const pit = @import("./pit.zig");
 
 pub const ata = @import("./block/ata/ata.zig");
+pub const test_init = @import("./block/ata/test.zig");
 pub const pci = @import("./pci.zig");
 
 // If no other function from a file is used
@@ -20,4 +21,5 @@ pub const pci = @import("./pci.zig");
 comptime {
     _ = pci.init;
     _ = ata.ata_init;
+    _ = test_init.test_init;
 }

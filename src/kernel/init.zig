@@ -10,28 +10,14 @@ extern var __init_call_early_end: u32;
 extern var __init_call_device_start: u32;
 extern var __init_call_device_end: u32;
 
-// Not working for now.
+const Levels = enum {
+    EARLY,
+    DEVICE,
+};
 
-// fn initcall(comptime section: []const u8, comptime func: anytype) void {
-//     const S = struct {
-//         const exported_data: *const fn() callconv(.c) void linksection(section) = func;
-//     };
-//     _ = S; // Force the struct to be analyzed
-// }
-//
-// pub fn earlyInitcall(comptime func: InitCallFn) void {
-//     registerInitcall(".init_call.early", func);
-// }
-//
-// pub fn deviceInitcall(comptime func: InitCallFn) void {
-//     registerInitcall(".init_call.device", func);
-// }
-//
-// fn registerInitcall(comptime section: []const u8, comptime func: InitCallFn) void {
-//     initcall(section, func);
-// }
+pub const EARLY = ".init_call.early";
+pub const DEVICE = ".init_call.device";
 
-//
 const InitCallFn = *const fn() callconv(.c)void;
 
 // Function to call early init functions

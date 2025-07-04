@@ -385,4 +385,4 @@ pub export fn init() linksection(".init.text") void {
     pci_manager.scanDevices();
 }
 
-export var exported_data: *const fn() callconv(.c) void linksection(".init_call.early") = init;
+export var exported_data: *const fn() callconv(.c) void linksection(krn.InitLevel.EARLY) = init;
