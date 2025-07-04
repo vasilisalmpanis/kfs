@@ -1,8 +1,7 @@
 const lst = @import("../utils/list.zig");
-const vfs = @import("vfs.zig");
 const mutex = @import("../sched/mutex.zig");
 const krn = @import("../main.zig");
-const fs = @import("fs-type.zig");
+const fs = @import("fs.zig");
 
 pub var mountpoints: ?*Mount = null;
 
@@ -13,8 +12,8 @@ pub var mountpoints: ?*Mount = null;
 pub var mnt_lock = mutex.Mutex.init();
 
 pub const Mount = struct {
-    sb: *vfs.SuperBlock,
-    root: *vfs.DEntry,
+    sb: *fs.SuperBlock,
+    root: *fs.DEntry,
     list: lst.ListHead,
 
     pub fn add(mnt: *Mount) void {
@@ -49,8 +48,8 @@ pub const Mount = struct {
         source: []const u8,
         target: []const u8,
         fs_type: *fs.FileSystem) !void {
-        const sb: *vfs.SuperBlock = try fs_type.getSB(source);
-        const dntr: *vfs.DEntry = vfs.DEntry.alloc(target, sb) catch {
+        const sb: *fs.SuperBlock = try fs_type.getSB(source);
+        const dntr: *fs.DEntry = fs.DEntry.alloc(target, sb) catch {
             // TODO: put sb
             return ;
         };
@@ -68,6 +67,6 @@ pub const Mount = struct {
 };
 
 pub const VFSMount = struct {
-    mnt_root: *vfs.DEntry,
-    sb: *vfs.SuperBlock,
+    mnt_root: *fs.DEntry,
+    sb: *fs.SuperBlock,
 };
