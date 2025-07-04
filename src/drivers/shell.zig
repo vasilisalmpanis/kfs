@@ -273,9 +273,9 @@ fn layout(_: *Shell, args: [][]const u8) void {
 }
 
 fn filesystems(_: *Shell, _: [][]const u8) void {
-    krn.fs.filesystem_mutex.lock();
-    defer krn.fs.filesystem_mutex.unlock();
-    if (krn.fs.fs_list) |head| {
+    krn.fs.filesystem.filesystem_mutex.lock();
+    defer krn.fs.filesystem.filesystem_mutex.unlock();
+    if (krn.fs.filesystem.fs_list) |head| {
         var it = head.list.iterator();
         while (it.next()) |node| {
             const fs = node.curr.entry(krn.fs.FileSystem, "list");
@@ -289,12 +289,12 @@ fn filesystems(_: *Shell, _: [][]const u8) void {
 fn mount(_: *Shell, _: [][]const u8) void {
 
     debug.printf("MOUNT\n", .{});
-    krn.mount.mnt_lock.lock();
-    defer krn.mount.mnt_lock.unlock();
-    if (krn.mount.mountpoints) |head| {
+    krn.fs.mount.mnt_lock.lock();
+    defer krn.fs.mount.mnt_lock.unlock();
+    if (krn.fs.mount.mountpoints) |head| {
         var it = head.list.iterator();
         while (it.next()) |node| {
-            const mnt = node.curr.entry(krn.mount.Mount, "list");
+            const mnt = node.curr.entry(krn.fs.Mount, "list");
             debug.printf("Mount :{s} type : {s}\n", .{mnt.root.name, mnt.sb.fs.name});
             // debug.printf("Mount : {x}\n", .{@intFromPtr(mnt.root)});
         }

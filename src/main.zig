@@ -78,7 +78,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     syscalls.initSyscalls();
 
     krn.examplefs.init_example();
-    _ = krn.mount.Mount.mount("/dev/sda1", "/", &krn.examplefs.example_fs) catch {
+    _ = krn.fs.Mount.mount("/dev/sda1", "/", &krn.examplefs.example_fs) catch {
         dbg.printf("Failed to mount root\n",.{});
     };
 

@@ -1,7 +1,7 @@
-const FileSystem = @import("../fs-type.zig").FileSystem;
-const lst = @import("../../utils/list.zig");
-const kernel = @import("../../main.zig");
-const vfs = @import("../vfs.zig");
+const fs = @import("../fs.zig");
+const FileSystem = fs.FileSystem;
+const lst = fs.list;
+const kernel = fs.kernel;
 
 pub fn init_example() void {
     example_fs.list.setup();
@@ -11,24 +11,24 @@ pub fn init_example() void {
 }
 
 fn kill_sb(self: *kernel.task.RefCount) void {
-    const sb: *vfs.SuperBlock = lst.containerOf(vfs.SuperBlock, @intFromPtr(self), "ref");
+    const sb: *fs.SuperBlock = lst.containerOf(fs.SuperBlock, @intFromPtr(self), "ref");
     kernel.mm.kfree(sb);
 }
 
-fn getSB(source: []const u8) !*vfs.SuperBlock {
+fn getSB(source: []const u8) !*fs.SuperBlock {
     if (!example_fs.sbs.isEmpty()) {
-        const sb = example_fs.sbs.entry(vfs.SuperBlock, "list");
+        const sb = example_fs.sbs.entry(fs.SuperBlock, "list");
         return sb;
     } else {
         // alloc
-        if (kernel.mm.kmalloc(vfs.SuperBlock)) |sb| {
-            const root_inode = vfs.Inode.alloc() catch |err| {
+        if (kernel.mm.kmalloc(fs.SuperBlock)) |sb| {
+            const root_inode = fs.Inode.alloc() catch |err| {
                 kernel.mm.kfree(sb);
                 return err;
             };
             _ = root_inode;
             _ = source;
-            const dntry = vfs.DEntry.alloc("/", sb) catch {
+            const dntry = fs.DEntry.alloc("/", sb) catch {
                 kernel.mm.kfree(sb);
                 return error.OutOfMemory;
             };
