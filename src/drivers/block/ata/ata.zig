@@ -597,7 +597,7 @@ pub const ATAManager = struct {
 
 pub var ata_manager: ATAManager = undefined;
 
-pub fn ata_init() void {
+pub export fn ata_init() linksection(".init.text") void {
     const temp: ?[*]u16 = kernel.mm.kmallocArray(u16, 256);
     if (temp) |buf| {
         ide_buf = buf;
@@ -644,3 +644,5 @@ pub fn ata_init() void {
         ata.read_full_drive_dma();
     }
 }
+
+export var ata_g: *const fn() callconv(.c) void linksection(kernel.InitLevel.DEVICE) = ata_init;

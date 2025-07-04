@@ -380,7 +380,9 @@ pub const PCIManager = struct {
 
 pub var pci_manager: PCIManager = undefined;
 
-pub fn init() void {
+pub export fn init() linksection(".init.text") void {
     pci_manager = PCIManager.init();
     pci_manager.scanDevices();
 }
+
+export var exported_data: *const fn() callconv(.c) void linksection(krn.InitLevel.EARLY) = init;

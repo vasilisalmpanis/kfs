@@ -44,3 +44,8 @@ pub const fs = @import("./fs/fs-type.zig");
 pub const mount = @import("fs/mount.zig");
 pub const vfs = @import("fs/vfs.zig");
 pub const examplefs = @import("fs/example/super.zig");
+
+pub const InitLevel = @import("init.zig");
+pub const do_initcalls = InitLevel.do_initcall;
+pub const earlyInitcall = InitLevel.earlyInitcall;
+pub const deviceInitcall = InitLevel.deviceInitcall;
