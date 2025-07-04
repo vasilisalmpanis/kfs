@@ -1,53 +1,50 @@
-const lst = @import("../utils/list.zig");
+const fs = @import("fs.zig");
+const list = fs.list;
 const Mutex = @import("../sched/mutex.zig").Mutex;
 const std = @import("std");
-const vfs = @import("vfs.zig");
 
 pub var filesystem_mutex: Mutex = Mutex.init(); 
 pub var fs_list: ?*FileSystem = null;
 
 pub const FileSystem = struct {
     name: []const u8,
-    list: lst.ListHead,
-    sbs: lst.ListHead,
+    list: list.ListHead,
+    sbs: list.ListHead,
 
-    getSB: * const fn (source: []const u8) anyerror!*vfs.SuperBlock,
-
-    // mount: ?* const fn () void,
-    // destroy_sb: ?* const fn () void,
-    // init_fs: ?* const fn () void,
+    // TODO: define and document FileSystemOps
+    getSB: * const fn (source: []const u8) anyerror!*fs.SuperBlock,
 
     pub fn init(
         name: []const u8,
     ) FileSystem {
-        var fs = FileSystem{
+        var _fs = FileSystem{
             .name = name,
-            .list = lst.ListHead.init(),
-            .sbs = lst.ListHead.init(),
+            .list = list.ListHead.init(),
+            .sbs = list.ListHead.init(),
         };
-        fs.list.setup();
-        fs.sbs.setup();
+        _fs.list.setup();
+        _fs.sbs.setup();
         return fs;
     }
 
-    pub fn register(fs: *FileSystem) void {
+    pub fn register(_fs: *FileSystem) void {
         filesystem_mutex.lock();
         defer filesystem_mutex.unlock();
         if (fs_list) |head| {
-            head.list.add(&fs.list);
+            head.list.add(&_fs.list);
         } else {
-            fs_list = fs;
+            fs_list = _fs;
         }
     }
 
-    pub fn unregister(fs: *FileSystem) void {
+    pub fn unregister(_fs: *FileSystem) void {
         filesystem_mutex.lock();
         defer filesystem_mutex.unlock();
         if (fs_list) |head| {
             var it = head.list.iterator();
             while (it.next()) |node| {
                 var fs_entry = node.curr.entry(FileSystem, "list");
-                if (std.mem.eql(u8, fs.name, fs_entry.name))
+                if (std.mem.eql(u8, _fs.name, fs_entry.name))
                     fs_entry.list.del();
             }
         }
