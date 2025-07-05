@@ -11,6 +11,7 @@ pub const DEntry = @import("dentry.zig").DEntry;
 // Filesystem
 pub const filesystem = @import("filesystem.zig");
 pub const FileSystem = filesystem.FileSystem;
+pub const FileSystemOps = filesystem.FileSystemOps;
 
 // Inode
 pub const Inode = @import("inode.zig").Inode;
