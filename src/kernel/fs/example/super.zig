@@ -48,5 +48,9 @@ pub var example_fs: FileSystem = FileSystem{
     .name = "examplefs",
     .list = .{ .next = &example_fs.list , .prev = &example_fs.list},
     .sbs = .{ .next = &example_fs.sbs , .prev = &example_fs.sbs},
+    .ops = &example_fs_ops,
+};
+
+pub var example_fs_ops: fs.FileSystemOps = fs.FileSystemOps {
     .getSB = getSB,
 };
