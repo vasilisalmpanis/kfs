@@ -21,6 +21,11 @@ pub fn doFork() i32 {
         mm.kfree(child.?);
         return -errors.ENOMEM;
     }
+    child.?.fs = tsk.current.fs.?.clone() catch {
+        kthread.kthreadStackFree(stack);
+        mm.kfree(child.?);
+        return -errors.ENOMEM;
+    };
     const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
     const parent_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
     var child_regs: *arch.Regs = @ptrFromInt(stack_top);

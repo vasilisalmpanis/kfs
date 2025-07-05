@@ -32,4 +32,5 @@ pub const Inode = struct {
 // TODO: define the Inode Ops struct with documentation.
 pub const InodeOps = struct {
     lookup: *const fn (base: *Inode) anyerror!*fs.DEntry,
+    mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
 };
