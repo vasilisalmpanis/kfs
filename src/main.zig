@@ -77,10 +77,16 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();
 
+    // FS
+    krn.fs.init_cache(krn.mm.kernel_allocator.allocator());
     krn.examplefs.init_example();
-    _ = krn.fs.Mount.mount("/dev/sda1", "/", &krn.examplefs.example_fs) catch {
-        dbg.printf("Failed to mount root\n",.{});
-    };
+    if (krn.fs.FileSystem.find("examplefs")) |fs| {
+        _ = krn.fs.Mount.mount("/dev/sda1", "/", fs) catch {
+            dbg.printf("Failed to mount root\n",.{});
+        };
+    } else {
+            dbg.printf("Unknown filesystem type\n",.{});
+    }
 
     // @import("drivers").pci.init();
     // @import("drivers").ata.ata_init();

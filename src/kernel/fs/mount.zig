@@ -48,7 +48,7 @@ pub const Mount = struct {
         source: []const u8,
         target: []const u8,
         fs_type: *fs.FileSystem) !void {
-        const sb: *fs.SuperBlock = try fs_type.ops.getSB(source);
+        const sb: *fs.SuperBlock = try fs_type.ops.getSB(fs_type, source);
         const dntr: *fs.DEntry = fs.DEntry.alloc(target, sb) catch {
             // TODO: put sb
             return ;
