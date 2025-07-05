@@ -95,6 +95,7 @@ pub const Task = struct {
     wakeup_time:    usize           = 0,
 
     mm:             ?*mm.MM              = null,
+    fs:             ?*krn.fs.FSInfo      = null,
 
     // signals
     sighand:        signal.SigHand       = signal.SigHand.init(),
