@@ -12,7 +12,7 @@ pub const FileSystem = struct {
     sbs: list.ListHead,
 
     // TODO: define and document FileSystemOps
-    getSB: * const fn (source: []const u8) anyerror!*fs.SuperBlock,
+    ops: *const FileSystemOps,
 
     pub fn init(
         name: []const u8,
@@ -49,4 +49,8 @@ pub const FileSystem = struct {
             }
         }
     }
+};
+
+pub const FileSystemOps = struct {
+    getSB: * const fn (source: []const u8) anyerror!*fs.SuperBlock,
 };

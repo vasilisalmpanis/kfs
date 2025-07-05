@@ -6,7 +6,7 @@ const fs = @import("fs.zig");
 pub var mountpoints: ?*Mount = null;
 
 // Root fs is passed as a parameter from the boot loader.
-// This will be mountpoint '/' all others are children
+// This will be mountpoint '/'. All others are children
 // of this.
 
 pub var mnt_lock = mutex.Mutex.init();
@@ -48,7 +48,7 @@ pub const Mount = struct {
         source: []const u8,
         target: []const u8,
         fs_type: *fs.FileSystem) !void {
-        const sb: *fs.SuperBlock = try fs_type.getSB(source);
+        const sb: *fs.SuperBlock = try fs_type.ops.getSB(source);
         const dntr: *fs.DEntry = fs.DEntry.alloc(target, sb) catch {
             // TODO: put sb
             return ;
