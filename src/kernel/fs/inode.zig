@@ -14,14 +14,7 @@ pub const Inode = struct {
     mode: fs.UMode = fs.UMode{},
     is_dirty: bool = false,
     size: u32 = 0,
-
-    pub fn alloc() !*Inode {
-        if (kernel.mm.kmalloc(Inode)) |node| {
-            // node.setup(null);
-            return node;
-        }
-        return error.OutOfMemory;
-    }
+    ops: *InodeOps,
 
     pub fn setup(
         self: *Inode,
@@ -37,8 +30,6 @@ pub const Inode = struct {
 };
 
 // TODO: define the Inode Ops struct with documentation.
-// pub const InodeOps = struct {
-//     lookup: *const fn (ptr: *anyopaque, data: []const u8) anyerror!u32,
-//     readlink: *const fn (ptr: *anyopaque, inode: *Inode, file: *File) anyerror!u32,
-//     create: *const fn (ptr: *anyopaque, file: *File, buff: [*]u8, size: u32, off: *u32) anyerror!u32,
-// };
+pub const InodeOps = struct {
+    lookup: *const fn (base: *Inode) anyerror!*fs.DEntry,
+};

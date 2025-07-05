@@ -1,12 +1,14 @@
 pub const kernel = @import("../main.zig");
 // SuperBlock
 pub const SuperBlock = @import("./super.zig").SuperBlock;
+pub const SuperOps = @import("super.zig").SuperOps;
 // Mount
 pub const Mount = @import("mount.zig").Mount;
 pub const mount = @import("mount.zig");
 
 // DEntry
 pub const DEntry = @import("dentry.zig").DEntry;
+pub const init_cache = @import("dentry.zig").init_cache;
 
 // Filesystem
 pub const filesystem = @import("filesystem.zig");
@@ -15,6 +17,7 @@ pub const FileSystemOps = filesystem.FileSystemOps;
 
 // Inode
 pub const Inode = @import("inode.zig").Inode;
+pub const InodeOps = @import("inode.zig").InodeOps;
 
 // Utils
 pub const Refcount = @import("../sched/task.zig").RefCount;

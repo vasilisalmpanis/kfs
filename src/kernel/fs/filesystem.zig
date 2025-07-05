@@ -11,20 +11,18 @@ pub const FileSystem = struct {
     list: list.ListHead,
     sbs: list.ListHead,
 
-    // TODO: define and document FileSystemOps
     ops: *const FileSystemOps,
 
-    pub fn init(
+    pub fn setup(
+        self: *FileSystem,
         name: []const u8,
-    ) FileSystem {
-        var _fs = FileSystem{
-            .name = name,
-            .list = list.ListHead.init(),
-            .sbs = list.ListHead.init(),
-        };
-        _fs.list.setup();
-        _fs.sbs.setup();
-        return fs;
+        ops: *FileSystemOps,
+    ) void {
+        self.list.setup();
+        self.sbs.setup();
+        self.name = name;
+        self.ops = ops;
+        self.register();
     }
 
     pub fn register(_fs: *FileSystem) void {
@@ -49,8 +47,27 @@ pub const FileSystem = struct {
             }
         }
     }
+
+    pub fn find(name: []const u8) ?*FileSystem {
+        filesystem_mutex.lock();
+        defer filesystem_mutex.unlock();
+        if (fs_list) |head| {
+            var it = head.list.iterator();
+            while (it.next()) |node| {
+                const _fs: *FileSystem = node.curr.entry(FileSystem, "list");
+                if (std.mem.eql(u8, _fs.name, name)) {
+                    return _fs;
+                }
+            }
+        }
+        return null;
+    }
+
+    pub fn getImpl(base: *FileSystem, comptime T: type, comptime member: []const u8) *T {
+        return @fieldParentPtr(member, base);
+    }
 };
 
 pub const FileSystemOps = struct {
-    getSB: * const fn (source: []const u8) anyerror!*fs.SuperBlock,
+    getSB: * const fn (fs: *FileSystem, source: []const u8) anyerror!*fs.SuperBlock,
 };
