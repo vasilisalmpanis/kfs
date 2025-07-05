@@ -26,4 +26,3 @@ pub const SuperOps = struct {
     // responsible of allocating a concrete inode type
     alloc_inode: *const fn (base: *SuperBlock) anyerror!*fs.Inode,
 };
-

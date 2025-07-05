@@ -43,3 +43,26 @@ pub const UMode = struct {
     other: u4 = 0,
     _unsed: u4 = 0
 };
+
+pub const Path = struct {
+    mnt: *Mount,
+    dentry: *DEntry,
+};
+
+pub const FSInfo = struct {
+    root: Path,
+    pwd: Path,
+
+    pub fn alloc() !*FSInfo {
+        if (kernel.mm.kmalloc(FSInfo)) |_fs| {
+            return _fs;
+        }
+        return error.OutOfMemory;
+    }
+
+    pub fn clone(self: *FSInfo) !*FSInfo {
+        const _fs = try FSInfo.alloc();
+        _fs.* = self.*;
+        return _fs;
+    }
+};
