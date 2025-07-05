@@ -4,14 +4,21 @@ const Refcount = fs.Refcount;
 const TreeNode = fs.TreeNode;
 const kernel = fs.kernel;
 const list = fs.list;
+const std = @import("std");
 
 /// Dentry: the path representation of every inode on the filesystem
 /// (RF, BD, CD, sockets, pipes, etc). There can be multiple different dentries
 /// that point to the same underlying inode.
+///
+pub fn init_cache(allocator: std.mem.Allocator) void {
+    cache = std.StringHashMap(*DEntry).init(allocator);
+}
+
+pub var cache: std.StringHashMap(*DEntry) = undefined;
 
 pub const DEntry = struct {
     sb: *SuperBlock,
-    // inode: *Inode,
+    inode: *fs.Inode,
     ref: Refcount,
     name: []u8,
     tree: TreeNode,
