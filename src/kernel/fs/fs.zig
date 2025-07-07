@@ -24,6 +24,15 @@ pub const Refcount = @import("../sched/task.zig").RefCount;
 pub const TreeNode = @import("../utils/tree.zig").TreeNode;
 pub const list = kernel.list;
 
+
+const std = @import("std");
+pub const DentryHash = struct {
+    ino: u32,
+    name: []const u8,
+};
+
+pub var dcache: std.AutoHashMap(DentryHash, *DEntry) = undefined;
+
 pub var last_ino: u32 = 0;
 var last_ino_lock = kernel.Mutex.init();
 
@@ -35,13 +44,22 @@ pub fn get_ino() u32 {
     return tmp;
 }
 
-
+pub const S_IFSOCK = 0o140;
+pub const S_IFLNK  = 0o120;
+pub const S_IFREG  = 0o100;
+pub const S_IFBLK  = 0o060;
+pub const S_IFDIR  = 0o040;
+pub const S_IFCHR  = 0o020;
+pub const S_IFIFO  = 0o010;
+pub const S_ISUID  = 0o004;
+pub const S_ISGID  = 0o002;
+pub const S_ISVTX  = 0o001;
 
 pub const UMode = struct {
-    grp: u4 = 0,
-    usr: u4 = 0,
-    other: u4 = 0,
-    _unsed: u4 = 0
+    grp: u3 = 0,
+    usr: u3 = 0,
+    other: u3 = 0,
+    type: u7 = 0,
 };
 
 pub const Path = struct {
