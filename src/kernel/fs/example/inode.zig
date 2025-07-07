@@ -13,20 +13,29 @@ pub const ExampleInode = struct {
         return error.OutOfMemory;
     }
 
-    fn lookup(_: *fs.Inode) !*fs.DEntry {
+    fn lookup(dir: *fs.Inode, name: []const u8) !*fs.DEntry {
+        const key: fs.DentryHash = fs.DentryHash{
+            .ino = dir.i_no,
+            .name = name,
+        };
+        if (fs.dcache.get(key)) |entry| {
+            return entry;
+        }
         return error.InodeNotFound;
     }
 
-    fn mkdir(base: *fs.Inode, parent: fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
+    fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
         var new_inode = try ExampleInode.create(base.sb);
-        var new_dentry = fs.DEntry.alloc(name, base.sb) catch |err| {
+        new_inode.mode = mode;
+        var new_dentry = fs.DEntry.alloc(name, base.sb, new_inode) catch |err| {
             kernel.mm.kfree(new_inode);
             return err;
         };
-        new_dentry.inode = new_inode;
         parent.tree.addChild(&new_dentry.tree);
-        new_inode.mode = mode;
-        
+        fs.dcache.put(fs.DentryHash{
+            .ino = new_inode.i_no,
+            .name = name,
+        }, new_dentry);
     }
 };
 

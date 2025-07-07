@@ -12,6 +12,7 @@ const std = @import("std");
 ///
 pub fn init_cache(allocator: std.mem.Allocator) void {
     cache = std.StringHashMap(*DEntry).init(allocator);
+    fs.dcache = std.AutoHashMap(fs.DentryHash, *fs.DEntry).init(allocator);
 }
 
 pub var cache: std.StringHashMap(*DEntry) = undefined;
@@ -28,7 +29,7 @@ pub const DEntry = struct {
         kernel.mm.kfree(dentry);
     }
 
-    pub fn alloc(name: []const u8, sb: *SuperBlock) !*DEntry {
+    pub fn alloc(name: []const u8, sb: *SuperBlock, ino: *fs.Inode) !*DEntry {
         if (kernel.mm.kmalloc(DEntry)) |entry| {
             if (kernel.mm.kmallocArray(u8, name.len)) |nm| {
                 @memcpy(nm[0..name.len], name[0..name.len]);
@@ -40,6 +41,7 @@ pub const DEntry = struct {
             entry.ref = Refcount.init();
             entry.ref.dropFn = drop;
             entry.tree.setup();
+            entry.inode = ino;
             return entry;
         }
         return error.OutOfMemory;
