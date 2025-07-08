@@ -47,20 +47,22 @@ pub const Mount = struct {
     pub fn mount(
         source: []const u8,
         target: []const u8,
-        fs_type: *fs.FileSystem) !void {
+        fs_type: *fs.FileSystem) !*Mount {
         const sb: *fs.SuperBlock = try fs_type.ops.getSB(fs_type, source);
         const dntr: *fs.DEntry = fs.DEntry.alloc(target, sb, sb.root.inode) catch {
-            return ;
+            return error.OutOfMemory;
         };
         if (krn.mm.kmalloc(Mount)) |mnt| {
             mnt.root = dntr;
             mnt.sb = sb;
             mnt.list.setup();
             mnt.add();
+            return mnt;
             // mnt.root.tree.addChild(&mnt.sb.root.tree);
         } else {
             dntr.release();
             sb.ref.unref(); // later maybe something else
+            return error.OutOfMemory;
         }
     }
 };
