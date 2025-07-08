@@ -21,7 +21,7 @@ pub fn doFork() i32 {
         mm.kfree(child.?);
         return -errors.ENOMEM;
     }
-    child.?.fs = tsk.current.fs.?.clone() catch {
+    child.?.fs = tsk.current.fs.clone() catch {
         kthread.kthreadStackFree(stack);
         mm.kfree(child.?);
         return -errors.ENOMEM;
