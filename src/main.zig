@@ -81,8 +81,20 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.fs.init_cache(krn.mm.kernel_allocator.allocator());
     krn.examplefs.init_example();
     if (krn.fs.FileSystem.find("examplefs")) |fs| {
-        _ = krn.fs.Mount.mount("/dev/sda1", "/", fs) catch {
+        const root_mount = krn.fs.Mount.mount("/dev/sda1", "/", fs) catch {
             dbg.printf("Failed to mount root\n",.{});
+            @panic("Not able to mount /\n");
+        };
+        krn.task.initial_task.fs = krn.fs.FSInfo.alloc() catch {
+            @panic("Initial task must have a root,pwd\n");
+        };
+        krn.task.initial_task.fs.root = krn.fs.Path{
+            .dentry = root_mount.root,
+            .mnt = root_mount,
+        };
+        krn.task.initial_task.fs.pwd = krn.fs.Path{
+            .dentry = root_mount.root,
+            .mnt = root_mount,
         };
     } else {
             dbg.printf("Unknown filesystem type\n",.{});
@@ -97,8 +109,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     // _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;
 
-    // krn.logger.INFO("Go usermode", .{});
-    // krn.goUserspace(@embedFile("userspace"));
+    krn.logger.INFO("Go usermode", .{});
+    krn.goUserspace(@embedFile("userspace"));
     
     while (true) {
         asm volatile ("hlt");

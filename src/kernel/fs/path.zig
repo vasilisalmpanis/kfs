@@ -6,7 +6,16 @@ const PathError = error{
     WrongPath,
 };
 
-pub fn resolve(path: []const u8) !*fs.DEntry {
+pub fn remove_trailing_slashes(path: []const u8) []const u8 {
+    var len = path.len - 1;
+    while(len > 0 and path[len] == '/') : (len = len - 1) {
+    }
+    if (len != path.len)
+        len = len + 1;
+    return path[0..len];
+}
+
+pub fn dir_resolve(path: []const u8) !*fs.DEntry {
     if (path.len == 0) {
         return PathError.WrongPath;
     }
@@ -23,8 +32,11 @@ pub fn resolve(path: []const u8) !*fs.DEntry {
         '/'
     );
     while (it.next()) |segment| {
+        if (it.rest().len == 0) {
+            return d_curr;
+        }
         const d_tmp = d_curr.inode.ops.lookup(segment) catch |err| {
-            switch (err) {}
+            return err;
         };
         d_curr = d_tmp;
     }

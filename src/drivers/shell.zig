@@ -63,6 +63,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "layout", .desc = "Change keyboard layout", .hndl = &layout });
         self.registerCommand(.{ .name = "filesystems", .desc = "Print available filesystems", .hndl = &filesystems });
         self.registerCommand(.{ .name = "mount", .desc = "Print mount points", .hndl = &mount });
+        self.registerCommand(.{ .name = "ls", .desc = "List directory content", .hndl = &ls });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -301,4 +302,9 @@ fn mount(_: *Shell, _: [][]const u8) void {
     } else {
         debug.printf("No mounts\n", .{});
     }
+}
+
+fn ls(_: *Shell, _: [][]const u8) void {
+    const curr: *krn.fs.DEntry = krn.task.initial_task.fs.pwd.dentry;
+    debug.printf("{s}\n", .{curr.name});
 }

@@ -95,7 +95,7 @@ pub const Task = struct {
     wakeup_time:    usize           = 0,
 
     mm:             ?*mm.MM              = null,
-    fs:             ?*krn.fs.FSInfo      = null,
+    fs:             *krn.fs.FSInfo,
 
     // signals
     sighand:        signal.SigHand       = signal.SigHand.init(),
@@ -115,6 +115,7 @@ pub const Task = struct {
             .pgid = pgid,
             .stack_bottom = 0,
             .tsktype = tp,
+            .fs = undefined,
         };
     }
 

@@ -24,6 +24,9 @@ pub const Refcount = @import("../sched/task.zig").RefCount;
 pub const TreeNode = @import("../utils/tree.zig").TreeNode;
 pub const list = kernel.list;
 
+// Path
+pub const path = @import("path.zig");
+
 
 const std = @import("std");
 pub const DentryHash = struct {
