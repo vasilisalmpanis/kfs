@@ -9,6 +9,7 @@ pub const ExampleSuper = struct {
     base: fs.SuperBlock,
 
     pub fn allocInode(_: *fs.SuperBlock) !*fs.Inode {
+        return error.NotImplemented;
     }
 
     pub fn create(_fs: *fs.FileSystem, source: []const u8) !*fs.SuperBlock {
@@ -41,6 +42,7 @@ pub const ExampleSuper = struct {
             sb.base.list.setup();
             sb.base.ref = kernel.task.RefCount.init();
             sb.base.fs = _fs;
+            sb.base.ops = &example_super_ops;
             _fs.sbs.add(&sb.base.list);
             return &sb.base;
         }

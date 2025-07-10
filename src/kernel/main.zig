@@ -42,3 +42,5 @@ pub var scr: screen.Screen = undefined;
 pub const proc_mm = @import("./mm/proc_mm.zig");
 pub const fs = @import("fs/fs.zig");
 pub const examplefs = @import("fs/example/filesystem.zig");
+
+pub const mkdir = @import("./syscalls/mkdir.zig").mkdir;

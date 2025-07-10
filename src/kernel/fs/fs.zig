@@ -34,7 +34,30 @@ pub const DentryHash = struct {
     name: []const u8,
 };
 
-pub var dcache: std.AutoHashMap(DentryHash, *DEntry) = undefined;
+pub const InoNameContext = struct {
+    pub fn hash(self: @This(), val: DentryHash) u64 {
+        _ = self;
+        var hasher = std.hash.Wyhash.init(123);
+        std.hash.autoHashStrat(
+            &hasher,
+            val,
+            .Deep
+        );
+        return hasher.final();
+    }
+
+    pub fn eql(self: @This(), a: DentryHash, b: DentryHash) bool {
+        _ = self;
+        return (a.ino == b.ino and std.mem.eql(u8, a.name, b.name));
+    }
+};
+
+pub var dcache: std.HashMap(
+    DentryHash,
+    *DEntry,
+    InoNameContext,
+    50
+) = undefined;
 
 pub var last_ino: u32 = 0;
 var last_ino_lock = kernel.Mutex.init();
@@ -58,7 +81,7 @@ pub const S_ISUID  = 0o004;
 pub const S_ISGID  = 0o002;
 pub const S_ISVTX  = 0o001;
 
-pub const UMode = struct {
+pub const UMode = packed struct {
     grp: u3 = 0,
     usr: u3 = 0,
     other: u3 = 0,
