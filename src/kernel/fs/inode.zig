@@ -14,7 +14,7 @@ pub const Inode = struct {
     mode: fs.UMode = fs.UMode{},
     is_dirty: bool = false,
     size: u32 = 0,
-    ops: *InodeOps,
+    ops: *const InodeOps,
 
     pub fn setup(
         self: *Inode,
@@ -31,6 +31,6 @@ pub const Inode = struct {
 
 // TODO: define the Inode Ops struct with documentation.
 pub const InodeOps = struct {
-    lookup: *const fn (base: *Inode) anyerror!*fs.DEntry,
+    lookup: *const fn (base: *Inode, name: []const u8) anyerror!*fs.DEntry,
     mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
 };

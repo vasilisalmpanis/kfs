@@ -12,7 +12,12 @@ const std = @import("std");
 ///
 pub fn init_cache(allocator: std.mem.Allocator) void {
     cache = std.StringHashMap(*DEntry).init(allocator);
-    fs.dcache = std.AutoHashMap(fs.DentryHash, *fs.DEntry).init(allocator);
+    fs.dcache = std.HashMap(
+        fs.DentryHash,
+        *fs.DEntry,
+        fs.InoNameContext,
+        50,
+    ).init(allocator);
 }
 
 pub var cache: std.StringHashMap(*DEntry) = undefined;

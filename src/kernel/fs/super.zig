@@ -9,7 +9,7 @@ const std = @import("std");
 /// and it is responsible for the creation of new inodes(?).
 
 pub const SuperBlock = struct {
-    ops: *SuperOps,
+    ops: *const SuperOps,
     root: *DEntry,
     fs: *fs.FileSystem,
     ref: Refcount,
