@@ -8,6 +8,7 @@ pub const ExampleInode = struct {
     pub fn create(sb: *fs.SuperBlock) !*fs.Inode {
         if (kernel.mm.kmalloc(ExampleInode)) |inode| {
             inode.base.setup(sb);
+            inode.base.ops = &example_inode_ops;
             return &inode.base;
         }
         return error.OutOfMemory;
@@ -25,17 +26,21 @@ pub const ExampleInode = struct {
     }
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
+        const cash_key = fs.DentryHash{
+            .ino = base.i_no,
+            .name = name,
+        };
+        if (fs.dcache.get(cash_key)) |_| {
+            return error.Exists;
+        }
         var new_inode = try ExampleInode.create(base.sb);
         new_inode.mode = mode;
-        var new_dentry = fs.DEntry.alloc(name, base.sb, new_inode) catch |err| {
-            kernel.mm.kfree(new_inode);
-            return err;
-        };
+        errdefer kernel.mm.kfree(new_inode);
+        var new_dentry = try fs.DEntry.alloc(name, base.sb, new_inode);
+        errdefer kernel.mm.kfree(new_dentry);
         parent.tree.addChild(&new_dentry.tree);
-        fs.dcache.put(fs.DentryHash{
-            .ino = new_inode.i_no,
-            .name = name,
-        }, new_dentry);
+        try fs.dcache.put(cash_key, new_dentry);
+        return new_dentry;
     }
 };
 

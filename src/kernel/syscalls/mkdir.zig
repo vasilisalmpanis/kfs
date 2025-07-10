@@ -5,19 +5,27 @@ const std = @import("std");
 const errors = @import("error-codes.zig");
 
 pub fn mkdir(
-    path_name: ?[*]u8,
-    mode: u32,
+    path_name: ?[*:0]u8,
+    mode: u16,
 ) i32 {
     if (path_name == null) {
         return -errors.ENOENT;
     }
-    const user_path = std.mem.span(path_name);
+    const user_path = std.mem.span(path_name.?);
     const stripped_path = fs.path.remove_trailing_slashes(user_path);
-    const parent = fs.path.dir_resolve(stripped_path) catch |err| {
-        _ = err;
+    var dir_name: []const u8 = undefined;
+    const parent = fs.path.dir_resolve(stripped_path, &dir_name) catch {
         return -errors.ENOTDIR;
     };
-    // TODO we need to pass segment to mkdir and not the full path.
-    parent.inode.ops.mkdir(parent.inode, parent, stripped_path, mode);
+    var dir_mode: fs.UMode = @bitCast(mode);
+    dir_mode.type = fs.S_IFDIR;
+    _ = parent.inode.ops.mkdir(
+        parent.inode,
+        parent,
+        dir_name,
+        dir_mode
+    ) catch {
+        return -errors.ENOENT;
+    };
     return 0;
 }

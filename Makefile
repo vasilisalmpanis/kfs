@@ -21,7 +21,7 @@ $(NAME): $(KERNEL) $(GRUB_CFG)
 	$(MKRESCUE) --compress=xz -o $(NAME) $(ISO_DIR)
 
 $(KERNEL): $(SRC) $(ASM_SRC)
-	zig build # -Doptimize=ReleaseSafe
+	zig build -freference-trace=20 # -Doptimize=ReleaseSafe
 
 clean:
 	rm -f ${IMG}

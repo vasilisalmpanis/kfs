@@ -64,6 +64,8 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "filesystems", .desc = "Print available filesystems", .hndl = &filesystems });
         self.registerCommand(.{ .name = "mount", .desc = "Print mount points", .hndl = &mount });
         self.registerCommand(.{ .name = "ls", .desc = "List directory content", .hndl = &ls });
+        self.registerCommand(.{ .name = "mkdir", .desc = "Create a new directory", .hndl = &mkdir });
+        self.registerCommand(.{ .name = "cd", .desc = "Change pwd", .hndl = &cd });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -307,4 +309,49 @@ fn mount(_: *Shell, _: [][]const u8) void {
 fn ls(_: *Shell, _: [][]const u8) void {
     const curr: *krn.fs.DEntry = krn.task.initial_task.fs.pwd.dentry;
     debug.printf("{s}\n", .{curr.name});
+}
+
+fn mkdir(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf(
+            \\Usage: mkdir <name>
+            \\  Example: mkdir test
+            \\
+            , .{}
+        );
+        return ;
+    }
+    const _name: ?[*:0]u8 = @ptrCast(krn.mm.kmallocArray(u8, args[0].len + 1));
+    if (_name) |name| {
+        @memcpy(name[0..args[0].len], args[0]);
+        name[args[0].len] = 0;
+        if (krn.mkdir(@ptrCast(name), 0) < 0) {
+            debug.printf("directory exists!\n", .{});
+        }
+    }
+}
+
+fn cd(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf(
+            \\Usage: cd <path>
+            \\  Example: cd /
+            \\
+            , .{}
+        );
+        return ;
+    }
+    var last: [] const u8 = "";
+    var dir = krn.fs.path.dir_resolve(args[0], &last) catch {
+        debug.printf("wrong path!\n", .{});
+        return ;
+    };
+    if (last.len != 0) {
+        dir = dir.inode.ops.lookup(dir.inode, last) catch {
+            debug.printf("wrong path!\n", .{});
+            return;
+        };
+    }
+    krn.task.initial_task.fs.pwd.dentry = dir;
+    // krn.task.initial_task.fs.pwd.mnt = ?;
 }
