@@ -8,6 +8,8 @@ const PathError = error{
 
 pub fn remove_trailing_slashes(path: []const u8) []const u8 {
     var len = path.len - 1;
+    if (path.len == 1 and path[0] == '/')
+        return path;
     while(len > 0 and path[len] == '/') : (len = len - 1) {
     }
     if (len != path.len)
@@ -32,6 +34,10 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !*fs.DEntry {
         '/'
     );
     while (it.next()) |segment| {
+        if (fs.Mount.find(d_curr)) |mount| {
+            krn.logger.INFO("Mountpoint found {s}\n" ,.{mount.root.name});
+            d_curr = mount.sb.root;
+        }
         if (it.rest().len == 0) {
             last.* = segment;
             return d_curr;
@@ -43,6 +49,10 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !*fs.DEntry {
             return err;
         };
         d_curr = d_tmp;
+    }
+    if (fs.Mount.find(d_curr)) |mount| {
+        krn.logger.INFO("Mountpoint found {s}\n" ,.{mount.root.name});
+        d_curr = mount.sb.root;
     }
     return d_curr;
 }

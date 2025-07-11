@@ -289,25 +289,64 @@ fn filesystems(_: *Shell, _: [][]const u8) void {
     }
 }
 
-fn mount(_: *Shell, _: [][]const u8) void {
-
-    debug.printf("MOUNT\n", .{});
-    krn.fs.mount.mnt_lock.lock();
-    defer krn.fs.mount.mnt_lock.unlock();
-    if (krn.fs.mount.mountpoints) |head| {
-        var it = head.list.iterator();
-        while (it.next()) |node| {
-            const mnt = node.curr.entry(krn.fs.Mount, "list");
-            debug.printf("Mount :{s} type : {s}\n", .{mnt.root.name, mnt.sb.fs.name});
-            // debug.printf("Mount : {x}\n", .{@intFromPtr(mnt.root)});
+fn mount(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf("MOUNT\n", .{});
+        krn.fs.mount.mnt_lock.lock();
+        defer krn.fs.mount.mnt_lock.unlock();
+        if (krn.fs.mount.mountpoints) |head| {
+            var it = head.list.iterator();
+            while (it.next()) |node| {
+                const mnt = node.curr.entry(krn.fs.Mount, "list");
+                debug.printf("Mount :{s} type : {s}\n", .{mnt.root.name, mnt.sb.fs.name});
+                // debug.printf("Mount : {x}\n", .{@intFromPtr(mnt.root)});
+            }
+        } else {
+            debug.printf("No mounts\n", .{});
         }
-    } else {
-        debug.printf("No mounts\n", .{});
+        return ;
+    }
+    if (args.len < 3) {
+        debug.printf(
+            \\Usage: mount source target type
+            \\  Example: mount PLACEHOLDER /home/user examplefs
+            \\
+            , .{}
+        );
+        return ;
+    }
+    if (krn.mm.kmallocArray(u8, args[2].len + 1)) |ftype| {
+        @memcpy(ftype[0..args[2].len], args[2][0..args[2].len]);
+        ftype[args[2].len] = 0;
+        _ = krn.mount(args[0], args[1], @ptrCast(ftype), 0, null);
+        krn.mm.kfree(ftype);
     }
 }
 
-fn ls(_: *Shell, _: [][]const u8) void {
-    const curr: *krn.fs.DEntry = krn.task.initial_task.fs.pwd.dentry;
+fn ls(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf(
+            \\Usage: ls <name>
+            \\  Example: ls /home
+            \\
+            , .{}
+        );
+        return ;
+    }
+    var last_slice: []const u8 = "";
+    var curr: *krn.fs.DEntry = krn.fs.path.dir_resolve(args[0], &last_slice) catch {
+            debug.printf("Wrong path\n", .{});
+            return;
+    };
+    if (last_slice.len != 0) {
+        curr = curr.inode.ops.lookup(curr.inode, last_slice) catch {
+            debug.printf("File doesn't exist\n", .{});
+            return;
+        };
+        if (krn.fs.Mount.find(curr)) |mnt| {
+            curr = mnt.sb.root;
+        }
+    }
     debug.printf("items in {s}:\n", .{curr.name});
     if (curr.tree.child) |ch| {
         var it = ch.siblingsIterator();
