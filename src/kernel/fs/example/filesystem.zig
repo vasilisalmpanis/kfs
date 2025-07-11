@@ -18,7 +18,8 @@ pub const ExampleFileSystem = struct {
     fn getSB(base: *fs.FileSystem, source: []const u8) !*fs.SuperBlock {
         const self: *ExampleFileSystem = base.getImpl(ExampleFileSystem, "base");
         if (!self.base.sbs.isEmpty()) {
-            const sb = self.base.sbs.entry(fs.SuperBlock, "list");
+            kernel.logger.INFO("sb already exists\n", .{});
+            const sb = self.base.sbs.next.?.entry(fs.SuperBlock, "list");
             return sb;
         } else {
             const sb: *fs.SuperBlock = super.ExampleSuper.create(base, source) catch |err| {

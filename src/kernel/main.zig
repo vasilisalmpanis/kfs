@@ -44,3 +44,4 @@ pub const fs = @import("fs/fs.zig");
 pub const examplefs = @import("fs/example/filesystem.zig");
 
 pub const mkdir = @import("./syscalls/mkdir.zig").mkdir;
+pub const mount = @import("./syscalls/mount.zig").mount;
