@@ -308,7 +308,14 @@ fn mount(_: *Shell, _: [][]const u8) void {
 
 fn ls(_: *Shell, _: [][]const u8) void {
     const curr: *krn.fs.DEntry = krn.task.initial_task.fs.pwd.dentry;
-    debug.printf("{s}\n", .{curr.name});
+    debug.printf("items in {s}:\n", .{curr.name});
+    if (curr.tree.child) |ch| {
+        var it = ch.siblingsIterator();
+        while (it.next()) |d| {
+            const _d = d.curr.entry(krn.fs.DEntry, "tree");
+            debug.printf("  {s}\n", .{_d.name});
+        }
+    }
 }
 
 fn mkdir(_: *Shell, args: [][]const u8) void {
