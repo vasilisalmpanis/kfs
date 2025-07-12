@@ -12,7 +12,6 @@ pub fn mount(
     new_flags: u32,
     data: ?*anyopaque
 ) i32 {
-    dbg.printf("MOUNTING\n", .{});
     if (fs_type) |string| { 
         const user_type: []const u8 = std.mem.span(string);
         if (fs.FileSystem.find(user_type)) |_type| {
