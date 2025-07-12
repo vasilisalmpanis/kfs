@@ -19,9 +19,9 @@ pub fn mkdir(
     };
     var dir_mode: fs.UMode = @bitCast(mode);
     dir_mode.type = fs.S_IFDIR;
-    _ = parent.inode.ops.mkdir(
-        parent.inode,
-        parent,
+    _ = parent.dentry.inode.ops.mkdir(
+        parent.dentry.inode,
+        parent.dentry,
         dir_name,
         dir_mode
     ) catch {
