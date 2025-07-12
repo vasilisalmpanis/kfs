@@ -294,13 +294,8 @@ fn mount(_: *Shell, args: [][]const u8) void {
         debug.printf("MOUNT\n", .{});
         krn.fs.mount.mnt_lock.lock();
         defer krn.fs.mount.mnt_lock.unlock();
-        if (krn.fs.mount.mountpoints) |head| {
-            var it = head.list.iterator();
-            while (it.next()) |node| {
-                const mnt = node.curr.entry(krn.fs.Mount, "list");
-                debug.printf("Mount :{s} type : {s}\n", .{mnt.root.name, mnt.sb.fs.name});
-                // debug.printf("Mount : {x}\n", .{@intFromPtr(mnt.root)});
-            }
+        if (krn.fs.mount.mountpoints) |_| {
+            debug.printMountTree();
         } else {
             debug.printf("No mounts\n", .{});
         }
@@ -324,31 +319,16 @@ fn mount(_: *Shell, args: [][]const u8) void {
 }
 
 fn ls(_: *Shell, args: [][]const u8) void {
-    if (args.len < 1) {
-        debug.printf(
-            \\Usage: ls <name>
-            \\  Example: ls /home
-            \\
-            , .{}
-        );
+    var path: []const u8 = ".";
+    if (args.len > 0) {
+        path = args[0];
+    }
+    const curr = krn.fs.path.resolve(path) catch |err| {
+        debug.printf("error: {!} for {s}\n", .{err, path});
         return ;
-    }
-    var last_slice: []const u8 = "";
-    var curr: *krn.fs.DEntry = krn.fs.path.dir_resolve(args[0], &last_slice) catch {
-            debug.printf("Wrong path\n", .{});
-            return;
     };
-    if (last_slice.len != 0) {
-        curr = curr.inode.ops.lookup(curr.inode, last_slice) catch {
-            debug.printf("File doesn't exist\n", .{});
-            return;
-        };
-        if (krn.fs.Mount.find(curr)) |mnt| {
-            curr = mnt.sb.root;
-        }
-    }
-    debug.printf("items in {s}:\n", .{curr.name});
-    if (curr.tree.child) |ch| {
+    debug.printf("items in {s}:\n", .{curr.dentry.name});
+    if (curr.dentry.tree.child) |ch| {
         var it = ch.siblingsIterator();
         while (it.next()) |d| {
             const _d = d.curr.entry(krn.fs.DEntry, "tree");
@@ -387,17 +367,11 @@ fn cd(_: *Shell, args: [][]const u8) void {
         );
         return ;
     }
-    var last: [] const u8 = "";
-    var dir = krn.fs.path.dir_resolve(args[0], &last) catch {
+    const dir = krn.fs.path.resolve(args[0]) catch {
         debug.printf("wrong path!\n", .{});
         return ;
     };
-    if (last.len != 0) {
-        dir = dir.inode.ops.lookup(dir.inode, last) catch {
-            debug.printf("wrong path!\n", .{});
-            return;
-        };
-    }
-    krn.task.initial_task.fs.pwd.dentry = dir;
+    krn.task.initial_task.fs.pwd.dentry = dir.dentry;
+    krn.task.initial_task.fs.pwd.mnt = dir.mnt;
     // krn.task.initial_task.fs.pwd.mnt = ?;
 }

@@ -88,11 +88,11 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
         krn.task.initial_task.fs = krn.fs.FSInfo.alloc() catch {
             @panic("Initial task must have a root,pwd\n");
         };
-        krn.task.initial_task.fs.root = krn.fs.Path{
+        krn.task.initial_task.fs.root = krn.fs.path.Path{
             .dentry = root_mount.sb.root,
             .mnt = root_mount,
         };
-        krn.task.initial_task.fs.pwd = krn.fs.Path{
+        krn.task.initial_task.fs.pwd = krn.fs.path.Path{
             .dentry = root_mount.sb.root,
             .mnt = root_mount,
         };
