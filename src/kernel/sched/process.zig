@@ -38,7 +38,13 @@ pub fn doFork() i32 {
         0, 
         tsk.current.pgid,
         .PROCESS,
-    );
+    ) catch {
+        km.kfree(child.?.fs);
+        km.kfree(child.?.mm.?);
+        km.kfree(child.?);
+        kthread.kthreadStackFree(stack);
+        return -errors.ENOMEM;
+    };
     return @intCast(child.?.pid);
 }
 

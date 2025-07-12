@@ -77,7 +77,10 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
             0,
             1,
             .KTHREAD
-        );
+        ) catch |err| {
+            krn.mm.kfree(task);
+            return err;
+        };
         return task;
     } else {
         return error.MemoryAllocation;

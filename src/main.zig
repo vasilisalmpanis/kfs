@@ -96,6 +96,11 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
             .dentry = root_mount.sb.root,
             .mnt = root_mount,
         };
+        if (krn.fs.TaskFiles.new()) |files| {
+            krn.task.initial_task.files = files;
+        } else {
+            @panic("PID 0 doesn't have TaskFiles struct, OOM\n");
+        }
     } else {
             dbg.printf("Unknown filesystem type\n",.{});
     }

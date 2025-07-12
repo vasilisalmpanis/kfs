@@ -27,6 +27,10 @@ pub const list = kernel.list;
 // Path
 pub const path = @import("path.zig");
 
+// File
+pub const File = @import("file.zig").File;
+pub const TaskFiles = @import("file.zig").TaskFiles;
+
 
 const std = @import("std");
 pub const DentryHash = struct {

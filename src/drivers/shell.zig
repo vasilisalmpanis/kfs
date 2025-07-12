@@ -291,7 +291,6 @@ fn filesystems(_: *Shell, _: [][]const u8) void {
 
 fn mount(_: *Shell, args: [][]const u8) void {
     if (args.len < 1) {
-        debug.printf("MOUNT\n", .{});
         krn.fs.mount.mnt_lock.lock();
         defer krn.fs.mount.mnt_lock.unlock();
         if (krn.fs.mount.mountpoints) |_| {
