@@ -95,7 +95,10 @@ pub const Task = struct {
     wakeup_time:    usize           = 0,
 
     mm:             ?*mm.MM              = null,
+    // Filesystem Info
     fs:             *krn.fs.FSInfo,
+    // Open files info
+    files:          *krn.fs.TaskFiles,
 
     // signals
     sighand:        signal.SigHand       = signal.SigHand.init(),
@@ -116,6 +119,7 @@ pub const Task = struct {
             .stack_bottom = 0,
             .tsktype = tp,
             .fs = undefined,
+            .files = undefined,
         };
     }
 
@@ -132,6 +136,22 @@ pub const Task = struct {
         mm.proc_mm.init_mm.vas = virt;
     }
 
+    pub fn new(
+        task_stack_top: u32,
+        stack_btm: u32,
+        uid: u16,
+        gid: u16,
+        pgid: u16,
+        tp: TaskType
+    ) anyerror!*Task {
+        if (krn.mm.kmalloc(Task)) |task| {
+            errdefer krn.mm.kfree(task);
+            try task.initSelf(task_stack_top, stack_btm, uid, gid, pgid, tp);
+            return task;
+        }
+        return error.OutOfMemory;
+    }
+
     pub fn initSelf(
         self: *Task,
         task_stack_top: u32,
@@ -140,7 +160,7 @@ pub const Task = struct {
         gid: u16,
         pgid: u16,
         tp: TaskType
-    ) void {
+    ) !void {
         const tmp = Task.init(uid, gid, pgid, tp);
         self.uid = tmp.uid;
         self.gid = tmp.gid;
@@ -163,6 +183,12 @@ pub const Task = struct {
 
         self.sighand = current.sighand;
         self.sighand.pending = std.StaticBitSet(32).initEmpty();
+
+        if (krn.fs.TaskFiles.new()) |files| {
+            self.files = files;
+        } else {
+            return error.OutOfMemory;
+        }
 
         tasks_mutex.lock();
         current.tree.addChild(&self.tree);
