@@ -88,14 +88,10 @@ pub const UMode = packed struct {
     type: u7 = 0,
 };
 
-pub const Path = struct {
-    mnt: *Mount,
-    dentry: *DEntry,
-};
 
 pub const FSInfo = struct {
-    root: Path,
-    pwd: Path,
+    root: path.Path,
+    pwd: path.Path,
 
     pub fn alloc() !*FSInfo {
         if (kernel.mm.kmalloc(FSInfo)) |_fs| {
