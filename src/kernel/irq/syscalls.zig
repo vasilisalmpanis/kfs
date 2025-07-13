@@ -3,6 +3,7 @@ const tsk = @import("../sched/task.zig");
 const krn = @import("../main.zig");
 const registerHandler = @import("./manage.zig").registerHandler;
 const systable = @import("../syscalls/table.zig");
+const errors = @import("../syscalls/error-codes.zig");
 
 pub fn syscallsManager(state: *arch.Regs) void {
     tsk.current.regs = state.*;
@@ -21,14 +22,18 @@ pub fn syscallsManager(state: *arch.Regs) void {
         });
     }
     if (systable.SyscallTable.get(sys)) |hndlr| {
-        state.eax = hndlr(
+        const result: u32 = hndlr(
             state.ebx,
             state.ecx,
             state.edx,
             state.esi,
             state.edi,
             state.ebp,
-        );
+        ) catch |err| {
+            state.eax = errors.toErrno(err);
+            return ;
+        };
+        state.eax = @intCast(result);
     }
 }
 

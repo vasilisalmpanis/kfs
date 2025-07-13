@@ -371,7 +371,7 @@ pub fn setupRegs(regs: *arch.Regs) *arch.Regs {
         const uregs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
         regs.* = uregs.*;
         if (regs.int_no == arch.idt.SYSCALL_INTERRUPT) {
-            regs.eax = krn.errors.EINTR;
+            regs.eax = krn.errors.toErrno(krn.errors.PosixError.EINTR);
         }
     }
     return regs;

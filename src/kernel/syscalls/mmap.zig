@@ -1,4 +1,4 @@
-const errors = @import("./error-codes.zig");
+const errors = @import("./error-codes.zig").PosixError;
 const arch = @import("arch");
 const krn = @import("../main.zig");
 const mm = @import("../mm/proc_mm.zig");
@@ -10,7 +10,7 @@ pub fn mmap2(
     flags: mm.MAP,
     _: i32, // fd
     _: u32, // off
-) i32 {
+) !u32 {
     krn.logger.INFO("mmap2: {any} {any} {any} flags: {any}", .{
         addr,
         length,
@@ -18,7 +18,7 @@ pub fn mmap2(
         flags,
     });
     if (prot & ~(mm.PROT_EXEC | mm.PROT_READ | mm.PROT_WRITE | mm.PROT_NONE) > 0)
-        return -errors.EINVAL;
+        return errors.EINVAL;
     // addr specifies the wanted virtual address (suggestion)
     // length is the size of the mapping
     const len: u32 = arch.pageAlign(length, false);
@@ -26,7 +26,7 @@ pub fn mmap2(
     if (addr != null) {
         if (hint & (arch.PAGE_SIZE - 1) > 0) {
             if (flags.FIXED) {
-                return -errors.EINVAL;
+                return errors.EINVAL;
             }
             hint = arch.pmm.pageAlign(hint, false);
         }
@@ -37,6 +37,5 @@ pub fn mmap2(
         krn.logger.INFO("heap_start mmap {x}\n", .{krn.task.current.mm.?.heap});
         // look through mappings and just give back one.
     }
-    const area: i32 = krn.task.current.mm.?.mmap_area(hint, len, prot, flags);
-    return area;
+    return try krn.task.current.mm.?.mmap_area(hint, len, prot, flags);
 }
