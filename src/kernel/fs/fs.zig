@@ -28,8 +28,10 @@ pub const list = kernel.list;
 pub const path = @import("path.zig");
 
 // File
-pub const File = @import("file.zig").File;
-pub const TaskFiles = @import("file.zig").TaskFiles;
+pub const file = @import("file.zig");
+pub const File = file.File;
+pub const TaskFiles = file.TaskFiles;
+pub const FileOps = file.FileOps;
 
 
 const std = @import("std");
@@ -90,6 +92,23 @@ pub const UMode = packed struct {
     usr: u3 = 0,
     other: u3 = 0,
     type: u7 = 0,
+
+    pub fn isDir(self: *UMode) bool {
+        return self.type & S_IFDIR != 0;
+    }
+
+    // Modify to add ownership
+    pub fn isReadable(self: *UMode) bool {
+        return self.usr & 0o4 != 0;
+    }
+
+    pub fn isWriteable(self: *UMode) bool {
+        return self.usr & 0o2 != 0;
+    }
+
+    pub fn isExecutable(self: *UMode) bool {
+        return self.usr & 0o1 != 0;
+    }
 };
 
 

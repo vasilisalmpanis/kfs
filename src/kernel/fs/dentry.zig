@@ -54,6 +54,7 @@ pub const DEntry = struct {
 
     pub fn release(self: *DEntry) void {
         self.ref.unref();
+        kernel.mm.kfree(self.name.ptr);
     }
 };
 
