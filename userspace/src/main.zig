@@ -170,6 +170,12 @@ pub export fn main() linksection(".text.main") noreturn {
             ) catch 0 == 0
         ) {}
 
+        var fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
+        serial("new fd {any}\n", .{fd});
+        fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
+        serial("new fd {any}\n", .{fd});
+        fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
+        serial("new fd {any}\n", .{fd});
         // Signaling
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);

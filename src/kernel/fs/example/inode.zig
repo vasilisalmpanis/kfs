@@ -1,11 +1,12 @@
 const fs = @import("../fs.zig");
 const kernel = fs.kernel;
+const file = @import("file.zig");
 
 
 pub const ExampleInode = struct {
     base: fs.Inode,
 
-    pub fn create(sb: *fs.SuperBlock) !*fs.Inode {
+    pub fn new(sb: *fs.SuperBlock) !*fs.Inode {
         if (kernel.mm.kmalloc(ExampleInode)) |inode| {
             inode.base.setup(sb);
             inode.base.ops = &example_inode_ops;
@@ -33,7 +34,7 @@ pub const ExampleInode = struct {
         if (fs.dcache.get(cash_key)) |_| {
             return error.Exists;
         }
-        var new_inode = try ExampleInode.create(base.sb);
+        var new_inode = try ExampleInode.new(base.sb);
         new_inode.mode = mode;
         errdefer kernel.mm.kfree(new_inode);
         var new_dentry = try fs.DEntry.alloc(name, base.sb, new_inode);
@@ -42,9 +43,36 @@ pub const ExampleInode = struct {
         try fs.dcache.put(cash_key, new_dentry);
         return new_dentry;
     }
+
+    pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode) !*fs.Inode {
+        if (base.mode.type != fs.S_IFDIR)
+            return error.NotDirectory;
+        if (!base.mode.isWriteable())
+            return error.Access;
+
+        // Lookup if file already exists.
+        _ = base.ops.lookup(base, name) catch {
+            const new_inode = try ExampleInode.new(base.sb);
+            new_inode.mode = mode;
+            errdefer kernel.mm.kfree(new_inode);
+            return new_inode;
+        };
+        return error.Exists;
+    }
+
+    fn newFile(base: *fs.Inode) !*fs.File {
+        if (kernel.mm.kmalloc(file.ExampleFile)) |new_file| {
+            new_file.base.init(&file.ExampleFileOps, base);
+            return &new_file.base;
+        } else {
+            return error.OutOfMemory;
+        }
+    }
 };
 
 const example_inode_ops = fs.InodeOps {
+    .create = ExampleInode.create,
     .lookup = ExampleInode.lookup,
     .mkdir = ExampleInode.mkdir,
+    .newFile = ExampleInode.newFile,
 };
