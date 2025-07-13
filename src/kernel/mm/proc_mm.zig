@@ -1,7 +1,7 @@
 const lst = @import("../utils/list.zig");
 const mm = @import("init.zig");
 const arch = @import("arch");
-const errors = @import("../syscalls/error-codes.zig");
+const errors = @import("../syscalls/error-codes.zig").PosixError;
 const krn = @import("../main.zig");
 
 const STACK_SIZE = mm.PAGE_SIZE * 2000;
@@ -200,7 +200,7 @@ pub const MM = struct {
         return new_vma;
     }
 
-    pub fn mmap_area(self: *MM, addr: u32, length: u32, prot: u32, flags: MAP) i32
+    pub fn mmap_area(self: *MM, addr: u32, length: u32, prot: u32, flags: MAP) !u32
     {
         // 1. check if this addr is taken.
         //  - if free or map fixed, create mappings or replace mappings
@@ -223,7 +223,7 @@ pub const MM = struct {
                         prot,
                         flags
                     ) catch |err| switch (err) {
-                        error.OutOfMemory => return -errors.ENOMEM
+                        error.OutOfMemory => return errors.ENOMEM
                     };
                     if (hint < self.vmas.?.start)
                         self.vmas = new_vma;
@@ -249,7 +249,7 @@ pub const MM = struct {
             prot,
             flags
         ) catch |err| switch (err) {
-            error.OutOfMemory => return -errors.ENOMEM
+            error.OutOfMemory => return errors.ENOMEM
         };
         if (self.vmas == null or hint < self.vmas.?.start) {
             self.vmas = new_vma;

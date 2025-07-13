@@ -1,6 +1,7 @@
 const std = @import("std");
 const arch = @import("arch");
 const krn = @import("../main.zig");
+const errors = @import("./error-codes.zig");
 
 pub const SyscallHandler = fn (
     a1: u32,
@@ -9,9 +10,9 @@ pub const SyscallHandler = fn (
     a4: u32,
     a5: u32,
     a6: u32,
-) i32;
+) errors.PosixError!u32;
 
-fn notImpl(_: u32, _: u32, _: u32, _: u32, _: u32, _: u32) i32 {
+fn notImpl(_: u32, _: u32, _: u32, _: u32, _: u32, _: u32) !u32 {
     const state: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
     krn.logger.WARN("syscall {d} {s} is not implemented", .{
         state.eax,

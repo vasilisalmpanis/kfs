@@ -312,7 +312,7 @@ fn mount(_: *Shell, args: [][]const u8) void {
     if (krn.mm.kmallocArray(u8, args[2].len + 1)) |ftype| {
         @memcpy(ftype[0..args[2].len], args[2][0..args[2].len]);
         ftype[args[2].len] = 0;
-        _ = krn.mount(args[0], args[1], @ptrCast(ftype), 0, null);
+        _ = krn.mount(args[0], args[1], @ptrCast(ftype), 0, null) catch {};
         krn.mm.kfree(ftype);
     }
 }
@@ -350,9 +350,9 @@ fn mkdir(_: *Shell, args: [][]const u8) void {
     if (_name) |name| {
         @memcpy(name[0..args[0].len], args[0]);
         name[args[0].len] = 0;
-        if (krn.mkdir(@ptrCast(name), 0) < 0) {
+        _ = krn.mkdir(@ptrCast(name), 0) catch {
             debug.printf("directory exists!\n", .{});
-        }
+        };
     }
 }
 
