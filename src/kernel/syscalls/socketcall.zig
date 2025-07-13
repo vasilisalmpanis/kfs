@@ -1,5 +1,5 @@
 const tsk = @import("../sched/task.zig");
-const errors = @import("./error-codes.zig");
+const errors = @import("./error-codes.zig").PosixError;
 const krn = @import("../main.zig");
 const arch = @import("arch");
 
@@ -27,20 +27,20 @@ const CallType = enum(u8) {
     _
 };
 
-pub fn socketcall(call: i32, args: [*]u32) i32 {
+pub fn socketcall(call: i32, args: [*]u32) !u32 {
     krn.logger.INFO("socketcall: {d} {any}", .{call, args});
     if (call < 1 or call > 20) {
-        return -errors.EINVAL;
+        return errors.EINVAL;
     }
     const call_type: CallType = @enumFromInt(call);
     switch (call_type) {
-        .SYS_SOCKETPAIR => return socketpair(
+        .SYS_SOCKETPAIR => return try socketpair(
             @intCast(args[0]),
             @intCast(args[1]),
             @intCast(args[2]),
             @ptrFromInt(args[3]),
         ),
-        .SYS_RECVFROM => return recvfrom(
+        .SYS_RECVFROM => return try recvfrom(
             @intCast(args[0]),
             @ptrFromInt(args[1]),
             args[2],
@@ -48,7 +48,7 @@ pub fn socketcall(call: i32, args: [*]u32) i32 {
             args[4],
             @intCast(args[5]),
         ),
-        .SYS_SENDTO => return sendto(
+        .SYS_SENDTO => return try sendto(
             @intCast(args[0]),
             @ptrFromInt(args[1]),
             args[2],
@@ -57,13 +57,13 @@ pub fn socketcall(call: i32, args: [*]u32) i32 {
             @intCast(args[5]),
         ),
         else => {
-            return -errors.EINVAL;
+            return errors.EINVAL;
         },
     }
     return 0;
 }
 
-pub fn socketpair(family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) i32 {
+pub fn socketpair(family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) !u32 {
     krn.logger.INFO("socketpair: {d} {d} {d} {any}", .{family, s_type, protocol, usockvec});
     if (krn.socket.newSocket()) |sock_a| {
         if (krn.socket.newSocket()) |sock_b| {
@@ -73,10 +73,10 @@ pub fn socketpair(family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) i32
             usockvec[1] = @intCast(sock_b.id);
         } else {
             sock_a.delete();
-            return -errors.ENOMEM;
+            return errors.ENOMEM;
         }
     } else {
-        return -errors.ENOMEM;
+        return errors.ENOMEM;
     }
     return 0;
 }
@@ -88,12 +88,12 @@ pub fn recvfrom(
     flags: u32,
     addr: u32,
     addr_len: i32
-) i32 {
+) !u32 {
     _ = addr;
     _ = addr_len;
     _ = flags;
     if (ubuff == null) {
-        return -errors.EFAULT;
+        return errors.EFAULT;
     }
     if (krn.socket.findById(@intCast(fd))) |sock| {
         const u_buff: [*]u8 = @ptrCast(ubuff);
@@ -104,20 +104,20 @@ pub fn recvfrom(
         sock.ringbuf.readFirstAssumeLength(u_buff[0..to_read], to_read);
         return @intCast(to_read);
     } else {
-        return -errors.EBADF;
+        return errors.EBADF;
     }
     return 0;
 }
 
-pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, addr_len: i32) i32 {
+pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, addr_len: i32) !u32 {
     _ = flags;
     _ = addr;
     _ = addr_len;
     if (buff == null) {
-        return -errors.EFAULT;
+        return errors.EFAULT;
     }
     if (len > 128) {
-        return -errors.EFAULT;
+        return errors.EFAULT;
     }
     if (krn.socket.findById(@intCast(fd))) |sock| {
         if (sock.conn) |remote| {
@@ -129,10 +129,10 @@ pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, add
             remote.ringbuf.writeSliceAssumeCapacity(ubuff[0..to_write]);
             return @intCast(len);
         } else {
-            return -errors.ENOTCONN;
+            return errors.ENOTCONN;
         }
     } else {
-        return -errors.EBADF;
+        return errors.EBADF;
     }
     return 0;
 }

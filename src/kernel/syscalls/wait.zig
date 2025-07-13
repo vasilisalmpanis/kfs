@@ -1,7 +1,7 @@
 const tsk = @import("../sched/task.zig");
 const krn = @import("../main.zig");
 const arch = @import("arch");
-const errors = @import("./error-codes.zig");
+const errors = @import("./error-codes.zig").PosixError;
 const sched = @import("../sched/scheduler.zig");
 
 const WNOHANG: u32 = 	0x00000001;
@@ -35,7 +35,7 @@ const Rusage = packed struct {
     ru_nivcsw: usize,        // involuntary context switches
 };
 
-pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) i32 {
+pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
     _ = rusage;
     krn.logger.DEBUG("waiting pid {d} from pid {d}", .{pid, tsk.current.pid});
     if (pid > 0) {

@@ -2,6 +2,7 @@ const Regs = @import("arch").Regs;
 const std = @import("std");
 const dbg = @import("debug");
 const registerExceptionHandler = @import("./manage.zig").registerExceptionHandler;
+const kernel = @import("../main.zig");
 
 pub const Exceptions = enum {
     DivisionError,
@@ -111,7 +112,9 @@ pub fn hGeneralProtectionFault(regs: *Regs) void {
 pub fn hPageFault(regs: *Regs) void {
     var addr: u32 = 0;
     addr = asm volatile("mov %%cr2, %[val]" : [val] "={eax}" (-> u32));
-    dbg.printf(
+    asm volatile ("cli");
+    kernel.logger.DEBUG("PID {d}\n", .{kernel.task.current.pid});
+    kernel.logger.DEBUG(
         \\Page Fault at addr: {x}
         \\EIP: {x}
         \\  present:      {d}
@@ -129,7 +132,7 @@ pub fn hPageFault(regs: *Regs) void {
             regs.err_code & 0x10,
         });
     regs.dump();
-    @panic("hPageFault");
+    while (true){}
 }
 
 pub fn hReserved_1(regs: *Regs) void {
