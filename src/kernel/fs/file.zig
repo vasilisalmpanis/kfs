@@ -32,6 +32,7 @@ pub const File = struct {
     mode: fs.UMode,
     flags: u16,
     ops: *const FileOps,
+    pos: u32,
     inode: *fs.Inode,
     ref: Refcount,
 
@@ -41,6 +42,7 @@ pub const File = struct {
         inode: *fs.Inode,
     ) void {
         self.ops = ops;
+        self.pos = 0;
         self.ref = kernel.task.RefCount.init();
         self.inode = inode;
     }
@@ -49,6 +51,9 @@ pub const File = struct {
 // TODO: define and document the file operations callbacks.
 pub const FileOps = struct {
     open: *const fn (base: *File, inode: *fs.Inode) anyerror!void,
+    write: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
+    read: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
+    lseek: ?*const fn (base: *File, offset: u32, origin: u32) anyerror!u32,
 };
 
 pub const TaskFiles = struct {
