@@ -159,7 +159,7 @@ pub export fn main() linksection(".text.main") noreturn {
         
 
         // Waiting for child to send message
-        var buf: [10]u8 = .{0} ** 10;
+        var buf: [30]u8 = .{0} ** 30;
         while (
             std.posix.recvfrom(
                 fds[0],
@@ -176,6 +176,13 @@ pub export fn main() linksection(".text.main") noreturn {
         serial("new fd {any}\n", .{fd});
         fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
         serial("new fd {any}\n", .{fd});
+        fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
+        serial("new fd {any}\n", .{fd});
+        const wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
+        serial("result of writing:\n  len:{d}\n", .{wl});
+        _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
+        const rl = std.posix.read(@intCast(fd), &buf) catch 1;
+        serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
         // Signaling
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);

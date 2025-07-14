@@ -37,6 +37,18 @@ pub fn open(
             };
             new = true;
             parent_dir.dentry.tree.addChild(&new_dentry.tree);
+            fs.dcache.put(
+                fs.DentryHash{
+                    .ino = parent_inode.i_no,
+                    .name = file_segment,
+                },
+                new_dentry
+            ) catch {
+                new_dentry.tree.del();
+                kernel.mm.kfree(new_dentry);
+                kernel.mm.kfree(new_inode);
+                return errors.ENOMEM;
+            };
             break :res new_dentry;
         } else {
             return errors.ENOENT;

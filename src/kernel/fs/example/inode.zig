@@ -5,11 +5,14 @@ const file = @import("file.zig");
 
 pub const ExampleInode = struct {
     base: fs.Inode,
+    buff: [50]u8,
 
     pub fn new(sb: *fs.SuperBlock) !*fs.Inode {
         if (kernel.mm.kmalloc(ExampleInode)) |inode| {
             inode.base.setup(sb);
             inode.base.ops = &example_inode_ops;
+            inode.base.size = 50;
+            inode.buff = .{0} ** 50;
             return &inode.base;
         }
         return error.OutOfMemory;
@@ -53,8 +56,8 @@ pub const ExampleInode = struct {
         // Lookup if file already exists.
         _ = base.ops.lookup(base, name) catch {
             const new_inode = try ExampleInode.new(base.sb);
-            new_inode.mode = mode;
             errdefer kernel.mm.kfree(new_inode);
+            new_inode.mode = mode;
             return new_inode;
         };
         return error.Exists;
