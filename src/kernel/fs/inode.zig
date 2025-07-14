@@ -28,6 +28,10 @@ pub const Inode = struct {
         self.mode = UMode{};
         self.is_dirty = false;
     }
+
+    pub fn getImpl(base: *Inode, comptime T: type, comptime member: []const u8) *T {
+        return @fieldParentPtr(member, base);
+    }
 };
 
 // TODO: define the Inode Ops struct with documentation.
