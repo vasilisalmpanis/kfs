@@ -24,6 +24,7 @@ pub const Inode = struct {
         self.i_no = fs.get_ino();
         self.sb = sb;
         self.ref = Refcount.init();
+        self.ref.ref();
         self.size = 0;
         self.mode = UMode{};
         self.is_dirty = false;
@@ -36,10 +37,8 @@ pub const Inode = struct {
 
 // TODO: define the Inode Ops struct with documentation.
 pub const InodeOps = struct {
+    file_ops: *const fs.FileOps,
     create: *const fn(base: *Inode, name: []const u8, mode: fs.UMode) anyerror!*Inode,
     lookup: *const fn (base: *Inode, name: []const u8) anyerror!*fs.DEntry,
     mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
-
-    // Open file creation. Allocates a fs.File struct that represents a per-process open file.
-    newFile: *const fn(base: *Inode) anyerror!*fs.File,
 };

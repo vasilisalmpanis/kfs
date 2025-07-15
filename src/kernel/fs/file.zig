@@ -35,6 +35,7 @@ pub const File = struct {
     pos: u32,
     inode: *fs.Inode,
     ref: Refcount,
+    path: fs.path.Path,
 
     pub fn init(
         self: *File,
@@ -44,13 +45,35 @@ pub const File = struct {
         self.ops = ops;
         self.pos = 0;
         self.ref = kernel.task.RefCount.init();
+        self.ref.dropFn = File.release;
+        self.ref.ref();
         self.inode = inode;
+    }
+
+    pub fn release(ref: *kernel.task.RefCount) void {
+        const file: *File = kernel.list.containerOf(File, @intFromPtr(ref), "ref");
+        const inode: *fs.Inode = file.inode;
+        file.path.dentry.ref.unref();
+        file.ops.close(file);
+        inode.ref.unref();
+        kernel.mm.kfree(file);
+    }
+
+    pub fn new(path: fs.path.Path) !*File {
+        if (kernel.mm.kmalloc(File)) |new_file| {
+            new_file.init(path.dentry.inode.ops.file_ops, path.dentry.inode);
+            new_file.path = path;
+            return new_file;
+        } else {
+            return error.OutOfMemory;
+        }
     }
 };
 
 // TODO: define and document the file operations callbacks.
 pub const FileOps = struct {
     open: *const fn (base: *File, inode: *fs.Inode) anyerror!void,
+    close: *const fn(base: *File) void,
     write: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
     read: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
     lseek: ?*const fn (base: *File, offset: u32, origin: u32) anyerror!u32,
@@ -70,6 +93,16 @@ pub const TaskFiles = struct {
             return files;
         }
         return null;
+    }
+
+    pub fn releaseFD(self: *TaskFiles, fd: u32) bool {
+        if (self.fds.get(fd)) |file| {
+            _ = self.fds.remove(fd);
+            self.unsetFD(fd);
+            file.ref.unref();
+            return true;
+        }
+        return false;
     }
 
     pub fn getNextFD(self: *TaskFiles) anyerror!u32 {
