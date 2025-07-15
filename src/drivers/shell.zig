@@ -66,6 +66,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "ls", .desc = "List directory content", .hndl = &ls });
         self.registerCommand(.{ .name = "mkdir", .desc = "Create a new directory", .hndl = &mkdir });
         self.registerCommand(.{ .name = "cd", .desc = "Change pwd", .hndl = &cd });
+        self.registerCommand(.{ .name = "date", .desc = "Current date and time", .hndl = &date });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -373,4 +374,8 @@ fn cd(_: *Shell, args: [][]const u8) void {
     krn.task.initial_task.fs.pwd.dentry = dir.dentry;
     krn.task.initial_task.fs.pwd.mnt = dir.mnt;
     // krn.task.initial_task.fs.pwd.mnt = ?;
+}
+
+fn date(_: *Shell, _: [][]const u8) void {
+    krn.cmos.printTime();
 }
