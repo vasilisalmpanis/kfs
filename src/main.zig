@@ -6,6 +6,7 @@ const gdt = @import("arch").gdt;
 const multiboot = @import("arch").multiboot;
 const screen = @import("drivers").screen;
 const dbg = @import("debug");
+const drv = @import("drivers");
 const builtin = @import("std").builtin;
 const idt = @import("arch").idt;
 const Serial = @import("drivers").Serial;
@@ -76,6 +77,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     irq.registerHandler(1, &keyboard.keyboardInterrupt);
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();
+    drv.cmos.init();
 
     // FS
     krn.fs.init_cache(krn.mm.kernel_allocator.allocator());
