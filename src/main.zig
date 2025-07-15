@@ -99,6 +99,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
             .mnt = root_mount,
         };
         if (krn.fs.TaskFiles.new()) |files| {
+            files.map.set(0); // No stdin
+            files.map.set(1); // No stdout
+            files.map.set(2); // No stderr
             krn.task.initial_task.files = files;
         } else {
             @panic("PID 0 doesn't have TaskFiles struct, OOM\n");

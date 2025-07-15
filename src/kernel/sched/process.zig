@@ -4,6 +4,7 @@ const km = @import("../mm/kmalloc.zig");
 const errors = @import("../syscalls/error-codes.zig").PosixError;
 const kthread = @import("./kthread.zig");
 const arch = @import("arch");
+const fs = @import("../fs/fs.zig");
 
 pub fn doFork() !u32 {
     var child: ?*tsk.Task = km.kmalloc(tsk.Task);
@@ -26,6 +27,7 @@ pub fn doFork() !u32 {
         mm.kfree(child.?);
         return errors.ENOMEM;
     };
+
     const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
     const parent_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
     var child_regs: *arch.Regs = @ptrFromInt(stack_top);
@@ -34,11 +36,13 @@ pub fn doFork() !u32 {
     child.?.initSelf(
         stack_top,
         stack,
-        0, 
+        0,
         0, 
         tsk.current.pgid,
         .PROCESS,
     ) catch {
+        // TODO: understand when error comes from kmalloc allocation of files
+        // or from resizing of fds/map inside files to do deinit
         km.kfree(child.?.fs);
         km.kfree(child.?.mm.?);
         km.kfree(child.?);
