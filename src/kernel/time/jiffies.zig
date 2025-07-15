@@ -1,8 +1,14 @@
 const drivers = @import("drivers");
+const krn = @import("../main.zig");
 pub var jiffies: u32 = 0;
 
 pub fn timerHandler() void {
     jiffies += 1;
+
+    if (jiffies % drivers.pit.HZ == 0) {
+        // Every second
+        krn.cmos.incSec();
+    }
 }
 
 pub fn getSecondsFromStart() u32 {

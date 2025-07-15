@@ -9,3 +9,4 @@ pub const pit = @import("./pit.zig");
 
 pub const ata = @import("./block/ata/ata.zig");
 pub const pci = @import("./pci.zig");
+pub const cmos = @import("./cmos.zig");
