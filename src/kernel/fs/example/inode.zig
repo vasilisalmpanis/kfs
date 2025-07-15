@@ -62,20 +62,11 @@ pub const ExampleInode = struct {
         };
         return error.Exists;
     }
-
-    fn newFile(base: *fs.Inode) !*fs.File {
-        if (kernel.mm.kmalloc(file.ExampleFile)) |new_file| {
-            new_file.base.init(&file.ExampleFileOps, base);
-            return &new_file.base;
-        } else {
-            return error.OutOfMemory;
-        }
-    }
 };
 
 const example_inode_ops = fs.InodeOps {
+    .file_ops = &file.ExampleFileOps,
     .create = ExampleInode.create,
     .lookup = ExampleInode.lookup,
     .mkdir = ExampleInode.mkdir,
-    .newFile = ExampleInode.newFile,
 };

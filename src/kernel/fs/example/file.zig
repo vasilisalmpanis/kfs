@@ -2,8 +2,6 @@ const fs = @import("../fs.zig");
 const ExampleInode = @import("./inode.zig").ExampleInode;
 
 pub const ExampleFile = struct {
-    base: fs.File,
-
     fn open(_: *fs.File, _: *fs.Inode) !void {
     }
 
@@ -26,10 +24,14 @@ pub const ExampleFile = struct {
         base.pos += to_read;
         return to_read;
     }
+
+    fn close(_: *fs.File) void {
+    }
 };
 
 pub const ExampleFileOps: fs.FileOps = fs.FileOps {
     .open = ExampleFile.open,
+    .close = ExampleFile.close,
     .write = ExampleFile.write,
     .read = ExampleFile.read,
     .lseek = null,

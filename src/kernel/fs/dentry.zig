@@ -31,6 +31,7 @@ pub const DEntry = struct {
 
     pub fn drop(self: *Refcount) void {
         const dentry: *DEntry = list.containerOf(DEntry, @intFromPtr(self), "ref");
+        dentry.tree.del();
         kernel.mm.kfree(dentry);
     }
 
@@ -44,6 +45,7 @@ pub const DEntry = struct {
             }
             entry.sb = sb;
             entry.ref = Refcount.init();
+            entry.ref.ref();
             entry.ref.dropFn = drop;
             entry.tree.setup();
             entry.inode = ino;
