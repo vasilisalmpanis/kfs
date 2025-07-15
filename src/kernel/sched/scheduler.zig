@@ -50,6 +50,17 @@ fn processTasks() void {
         curr.del();
         task.delFromTree();
         task.mm.?.delete();
+        var file_it = task.files.map.iterator(.{});
+        while (file_it.next()) |id| {
+            if (id > 2) {
+                if (task.files.fds.get(id)) |file| {
+                    file.ref.unref();
+                }
+            }
+        }
+        krn.mm.kfree(task.files);
+
+        // TODO: think about filesystem data. (Unreffing root and pwd path).
         kthreadStackFree(task.stack_bottom);
         km.kfree(task);
         if (end)

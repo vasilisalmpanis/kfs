@@ -123,7 +123,6 @@ fn childProcess(sock_fd: i32) void {
         break :brk 0;
     };
     // Child Process dies.
-    while (true) {}
     os.linux.exit(5); 
 }
 
@@ -135,8 +134,17 @@ pub export fn main() linksection(".text.main") noreturn {
         0,
         &fds
     );
+    var fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
+    fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
+    const wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
+    serial("result of writing to {d}:\n  len:{d}\n", .{fd, wl});
+    _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
     const pid= os.linux.fork();
     if (pid == 0) {
+        _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
+        var buf1: [30]u8 = .{0} ** 30;
+        const rl = std.posix.read(@intCast(fd), &buf1) catch 1;
+        serial("\n\n\nChild process read:\n  len:{d}\n  data: {s}\n\n\n", .{rl, buf1[0..rl]});
         childProcess(fds[1]);
     } else { 
         // Parent
@@ -170,20 +178,21 @@ pub export fn main() linksection(".text.main") noreturn {
             ) catch 0 == 0
         ) {}
 
-        var fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
-        serial("new fd {any}\n", .{fd});
-        fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
-        serial("new fd {any}\n", .{fd});
-        fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
-        serial("new fd {any}\n", .{fd});
-        fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
-        serial("new fd {any}\n", .{fd});
-        const wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
-        serial("result of writing:\n  len:{d}\n", .{wl});
-        _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-        const rl = std.posix.read(@intCast(fd), &buf) catch 1;
-        serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
-        _ = std.posix.close(@intCast(fd));
+        // var fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
+        // serial("new fd {any}\n", .{fd});
+        // fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
+        // serial("new fd {any}\n", .{fd});
+        // fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
+        // serial("new fd {any}\n", .{fd});
+        // fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
+        // serial("new fd {any}\n", .{fd});
+        // const wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
+        // serial("result of writing:\n  len:{d}\n", .{wl});
+        // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
+        // const rl = std.posix.read(@intCast(fd), &buf) catch 1;
+        // serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
+        _ = std.posix.close(3);
+        _ = std.posix.close(4);
         // Signaling
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);

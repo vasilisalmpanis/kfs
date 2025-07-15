@@ -4,6 +4,7 @@ const mount = fs.mount;
 const Refcount = fs.Refcount;
 const std = @import("std");
 const kernel = fs.kernel;
+const errors = @import("../syscalls/error-codes.zig").PosixError;
 
 // Mode
 pub const O_ACCMODE	= 0o0000003;
@@ -93,6 +94,27 @@ pub const TaskFiles = struct {
             return files;
         }
         return null;
+    }
+
+    pub fn dup(self: *TaskFiles, old: *TaskFiles) !void {
+        var fd_it = old.map.iterator(.{});
+        while (fd_it.next()) |id| {
+            if (id > self.map.capacity()) {
+                self.map.resize(self.map.capacity() * 2, false) catch {
+                    return errors.ENOMEM;
+                };
+            }
+            self.map.set(id);
+            errdefer self.map.unset(id);
+            if (id > 2) { // standard IO don't exist yet
+                if (old.fds.get(id)) |file| {
+                    file.ref.ref();
+                    try self.fds.put(id, file);
+                } else {
+                    return errors.ENOMEM;
+                }
+            }
+        }
     }
 
     pub fn releaseFD(self: *TaskFiles, fd: u32) bool {
