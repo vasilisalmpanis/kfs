@@ -12,6 +12,7 @@ const mutex = @import("./mutex.zig").Mutex;
 const signal = @import("./signals.zig");
 const ThreadHandler = @import("./kthread.zig").ThreadHandler;
 const mm = @import("../mm/init.zig");
+const errors = @import("../syscalls/error-codes.zig").PosixError;
 
 var pid: u32 = 0;
 
@@ -184,10 +185,13 @@ pub const Task = struct {
         self.sighand = current.sighand;
         self.sighand.pending = std.StaticBitSet(32).initEmpty();
 
-        if (krn.fs.TaskFiles.new()) |files| {
-            self.files = files;
-        } else {
-            return error.OutOfMemory;
+        if (tp != .KTHREAD) { // For now
+            if (krn.fs.TaskFiles.new()) |files| {
+                try files.dup(current.files);
+                self.files = files;
+            } else {
+                return errors.ENOMEM;
+            }
         }
 
         tasks_mutex.lock();
