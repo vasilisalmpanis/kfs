@@ -183,6 +183,7 @@ pub export fn main() linksection(".text.main") noreturn {
         _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
         const rl = std.posix.read(@intCast(fd), &buf) catch 1;
         serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
+        _ = std.posix.close(@intCast(fd));
         // Signaling
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);

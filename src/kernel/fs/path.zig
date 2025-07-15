@@ -43,7 +43,6 @@ pub const Path = struct {
                 }
             }
         } else if (!std.mem.eql(u8, segment, ".")) {
-            krn.logger.INFO("stepping into {s}", .{segment});
             self.dentry = self.dentry.inode.ops.lookup(
                 self.dentry.inode,
                 segment
@@ -75,7 +74,6 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !Path {
     if (path[0] == '/') {
         cwd = krn.task.initial_task.fs.root;
     }
-
     var curr = Path{
         .dentry = cwd.dentry,
         .mnt = cwd.mnt,
