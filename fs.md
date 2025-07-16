@@ -156,3 +156,10 @@ sequenceDiagram
     sys_open-)-userspace: DEntry.inode.fd
 ```
 
+# Referencing
+
+Dentry: children reference parent
+In-memory fs's: dentries start with refcount 2
+Dentries reference inodes
+File reference dentry
+Path walk: reference curr and AFTER unreference prev
