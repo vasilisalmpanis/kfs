@@ -6,6 +6,7 @@ const kernel = fs.kernel;
 const list = fs.list;
 const std = @import("std");
 
+
 /// Dentry: the path representation of every inode on the filesystem
 /// (RF, BD, CD, sockets, pipes, etc). There can be multiple different dentries
 /// that point to the same underlying inode.
@@ -52,6 +53,27 @@ pub const DEntry = struct {
             return entry;
         }
         return error.OutOfMemory;
+    }
+
+    pub fn new(parent: *DEntry, name: []const u8, ino: *fs.Inode) !*DEntry {
+        parent.ref.ref();
+        errdefer parent.ref.unref();
+        const new_dentry: *fs.DEntry = fs.DEntry.alloc(name, ino.sb, ino) catch {
+            return kernel.errors.PosixError.ENOMEM;
+        };
+        parent.tree.addChild(&new_dentry.tree);
+        fs.dcache.put(
+            fs.DentryHash{
+                .ino = parent.inode.i_no,
+                .name = name,
+            },
+            new_dentry
+        ) catch {
+            new_dentry.tree.del();
+            kernel.mm.kfree(new_dentry);
+            return kernel.errors.PosixError.ENOMEM;
+        };
+        return new_dentry;
     }
 
     pub fn release(self: *DEntry) void {

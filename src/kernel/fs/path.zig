@@ -10,16 +10,37 @@ pub const Path = struct {
     mnt: *fs.Mount,
     dentry: *fs.DEntry,
 
+    pub fn init(mnt: *fs.Mount, dentry: *fs.DEntry) Path {
+        dentry.ref.ref();
+        return Path{
+            .mnt = mnt,
+            .dentry = dentry,
+        };
+    }
+
+    pub fn clone(self: *const Path) Path {
+        return Path.init(self.mnt, self.dentry);
+    }
+
+    pub fn release(self: *const Path) void {
+        self.dentry.ref.unref();
+    }
+
     pub fn isRoot(self: *Path) bool {
         return self.dentry.sb.root == self.dentry;
     }
 
     pub fn resolveMount(self: *Path) void {
         if (self.mnt.checkChildMount(self.dentry)) |child_mnt| {
-            krn.logger.INFO("child mnt found for {s}", .{self.dentry.name});
             self.mnt = child_mnt;
-            self.dentry = child_mnt.sb.root;
+            self.setDentry(child_mnt.sb.root);
         }
+    }
+
+    pub fn setDentry(self: *Path, dent: *fs.DEntry) void {
+        dent.ref.ref();
+        self.dentry.ref.unref();
+        self.dentry = dent;
     }
 
     pub fn stepInto(self: *Path, segment: [] const u8) !void {
@@ -28,7 +49,7 @@ pub const Path = struct {
                 if (self.mnt.root.tree.parent) |d| {
                     if (self.mnt.tree.parent) |p| {
                         self.mnt = p.entry(fs.Mount, "tree");
-                        self.dentry = d.entry(fs.DEntry, "tree");
+                        self.setDentry(d.entry(fs.DEntry, "tree"));
                     } else {
                         return error.WrongPath;
                     }
@@ -37,18 +58,19 @@ pub const Path = struct {
                 }
             } else {
                 if (self.dentry.tree.parent) |p| {
-                    self.dentry = p.entry(fs.DEntry, "tree");
+                    self.setDentry(p.entry(fs.DEntry, "tree"));
                 } else {
                     return error.WrongPath;
                 }
             }
         } else if (!std.mem.eql(u8, segment, ".")) {
-            self.dentry = self.dentry.inode.ops.lookup(
+            const dentry = self.dentry.inode.ops.lookup(
                 self.dentry.inode,
                 segment
             ) catch |err| {
                 return err;
             };
+            self.setDentry(dentry);
         }
         self.resolveMount();
     }
@@ -74,10 +96,10 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !Path {
     if (path[0] == '/') {
         cwd = krn.task.initial_task.fs.root;
     }
-    var curr = Path{
-        .dentry = cwd.dentry,
-        .mnt = cwd.mnt,
-    };
+    var curr = Path.init(
+        cwd.mnt,
+        cwd.dentry
+    );
     try curr.stepInto(".");
     var it = std.mem.tokenizeScalar(
         u8,

@@ -38,7 +38,7 @@ pub const Inode = struct {
 // TODO: define the Inode Ops struct with documentation.
 pub const InodeOps = struct {
     file_ops: *const fs.FileOps,
-    create: *const fn(base: *Inode, name: []const u8, mode: fs.UMode) anyerror!*Inode,
+    create: *const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) anyerror!*fs.DEntry,
     lookup: *const fn (base: *Inode, name: []const u8) anyerror!*fs.DEntry,
     mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
 };
