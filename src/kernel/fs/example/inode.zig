@@ -47,7 +47,7 @@ pub const ExampleInode = struct {
         return new_dentry;
     }
 
-    pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode) !*fs.Inode {
+    pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
         if (base.mode.type != fs.S_IFDIR)
             return error.NotDirectory;
         if (!base.mode.isWriteable())
@@ -58,7 +58,9 @@ pub const ExampleInode = struct {
             const new_inode = try ExampleInode.new(base.sb);
             errdefer kernel.mm.kfree(new_inode);
             new_inode.mode = mode;
-            return new_inode;
+            var dent = try parent.new(name, new_inode);
+            dent.ref.ref();
+            return dent;
         };
         return error.Exists;
     }

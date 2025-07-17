@@ -327,12 +327,13 @@ fn ls(_: *Shell, args: [][]const u8) void {
         debug.printf("error: {!} for {s}\n", .{err, path});
         return ;
     };
+    defer curr.release();
     debug.printf("items in {s}:\n", .{curr.dentry.name});
     if (curr.dentry.tree.child) |ch| {
         var it = ch.siblingsIterator();
         while (it.next()) |d| {
             const _d = d.curr.entry(krn.fs.DEntry, "tree");
-            debug.printf("  {s}\n", .{_d.name});
+            debug.printf("  {s} {d}\n", .{_d.name, _d.ref.count.raw});
         }
     }
 }
@@ -371,6 +372,7 @@ fn cd(_: *Shell, args: [][]const u8) void {
         debug.printf("wrong path!\n", .{});
         return ;
     };
+    defer dir.release();
     krn.task.initial_task.fs.pwd.dentry = dir.dentry;
     krn.task.initial_task.fs.pwd.mnt = dir.mnt;
     // krn.task.initial_task.fs.pwd.mnt = ?;

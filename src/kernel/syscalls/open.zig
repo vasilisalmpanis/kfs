@@ -20,11 +20,17 @@ pub fn open(
     const parent_dir = fs.path.dir_resolve(path, &file_segment) catch {
         return errors.ENOENT;
     };
+    defer parent_dir.release();
     const parent_inode: *fs.Inode = parent_dir.dentry.inode;
-    var target_path = parent_dir;
+    var target_path = parent_dir.clone();
     target_path.stepInto(file_segment) catch {
         if (flags & fs.file.O_CREAT != 0) {
-            const new_inode: *fs.Inode = parent_inode.ops.create(parent_inode, file_segment,mode) catch |err| {
+            const new_dentry = parent_inode.ops.create(
+                parent_inode,
+                file_segment,
+                mode,
+                parent_dir.dentry
+            ) catch |err| {
                 tsk.current.files.unsetFD(fd);
                 switch (err) {
                     error.OutOfMemory => { return errors.ENOMEM; },
@@ -32,24 +38,8 @@ pub fn open(
                     else => { return errors.ENOENT; },
                 }
             };
-            const new_dentry: *fs.DEntry = fs.DEntry.alloc(file_segment, new_inode.sb, new_inode) catch {
-                kernel.mm.kfree(new_inode);
-                return errors.ENOMEM;
-            };
             new = true;
-            parent_dir.dentry.tree.addChild(&new_dentry.tree);
-            fs.dcache.put(
-                fs.DentryHash{
-                    .ino = parent_inode.i_no,
-                    .name = file_segment,
-                },
-                new_dentry
-            ) catch {
-                new_dentry.tree.del();
-                kernel.mm.kfree(new_dentry);
-                kernel.mm.kfree(new_inode);
-                return errors.ENOMEM;
-            };
+            target_path.release();
             target_path = .{
                 .dentry = new_dentry,
                 .mnt = parent_dir.mnt,

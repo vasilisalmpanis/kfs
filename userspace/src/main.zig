@@ -178,21 +178,28 @@ pub export fn main() linksection(".text.main") noreturn {
             ) catch 0 == 0
         ) {}
 
-        // var fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
-        // serial("new fd {any}\n", .{fd});
-        // fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
-        // serial("new fd {any}\n", .{fd});
-        // fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
-        // serial("new fd {any}\n", .{fd});
-        // fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
-        // serial("new fd {any}\n", .{fd});
-        // const wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
-        // serial("result of writing:\n  len:{d}\n", .{wl});
-        // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-        // const rl = std.posix.read(@intCast(fd), &buf) catch 1;
-        // serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
+        fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
+        serial("new fd {any}\n", .{fd});
+        fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
+        serial("new fd {any}\n", .{fd});
+        fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
+        serial("new fd {any}\n", .{fd});
+        const _wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
+        serial("result of writing:\n  len:{d}\n", .{_wl});
+        _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
+        var rl = std.posix.read(@intCast(fd), &buf) catch 1;
+        serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
+        serial("new fd {any}\n", .{fd});
+        fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
         _ = std.posix.close(3);
         _ = std.posix.close(4);
+        _ = std.posix.close(5);
+        _ = std.posix.close(6);
+        _ = std.posix.close(7);
+        _ = std.posix.lseek_SET(@intCast(8), 0) catch null;
+        rl = std.posix.read(@intCast(8), &buf) catch 1;
+        serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
+        _ = std.posix.close(8);
         // Signaling
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);

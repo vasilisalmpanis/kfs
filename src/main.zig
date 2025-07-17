@@ -90,14 +90,14 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
         krn.task.initial_task.fs = krn.fs.FSInfo.alloc() catch {
             @panic("Initial task must have a root,pwd\n");
         };
-        krn.task.initial_task.fs.root = krn.fs.path.Path{
-            .dentry = root_mount.sb.root,
-            .mnt = root_mount,
-        };
-        krn.task.initial_task.fs.pwd = krn.fs.path.Path{
-            .dentry = root_mount.sb.root,
-            .mnt = root_mount,
-        };
+        krn.task.initial_task.fs.root = krn.fs.path.Path.init(
+            root_mount,
+            root_mount.sb.root
+        );
+        krn.task.initial_task.fs.pwd = krn.fs.path.Path.init(
+            root_mount,
+            root_mount.sb.root
+        );
         if (krn.fs.TaskFiles.new()) |files| {
             files.map.set(0); // No stdin
             files.map.set(1); // No stdout
