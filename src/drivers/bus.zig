@@ -1,0 +1,40 @@
+const drv = @import("./driver.zig");
+const dev = @import("./device.zig");
+const kern = @import("kernel");
+
+var buses: ?*Bus = null;
+var bus_mutex: kern.Mutex = kern.Mutex.init();
+
+pub const Bus = struct {
+    driver: ?*drv.Driver,
+    list: kern.list.ListHead,
+    // TODO: callbacks to match driver with device.
+    //
+    probe: *const fn(*drv.Driver, *dev.Device) anyerror!void,
+    remove: *const fn(*drv.Driver, *dev.Device) anyerror!void,
+
+    pub fn register(bus: *Bus) void {
+        bus_mutex.lock();
+        defer bus_mutex.unlock();
+        if (buses) |head| {
+            head.list.addTail(&bus.list);
+        } else {
+            buses = bus;
+        }
+    }
+
+    pub fn unregister(bus: *Bus) void {
+        bus_mutex.lock();
+        defer bus_mutex.unlock();
+        if (buses) |head| {
+            if (head == bus) {
+                if (!head.list.isEmpty()) {
+                    head = &bus.list.next;
+                } else {
+                    head = null;
+                }
+            }
+            bus.list.del();
+        }
+    }
+};
