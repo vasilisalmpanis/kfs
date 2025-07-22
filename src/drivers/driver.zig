@@ -1,8 +1,7 @@
 const kern = @import("kernel");
 const dev = @import("./device.zig");
+const Bus = @import("./bus.zig").Bus;
 
-var drivers: ?*Driver = null;
-var driver_mutex = kern.Mutex.init();
 
 /// The device driver generic type
 pub const Driver = struct {
@@ -13,28 +12,54 @@ pub const Driver = struct {
     probe: *const fn(*Driver, *dev.Device) anyerror!void,
     remove: *const fn(*Driver, *dev.Device) anyerror!void,
 
-    pub fn register(driver: *Driver) void {
-        driver_mutex.lock();
-        defer driver_mutex.unlock();
-        if (drivers) |head| {
-            head.list.addTail(&driver.list);
+    pub fn register(self: *Driver, bus: *Bus) void {
+        bus.drivers_mutex.lock();
+        if (bus.drivers) |head| {
+            head.list.addTail(&self.list);
         } else {
-            drivers = driver;
+            bus.drivers = self;
         }
+        bus.drivers_mutex.unlock();
+
+        if (bus.devices) |head| {
+            var it = head.list.iterator();
+            while (it.next()) |node| {
+                const bus_dev: *dev.Device = node.curr.entry(dev.Device, "list");
+                bus_dev.lock.lock();
+                if (bus_dev.driver == null) {
+                    // Match device with driver
+                    if (bus.match(self, bus_dev)) {
+                        bus_dev.driver = self;
+                        // Probe the device
+                        self.probe(bus_dev) catch {
+                            bus_dev.driver = null;
+                        };
+                    }
+                }
+                bus_dev.lock.unlock();
+            }
+        }
+        return ;
     }
 
-    pub fn unregister(driver: *Driver) void {
-        driver_mutex.lock();
-        defer driver_mutex.unlock();
-        if (drivers) |head| {
-            if (driver == head) {
-                if (head.list.isEmpty()) {
-                    head = null;
-                } else {
-                    head = &head.list.next;
+    pub fn unregister(self: *Driver, bus: *Bus) void {
+        if (bus.devices) |head| {
+            var it = head.list.iterator();
+            while (it.next()) |node| {
+                const bus_dev: *dev.Device = node.curr.entry(dev.Device, "list");
+                bus_dev.lock.lock();
+                if (bus_dev.driver == self) {
+                    self.remove(bus_dev);
                 }
+                bus_dev.unlock.lock();
             }
-            driver.list.del();
         }
+        if (bus.drivers == self) {
+           if (self.list.isEmpty()) {
+               bus.drivers = null;
+           }
+           self.list.del();
+        }
+
     }
 };

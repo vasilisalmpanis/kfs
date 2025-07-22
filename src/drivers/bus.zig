@@ -6,10 +6,15 @@ var buses: ?*Bus = null;
 var bus_mutex: kern.Mutex = kern.Mutex.init();
 
 pub const Bus = struct {
-    driver: ?*drv.Driver,
+    name: []const u8,
     list: kern.list.ListHead,
+    drivers: ?*drv.Driver,
+    drivers_mutex: kern.Mutex = kern.Mutex.init(),
+    devices: ?*dev.Device,
+    device_mutex: kern.Mutex = kern.Mutex.init(),
     // TODO: callbacks to match driver with device.
     //
+    match: *const fn(*drv.Driver, *dev.Device) bool,
     probe: *const fn(*drv.Driver, *dev.Device) anyerror!void,
     remove: *const fn(*drv.Driver, *dev.Device) anyerror!void,
 
