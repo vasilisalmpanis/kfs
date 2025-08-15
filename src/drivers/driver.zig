@@ -34,6 +34,7 @@ pub const Driver = struct {
                         self.probe(bus_dev) catch {
                             bus_dev.driver = null;
                         };
+                        // TODO: add the device to the driver
                     }
                 }
                 bus_dev.lock.unlock();
@@ -51,6 +52,7 @@ pub const Driver = struct {
                 if (bus_dev.driver == self) {
                     self.remove(bus_dev);
                 }
+                // TODO: remove the device from the driver
                 bus_dev.unlock.lock();
             }
         }
