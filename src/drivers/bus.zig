@@ -15,8 +15,6 @@ pub const Bus = struct {
     // TODO: callbacks to match driver with device.
     //
     match: *const fn(*drv.Driver, *dev.Device) bool,
-    probe: *const fn(*drv.Driver, *dev.Device) anyerror!void,
-    remove: *const fn(*drv.Driver, *dev.Device) anyerror!void,
 
     pub fn register(bus: *Bus) void {
         bus_mutex.lock();

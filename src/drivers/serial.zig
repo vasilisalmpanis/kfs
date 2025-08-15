@@ -1,4 +1,32 @@
 const io = @import("arch").io;
+const platform = @import("buses/platform.zig");
+const drv = @import("driver.zig");
+
+
+const serial_driver = platform.PlatformDriver {
+    .driver = drv.Driver {
+        .list = undefined,
+        .name = "8250",
+        .probe = undefined,
+        .remove = undefined,
+    },
+    .probe = serial_probe,
+    .remove = serial_remove,
+};
+
+fn serial_probe(device: *platform.PlatformDevice) !void {
+    _ = device;
+}
+
+fn serial_remove(device: *platform.PlatformDevice) !void {
+    _ = device;
+}
+
+pub fn init_serial() void {
+    // if (platform.PlatformDevice.alloc("8250")) |serial| {
+    // }
+    // register driver
+}
 
 pub const Serial = struct {
     addr: u16 = 0x3F8, // COM1
