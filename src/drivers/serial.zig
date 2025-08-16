@@ -30,7 +30,10 @@ pub fn init_serial() void {
             return ;
         };
         kernel.logger.WARN("Device registered for serial", .{});
-        platform.platform_register_driver(&serial_driver.driver);
+        platform.platform_register_driver(&serial_driver.driver) catch |err| {
+            kernel.logger.ERROR("Error registering platform driver: {!}", .{err});
+            return ;
+        };
         kernel.logger.WARN("Driver registered for serial", .{});
         return ;
     }

@@ -70,14 +70,17 @@ var platform_bus: Bus = Bus{
 };
 
 pub fn init_platform() void {
-    platform_bus.register();
+    platform_bus.register() catch |err| {
+        kernel.logger.ERROR("Error while registering platform bus: {!}", .{err});
+        return ;
+    };
     kernel.logger.INFO("Platform bus is registered",.{});
 }
 
-pub fn platform_register_driver(driver: *drv.Driver) void {
+pub fn platform_register_driver(driver: *drv.Driver) !void {
     driver.probe = platform_probe_device;
     driver.remove = platform_remove_device;
-    driver.register(&platform_bus);
+    try driver.register(&platform_bus);
 }
 
 pub fn platform_unregister_driver(driver: *drv.Driver) void {
