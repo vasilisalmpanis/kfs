@@ -38,9 +38,8 @@ pub const DEntry = struct {
 
     pub fn alloc(name: []const u8, sb: *SuperBlock, ino: *fs.Inode) !*DEntry {
         if (kernel.mm.kmalloc(DEntry)) |entry| {
-            if (kernel.mm.kmallocArray(u8, name.len)) |nm| {
-                @memcpy(nm[0..name.len], name[0..name.len]);
-                entry.name = nm[0..name.len];
+            if (kernel.mm.dupSlice(u8, name)) |nm| {
+                entry.name = nm;
             } else {
                 return error.OutOfMemory;
             }

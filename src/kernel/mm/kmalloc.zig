@@ -32,3 +32,11 @@ pub fn kmallocSlice(comptime T: type, count: u32) ?[]T {
     const ptr: [*]T = @ptrFromInt(addr);
     return ptr[0..count];
 }
+
+pub fn dupSlice(comptime T: type, slice: []const T) ?[]T {
+    if (kmallocSlice(T, slice.len)) |new| {
+        @memcpy(new[0..], slice[0..]);
+        return new;
+    }
+    return null;
+}

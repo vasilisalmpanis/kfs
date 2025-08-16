@@ -15,6 +15,7 @@ pub const MM = @import("./proc_mm.zig").MM;
 pub const kmalloc = @import("./kmalloc.zig").kmalloc;
 pub const kmallocArray = @import("./kmalloc.zig").kmallocArray;
 pub const kmallocSlice = @import("./kmalloc.zig").kmallocSlice;
+pub const dupSlice = @import("./kmalloc.zig").dupSlice;
 pub const kfree = @import("./kmalloc.zig").kfree;
 pub const ksize = @import("./kmalloc.zig").ksize;
 pub const vmalloc = @import("./vmalloc.zig").vmalloc;

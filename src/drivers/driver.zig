@@ -12,13 +12,25 @@ pub const Driver = struct {
     probe: *const fn(*Driver, *dev.Device) anyerror!void,
     remove: *const fn(*Driver, *dev.Device) anyerror!void,
 
-    pub fn register(self: *Driver, bus: *Bus) void {
+    pub fn register(self: *Driver, bus: *Bus) !void {
         bus.drivers_mutex.lock();
         if (bus.drivers) |head| {
             head.list.addTail(&self.list);
         } else {
             bus.drivers = self;
         }
+
+        if (bus.sysfs_drivers) |d| {
+            _ = try d.inode.ops.create(
+                d.inode,
+                self.name,
+                kern.fs.UMode{
+                    .usr = 0o6,
+                },
+                d
+            );
+        }
+
         bus.drivers_mutex.unlock();
 
 
@@ -40,6 +52,7 @@ pub const Driver = struct {
                             bus_dev.lock.unlock();
                             continue;
                         };
+                        
                         bus_dev.lock.unlock();
                         return;
                     }

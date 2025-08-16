@@ -5,7 +5,7 @@ const std = @import("std");
 const errors = @import("error-codes.zig").PosixError;
 
 pub fn mkdir(
-    path_name: ?[*:0]u8,
+    path_name: ?[*:0]const u8,
     mode: u16,
 ) !u32 {
     if (path_name == null) {
