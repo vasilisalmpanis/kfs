@@ -69,8 +69,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     mm.mmInit(&boot_info);
     krn.logger.INFO("Memory initialized", .{});
 
-    init_platform();
-    init_serial();
     screen.initScreen(&krn.scr, &boot_info);
 
     krn.pit = PIT.init(1000);
@@ -83,6 +81,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     syscalls.initSyscalls();
     drv.cmos.init();
 
+    
     // FS
     krn.fs.init_cache(krn.mm.kernel_allocator.allocator());
     krn.examplefs.init_example();
@@ -113,6 +112,11 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     } else {
             dbg.printf("Unknown filesystem type\n",.{});
     }
+
+    // Devices
+    drv.init();
+    init_platform();
+    init_serial();
 
     // @import("drivers").pci.init();
     // @import("drivers").ata.ata_init();

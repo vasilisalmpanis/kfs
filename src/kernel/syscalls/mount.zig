@@ -8,7 +8,7 @@ const dbg = @import("debug");
 pub fn mount(
     dev_name: ?[]const u8,
     dir_name: ?[]const u8,
-    fs_type: ?[*:0]u8,
+    fs_type: ?[*:0]const u8,
     new_flags: u32,
     data: ?*anyopaque
 ) !u32 {
