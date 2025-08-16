@@ -1,5 +1,7 @@
 pub const Keyboard = @import("kbd.zig").Keyboard;
 pub const Serial = @import("serial.zig").Serial;
+pub const init_serial = @import("serial.zig").init_serial;
+pub const init_platform = @import("./buses/platform.zig").init_platform;
 pub const screen = @import("./screen.zig");
 pub const tty = @import("./tty-fb.zig");
 pub const shell = @import("./shell.zig");

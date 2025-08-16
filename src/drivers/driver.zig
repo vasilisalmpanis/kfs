@@ -5,7 +5,7 @@ const Bus = @import("./bus.zig").Bus;
 
 /// The device driver generic type
 pub const Driver = struct {
-    name: []u8,
+    name: []const u8,
     list: kern.list.ListHead,
 
     // Device initialization and removal.
@@ -21,20 +21,27 @@ pub const Driver = struct {
         }
         bus.drivers_mutex.unlock();
 
+
+        bus.device_mutex.lock();
+        defer bus.device_mutex.unlock();
         if (bus.devices) |head| {
             var it = head.list.iterator();
             while (it.next()) |node| {
                 const bus_dev: *dev.Device = node.curr.entry(dev.Device, "list");
                 bus_dev.lock.lock();
+                kern.logger.INFO("probe",.{});
                 if (bus_dev.driver == null) {
                     // Match device with driver
                     if (bus.match(self, bus_dev)) {
                         bus_dev.driver = self;
                         // Probe the device
-                        self.probe(bus_dev) catch {
+                        self.probe(self, bus_dev) catch {
                             bus_dev.driver = null;
+                            bus_dev.lock.unlock();
+                            continue;
                         };
-                        // TODO: add the device to the driver
+                        bus_dev.lock.unlock();
+                        return;
                     }
                 }
                 bus_dev.lock.unlock();

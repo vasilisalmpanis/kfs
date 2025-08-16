@@ -1,9 +1,10 @@
 const io = @import("arch").io;
 const platform = @import("buses/platform.zig");
 const drv = @import("driver.zig");
+const kernel = @import("kernel");
 
 
-const serial_driver = platform.PlatformDriver {
+var serial_driver = platform.PlatformDriver {
     .driver = drv.Driver {
         .list = undefined,
         .name = "8250",
@@ -15,17 +16,25 @@ const serial_driver = platform.PlatformDriver {
 };
 
 fn serial_probe(device: *platform.PlatformDevice) !void {
-    _ = device;
+    kernel.logger.WARN("Probing device {s} {any}", .{device.dev.name, device});
 }
 
 fn serial_remove(device: *platform.PlatformDevice) !void {
     _ = device;
+    kernel.logger.WARN("serial cannot be initialized", .{});
 }
 
 pub fn init_serial() void {
-    // if (platform.PlatformDevice.alloc("8250")) |serial| {
-    // }
-    // register driver
+    if (platform.PlatformDevice.alloc("8250")) |serial| {
+        serial.register() catch {
+            return ;
+        };
+        kernel.logger.WARN("Device registered for serial", .{});
+        platform.platform_register_driver(&serial_driver.driver);
+        kernel.logger.WARN("Driver registered for serial", .{});
+        return ;
+    }
+    kernel.logger.WARN("serial cannot be initialized", .{});
 }
 
 pub const Serial = struct {
