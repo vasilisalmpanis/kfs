@@ -1,6 +1,10 @@
 const kern = @import("kernel");
 const drv = @import("./driver.zig");
 const bus = @import("./bus.zig");
+const std = @import("std");
+
+var dev_t_mutex = kern.Mutex.init();
+var major_bitmap = std.bit_set.StaticBitSet(256).initEmpty();
 
 pub const dev_t = packed struct {
     major: u8,
@@ -8,6 +12,37 @@ pub const dev_t = packed struct {
 
     pub fn eql(self: *dev_t, rhs: *dev_t) bool {
         return self.major == rhs.major and self.minor == rhs.minor;
+    }
+
+    pub fn find_major() !u8 {
+        dev_t_mutex.lock();
+        defer dev_t_mutex.unlock();
+        for (0..256) |idx| {
+            if (!major_bitmap.isSet(idx)) {
+                major_bitmap.set(idx);
+                return @truncate(idx);
+            }
+        }
+        return kern.errors.PosixError.ENOENT;
+    }
+
+    pub fn new(major: u8, bitset: *std.bit_set.ArrayBitSet) !dev_t {
+        var res = dev_t{
+            .major = major,
+            .minor = 0,
+        };
+        var minor: u8 = 0;
+        if (bitset.count() == 256)
+            return kern.errors.PosixError.ENOENT;
+        for (0..256) |idx| {
+            if (!bitset.isSet(idx)) {
+                bitset.set(idx);
+                minor = idx;
+                break;
+            }
+        }
+        res.minor = minor;
+        return res;
     }
 };
 
