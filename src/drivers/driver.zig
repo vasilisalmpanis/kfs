@@ -1,12 +1,16 @@
 const kern = @import("kernel");
 const dev = @import("./device.zig");
 const Bus = @import("./bus.zig").Bus;
+const std = @import("std");
 
 
 /// The device driver generic type
 pub const Driver = struct {
     name: []const u8,
     list: kern.list.ListHead,
+    minor_set: std.bit_set.StaticBitSet(256) = std.bit_set.StaticBitSet(256).initEmpty(),
+    minor_mutex: kern.Mutex = kern.Mutex.init(),
+    major: u8 = 0,
 
     // Device initialization and removal.
     probe: *const fn(*Driver, *dev.Device) anyerror!void,
@@ -19,6 +23,15 @@ pub const Driver = struct {
         } else {
             bus.drivers = self;
         }
+
+        self.major = dev.dev_t.find_major() catch |err| {
+            // remove driver and return error.
+            if (bus.drivers == self) {
+                bus.drivers = null;
+            } else {
+            }
+            return err;
+        };
 
         if (bus.sysfs_drivers) |d| {
             _ = try d.inode.ops.create(
