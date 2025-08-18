@@ -3,14 +3,14 @@ const kernel = fs.kernel;
 const file = @import("file.zig");
 
 
-pub const ExampleInode = struct {
+pub const DevInode = struct {
     base: fs.Inode,
     buff: [50]u8,
 
     pub fn new(sb: *fs.SuperBlock) !*fs.Inode {
-        if (kernel.mm.kmalloc(ExampleInode)) |inode| {
+        if (kernel.mm.kmalloc(DevInode)) |inode| {
             inode.base.setup(sb);
-            inode.base.ops = &example_inode_ops;
+            inode.base.ops = &dev_inode_ops;
             inode.base.size = 50;
             inode.buff = .{0} ** 50;
             return &inode.base;
@@ -30,21 +30,26 @@ pub const ExampleInode = struct {
     }
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
-        const cash_key = fs.DentryHash{
-            .ino = base.i_no,
-            .name = name,
-        };
-        if (fs.dcache.get(cash_key)) |_| {
-            return error.Exists;
+        if (kernel.mm.dupSlice(u8, name)) |_name| {
+            const cash_key = fs.DentryHash{
+                .ino = base.i_no,
+                .name = _name,
+            };
+            if (fs.dcache.get(cash_key)) |_| {
+                return error.Exists;
+            }
+            var new_inode = try DevInode.new(base.sb);
+            new_inode.mode = mode;
+            new_inode.mode.type |= kernel.fs.S_IFDIR;
+            errdefer kernel.mm.kfree(new_inode);
+            var new_dentry = try fs.DEntry.alloc(_name, base.sb, new_inode);
+            errdefer kernel.mm.kfree(new_dentry);
+            parent.tree.addChild(&new_dentry.tree);
+            try fs.dcache.put(cash_key, new_dentry);
+            return new_dentry;
+        } else {
+            return error.OutOfMemory;
         }
-        var new_inode = try ExampleInode.new(base.sb);
-        new_inode.mode = mode;
-        errdefer kernel.mm.kfree(new_inode);
-        var new_dentry = try fs.DEntry.alloc(name, base.sb, new_inode);
-        errdefer kernel.mm.kfree(new_dentry);
-        parent.tree.addChild(&new_dentry.tree);
-        try fs.dcache.put(cash_key, new_dentry);
-        return new_dentry;
     }
 
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
@@ -55,7 +60,7 @@ pub const ExampleInode = struct {
 
         // Lookup if file already exists.
         _ = base.ops.lookup(base, name) catch {
-            const new_inode = try ExampleInode.new(base.sb);
+            const new_inode = try DevInode.new(base.sb);
             errdefer kernel.mm.kfree(new_inode);
             new_inode.mode = mode;
             var dent = try parent.new(name, new_inode);
@@ -66,10 +71,10 @@ pub const ExampleInode = struct {
     }
 };
 
-const example_inode_ops = fs.InodeOps {
-    .file_ops = &file.ExampleFileOps,
-    .create = ExampleInode.create,
+const dev_inode_ops = fs.InodeOps {
+    .file_ops = &file.DevFileOps,
+    .create = DevInode.create,
     .mknod = null,
-    .lookup = ExampleInode.lookup,
-    .mkdir = ExampleInode.mkdir,
+    .lookup = DevInode.lookup,
+    .mkdir = DevInode.mkdir,
 };
