@@ -2,7 +2,7 @@ const io = @import("arch").io;
 const platform = @import("buses/platform.zig");
 const drv = @import("driver.zig");
 const kernel = @import("kernel");
-
+const cdev = @import("./cdev.zig");
 
 var serial_driver = platform.PlatformDriver {
     .driver = drv.Driver {
@@ -17,6 +17,7 @@ var serial_driver = platform.PlatformDriver {
 
 fn serial_probe(device: *platform.PlatformDevice) !void {
     kernel.logger.WARN("Probing device {s} {any}", .{device.dev.name, device});
+    try cdev.addCdev(&device.dev);
 }
 
 fn serial_remove(device: *platform.PlatformDevice) !void {

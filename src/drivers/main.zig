@@ -14,15 +14,17 @@ pub const pci = @import("./pci.zig");
 pub const cmos = @import("./cmos.zig");
 
 pub const bus = @import("bus.zig");
-
+pub const device = @import("./device.zig");
+pub const cdev = @import("./cdev.zig");
 const krn = @import("kernel");
 
 pub fn init() void {
+    // Init /sys 
     krn.sysfs.init_sys();
     _ = krn.mkdir("/sys", 0) catch {
         @panic("unable to create /sys directory");
     };
-    _ = krn.mount("", "/sys", "sysfs", 0, null) catch |err| {
+    _ = krn.mount("sys", "/sys", "sysfs", 0, null) catch |err| {
         krn.logger.ERROR("{!}", .{err});
         @panic("unable to mount sysfs");
     };
@@ -33,4 +35,16 @@ pub fn init() void {
         @panic("unable to init devices");
     };
     bus.sysfs_bus_dentry = path.dentry;
+
+    // Init /dev
+    krn.devfs.init_dev();
+    _ = krn.mkdir("/dev", 0) catch {
+        @panic("unable to create /dev directory");
+    };
+    _ = krn.mount("dev", "/dev", "devfs", 0, null) catch |err| {
+        krn.logger.ERROR("{!}", .{err});
+        @panic("unable to mount devfs");
+    };
+
+    cdev.init();
 }

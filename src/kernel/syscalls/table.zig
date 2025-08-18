@@ -38,7 +38,7 @@ pub const SyscallTable = brk: {
         .SYS_execve                     = &notImpl,
         .SYS_chdir                      = &notImpl,
         .SYS_time                       = &notImpl,
-        .SYS_mknod                      = &notImpl,
+        .SYS_mknod                      = @ptrCast(&@import("mknod.zig").mknod),
         .SYS_chmod                      = &notImpl,
         .SYS_lchown                     = &notImpl,
         .SYS_break                      = &notImpl,
@@ -221,6 +221,7 @@ pub const SyscallTable = brk: {
         .SYS_sendto                     = @ptrCast(&@import("socketcall.zig").sendto),
         .SYS_recvfrom                   = @ptrCast(&@import("socketcall.zig").recvfrom),
         .SYS_getuid32                   = @ptrCast(&@import("../sched/process.zig").getUID),
+        .SYS_mknodat                    = &notImpl,
     });
 };
 
