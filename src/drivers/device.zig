@@ -17,7 +17,7 @@ pub const dev_t = packed struct {
     pub fn find_major() !u8 {
         dev_t_mutex.lock();
         defer dev_t_mutex.unlock();
-        for (0..256) |idx| {
+        for (1..256) |idx| {
             if (!major_bitmap.isSet(idx)) {
                 major_bitmap.set(idx);
                 return @truncate(idx);
@@ -34,7 +34,7 @@ pub const dev_t = packed struct {
         var minor: u8 = 0;
         if (bitset.count() == 256)
             return kern.errors.PosixError.ENOENT;
-        for (0..256) |idx| {
+        for (1..256) |idx| {
             if (!bitset.isSet(idx)) {
                 bitset.set(idx);
                 minor = idx;
@@ -43,6 +43,17 @@ pub const dev_t = packed struct {
         }
         res.minor = minor;
         return res;
+    }
+
+    pub fn valid(self: *dev_t) bool {
+        return self.major != 0 and self.minor != 0;
+    }
+
+    pub fn from_u32(val: u32) dev_t {
+        return dev_t{
+            .major = @truncate((val & 0xFFF00) >> 8),
+            .minor = @truncate((val & 0xFF) | ((val >> 12) & 0xFFF00)),
+        };
     }
 };
 
