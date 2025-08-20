@@ -11,6 +11,7 @@ pub const Driver = struct {
     minor_set: std.bit_set.StaticBitSet(256) = std.bit_set.StaticBitSet(256).initEmpty(),
     minor_mutex: kern.Mutex = kern.Mutex.init(),
     major: u8 = 0,
+    fops: ?*kern.fs.FileOps = null,
 
     // Device initialization and removal.
     probe: *const fn(*Driver, *dev.Device) anyerror!void,
@@ -60,9 +61,11 @@ pub const Driver = struct {
                     if (bus.match(self, bus_dev)) {
                         bus_dev.driver = self;
                         // Probe the device
+                        bus_dev.id.major = self.major;
                         self.probe(self, bus_dev) catch {
                             bus_dev.driver = null;
                             bus_dev.lock.unlock();
+                            bus_dev.id.major = 0;
                             continue;
                         };
                         

@@ -13,6 +13,8 @@ pub const Inode = struct {
     sb: *fs.SuperBlock,
     ref: Refcount = Refcount.init(),
     mode: fs.UMode = fs.UMode{},
+    dev_id: drv.device.dev_t,
+    dev: ?*drv.device.Device,
     is_dirty: bool = false,
     size: u32 = 0,
     ops: *const InodeOps,
@@ -29,10 +31,25 @@ pub const Inode = struct {
         self.size = 0;
         self.mode = UMode{};
         self.is_dirty = false;
+        self.dev = null;
+        self.dev_id = drv.device.dev_t {
+            .minor = 0,
+            .major = 0,
+        };
     }
 
     pub fn getImpl(base: *Inode, comptime T: type, comptime member: []const u8) *T {
         return @fieldParentPtr(member, base);
+    }
+
+    pub fn setup_special(inode: *Inode) void {
+        switch (inode.mode) {
+            fs.S_IFCHR => {
+                inode.fops = &drv.cdev.cdev_default_ops;
+            },
+            fs.S_IFBLK => {@panic("todo");},
+            else => {},
+        }
     }
 };
 
