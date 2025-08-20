@@ -92,8 +92,15 @@ pub const Device = struct {
                 self.id = dev_t{ .major = 0, .minor = 0};
                 self.bus = _bus;
                 self.lock = kern.Mutex.init();
+                self.list = kern.list.ListHead.init();
+                self.tree = kern.tree.TreeNode.init();
                 self.list.setup();
                 self.tree.setup();
+    }
+
+    pub fn dump(self: *Device) void {
+        kern.logger.INFO("name {s}\n", .{self.name});
+        kern.logger.INFO("bus {any}\n", .{self.bus});
     }
 
     pub fn delete(self: *Device) void {

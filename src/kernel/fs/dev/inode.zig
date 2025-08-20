@@ -1,6 +1,7 @@
 const fs = @import("../fs.zig");
 const kernel = fs.kernel;
 const file = @import("file.zig");
+const drv = @import("drivers");
 
 
 pub const DevInode = struct {
@@ -52,6 +53,15 @@ pub const DevInode = struct {
         }
     }
 
+    fn mknod(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry, dev: drv.device.dev_t) anyerror!*fs.DEntry {
+        const special: *fs.DEntry = base.ops.create(base, name, mode, parent) catch {
+            return kernel.errors.PosixError.ENOENT;
+        };
+        special.inode.dev_id = dev;
+        special.inode.fops = &drv.cdev.cdev_default_ops;
+        return special;
+    }
+
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
         if (base.mode.type != fs.S_IFDIR)
             return error.NotDirectory;
@@ -74,7 +84,7 @@ pub const DevInode = struct {
 const dev_inode_ops = fs.InodeOps {
     .file_ops = &file.DevFileOps,
     .create = DevInode.create,
-    .mknod = null,
+    .mknod = DevInode.mknod,
     .lookup = DevInode.lookup,
     .mkdir = DevInode.mkdir,
 };

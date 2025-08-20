@@ -3,6 +3,7 @@ const arch = @import("arch");
 const fs = @import("../fs/fs.zig");
 const std = @import("std");
 const errors = @import("error-codes.zig").PosixError;
+const drv = @import("drivers");
 
 pub fn mkdir(
     path_name: ?[*:0]const u8,
