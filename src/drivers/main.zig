@@ -18,6 +18,9 @@ pub const device = @import("./device.zig");
 pub const cdev = @import("./cdev.zig");
 const krn = @import("kernel");
 
+
+pub var devfs_path: krn.fs.path.Path = undefined;
+
 pub fn init() void {
     // Init /sys 
     krn.sysfs.init_sys();
@@ -44,6 +47,9 @@ pub fn init() void {
     _ = krn.mount("dev", "/dev", "devfs", 0, null) catch |err| {
         krn.logger.ERROR("{!}", .{err});
         @panic("unable to mount devfs");
+    };
+    devfs_path = krn.fs.path.resolve("/dev") catch {
+        @panic("unable to init devfs");
     };
 
     cdev.init();

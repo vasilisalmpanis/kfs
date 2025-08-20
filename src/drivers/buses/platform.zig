@@ -58,7 +58,6 @@ fn platform_remove_device(driver: *drv.Driver, device: *dev.Device) anyerror!voi
 }
 
 fn match(driver: *drv.Driver, device: *dev.Device) bool {
-    kernel.logger.INFO("matching", .{});
     return std.mem.eql(u8, driver.name, device.name);
 }
 
@@ -70,6 +69,7 @@ var platform_bus: Bus = Bus{
 };
 
 pub fn init_platform() void {
+    platform_bus.list.setup();
     platform_bus.register() catch |err| {
         kernel.logger.ERROR("Error while registering platform bus: {!}", .{err});
         return ;

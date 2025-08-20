@@ -16,7 +16,6 @@ var serial_driver = platform.PlatformDriver {
 };
 
 fn serial_probe(device: *platform.PlatformDevice) !void {
-    kernel.logger.WARN("Probing device {s} {any}", .{device.dev.name, device});
     try cdev.addCdev(&device.dev);
 }
 
