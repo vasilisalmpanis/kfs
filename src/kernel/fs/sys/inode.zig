@@ -11,6 +11,7 @@ pub const SysInode = struct {
         if (kernel.mm.kmalloc(SysInode)) |inode| {
             inode.base.setup(sb);
             inode.base.ops = &sys_inode_ops;
+            inode.base.fops = &file.SysFileOps;
             inode.base.size = 50;
             inode.buff = .{0} ** 50;
             return &inode.base;
@@ -72,7 +73,7 @@ pub const SysInode = struct {
 };
 
 const sys_inode_ops = fs.InodeOps {
-    .file_ops = &file.SysFileOps,
+    // .file_ops = &file.SysFileOps,
     .create = SysInode.create,
     .mknod = null,
     .lookup = SysInode.lookup,

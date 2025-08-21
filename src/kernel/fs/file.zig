@@ -62,7 +62,7 @@ pub const File = struct {
 
     pub fn new(path: fs.path.Path) !*File {
         if (kernel.mm.kmalloc(File)) |new_file| {
-            new_file.init(path.dentry.inode.ops.file_ops, path.dentry.inode);
+            new_file.init(path.dentry.inode.fops, path.dentry.inode);
             new_file.path = path;
             return new_file;
         } else {

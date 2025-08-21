@@ -11,12 +11,13 @@ pub fn init() void {
 }
 
 fn cdev_open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
+    krn.logger.WARN("dev file opened\n",.{});
     if (inode.dev == null) inode.dev = try getCdev(inode.dev_id);
     if (inode.dev) |_dev| {
         if (_dev.driver) |drv| {
             if (drv.fops) |ops| {
                 base.ops = ops;
-                return ;
+                return try base.ops.open(base, inode);
             }
             return krn.errors.PosixError.ENXIO;
         }
@@ -50,9 +51,9 @@ pub const cdev_default_ops: krn.fs.FileOps = .{
 };
 
 pub fn addCdev(device: *dev.Device) !void {
-    if (!device.id.valid()) {
-        return krn.errors.PosixError.ENOENT;
-    }
+    // if (!device.id.valid()) {
+    //     return krn.errors.PosixError.ENOENT;
+    // }
     cdev_map_mtx.lock();
     defer cdev_map_mtx.unlock();
 
