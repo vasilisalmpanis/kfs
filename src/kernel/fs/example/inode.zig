@@ -12,6 +12,7 @@ pub const ExampleInode = struct {
             inode.base.setup(sb);
             inode.base.ops = &example_inode_ops;
             inode.base.size = 50;
+            inode.base.fops = &file.ExampleFileOps;
             inode.buff = .{0} ** 50;
             return &inode.base;
         }
@@ -67,7 +68,7 @@ pub const ExampleInode = struct {
 };
 
 const example_inode_ops = fs.InodeOps {
-    .file_ops = &file.ExampleFileOps,
+    // .file_ops = &file.ExampleFileOps,
     .create = ExampleInode.create,
     .mknod = null,
     .lookup = ExampleInode.lookup,

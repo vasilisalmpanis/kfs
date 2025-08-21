@@ -10,10 +10,36 @@ var serial_driver = platform.PlatformDriver {
         .name = "8250",
         .probe = undefined,
         .remove = undefined,
+        .fops = &serial_file_ops,
     },
     .probe = serial_probe,
     .remove = serial_remove,
 };
+
+var serial_file_ops = kernel.fs.FileOps{
+    .open = serial_open,
+    .close = serial_close,
+    .read = serial_read,
+    .write = serial_write,
+    .lseek = null,
+};
+
+fn serial_open(_: *kernel.fs.File, _: *kernel.fs.Inode) !void {
+    kernel.logger.WARN("8250 file opened\n", .{});
+}
+
+fn serial_close(_: *kernel.fs.File) void {
+}
+
+fn serial_read(_: *kernel.fs.File, _: [*]u8, _: u32) !u32 {
+    return 0;
+}
+
+fn serial_write(_: *kernel.fs.File, buf: [*]u8, size: u32) !u32 {
+    const msg_slice: []const u8 = buf[0..size];
+    kernel.serial.print(msg_slice);
+    return size;
+}
 
 fn serial_probe(device: *platform.PlatformDevice) !void {
     try cdev.addCdev(&device.dev);

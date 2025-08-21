@@ -58,7 +58,14 @@ pub const DevInode = struct {
             return kernel.errors.PosixError.ENOENT;
         };
         special.inode.dev_id = dev;
-        special.inode.fops = &drv.cdev.cdev_default_ops;
+        switch (mode.type) {
+            fs.S_IFCHR => {
+                special.inode.fops = &drv.cdev.cdev_default_ops;
+            },
+            else => {
+                @panic("TODO");
+            },
+        }
         return special;
     }
 
@@ -81,8 +88,8 @@ pub const DevInode = struct {
     }
 };
 
-const dev_inode_ops = fs.InodeOps {
-    .file_ops = &file.DevFileOps,
+var dev_inode_ops = fs.InodeOps {
+    // .file_ops = &file.DevFileOps,
     .create = DevInode.create,
     .mknod = DevInode.mknod,
     .lookup = DevInode.lookup,

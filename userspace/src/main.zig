@@ -198,6 +198,9 @@ pub export fn main() linksection(".text.main") noreturn {
         _ = std.posix.close(7);
         _ = std.posix.lseek_SET(@intCast(8), 0) catch null;
         rl = std.posix.read(@intCast(8), &buf) catch 1;
+        fd = std.os.linux.open("/dev/8250", .{ .CREAT = true }, 0o444);
+        serial("new fd for dev {any}\n", .{fd});
+        _ = std.posix.write(@intCast(fd), "We can now print to serial from userspace\n") catch 0;
         serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
         _ = std.posix.close(8);
         // Signaling
