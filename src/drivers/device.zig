@@ -67,6 +67,7 @@ pub const Device = struct {
     lock: kern.Mutex,
     list: kern.list.ListHead, // Bus list (not global)
     tree: kern.tree.TreeNode, // Global
+    data: *anyopaque,
 
     pub fn new(name: []u8, _bus: *bus.Bus) !*Device {
         // Think about parent child relationship.

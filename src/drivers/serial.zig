@@ -41,7 +41,14 @@ fn serial_write(_: *kernel.fs.File, buf: [*]u8, size: u32) !u32 {
     return size;
 }
 
+const UART_port = struct {
+    a: u32,
+    b: u32,
+};
+
 fn serial_probe(device: *platform.PlatformDevice) !void {
+    const serial: *Serial = @ptrCast(@alignCast(device.dev.data));
+    serial.setup();
     try cdev.addCdev(&device.dev);
 }
 
@@ -50,8 +57,18 @@ fn serial_remove(device: *platform.PlatformDevice) !void {
     kernel.logger.WARN("serial cannot be initialized", .{});
 }
 
+pub const SerialDevice = struct {
+    platform: platform.PlatformDevice,
+};
+
 pub fn init_serial() void {
     if (platform.PlatformDevice.alloc("8250")) |serial| {
+        if (kernel.mm.kmalloc(Serial)) |data| {
+            data.* = Serial.init(COM1);
+            serial.dev.data = @ptrCast(@alignCast(data));
+        } else {
+            return ;
+        }
         serial.register() catch {
             return ;
         };
@@ -66,18 +83,23 @@ pub fn init_serial() void {
     kernel.logger.WARN("serial cannot be initialized", .{});
 }
 
+const COM1: u16 = 0x3F8;
+
 pub const Serial = struct {
-    addr: u16 = 0x3F8, // COM1
-    pub fn init() Serial {
-        const serial = Serial{};
-        io.outb(serial.addr + 1, 0x00);
-        io.outb(serial.addr + 3, 0x80);
-        io.outb(serial.addr, 0x01);
-        io.outb(serial.addr + 1, 0x00);
-        io.outb(serial.addr + 3, 0x03);
-        io.outb(serial.addr + 2, 0xC7);
-        io.outb(serial.addr + 1, 0x01);
+    addr: u16, // COM1
+    pub fn init(port: u16) Serial {
+        const serial = Serial{ .addr = port };
         return serial;
+    }
+
+    pub fn setup(self: *Serial) void {
+        io.outb(self.addr + 1, 0x00);
+        io.outb(self.addr + 3, 0x80);
+        io.outb(self.addr, 0x01);
+        io.outb(self.addr + 1, 0x00);
+        io.outb(self.addr + 3, 0x03);
+        io.outb(self.addr + 2, 0xC7);
+        io.outb(self.addr + 1, 0x01);
     }
 
     pub fn putchar(self: *Serial, char: u8) void {
