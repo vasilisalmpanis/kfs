@@ -16,6 +16,7 @@ pub const cmos = @import("./cmos.zig");
 pub const bus = @import("bus.zig");
 pub const device = @import("./device.zig");
 pub const cdev = @import("./cdev.zig");
+pub const bdev = @import("./bdev.zig");
 const krn = @import("kernel");
 
 

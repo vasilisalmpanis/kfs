@@ -62,6 +62,9 @@ pub const DevInode = struct {
             fs.S_IFCHR => {
                 special.inode.fops = &drv.cdev.cdev_default_ops;
             },
+            fs.S_IFBLK => {
+                special.inode.fops = &drv.bdev.bdev_default_ops;
+            },
             else => {
                 @panic("TODO");
             },
