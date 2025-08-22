@@ -124,12 +124,16 @@ higher_half:
 initial_page_dir:
     .long 0b10000011           # First entry in the page directory
     .long 0b10000011           # First entry in the page directory
-    .rept 768-2
+    .long 0b10000011           # First entry in the page directory
+    .long 0b10000011           # First entry in the page directory
+    .rept 768-4
     .long 0                    # Fill remaining entries with 0s
     .endr
 
     .long (0 << 22) | 0b10000011   # Map page 0
     .long (1 << 22) | 0b10000011   # Map page 0
-    .rept 256-2
+    .long (2 << 22) | 0b10000011   # Map page 0
+    .long (3 << 22) | 0b10000011   # Map page 0
+    .rept 256-4
     .long 0                    # Fill remaining entries with 0s
     .endr

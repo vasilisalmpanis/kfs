@@ -10,8 +10,6 @@ const drv = @import("drivers");
 const builtin = @import("std").builtin;
 const idt = @import("arch").idt;
 const Serial = @import("drivers").Serial;
-pub const init_serial = @import("drivers").init_serial;
-pub const init_platform = @import("drivers").init_platform;
 const Logger = @import("debug").Logger;
 pub const mm = @import("kernel").mm;
 pub const vmm = @import("arch").vmm;
@@ -116,8 +114,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     // Devices
     drv.init();
-    init_platform();
-    init_serial();
 
     // @import("drivers").pci.init();
     // @import("drivers").ata.ata_init();
