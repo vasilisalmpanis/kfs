@@ -73,7 +73,6 @@ pub const SysInode = struct {
 };
 
 const sys_inode_ops = fs.InodeOps {
-    // .file_ops = &file.SysFileOps,
     .create = SysInode.create,
     .mknod = null,
     .lookup = SysInode.lookup,

@@ -92,7 +92,6 @@ pub const DevInode = struct {
 };
 
 var dev_inode_ops = fs.InodeOps {
-    // .file_ops = &file.DevFileOps,
     .create = DevInode.create,
     .mknod = DevInode.mknod,
     .lookup = DevInode.lookup,
