@@ -1,10 +1,14 @@
 const io = @import("arch").io;
-const platform = @import("buses/platform.zig");
-const drv = @import("driver.zig");
 const kernel = @import("kernel");
-const cdev = @import("./cdev.zig");
 
-var serial_driver = platform.PlatformDriver {
+const pdev = @import("./device.zig");
+const pdrv = @import("./driver.zig");
+const pbus = @import("./bus.zig");
+
+const drv = @import("../driver.zig");
+const cdev = @import("../cdev.zig");
+
+var serial_driver = pdrv.PlatformDriver {
     .driver = drv.Driver {
         .list = undefined,
         .name = "8250",
@@ -46,23 +50,23 @@ const UART_port = struct {
     b: u32,
 };
 
-fn serial_probe(device: *platform.PlatformDevice) !void {
+fn serial_probe(device: *pdev.PlatformDevice) !void {
     const serial: *Serial = @ptrCast(@alignCast(device.dev.data));
     serial.setup();
     try cdev.addCdev(&device.dev);
 }
 
-fn serial_remove(device: *platform.PlatformDevice) !void {
+fn serial_remove(device: *pdev.PlatformDevice) !void {
     _ = device;
     kernel.logger.WARN("serial cannot be initialized", .{});
 }
 
 pub const SerialDevice = struct {
-    platform: platform.PlatformDevice,
+    platform: pdev.PlatformDevice,
 };
 
-pub fn init_serial() void {
-    if (platform.PlatformDevice.alloc("8250")) |serial| {
+pub fn init() void {
+    if (pdev.PlatformDevice.alloc("8250")) |serial| {
         if (kernel.mm.kmalloc(Serial)) |data| {
             data.* = Serial.init(COM1);
             serial.dev.data = @ptrCast(@alignCast(data));
@@ -73,7 +77,7 @@ pub fn init_serial() void {
             return ;
         };
         kernel.logger.WARN("Device registered for serial", .{});
-        platform.platform_register_driver(&serial_driver.driver) catch |err| {
+        pdrv.platform_register_driver(&serial_driver.driver) catch |err| {
             kernel.logger.ERROR("Error registering platform driver: {!}", .{err});
             return ;
         };
