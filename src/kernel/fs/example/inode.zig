@@ -68,7 +68,6 @@ pub const ExampleInode = struct {
 };
 
 const example_inode_ops = fs.InodeOps {
-    // .file_ops = &file.ExampleFileOps,
     .create = ExampleInode.create,
     .mknod = null,
     .lookup = ExampleInode.lookup,
