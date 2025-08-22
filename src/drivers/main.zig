@@ -1,7 +1,4 @@
 pub const Keyboard = @import("kbd.zig").Keyboard;
-pub const Serial = @import("serial.zig").Serial;
-pub const init_serial = @import("serial.zig").init_serial;
-pub const init_platform = @import("./buses/platform.zig").init_platform;
 pub const screen = @import("./screen.zig");
 pub const tty = @import("./tty-fb.zig");
 pub const shell = @import("./shell.zig");
@@ -10,7 +7,7 @@ pub const keyboard = @import("./kbd.zig");
 pub const pit = @import("./pit.zig");
 
 pub const ata = @import("./block/ata/ata.zig");
-pub const pci = @import("./pci.zig");
+// pub const pci = @import("./pci.zig");
 pub const cmos = @import("./cmos.zig");
 
 pub const bus = @import("bus.zig");
@@ -19,6 +16,10 @@ pub const cdev = @import("./cdev.zig");
 pub const bdev = @import("./bdev.zig");
 const krn = @import("kernel");
 
+pub const platform = @import("./platform/main.zig");
+pub const Serial = platform.Serial;
+
+pub const pci = @import("./pci/main.zig");
 
 pub var devfs_path: krn.fs.path.Path = undefined;
 
@@ -54,4 +55,10 @@ pub fn init() void {
     };
 
     cdev.init();
+    bdev.init();
+
+    platform.bus.init();
+    pci.bus.init();
+
+    platform.serial.init();
 }
