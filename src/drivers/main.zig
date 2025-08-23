@@ -12,6 +12,7 @@ pub const cmos = @import("./cmos.zig");
 
 pub const bus = @import("bus.zig");
 pub const device = @import("./device.zig");
+pub const driver = @import("./driver.zig");
 pub const cdev = @import("./cdev.zig");
 pub const bdev = @import("./bdev.zig");
 const krn = @import("kernel");
@@ -22,6 +23,8 @@ pub const Serial = platform.Serial;
 pub const pci = @import("./pci/main.zig");
 
 pub var devfs_path: krn.fs.path.Path = undefined;
+
+pub const ata_mock = @import("ata/driver.zig");
 
 pub fn init() void {
     // Init /sys 
@@ -61,4 +64,5 @@ pub fn init() void {
     pci.bus.init();
 
     platform.serial.init();
+    ata_mock.init();
 }
