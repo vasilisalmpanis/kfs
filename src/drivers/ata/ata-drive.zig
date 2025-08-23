@@ -7,7 +7,9 @@ const kernel = @import("kernel");
 const irq = kernel.irq;
 const arch = @import("arch");
 const lst = kernel.list;
-const pci = @import("../../pci.zig");
+const pci = @import("../pci/device.zig");
+const driver = @import("../main.zig");
+const ata = @import("device.zig");
 
 // BUS MASTER IDE
 const BMIDE_COMMAND             = 0x00;
@@ -210,6 +212,8 @@ const ATADrive = struct {
     dma_buff_phys: u32 = 0,
     dma_buff_virt: u32 = 0,
     dma_initialized: bool = false,
+
+    dev: driver.device.Device = undefined,
 
     const SECTOR_SIZE = 512;
     const DMA_BUFFER_PAGES = 8;
@@ -550,7 +554,7 @@ fn ata_probe_channel(
             @truncate(ide_device.bar4 & 0xFFF0),
             str
         )) |drv| {
-            kernel.logger.INFO("ATA DRIVE {s}\n{any}\n", .{drv.name, drv});
+            kernel.logger.INFO("ATA DRIVE \n", .{});
             return drv;
         }
     }
@@ -572,12 +576,10 @@ pub const Iterator = struct {
 pub const ATAManager = struct {
     drives: std.ArrayList(ATADrive) = undefined,
 
-    pub fn init() ATAManager {
-        var manager = ATAManager{};
-        manager.drives = std.ArrayList(ATADrive).init(
+    pub fn init(self: *ATAManager) void {
+        self.drives = std.ArrayList(ATADrive).init(
             kernel.mm.kernel_allocator.allocator(),
         );
-        return manager;
     }
 
     pub fn addDevice(self: *ATAManager, device: ATADrive) !void {
@@ -597,7 +599,7 @@ pub const ATAManager = struct {
 
 pub var ata_manager: ATAManager = undefined;
 
-pub fn ata_init() void {
+pub fn ata_init(pci_device: *pci.PCIDevice) void {
     const temp: ?[*]u16 = kernel.mm.kmallocArray(u16, 256);
     if (temp) |buf| {
         ide_buf = buf;
@@ -606,41 +608,51 @@ pub fn ata_init() void {
         return ;
     }
     @memset(ide_buf[0..256], 0);
-    ata_manager = ATAManager.init();
-    // Iterate over all PCI IDE Inerfaces (0x01 class = mass storage, 0x01 subclass = IDE Intereface)
-    var ide_iter = pci.pci_manager.iterateByClass(0x01, 0x01);
-    while (ide_iter.next()) |ide_dev| {
+    if (kernel.mm.kmalloc(ATAManager)) |manager| {
+        manager.init();
+        pci_device.dev.data = @ptrCast(manager);
         if (ata_probe_channel(
-            .PRIMARY_MASTER,
-            ide_dev
-        )) |ata_drive| {
-            ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
+                .PRIMARY_MASTER,
+                pci_device,
+        ))|drive| {
+            if (ata.ATADevice.alloc("sda")) |ata_dev| {
+                ata_dev.register() catch {};
+            }
+            manager.addDevice(drive) catch {};
+            kernel.logger.INFO("ATA drive {s}\n",.{drive.name});
+        }
+
+        if (ata_probe_channel(
+                .PRIMARY_SLAVE,
+                pci_device,
+        )) |drive| {
+            if (ata.ATADevice.alloc("sdb")) |ata_dev| {
+                ata_dev.register() catch {};
+            }
+            manager.addDevice(drive) catch {};
+            kernel.logger.INFO("ATA drive {s}\n",.{drive.name});
         }
         if (ata_probe_channel(
-            .PRIMARY_SLAVE,
-            ide_dev
-        )) |ata_drive| {
-            ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
+                .SECONDARY_MASTER, 
+                pci_device,
+        ))|drive| {
+            if (ata.ATADevice.alloc("sdc")) |ata_dev| {
+                ata_dev.register() catch {};
+            }
+            manager.addDevice(drive) catch {};
+            kernel.logger.INFO("ATA drive {s}\n",.{drive.name});
         }
+
         if (ata_probe_channel(
-            .SECONDARY_MASTER, 
-            ide_dev
-        )) |ata_drive| {
-            ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
-        }
-        if (ata_probe_channel(
-            .SECONDARY_SLAVE,
-            ide_dev
-        )) |ata_drive| {
-            ata_manager.addDevice(ata_drive) catch kernel.logger.ERROR("error adding drive", .{});
+                .SECONDARY_SLAVE,
+                pci_device,
+        ))|drive| {
+            if (ata.ATADevice.alloc("sdd")) |ata_dev| {
+                ata_dev.register() catch {};
+            }
+            manager.addDevice(drive) catch {};
+            kernel.logger.INFO("ATA drive {s}\n",.{drive.name});
         }
     }
-    var ata_iter = ata_manager.iterate();
-    while (ata_iter.next()) |ata| {
-        kernel.logger.INFO(
-            "READING DRIVE {s} {s}", 
-            .{@tagName(ata.channel), ata.name}
-        );
-        ata.read_full_drive_dma();
-    }
+
 }

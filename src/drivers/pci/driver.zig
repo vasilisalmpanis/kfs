@@ -18,13 +18,16 @@ pub const PCIid = struct {
     deviceid: u16,
 
     pub fn match(self: * const PCIid, device: *const PCIDevice) bool {
-        if (self.vendorid == device.vendor_id and
-            self.deviceid == device.device_id and
-            self.class == device.class_code and
-            self.subclass == device.subclass
-            )
+        if (self.class != device.class_code or
+            self.subclass != device.subclass)
+            return false;
+        if (self.vendorid == 0 and
+            self.deviceid == 0)
             return true;
-        return false;
+        if (self.vendorid != device.vendor_id
+            or self.deviceid != device.device_id)
+            return false;
+        return true;
     }
 };
 
