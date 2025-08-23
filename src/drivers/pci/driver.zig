@@ -5,9 +5,27 @@ const bus = @import("bus.zig");
 
 pub const PCIDriver = struct {
     driver: drv.Driver,
+    ids: ?[] const PCIid,
 
     probe: *const fn(*PCIDevice) anyerror!void,
     remove: *const fn(*PCIDevice) anyerror!void,
+};
+
+pub const PCIid = struct {
+    class: u8,
+    subclass: u8,
+    vendorid: u16,
+    deviceid: u16,
+
+    pub fn match(self: * const PCIid, device: *const PCIDevice) bool {
+        if (self.vendorid == device.vendor_id and
+            self.deviceid == device.device_id and
+            self.class == device.class_code and
+            self.subclass == device.subclass
+            )
+            return true;
+        return false;
+    }
 };
 
 // core probe wrapper

@@ -9,6 +9,15 @@ const utils = krn.list;
 const pci = @import("./main.zig");
 
 fn match(driver: *drv.Driver, device: *dev.Device) bool {
+    const pci_driver: *pci.PCIDriver = @fieldParentPtr("driver", driver);
+    const pci_device: *pci.PCIDevice = @fieldParentPtr("dev", device);
+    if (pci_driver.ids) |ids| {
+        for (ids) |id| {
+            if (id.match(pci_device))
+                return true;
+        }
+
+    }
     return std.mem.eql(u8, driver.name, device.name);
 }
 
@@ -35,9 +44,9 @@ fn scan(bus: *Bus) void {
                         var _cmd = cmd;
                         _cmd.func_num = @truncate(func_num);
                         if (pci.device.readPCIDev(_cmd)) |_dev| {
-                            krn.logger.INFO("DEVICE {d} ON BUS {d} FUNC {d}", .{
-                                dev_num, bus_num, func_num
-                            });
+                            // krn.logger.INFO("DEVICE {d} ON BUS {d} FUNC {d}", .{
+                            //     dev_num, bus_num, func_num
+                            // });
                             if (_dev.clone()) |_d| {
                                 var new_dev = _d;
                                 if (krn.mm.kmallocSlice(u8, 12)) |name| {
@@ -54,13 +63,13 @@ fn scan(bus: *Bus) void {
                                     new_dev.register();
                                 }
                             }
-                            _dev.print();
+                            // _dev.print();
                         }
                     }
                 } else {
-                    krn.logger.INFO("DEVICE {d} ON BUS {d}", .{
-                        dev_num, bus_num
-                    });
+                    // krn.logger.INFO("DEVICE {d} ON BUS {d}", .{
+                    //     dev_num, bus_num
+                    // });
                     if (device.clone()) |_d| {
                         var new_dev = _d;
                         if (krn.mm.kmallocSlice(u8, 12)) |name| {
@@ -77,7 +86,7 @@ fn scan(bus: *Bus) void {
                             new_dev.register();
                         }
                     }
-                    device.print();
+                    // device.print();
                 }
             }
         }

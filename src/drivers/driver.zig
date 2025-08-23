@@ -55,7 +55,6 @@ pub const Driver = struct {
             while (it.next()) |node| {
                 const bus_dev: *dev.Device = node.curr.entry(dev.Device, "list");
                 bus_dev.lock.lock();
-                kern.logger.INFO("probe",.{});
                 if (bus_dev.driver == null) {
                     // Match device with driver
                     if (bus.match(self, bus_dev)) {
