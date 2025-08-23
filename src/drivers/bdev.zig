@@ -10,6 +10,8 @@ pub fn init() void {
     bdev_map = std.AutoHashMap(dev.dev_t, *dev.Device).init(krn.mm.kernel_allocator.allocator());
 }
 
+const disk_names = std.StaticBitSet(26);
+
 fn bdev_open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
     if (inode.dev == null) inode.dev = try getbdev(inode.dev_id);
     if (inode.dev) |_dev| {
