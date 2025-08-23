@@ -1,4 +1,5 @@
 const Bus = @import("../bus.zig").Bus;
+const pci = @import("main.zig");
 const drv = @import("../driver.zig");
 const dev = @import("../device.zig");
 const utils = @import("kernel").list;
@@ -132,6 +133,12 @@ pub const PCIDevice = struct {
                 )
             }
         );
+    }
+
+    pub fn register(self: *PCIDevice) void {
+        pci.bus.pci_bus.add_dev(&self.dev) catch |err| {
+            krn.logger.ERROR("Failer to add PCI device: {!}", .{err});
+        };
     }
 
     pub fn clone(self: *const PCIDevice) ?*PCIDevice {
