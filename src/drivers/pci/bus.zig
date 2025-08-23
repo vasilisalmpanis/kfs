@@ -51,9 +51,7 @@ fn scan(bus: *Bus) void {
                                         }
                                     ) catch null;
                                     new_dev.dev.setup(name, bus);
-                                    bus.add_dev(&new_dev.dev) catch |err| {
-                                        krn.logger.ERROR("Failer to add PCI device: {!}", .{err});
-                                    };
+                                    new_dev.register();
                                 }
                             }
                             _dev.print();
@@ -76,9 +74,7 @@ fn scan(bus: *Bus) void {
                                 }
                             ) catch null;
                             new_dev.dev.setup(name, bus);
-                            bus.add_dev(&new_dev.dev) catch |err| {
-                                krn.logger.ERROR("Failer to add PCI device: {!}", .{err});
-                            };
+                            new_dev.register();
                         }
                     }
                     device.print();
@@ -88,7 +84,7 @@ fn scan(bus: *Bus) void {
     }
 }
 
-var pci_bus: Bus = Bus{
+pub var pci_bus: Bus = Bus{
     .name = "pci",
     .match = match,
     .scan = scan,
