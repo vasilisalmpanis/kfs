@@ -58,6 +58,7 @@ fn serial_remove(device: *pdev.PlatformDevice) !void {
 }
 
 pub fn init() void {
+    kernel.logger.DEBUG("DRIVER INIT Serial", .{});
     if (pdev.PlatformDevice.alloc("8250")) |serial| {
         if (kernel.mm.kmalloc(Serial)) |data| {
             data.* = Serial.init(COM1);

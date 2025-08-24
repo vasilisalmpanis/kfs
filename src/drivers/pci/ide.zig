@@ -33,6 +33,7 @@ fn ide_remove(_: *pci.PCIDevice) !void {
 }
 
 pub fn init() void {
+    kernel.logger.DEBUG("DRIVER INIT IDE", .{});
     pci.driver.pci_register_driver(&ide_driver.driver) catch {
         kernel.logger.ERROR("IDE driver cannot be registered\n", .{});
     };
