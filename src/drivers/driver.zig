@@ -61,15 +61,15 @@ pub const Driver = struct {
                         bus_dev.driver = self;
                         // Probe the device
                         bus_dev.id.major = self.major;
+                        kern.logger.INFO("Probing dev {s} with driver {s}", .{bus_dev.name, self.name});
                         self.probe(self, bus_dev) catch {
+                            kern.logger.ERROR("Probe failed", .{});
                             bus_dev.driver = null;
                             bus_dev.lock.unlock();
                             bus_dev.id.major = 0;
                             continue;
                         };
-                        
                         bus_dev.lock.unlock();
-                        return;
                     }
                 }
                 bus_dev.lock.unlock();
