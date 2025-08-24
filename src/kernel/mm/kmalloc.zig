@@ -22,7 +22,7 @@ pub fn kmallocArray(comptime T: type, count: u32) ?[*]T {
     return @ptrFromInt(addr);
 }
 
-pub fn kfree(addr: *anyopaque) void {
+pub fn kfree(addr: *const anyopaque) void {
     mm.kheap.free(@intFromPtr(addr));
 }
 

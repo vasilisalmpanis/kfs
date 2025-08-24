@@ -45,10 +45,6 @@ fn serial_write(_: *kernel.fs.File, buf: [*]u8, size: u32) !u32 {
     return size;
 }
 
-const UART_port = struct {
-    a: u32,
-    b: u32,
-};
 
 fn serial_probe(device: *pdev.PlatformDevice) !void {
     const serial: *Serial = @ptrCast(@alignCast(device.dev.data));
@@ -60,10 +56,6 @@ fn serial_remove(device: *pdev.PlatformDevice) !void {
     _ = device;
     kernel.logger.WARN("serial cannot be initialized", .{});
 }
-
-pub const SerialDevice = struct {
-    platform: pdev.PlatformDevice,
-};
 
 pub fn init() void {
     if (pdev.PlatformDevice.alloc("8250")) |serial| {

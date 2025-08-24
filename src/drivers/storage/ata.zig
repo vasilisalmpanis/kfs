@@ -582,11 +582,12 @@ pub const ATAManager = struct {
         );
     }
 
-    pub fn addDevice(self: *ATAManager, device: ATADrive) !void {
+    pub fn addDevice(self: *ATAManager, device: ATADrive) !*ATADrive {
         kernel.logger.INFO("Adding drive {s} {s}",
             .{@tagName(device.channel), device.name}
         );
         try self.drives.append(device);
+        return &self.drives.items[self.drives.items.len - 1];
     }
 
     pub fn iterate(self: *const ATAManager) Iterator {
@@ -598,6 +599,22 @@ pub const ATAManager = struct {
 };
 
 pub var ata_manager: ATAManager = undefined;
+
+pub fn createStorageDev(
+    drive: ATADrive,
+    name: []const u8,
+    manager: *ATAManager
+) !void {
+    if (ata.StorageDevice.alloc(name)) |ata_dev| {
+        errdefer ata_dev.free();
+        ata_dev.dev.data = try manager.addDevice(drive);
+        try ata_dev.register();
+    } else {
+        kernel.logger.ERROR("Failed to alloc StorageDevice", .{});
+        return error.OutOfMemory;
+    }
+    kernel.logger.INFO("ATA drive {s}\n",.{drive.name});
+}
 
 pub fn ata_init(pci_device: *pci.PCIDevice) void {
     const temp: ?[*]u16 = kernel.mm.kmallocArray(u16, 256);
@@ -615,44 +632,56 @@ pub fn ata_init(pci_device: *pci.PCIDevice) void {
                 .PRIMARY_MASTER,
                 pci_device,
         ))|drive| {
-            if (ata.ATADevice.alloc("sda")) |ata_dev| {
-                ata_dev.register() catch {};
-            }
-            manager.addDevice(drive) catch {};
-            kernel.logger.INFO("ATA drive {s}\n",.{drive.name});
+            createStorageDev(drive, "sda", manager) catch {};
         }
 
         if (ata_probe_channel(
                 .PRIMARY_SLAVE,
                 pci_device,
         )) |drive| {
-            if (ata.ATADevice.alloc("sdb")) |ata_dev| {
-                ata_dev.register() catch {};
-            }
-            manager.addDevice(drive) catch {};
-            kernel.logger.INFO("ATA drive {s}\n",.{drive.name});
+            createStorageDev(drive, "sdb", manager) catch {};
         }
         if (ata_probe_channel(
                 .SECONDARY_MASTER, 
                 pci_device,
         ))|drive| {
-            if (ata.ATADevice.alloc("sdc")) |ata_dev| {
-                ata_dev.register() catch {};
-            }
-            manager.addDevice(drive) catch {};
-            kernel.logger.INFO("ATA drive {s}\n",.{drive.name});
+            createStorageDev(drive, "sda", manager) catch {};
         }
 
         if (ata_probe_channel(
                 .SECONDARY_SLAVE,
                 pci_device,
         ))|drive| {
-            if (ata.ATADevice.alloc("sdd")) |ata_dev| {
-                ata_dev.register() catch {};
-            }
-            manager.addDevice(drive) catch {};
-            kernel.logger.INFO("ATA drive {s}\n",.{drive.name});
+            createStorageDev(drive, "sda", manager) catch {};
         }
     }
+}
 
+var ata_driver = driver.storage.StorageDriver{
+    .driver = driver.driver.Driver{
+        .fops = null,
+        .list = undefined,
+        .name = "ata",
+        .probe = undefined,
+        .remove = undefined,
+    },
+    .probe = ata_probe,
+    .remove = ata_remove,
+};
+
+fn ata_probe(device: *driver.storage.StorageDevice) !void {
+    const drive: *ATADrive = @ptrCast(@alignCast(device.dev.data));
+    kernel.logger.INFO("Probing drive: {s}", .{drive.name});
+    // Init DMA
+    // Create block device for drive
+    // Maybe: think about creating bdevs for partitions
+}
+
+fn ata_remove(_: *driver.storage.StorageDevice) !void {
+}
+
+pub fn init() void {
+    driver.storage.driver.storage_register_driver(&ata_driver.driver) catch {
+        kernel.logger.ERROR("ATA driver cannot be registered\n", .{});
+    };
 }
