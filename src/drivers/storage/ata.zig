@@ -242,8 +242,6 @@ const ATADrive = struct {
         @memcpy(drv.name[0..41], name[0..41]);
         drv.lba28 = @as(*u32, @ptrCast(@alignCast(&ide_buf[60]))).*;
         drv.lba48 = @as(*u64, @ptrCast(@alignCast(&ide_buf[100]))).*;
-
-        drv.initDMA();
         return drv;
     }
 
@@ -554,7 +552,6 @@ fn ata_probe_channel(
             @truncate(ide_device.bar4 & 0xFFF0),
             str
         )) |drv| {
-            kernel.logger.INFO("ATA DRIVE \n", .{});
             return drv;
         }
     }
@@ -562,22 +559,22 @@ fn ata_probe_channel(
 }
 
 pub const Iterator = struct {
-    drives: *const std.ArrayList(ATADrive),
+    drives: *const std.ArrayList(*ATADrive),
     current: usize,
     
     pub fn next(self: *Iterator) ?*const ATADrive {
         if (self.current >= self.drives.items.len) return null;
-        const drive = &self.drives.items[self.current];
+        const drive = self.drives.items[self.current];
         self.current += 1;
         return drive;
     }
 };
 
 pub const ATAManager = struct {
-    drives: std.ArrayList(ATADrive) = undefined,
+    drives: std.ArrayList(*ATADrive) = undefined,
 
     pub fn init(self: *ATAManager) void {
-        self.drives = std.ArrayList(ATADrive).init(
+        self.drives = std.ArrayList(*ATADrive).init(
             kernel.mm.kernel_allocator.allocator(),
         );
     }
@@ -586,8 +583,13 @@ pub const ATAManager = struct {
         kernel.logger.INFO("Adding drive {s} {s}",
             .{@tagName(device.channel), device.name}
         );
-        try self.drives.append(device);
-        return &self.drives.items[self.drives.items.len - 1];
+        if (kernel.mm.kmalloc(ATADrive)) |drive| {
+            drive.* = device;
+            errdefer kernel.mm.kfree(drive);
+            try self.drives.append(drive);
+            return drive;
+        }
+        return error.OutOfMemory;
     }
 
     pub fn iterate(self: *const ATAManager) Iterator {
@@ -599,6 +601,38 @@ pub const ATAManager = struct {
 };
 
 pub var ata_manager: ATAManager = undefined;
+
+pub var drive_names: std.bit_set.IntegerBitSet(26) = std.bit_set.IntegerBitSet(26).initEmpty();
+var drive_names_lock = kernel.Mutex.init();
+
+fn getDriveName() ?[] const u8 {
+    drive_names_lock.lock();
+    defer drive_names_lock.unlock();
+
+    var it = drive_names.iterator(.{.direction = .forward, .kind = .unset});
+    while (it.next()) |i| {
+        if (!drive_names.isSet(i)) {
+            if (kernel.mm.kmallocSlice(u8, 3)) |new_name| {
+                drive_names.toggle(i);
+                @memcpy(new_name[0..2], "sd");
+                new_name[2] = @as(u8, @truncate(i)) + 'a';
+                return new_name;
+            } else {
+                return null;
+            }
+        }
+    }
+    return null;
+}
+
+fn releaseDriveName(name: []const u8) void {
+    if (name.len < 3) return;
+    const idx: u8 = name[2];
+
+    drive_names_lock.lock();
+    drive_names.unset(idx);
+    drive_names_lock.unlock();
+}
 
 pub fn createStorageDev(
     drive: ATADrive,
@@ -628,31 +662,18 @@ pub fn ata_init(pci_device: *pci.PCIDevice) void {
     if (kernel.mm.kmalloc(ATAManager)) |manager| {
         manager.init();
         pci_device.dev.data = @ptrCast(manager);
-        if (ata_probe_channel(
-                .PRIMARY_MASTER,
+        inline for (std.meta.fields(ChannelType)) |field| {
+            if (ata_probe_channel(
+                @enumFromInt(field.value),
                 pci_device,
-        ))|drive| {
-            createStorageDev(drive, "sda", manager) catch {};
-        }
-
-        if (ata_probe_channel(
-                .PRIMARY_SLAVE,
-                pci_device,
-        )) |drive| {
-            createStorageDev(drive, "sdb", manager) catch {};
-        }
-        if (ata_probe_channel(
-                .SECONDARY_MASTER, 
-                pci_device,
-        ))|drive| {
-            createStorageDev(drive, "sda", manager) catch {};
-        }
-
-        if (ata_probe_channel(
-                .SECONDARY_SLAVE,
-                pci_device,
-        ))|drive| {
-            createStorageDev(drive, "sda", manager) catch {};
+            ))|drive| {
+                if (getDriveName()) |name| {
+                    createStorageDev(drive, name, manager) catch |err| {
+                        kernel.logger.ERROR("Failed to create Storage Device: {!}", .{err});
+                    };
+                    kernel.mm.kfree(name.ptr);
+                } else kernel.logger.ERROR("Failed to alloc name for ATADrive", .{});
+            }
         }
     }
 }
@@ -669,10 +690,15 @@ var ata_driver = driver.storage.StorageDriver{
     .remove = ata_remove,
 };
 
+
 fn ata_probe(device: *driver.storage.StorageDevice) !void {
     const drive: *ATADrive = @ptrCast(@alignCast(device.dev.data));
-    kernel.logger.INFO("Probing drive: {s}", .{drive.name});
-    // Init DMA
+    kernel.logger.INFO(
+        "Probing drive: {any} {s}",
+        .{drive.channel, drive.name}
+    );
+    drive.initDMA();
+    try driver.bdev.addbdev(&device.dev);
     // Create block device for drive
     // Maybe: think about creating bdevs for partitions
 }
@@ -681,6 +707,7 @@ fn ata_remove(_: *driver.storage.StorageDevice) !void {
 }
 
 pub fn init() void {
+    kernel.logger.DEBUG("DRIVER INIT ATA", .{});
     driver.storage.driver.storage_register_driver(&ata_driver.driver) catch {
         kernel.logger.ERROR("ATA driver cannot be registered\n", .{});
     };
