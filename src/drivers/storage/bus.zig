@@ -8,8 +8,8 @@ fn match(_: *drv.Driver, _: *dev.Device) bool {
     return true;
 }
 
-pub var ata_bus: Bus = Bus{
-    .name = "ata",
+pub var storage_bus: Bus = Bus{
+    .name = "storage",
     .match = match,
     .scan = null,
     .drivers = null,
@@ -17,8 +17,8 @@ pub var ata_bus: Bus = Bus{
 };
 
 pub fn init() void {
-    ata_bus.list.setup();
-    ata_bus.register() catch |err| {
+    storage_bus.list.setup();
+    storage_bus.register() catch |err| {
         kernel.logger.ERROR("Error while registering platform bus: {!}", .{err});
         return ;
     };

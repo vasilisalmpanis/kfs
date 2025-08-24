@@ -6,7 +6,7 @@ pub const framebuffer = @import("./framebuffer.zig");
 pub const keyboard = @import("./kbd.zig");
 pub const pit = @import("./pit.zig");
 
-pub const ata = @import("./ata/main.zig");
+pub const storage = @import("./storage/main.zig");
 // pub const pci = @import("./pci.zig");
 pub const cmos = @import("./cmos.zig");
 
@@ -23,8 +23,6 @@ pub const Serial = platform.Serial;
 pub const pci = @import("./pci/main.zig");
 
 pub var devfs_path: krn.fs.path.Path = undefined;
-
-pub const ata_mock = @import("ata/ide-driver.zig");
 
 pub fn init() void {
     // Init /sys 
@@ -62,8 +60,9 @@ pub fn init() void {
 
     platform.bus.init();
     pci.bus.init();
-    ata.bus.init();
+    storage.bus.init();
 
     platform.serial.init();
-    ata_mock.init();
+    pci.ide.init();
+    storage.ata.init();
 }

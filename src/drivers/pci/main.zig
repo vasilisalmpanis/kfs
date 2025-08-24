@@ -4,3 +4,5 @@ pub const device = @import("./device.zig");
 
 pub const PCIDevice = device.PCIDevice;
 pub const PCIDriver = driver.PCIDriver;
+
+pub const ide = @import("./ide.zig");
