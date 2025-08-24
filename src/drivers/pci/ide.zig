@@ -1,7 +1,7 @@
 const drv = @import("../main.zig");
 const pci = drv.pci;
 const kernel = @import("kernel");
-const drive = @import("ata-drive.zig");
+const drive = @import("../storage/ata.zig");
 
 var ide_driver = pci.PCIDriver{
     .driver = drv.driver.Driver{
@@ -34,6 +34,6 @@ fn ide_remove(_: *pci.PCIDevice) !void {
 
 pub fn init() void {
     pci.driver.pci_register_driver(&ide_driver.driver) catch {
-        kernel.logger.ERROR("ATA driver cannot be registered\n", .{});
+        kernel.logger.ERROR("IDE driver cannot be registered\n", .{});
     };
 }
