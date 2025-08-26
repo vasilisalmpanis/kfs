@@ -203,6 +203,16 @@ pub export fn main() linksection(".text.main") noreturn {
         _ = std.posix.write(@intCast(fd), "We can now print to serial from userspace\n") catch 0;
         serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
         _ = std.posix.close(8);
+        fd = std.os.linux.open("/dev/sda", .{ .CREAT = true }, 0o444);
+
+        var big_buf: [512]u8 = .{0} ** 512;
+        for (0..5000) |_| {
+            const r = std.posix.read(@intCast(fd), &big_buf) catch 0;
+            if (!std.mem.allEqual(u8, &big_buf, 0)) {
+                serial("result of reading:\n{s}\n", .{big_buf[0..r]});
+            }
+        }
+
         // Signaling
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
