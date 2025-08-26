@@ -213,10 +213,8 @@ const ATADrive = struct {
     dma_buff_virt: u32 = 0,
     dma_initialized: bool = false,
 
-    dev: driver.device.Device = undefined,
-
-    const SECTOR_SIZE = 512;
-    const DMA_BUFFER_PAGES = 8;
+    pub const SECTOR_SIZE = 512;
+    pub const DMA_BUFFER_PAGES = 8;
     const TIMEOUT_READY = 10000;
     const TIMEOUT_DMA = 1000000;
     const STATUS_READ_COUNT = 15;
@@ -424,10 +422,10 @@ const ATADrive = struct {
                 self.stopDMA();                
                 arch.io.outb(self.bmide_base + BMIDE_STATUS, bmide_status | BMIDE_STATUS_INTERRUPT);
                 self.delay();
-                const sector: []const u8 = @as([*]u8, @ptrFromInt(self.dma_buff_virt))[0..512];
-                if (!std.mem.allEqual(u8, sector, 0)) {
-                    kernel.logger.INFO("DATA: {s}", .{sector});
-                }
+                // const sector: []const u8 = @as([*]u8, @ptrFromInt(self.dma_buff_virt))[0..512];
+                // if (!std.mem.allEqual(u8, sector, 0)) {
+                //     kernel.logger.INFO("DATA: {s}", .{sector});
+                // }
                 return ;
             }
             timeout -= 1;
@@ -680,7 +678,7 @@ pub fn ata_init(pci_device: *pci.PCIDevice) void {
 
 var ata_driver = driver.storage.StorageDriver{
     .driver = driver.driver.Driver{
-        .fops = null,
+        .fops = &ata_file_ops,
         .list = undefined,
         .name = "ata",
         .probe = undefined,
@@ -711,4 +709,47 @@ pub fn init() void {
     driver.storage.driver.storage_register_driver(&ata_driver.driver) catch {
         kernel.logger.ERROR("ATA driver cannot be registered\n", .{});
     };
+}
+
+
+// File operations
+
+var ata_file_ops = kernel.fs.FileOps{
+    .open = ata_open,
+    .close = ata_close,
+    .read = ata_read,
+    .write = ata_write,
+    .lseek = null,
+};
+
+fn ata_open(file: *kernel.fs.File, _: *kernel.fs.Inode) !void {
+    kernel.logger.WARN("ata file opened {s}\n", .{file.path.dentry.name});
+}
+
+fn ata_close(_: *kernel.fs.File) void {
+}
+
+fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
+    if( file.inode.dev) |d| {
+        const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
+        
+        const lba: u32 = file.pos / ATADrive.SECTOR_SIZE;
+        ata_dev.selectChannel();
+        ata_dev.readSectorsDMA(lba, 1);
+        
+        const offset: u32 = file.pos % ATADrive.SECTOR_SIZE;
+        var to_read: u32 = ATADrive.SECTOR_SIZE - offset;
+        if (size < to_read)
+            to_read = size;
+
+        const dma_buf: [*]u8 = @ptrFromInt(ata_dev.dma_buff_virt);
+        @memcpy(buff[0..to_read], dma_buf[offset..offset + to_read]);
+        file.pos += to_read;
+        return to_read;
+    }
+    return 0;
+}
+
+fn ata_write(_: *kernel.fs.File, _: [*]u8, _: u32) !u32 {
+    return 0;
 }
