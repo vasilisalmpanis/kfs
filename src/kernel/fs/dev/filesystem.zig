@@ -5,7 +5,7 @@ const kernel = fs.kernel;
 const super = @import("super.zig");
 
 
-pub fn init_dev() void {
+pub fn init() void {
     if (kernel.mm.kmalloc(DevFileSystem)) |_fs| {
         _fs.base.setup("devfs", &dev_fs_ops);
     }

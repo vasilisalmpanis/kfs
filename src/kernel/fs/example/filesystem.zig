@@ -4,7 +4,7 @@ const lst = fs.list;
 const kernel = fs.kernel;
 const super = @import("super.zig");
 
-pub fn init_example() void {
+pub fn init() void {
     if (kernel.mm.kmalloc(ExampleFileSystem)) |_fs| {
         _fs.base.setup("examplefs", &example_fs_ops);
     }

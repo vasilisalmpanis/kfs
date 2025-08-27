@@ -10,7 +10,7 @@ pub const FileSystem = struct {
     name: []const u8,
     list: list.ListHead,
     sbs: list.ListHead,
-
+    virtual: bool = true,
     ops: *const FileSystemOps,
 
     pub fn setup(
