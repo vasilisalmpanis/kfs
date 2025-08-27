@@ -44,9 +44,6 @@ pub var cmos: drv.cmos.CMOS = undefined;
 
 pub const proc_mm = @import("./mm/proc_mm.zig");
 pub const fs = @import("fs/fs.zig");
-pub const examplefs = @import("fs/example/filesystem.zig");
-pub const sysfs = @import("fs/sys/filesystem.zig");
-pub const devfs = @import("fs/dev/filesystem.zig");
 
 pub const mkdir = @import("./syscalls/mkdir.zig").mkdir;
 pub const mount = @import("./syscalls/mount.zig").mount;
