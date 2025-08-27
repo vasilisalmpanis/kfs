@@ -33,6 +33,10 @@ pub const File = file.File;
 pub const TaskFiles = file.TaskFiles;
 pub const FileOps = file.FileOps;
 
+pub const examplefs = @import("example/filesystem.zig");
+pub const sysfs = @import("sys/filesystem.zig");
+pub const devfs = @import("dev/filesystem.zig");
+pub const ext2 = @import("ext2/filesystem.zig");
 
 const std = @import("std");
 pub const DentryHash = struct {
@@ -129,3 +133,11 @@ pub const FSInfo = struct {
         return _fs;
     }
 };
+
+pub fn init() void {
+    init_cache(kernel.mm.kernel_allocator.allocator());
+    examplefs.init();
+    sysfs.init();
+    devfs.init();
+    ext2.init();
+}

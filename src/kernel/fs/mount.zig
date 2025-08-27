@@ -20,9 +20,17 @@ pub const Mount = struct {
     tree: tree.TreeNode,
 
     pub fn mount(
-        source: []const u8,
-        target: []const u8,
+        source: []const u8, // device
+        target: []const u8, // directory
         fs_type: *fs.FileSystem) !*Mount {
+        // For device
+        // 1. Check that device exists
+        // 2. Check that its a block device
+        // 3. Take device major and retrieve fops from driver
+        //
+        // For directory
+        // 1. resolve to inode and check if its a directory
+        // 2. Check if we can mount (?)
         var curr: fs.path.Path = undefined;
         const sb: *fs.SuperBlock = try fs_type.ops.getSB(fs_type, source);
         errdefer sb.ref.unref();

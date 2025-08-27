@@ -82,8 +82,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     
     // FS
-    krn.fs.init_cache(krn.mm.kernel_allocator.allocator());
-    krn.examplefs.init_example();
+    krn.fs.init();
     if (krn.fs.FileSystem.find("examplefs")) |fs| {
         const root_mount = krn.fs.Mount.mount("/dev/sda1", "/", fs) catch {
             dbg.printf("Failed to mount root\n",.{});

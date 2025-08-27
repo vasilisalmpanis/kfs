@@ -25,8 +25,6 @@ pub const pci = @import("./pci/main.zig");
 pub var devfs_path: krn.fs.path.Path = undefined;
 
 pub fn init() void {
-    // Init /sys 
-    krn.sysfs.init_sys();
     _ = krn.mkdir("/sys", 0) catch {
         @panic("unable to create /sys directory");
     };
@@ -42,8 +40,6 @@ pub fn init() void {
     };
     bus.sysfs_bus_dentry = path.dentry;
 
-    // Init /dev
-    krn.devfs.init_dev();
     _ = krn.mkdir("/dev", 0) catch {
         @panic("unable to create /dev directory");
     };
