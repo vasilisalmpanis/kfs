@@ -63,9 +63,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     var boot_info: multiboot.Multiboot = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
     dbg.initSymbolTable(&boot_info);
     gdt.gdtInit();
-    krn.logger.INFO("GDT initialized", .{});
 
     mm.mmInit(&boot_info);
+    krn.logger.INFO("GDT initialized", .{});
     krn.logger.INFO("Memory initialized", .{});
 
     screen.initScreen(&krn.scr, &boot_info);

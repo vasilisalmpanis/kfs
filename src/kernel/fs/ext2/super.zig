@@ -2,10 +2,24 @@ const fs = @import("../fs.zig");
 const kernel = fs.kernel;
 const Ext2Inode = @import("inode.zig").Ext2Inode;
 const std = @import("std");
+const device = @import("drivers").device;
 
+const EXT2_MAGIC: u32 = 0xEF53;
 
+const BGDT = extern struct {
+    bg_block_bitmap: u32,
+        bg_inode_bitmap: u32,
+        bg_inode_table: u32,
+        bg_free_blocks_count: u16,
+        bg_free_inodes_count: u16,
+        bg_used_dirs_count: u16,
+        bg_pad: u16,
+        bg_reserved1: u32,
+        bg_reserved2: u32,
+        bg_reserved3: u32,
+};
 
-pub const Ext2Super = struct {
+const Ext2SuperData = extern struct {
         s_inodes_count		        :u32,	// Inodes count
 	s_blocks_count			:u32,	// Blocks count
 	s_r_blocks_count		:u32,	// Reserved blocks count
@@ -52,14 +66,50 @@ pub const Ext2Super = struct {
 	s_feature_incompat 	:u32,           // incompatible feature set */
 	s_feature_ro_compat 	:u32,           // readonly-compatible feature set */
 	s_reserved	        :[230] u32,     // Padding to the end of the block */
+};
+
+pub const Ext2Super = struct {
+        data: Ext2SuperData,
+        bgdt: []BGDT,
         base: fs.SuperBlock,
     pub fn allocInode(_: *fs.SuperBlock) !*fs.Inode {
         return error.NotImplemented;
     }
 
-    pub fn create(_fs: *fs.FileSystem, source: []const u8) !*fs.SuperBlock {
+    pub fn create(_fs: *fs.FileSystem, dev_file: ?*fs.File) !*fs.SuperBlock {
+        if (dev_file == null)
+            return kernel.errors.PosixError.ENOTBLK;
+        const file: *fs.File = dev_file.?;
         if (kernel.mm.kmalloc(Ext2Super)) |sb| {
+            errdefer kernel.mm.kfree(sb);
+            sb.bgdt.len = 0;
             sb.base.inode_map = std.AutoHashMap(u32, *fs.Inode).init(kernel.mm.kernel_allocator.allocator());
+            errdefer sb.base.inode_map.deinit();
+
+            file.pos = 1024;
+            var super_buffer: [1024]u8 align(16) = .{0} ** 1024;
+            _ = try file.ops.read(file, &super_buffer, 512);
+            _ = try file.ops.read(file, @ptrCast(&super_buffer[512]), 512);
+            const ext2_super_data: *Ext2SuperData = @ptrCast(&super_buffer);
+            if (ext2_super_data.s_magic != EXT2_MAGIC) {
+                return kernel.errors.PosixError.EINVAL;
+            }
+            sb.data = ext2_super_data.*;
+            var number_of_block_groups: u32 = ext2_super_data.s_blocks_count / ext2_super_data.s_blocks_per_group;
+            if (ext2_super_data.s_blocks_count % ext2_super_data.s_blocks_per_group != 0)
+                number_of_block_groups += 1;
+            if (kernel.mm.kmallocArray(BGDT, number_of_block_groups)) |bgdt_array| {
+                errdefer kernel.mm.kfree(bgdt_array);
+                for (0..number_of_block_groups) |idx| {
+                    _ = try file.ops.read(file, @ptrCast(&super_buffer), @sizeOf(BGDT));
+                    const bgdt: *BGDT = @ptrCast(&super_buffer);
+                    bgdt_array[idx] = bgdt.*;
+                }
+                sb.bgdt = bgdt_array[0..number_of_block_groups];
+            }
+
+            // TODO
+
             const root_inode = Ext2Inode.new(&sb.base) catch |err| {
                 kernel.mm.kfree(sb);
                 return err;
@@ -76,7 +126,6 @@ pub const Ext2Super = struct {
                 kernel.mm.kfree(sb);
                 return err;
             };
-            _ = source;
             const dntry = fs.DEntry.alloc("/", &sb.base, root_inode) catch {
                 kernel.mm.kfree(sb);
                 return error.OutOfMemory;
