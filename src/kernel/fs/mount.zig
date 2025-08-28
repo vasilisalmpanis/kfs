@@ -3,6 +3,7 @@ const tree = @import("../utils/tree.zig");
 const mutex = @import("../sched/mutex.zig");
 const krn = @import("../main.zig");
 const fs = @import("fs.zig");
+const device = @import("drivers").device;
 
 pub var mountpoints: ?*Mount = null;
 
@@ -23,21 +24,39 @@ pub const Mount = struct {
         source: []const u8, // device
         target: []const u8, // directory
         fs_type: *fs.FileSystem) !*Mount {
-        // For device
-        // 1. Check that device exists
-        // 2. Check that its a block device
-        // 3. Take device major and retrieve fops from driver
+        var blk_dev: ?*device.Device = null;
+        var dummy_file: ?*fs.File = null;
+        if (!fs_type.virtual) {
+            // 1. Check that device exists
+            krn.logger.INFO("needs dev {s}\n", .{fs_type.name});
+            const device_path = try fs.path.resolve(source);
+            errdefer device_path.release();
+            const device_inode: *fs.Inode = device_path.dentry.inode;
+            // 2. Check that its a block device
+            if (device_inode.mode.type & fs.S_IFBLK == 0) {
+                return krn.errors.PosixError.ENOTBLK;
+            }
+            // 3. Retrieve fops from driver
+
+            dummy_file = try fs.File.new(device_path);
+            try device_inode.fops.open(dummy_file.?, device_inode);
+            blk_dev = device_inode.dev;
+            defer device_inode.fops.close(dummy_file.?);
+        }
         //
         // For directory
         // 1. resolve to inode and check if its a directory
         // 2. Check if we can mount (?)
         var curr: fs.path.Path = undefined;
-        const sb: *fs.SuperBlock = try fs_type.ops.getSB(fs_type, source);
-        errdefer sb.ref.unref();
+        var sb: *fs.SuperBlock = undefined;
         if (mountpoints != null) {
             const point = fs.path.remove_trailing_slashes(target);
             curr = try fs.path.resolve(point);
+            sb = try fs_type.ops.getSB(fs_type, dummy_file);
+            errdefer sb.ref.unref();
         } else {
+            sb = try fs_type.ops.getSB(fs_type, dummy_file);
+            errdefer sb.ref.unref();
             curr.dentry = fs.DEntry.alloc(target, sb, sb.root.inode) catch {
                 return error.OutOfMemory;
             };

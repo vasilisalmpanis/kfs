@@ -3,6 +3,7 @@ const FileSystem = fs.FileSystem;
 const lst = fs.list;
 const kernel = fs.kernel;
 const super = @import("super.zig");
+const device = @import("drivers").device;
 
 pub fn init() void {
     if (kernel.mm.kmalloc(ExampleFileSystem)) |_fs| {
@@ -15,14 +16,14 @@ pub const ExampleFileSystem = struct {
     base: fs.FileSystem,
 
 
-    fn getSB(base: *fs.FileSystem, source: []const u8) !*fs.SuperBlock {
+    fn getSB(base: *fs.FileSystem, dev_file: ?*fs.File) !*fs.SuperBlock {
         const self: *ExampleFileSystem = base.getImpl(ExampleFileSystem, "base");
         if (!self.base.sbs.isEmpty()) {
             kernel.logger.INFO("sb already exists\n", .{});
             const sb = self.base.sbs.next.?.entry(fs.SuperBlock, "list");
             return sb;
         } else {
-            const sb: *fs.SuperBlock = super.ExampleSuper.create(base, source) catch |err| {
+            const sb: *fs.SuperBlock = super.ExampleSuper.create(base, dev_file) catch |err| {
                 return err;
             };
             return sb;

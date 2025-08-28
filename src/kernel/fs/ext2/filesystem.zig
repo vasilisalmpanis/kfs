@@ -3,6 +3,7 @@ const FileSystem = fs.FileSystem;
 const lst = fs.list;
 const kernel = fs.kernel;
 const super = @import("super.zig");
+const device = @import("drivers").device;
 
 pub fn init() void {
     if (kernel.mm.kmalloc(Ext2FileSystem)) |_fs| {
@@ -16,17 +17,22 @@ pub const Ext2FileSystem = struct {
     base: fs.FileSystem,
 
 
-    fn getSB(base: *fs.FileSystem, source: []const u8) !*fs.SuperBlock {
-        const self: *Ext2FileSystem = base.getImpl(Ext2FileSystem, "base");
-        if (!self.base.sbs.isEmpty()) {
-            kernel.logger.INFO("sb already exists\n", .{});
-            const sb = self.base.sbs.next.?.entry(fs.SuperBlock, "list");
-            return sb;
+    fn getSB(base: *fs.FileSystem, dev_file: ?*fs.File) !*fs.SuperBlock {
+        if (dev_file) |file| {
+            const self: *Ext2FileSystem = base.getImpl(Ext2FileSystem, "base");
+            if (!self.base.sbs.isEmpty()) {
+                kernel.logger.INFO("sb already exists\n", .{});
+                const sb = self.base.sbs.next.?.entry(fs.SuperBlock, "list");
+                return sb;
+            } else {
+                const sb: *fs.SuperBlock = super.Ext2Super.create(base, file) catch |err| {
+                    return err;
+                };
+                // here
+                return sb;
+            }
         } else {
-            const sb: *fs.SuperBlock = super.Ext2Super.create(base, source) catch |err| {
-                return err;
-            };
-            return sb;
+            return kernel.errors.PosixError.ENODEV;
         }
     }
 };

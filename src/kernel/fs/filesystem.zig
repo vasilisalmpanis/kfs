@@ -2,6 +2,7 @@ const fs = @import("fs.zig");
 const list = fs.list;
 const Mutex = @import("../sched/mutex.zig").Mutex;
 const std = @import("std");
+const device = @import("drivers").device;
 
 pub var filesystem_mutex: Mutex = Mutex.init(); 
 pub var fs_list: ?*FileSystem = null;
@@ -22,6 +23,7 @@ pub const FileSystem = struct {
         self.sbs.setup();
         self.name = name;
         self.ops = ops;
+        self.virtual = true;
         self.register();
     }
 
@@ -69,5 +71,5 @@ pub const FileSystem = struct {
 };
 
 pub const FileSystemOps = struct {
-    getSB: * const fn (fs: *FileSystem, source: []const u8) anyerror!*fs.SuperBlock,
+    getSB: * const fn (fs: *FileSystem, dev: ?*fs.File) anyerror!*fs.SuperBlock,
 };
