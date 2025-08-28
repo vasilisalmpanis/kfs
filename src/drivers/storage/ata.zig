@@ -730,6 +730,7 @@ fn ata_close(_: *kernel.fs.File) void {
 }
 
 fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
+    kernel.logger.INFO("read called {d}\n", .{size});
     if( file.inode.dev) |d| {
         const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
         

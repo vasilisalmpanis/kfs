@@ -2,6 +2,7 @@ const fs = @import("../fs.zig");
 const kernel = fs.kernel;
 const ExampleInode = @import("inode.zig").DevInode;
 const std = @import("std");
+const device = @import("drivers").device;
 
 
 
@@ -12,7 +13,7 @@ pub const DevSuper = struct {
         return error.NotImplemented;
     }
 
-    pub fn create(_fs: *fs.FileSystem, source: []const u8) !*fs.SuperBlock {
+    pub fn create(_fs: *fs.FileSystem, dev: ?*fs.File) !*fs.SuperBlock {
         if (kernel.mm.kmalloc(DevSuper)) |sb| {
             sb.base.inode_map = std.AutoHashMap(u32, *fs.Inode).init(kernel.mm.kernel_allocator.allocator());
             const root_inode = ExampleInode.new(&sb.base) catch |err| {
@@ -31,7 +32,7 @@ pub const DevSuper = struct {
                 kernel.mm.kfree(sb);
                 return err;
             };
-            _ = source;
+            _ = dev;
             const dntry = fs.DEntry.alloc("/", &sb.base, root_inode) catch {
                 kernel.mm.kfree(sb);
                 return error.OutOfMemory;

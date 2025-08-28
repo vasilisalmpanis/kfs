@@ -41,14 +41,13 @@ pub const Logger = struct {
     ) !void {
         if (@intFromEnum(level) < @intFromEnum(self.log_level)) return;
 
-        var buffer: [1024]u8 = undefined;
         const color = switch (level) {
             .DEBUG => BLUE,
             .INFO => GREEN,
             .WARN => YELLOW,
             .ERROR => RED
         };
-        const formatted_log = try std.fmt.bufPrint(&buffer, 
+        const formatted_log = try std.fmt.allocPrint(krn.mm.kernel_allocator.allocator(),
             "{s}[{s}]: " ++
                 format ++
                 DEFAULT ++
@@ -59,6 +58,7 @@ pub const Logger = struct {
             } ++ args
         );
         krn.serial.print(formatted_log);
+        krn.mm.kfree(formatted_log.ptr);
     }
 
     pub fn DEBUG(

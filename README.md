@@ -122,6 +122,7 @@ This project is licensed under [MIT License](LICENSE).
 - https://osblog.stephenmarz.com/index.html
 - https://www.bottomupcs.com/
 - https://www.singlix.com/trdos/archive/
+- https://www.nongnu.org/ext2-doc/ext2.html
 
 ## Acknowledgments
 
