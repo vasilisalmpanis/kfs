@@ -141,11 +141,11 @@ pub export fn main() linksection(".text.main") noreturn {
     _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
     const pid= os.linux.fork();
     if (pid == 0) {
-        _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-        var buf1: [30]u8 = .{0} ** 30;
-        const rl = std.posix.read(@intCast(fd), &buf1) catch 1;
-        serial("\n\n\nChild process read:\n  len:{d}\n  data: {s}\n\n\n", .{rl, buf1[0..rl]});
-        childProcess(fds[1]);
+        // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
+        // var buf1: [30]u8 = .{0} ** 30;
+        // const rl = std.posix.read(@intCast(fd), &buf1) catch 1;
+        // serial("\n\n\nChild process read:\n  len:{d}\n  data: {s}\n\n\n", .{rl, buf1[0..rl]});
+        // childProcess(fds[1]);
     } else { 
         // Parent
         // PID / UID
@@ -153,30 +153,30 @@ pub export fn main() linksection(".text.main") noreturn {
         pidUid("[PARENT]");
 
         // IPC in parent
-        const res = std.posix.sendto(
-            fds[0],
-            "test send",
-            0,
-            null,
-            0
-        ) catch |err| brk: {
-            serial("[PARENT] error: {any}", .{err});
-            break :brk 0;
-        };
-        serial("[PARENT] Parent sent {d} bytes to child process\n", .{res});
+        // const res = std.posix.sendto(
+        //     fds[0],
+        //     "test send",
+        //     0,
+        //     null,
+        //     0
+        // ) catch |err| brk: {
+        //     serial("[PARENT] error: {any}", .{err});
+        //     break :brk 0;
+        // };
+        // serial("[PARENT] Parent sent {d} bytes to child process\n", .{res});
         
 
-        // Waiting for child to send message
-        var buf: [30]u8 = .{0} ** 30;
-        while (
-            std.posix.recvfrom(
-                fds[0],
-                @ptrCast(&buf),
-                0,
-                null,
-                null
-            ) catch 0 == 0
-        ) {}
+        // // Waiting for child to send message
+        // var buf: [30]u8 = .{0} ** 30;
+        // while (
+        //     std.posix.recvfrom(
+        //         fds[0],
+        //         @ptrCast(&buf),
+        //         0,
+        //         null,
+        //         null
+        //     ) catch 0 == 0
+        // ) {}
 
         fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
         serial("new fd {any}\n", .{fd});
@@ -186,32 +186,32 @@ pub export fn main() linksection(".text.main") noreturn {
         serial("new fd {any}\n", .{fd});
         const _wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
         serial("result of writing:\n  len:{d}\n", .{_wl});
-        _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-        var rl = std.posix.read(@intCast(fd), &buf) catch 1;
-        serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
-        serial("new fd {any}\n", .{fd});
-        fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
-        _ = std.posix.close(3);
-        _ = std.posix.close(4);
-        _ = std.posix.close(5);
-        _ = std.posix.close(6);
-        _ = std.posix.close(7);
-        _ = std.posix.lseek_SET(@intCast(8), 0) catch null;
-        rl = std.posix.read(@intCast(8), &buf) catch 1;
-        fd = std.os.linux.open("/dev/8250", .{ .CREAT = true }, 0o444);
-        serial("new fd for dev {any}\n", .{fd});
-        _ = std.posix.write(@intCast(fd), "We can now print to serial from userspace\n") catch 0;
-        serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
-        _ = std.posix.close(8);
-        fd = std.os.linux.open("/dev/sda", .{ .CREAT = true }, 0o444);
+        // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
+        // var rl = std.posix.read(@intCast(fd), &buf) catch 1;
+        // serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
+        // serial("new fd {any}\n", .{fd});
+        // fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
+        // _ = std.posix.close(3);
+        // _ = std.posix.close(4);
+        // _ = std.posix.close(5);
+        // _ = std.posix.close(6);
+        // _ = std.posix.close(7);
+        // _ = std.posix.lseek_SET(@intCast(8), 0) catch null;
+        // rl = std.posix.read(@intCast(8), &buf) catch 1;
+        // fd = std.os.linux.open("/dev/8250", .{ .CREAT = true }, 0o444);
+        // serial("new fd for dev {any}\n", .{fd});
+        // _ = std.posix.write(@intCast(fd), "We can now print to serial from userspace\n") catch 0;
+        // serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
+        // _ = std.posix.close(8);
+        // fd = std.os.linux.open("/dev/sda", .{ .CREAT = true }, 0o444);
 
-        var big_buf: [512]u8 = .{0} ** 512;
-        for (0..5000) |_| {
-            const r = std.posix.read(@intCast(fd), &big_buf) catch 0;
-            if (!std.mem.allEqual(u8, &big_buf, 0)) {
-                serial("result of reading:\n{s}\n", .{big_buf[0..r]});
-            }
-        }
+        // var big_buf: [512]u8 = .{0} ** 512;
+        // for (0..5000) |_| {
+        //     const r = std.posix.read(@intCast(fd), &big_buf) catch 0;
+        //     if (!std.mem.allEqual(u8, &big_buf, 0)) {
+        //         serial("result of reading:\n{s}\n", .{big_buf[0..r]});
+        //     }
+        // }
 
         // Signaling
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});

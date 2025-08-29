@@ -3,6 +3,7 @@ const kernel = fs.kernel;
 const Ext2Inode = @import("inode.zig").Ext2Inode;
 const std = @import("std");
 const device = @import("drivers").device;
+const ext2_inode = @import("./inode.zig");
 
 const EXT2_MAGIC: u32 = 0xEF53;
 
@@ -20,7 +21,7 @@ const BGDT = extern struct {
 };
 
 const Ext2SuperData = extern struct {
-        s_inodes_count		        :u32,	// Inodes count
+    s_inodes_count		        :u32,	// Inodes count
 	s_blocks_count			:u32,	// Blocks count
 	s_r_blocks_count		:u32,	// Reserved blocks count
 	s_free_blocks_count		:u32,	// Free blocks count
@@ -82,6 +83,7 @@ pub const Ext2Super = struct {
         const file: *fs.File = dev_file.?;
         if (kernel.mm.kmalloc(Ext2Super)) |sb| {
             errdefer kernel.mm.kfree(sb);
+            sb.base.dev_file = file;
             sb.bgdt.len = 0;
             sb.base.inode_map = std.AutoHashMap(u32, *fs.Inode).init(kernel.mm.kernel_allocator.allocator());
             errdefer sb.base.inode_map.deinit();
@@ -109,11 +111,15 @@ pub const Ext2Super = struct {
             }
 
             // TODO
+            // Get root inode from disk, store it in root dentry
 
             const root_inode = Ext2Inode.new(&sb.base) catch |err| {
                 kernel.mm.kfree(sb);
                 return err;
             };
+
+            try root_inode.getImpl(Ext2Inode, "base").iget(sb, ext2_inode.EXT2_ROOT_INO);
+
             root_inode.mode = fs.UMode{
                 // This should come from mount.
                 .type   = fs.S_IFDIR,
@@ -141,6 +147,14 @@ pub const Ext2Super = struct {
             return &sb.base;
         }
         return error.OutOfMemory;
+    }
+
+    pub fn getFirstInodeIdx(self: *Ext2Super) u32 {
+        if (self.data.s_rev_level == 0) {
+            return 11;
+        } else {
+            return self.data.s_first_ino;
+        }
     }
 };
 
