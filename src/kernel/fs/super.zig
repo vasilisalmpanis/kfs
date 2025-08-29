@@ -3,6 +3,7 @@ const DEntry = fs.DEntry;
 const Refcount = fs.Refcount;
 const list = fs.list;
 const std = @import("std");
+const drv = @import("driver");
 
 /// SuperBlock: Is the representation of a mounted filesystem.
 /// it containes metadata about the filesystem, root inode
@@ -15,6 +16,7 @@ pub const SuperBlock = struct {
     ref: Refcount,
     list: list.ListHead,
     inode_map: std.AutoHashMap(u32, *fs.Inode),
+    dev_file: ?*fs.File = null,
     
     pub fn getImpl(base: *SuperBlock, comptime T: type, comptime member: []const u8) *T {
         return @fieldParentPtr(member, base);
