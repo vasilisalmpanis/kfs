@@ -39,9 +39,10 @@ pub const Mount = struct {
             // 3. Retrieve fops from driver
 
             dummy_file = try fs.File.new(device_path);
+            errdefer krn.mm.kfree(dummy_file.?);
             try device_inode.fops.open(dummy_file.?, device_inode);
+            errdefer dummy_file.?.ops.close(dummy_file.?);
             blk_dev = device_inode.dev;
-            defer device_inode.fops.close(dummy_file.?);
         }
         //
         // For directory

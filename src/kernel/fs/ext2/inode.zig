@@ -1,6 +1,13 @@
 const fs = @import("../fs.zig");
 const kernel = fs.kernel;
 const file = @import("file.zig");
+const ext2_sb = @import("./super.zig");
+
+// Special inode numbers
+pub const EXT2_BAD_INO	          = 1; // Bad blocks inode
+pub const EXT2_ROOT_INO	          = 2; // Root inode
+pub const EXT2_BOOT_LOADER_INO      = 5; // Boot loader inode
+pub const EXT2_UNDEL_DIR_INO        = 6; // Undelete directory inode
 
 
 pub const Ext2Inode = struct {
@@ -64,6 +71,30 @@ pub const Ext2Inode = struct {
             return dent;
         };
         return error.Exists;
+    }
+
+    pub fn iget(_: *Ext2Inode, sb: *ext2_sb.Ext2Super, i_no: u32) !void {
+        if (
+            (i_no != EXT2_ROOT_INO and i_no < sb.getFirstInodeIdx())
+            or (i_no > sb.data.s_inodes_count)
+        ) {
+            return kernel.errors.PosixError.EINVAL;
+        }
+        const block_group = (i_no - 1) / sb.data.s_inodes_per_group;
+        const gd = sb.bgdt[block_group];
+        const rel_offset = ((i_no - 1) % sb.data.s_inodes_per_group) * sb.data.s_inode_size;
+
+        const block_size: u32 = @as(u32, 1024) << @as(u5, @truncate(sb.data.s_log_block_size));
+        const table_byte_off: u32 = gd.bg_inode_table * block_size;
+        const abs_offset = table_byte_off + rel_offset;
+
+        if (kernel.mm.kmallocArray(u8, sb.data.s_inode_size)) |raw_buff| {
+            errdefer kernel.mm.kfree(raw_buff);
+            @memset(raw_buff[0..sb.data.s_inode_size], 0);
+            sb.base.dev_file.?.pos = abs_offset;
+            _  = try sb.base.dev_file.?.ops.read(sb.base.dev_file.?, raw_buff, sb.data.s_inode_size);
+            kernel.logger.INFO("inode: \n{any}", .{raw_buff[0..sb.data.s_inode_size]});
+        }
     }
 };
 
