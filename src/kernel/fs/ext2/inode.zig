@@ -12,6 +12,27 @@ pub const EXT2_N_BLOCKS             = 15;
 
 /// ext2 on-disk inode (little-endian fields). Classic 128-byte layout.
 /// Use `le16/le32` helpers below if you need host-endian values.
+///
+const Ext2DirEntry = struct {
+    inode: u32,       // inode number
+    rec_len: u16,     // total size of this entry
+    name_len: u8,     // length of name
+    file_type: u8,    // (ext2 rev>=1)
+                      //
+    fn getName(self: *Ext2DirEntry) []u8 {
+        const addr: u32 = @intFromPtr(self) + @sizeOf(Ext2DirEntry);
+        const name: [*]u8 = @ptrFromInt(addr);
+        return name[0..self.name_len];
+    }
+
+    fn getNext(self: *Ext2DirEntry) ?*Ext2DirEntry {
+        if (self.rec_len == 0)
+            return null;
+        const addr: u32 = @intFromPtr(self) + self.rec_len;
+        return @ptrFromInt(addr);
+    }
+};
+
 pub const Ext2InodeData = extern struct {
     i_mode:        fs.UMode,              // file mode
     i_uid:         u16,                   // low 16 bits of uid
@@ -90,6 +111,20 @@ pub const Ext2Inode = struct {
         if (fs.dcache.get(key)) |entry| {
             return entry;
         }
+        // Get from disk
+        const ext2_dir_inode = dir.getImpl(Ext2Inode, "base");
+        const ext2_super = dir.sb.getImpl(ext2_sb.Ext2Super, "base");
+        for (0..ext2_dir_inode.data.i_blocks) |idx| {
+            const block: u32 = ext2_dir_inode.data.i_block[idx];
+            const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
+            var ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
+            while (ext_dir) |curr_dir| {
+                kernel.logger.INFO("Name {s}\n",.{curr_dir.getName()});
+                ext_dir = curr_dir.getNext();
+            }
+            kernel.mm.kfree(block_slice.ptr);
+            // while(offset < 1024) {
+        }
         return error.InodeNotFound;
     }
 
@@ -141,22 +176,13 @@ pub const Ext2Inode = struct {
         const gd = sb.bgdt[block_group];
         var rel_offset = ((i_no - 1) % sb.data.s_inodes_per_group) * sb.data.s_inode_size;
         const block = gd.bg_inode_table + (rel_offset >> @as(u5, @truncate(sb.data.s_log_block_size + 10)));
-        const block_size: u32 = @as(u32, 1024) << @as(u5, @truncate(sb.data.s_log_block_size));
-        kernel.logger.INFO("Block size {d}\n", .{block_size});
 
 
-        if (kernel.mm.kmallocArray(u8, block_size)) |raw_buff| {
-            errdefer kernel.mm.kfree(raw_buff);
-            @memset(raw_buff[0..block_size], 0);
-            sb.base.dev_file.?.pos = block_size * block;
-            _  = try sb.base.dev_file.?.ops.read(sb.base.dev_file.?, raw_buff, block_size);
-            rel_offset &= (block_size - 1);
-            const raw_inode: *Ext2InodeData = @ptrCast(@alignCast(&raw_buff[rel_offset]));
-            inode.data = raw_inode.*;
-            return ;
-        } else {
-            kernel.logger.INFO("Ext2: Allocate buffer: Out of Memory", .{});
-        }
+        const raw_buff: []u8 = try sb.readBlocks(block, 1);
+        rel_offset &= (sb.block_size - 1);
+        const raw_inode: *Ext2InodeData = @ptrCast(@alignCast(&raw_buff[rel_offset]));
+        inode.data = raw_inode.*;
+        kernel.mm.kfree(raw_buff.ptr);
     }
 };
 
