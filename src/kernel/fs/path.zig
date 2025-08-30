@@ -64,6 +64,7 @@ pub const Path = struct {
                 }
             }
         } else if (!std.mem.eql(u8, segment, ".")) {
+            krn.logger.INFO("looking up {s} {s}\n", .{segment, self.dentry.inode.sb.fs.name});
             const dentry = self.dentry.inode.ops.lookup(
                 self.dentry.inode,
                 segment

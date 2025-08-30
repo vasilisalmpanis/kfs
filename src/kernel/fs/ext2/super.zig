@@ -72,6 +72,7 @@ const Ext2SuperData = extern struct {
 pub const Ext2Super = struct {
         data: Ext2SuperData,
         bgdt: []BGDT,
+        block_size: u32,
         base: fs.SuperBlock,
     pub fn allocInode(_: *fs.SuperBlock) !*fs.Inode {
         return error.NotImplemented;
@@ -97,6 +98,7 @@ pub const Ext2Super = struct {
                 return kernel.errors.PosixError.EINVAL;
             }
             sb.data = ext2_super_data.*;
+            sb.block_size = @as(u32, 1024) << @as(u5, @truncate(sb.data.s_log_block_size));
             var number_of_block_groups: u32 = ext2_super_data.s_blocks_count / ext2_super_data.s_blocks_per_group;
             if (ext2_super_data.s_blocks_count % ext2_super_data.s_blocks_per_group != 0)
                 number_of_block_groups += 1;
@@ -146,6 +148,26 @@ pub const Ext2Super = struct {
             return &sb.base;
         }
         return error.OutOfMemory;
+    }
+
+    pub fn readBlocks(sb: *Ext2Super, block: u32, count: u32) ![]u8 {
+        const alloc_size: u32 = sb.block_size * count;
+        if (kernel.mm.kmallocArray(u8, alloc_size)) |raw_buff| {
+            errdefer kernel.mm.kfree(raw_buff);
+            @memset(raw_buff[0..alloc_size], 0);
+            sb.base.dev_file.?.pos = sb.block_size * block;
+            var read: u32 = 0;
+            while (read < alloc_size) {
+                const single_read: u32 = try sb.base.dev_file.?.ops.read(sb.base.dev_file.?, @ptrCast(&raw_buff[read]), sb.block_size);
+                // FIXME:
+                if (single_read == 0) break;
+                read += single_read;
+            }
+            return raw_buff[0..alloc_size];
+        } else {
+            kernel.logger.INFO("Ext2: Allocate buffer: Out of Memory", .{});
+            return kernel.errors.PosixError.ENOMEM;
+        }
     }
 
     pub fn getFirstInodeIdx(self: *Ext2Super) u32 {
