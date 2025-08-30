@@ -21,6 +21,7 @@ pub const ExampleInode = struct {
 
     fn lookup(dir: *fs.Inode, name: []const u8) !*fs.DEntry {
         const key: fs.DentryHash = fs.DentryHash{
+            .sb = @intFromPtr(dir.sb),
             .ino = dir.i_no,
             .name = name,
         };
@@ -32,6 +33,7 @@ pub const ExampleInode = struct {
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
         const cash_key = fs.DentryHash{
+            .sb = @intFromPtr(parent.sb),
             .ino = base.i_no,
             .name = name,
         };

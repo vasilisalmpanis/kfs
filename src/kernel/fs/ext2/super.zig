@@ -21,7 +21,7 @@ const BGDT = extern struct {
 };
 
 const Ext2SuperData = extern struct {
-    s_inodes_count		        :u32,	// Inodes count
+        s_inodes_count		        :u32,	// Inodes count
 	s_blocks_count			:u32,	// Blocks count
 	s_r_blocks_count		:u32,	// Reserved blocks count
 	s_free_blocks_count		:u32,	// Free blocks count
@@ -110,15 +110,14 @@ pub const Ext2Super = struct {
                 sb.bgdt = bgdt_array[0..number_of_block_groups];
             }
 
-            // TODO
-            // Get root inode from disk, store it in root dentry
-
-            const root_inode = Ext2Inode.new(&sb.base) catch |err| {
-                kernel.mm.kfree(sb);
-                return err;
-            };
-
-            try root_inode.getImpl(Ext2Inode, "base").iget(sb, ext2_inode.EXT2_ROOT_INO);
+            const root_inode = try Ext2Inode.new(&sb.base);
+            const ext2_root_inode = root_inode.getImpl(Ext2Inode, "base");
+            errdefer kernel.mm.kfree(ext2_root_inode);
+            try ext2_root_inode.iget(sb, ext2_inode.EXT2_ROOT_INO);
+            if (!ext2_root_inode.data.i_mode.isDir()) {
+                kernel.logger.WARN("Ext2: corrupted disk\n",.{});
+                return kernel.errors.PosixError.ENOENT;
+            }
 
             root_inode.mode = fs.UMode{
                 // This should come from mount.
