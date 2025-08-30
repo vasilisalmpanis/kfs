@@ -40,6 +40,7 @@ pub const ext2 = @import("ext2/filesystem.zig");
 
 const std = @import("std");
 pub const DentryHash = struct {
+    sb: u32,
     ino: u32,
     name: []const u8,
 };

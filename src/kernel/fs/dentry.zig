@@ -63,6 +63,7 @@ pub const DEntry = struct {
         parent.tree.addChild(&new_dentry.tree);
         fs.dcache.put(
             fs.DentryHash{
+                .sb = @intFromPtr(parent.sb),
                 .ino = parent.inode.i_no,
                 .name = name,
             },
