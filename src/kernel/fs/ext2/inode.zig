@@ -1,3 +1,4 @@
+const std = @import("std");
 const fs = @import("../fs.zig");
 const kernel = fs.kernel;
 const file = @import("file.zig");
@@ -88,7 +89,6 @@ pub const Ext2InodeData = extern struct {
 pub const Ext2Inode = struct {
     data: Ext2InodeData,
     base: fs.Inode,
-    buff: [50]u8,
 
     pub fn new(sb: *fs.SuperBlock) !*fs.Inode {
         if (kernel.mm.kmalloc(Ext2Inode)) |inode| {
@@ -96,35 +96,39 @@ pub const Ext2Inode = struct {
             inode.base.ops = &ext2_inode_ops;
             inode.base.size = 50;
             inode.base.fops = &file.Ext2FileOps;
-            inode.buff = .{0} ** 50;
             return &inode.base;
         }
         return error.OutOfMemory;
     }
 
-    fn lookup(dir: *fs.Inode, name: []const u8) !*fs.DEntry {
+    fn lookup(dir: *fs.DEntry, name: []const u8) !*fs.DEntry {
         kernel.logger.INFO("ext2 lookup {s}", .{name});
         const key: fs.DentryHash = fs.DentryHash{
             .sb = @intFromPtr(dir.sb),
-            .ino = dir.i_no,
+            .ino = dir.inode.i_no,
             .name = name,
         };
         if (fs.dcache.get(key)) |entry| {
             return entry;
         }
         // Get from disk
-        const ext2_dir_inode = dir.getImpl(Ext2Inode, "base");
+        const ext2_dir_inode = dir.inode.getImpl(Ext2Inode, "base");
         const ext2_super = dir.sb.getImpl(ext2_sb.Ext2Super, "base");
         for (0..ext2_dir_inode.data.i_blocks) |idx| {
             const block: u32 = ext2_dir_inode.data.i_block[idx];
             const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
+            defer kernel.mm.kfree(block_slice.ptr);
             var ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
             while (ext_dir) |curr_dir| {
-                kernel.logger.INFO("Name {s}\n",.{curr_dir.getName()});
+                const curr_name = curr_dir.getName();
+                if (std.mem.eql(u8, name, curr_name)) {
+                    const new_inode = (try Ext2Inode.new(dir.sb)).getImpl(Ext2Inode, "base");
+                    errdefer kernel.mm.kfree(new_inode);
+                    try new_inode.iget(ext2_super, curr_dir.inode);
+                    return try dir.new(name, &new_inode.base);
+                }
                 ext_dir = curr_dir.getNext();
             }
-            kernel.mm.kfree(block_slice.ptr);
-            // while(offset < 1024) {
         }
         return error.InodeNotFound;
     }
@@ -155,7 +159,7 @@ pub const Ext2Inode = struct {
             return error.Access;
 
         // Lookup if file already exists.
-        _ = base.ops.lookup(base, name) catch {
+        _ = base.ops.lookup(parent, name) catch {
             const new_inode = try Ext2Inode.new(base.sb);
             errdefer kernel.mm.kfree(new_inode);
             new_inode.mode = mode;
@@ -183,6 +187,7 @@ pub const Ext2Inode = struct {
         rel_offset &= (sb.block_size - 1);
         const raw_inode: *Ext2InodeData = @ptrCast(@alignCast(&raw_buff[rel_offset]));
         inode.data = raw_inode.*;
+        inode.base.size = inode.data.i_size;
         kernel.mm.kfree(raw_buff.ptr);
     }
 };
