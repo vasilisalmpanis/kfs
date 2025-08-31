@@ -28,11 +28,11 @@ const CallType = enum(u8) {
 };
 
 pub fn socketcall(call: i32, args: [*]u32) !u32 {
-    krn.logger.INFO("socketcall: {d} {any}", .{call, args});
     if (call < 1 or call > 20) {
         return errors.EINVAL;
     }
     const call_type: CallType = @enumFromInt(call);
+    krn.logger.INFO("socketcall: {any} {any}", .{call_type, args});
     switch (call_type) {
         .SYS_SOCKETPAIR => return try socketpair(
             @intCast(args[0]),

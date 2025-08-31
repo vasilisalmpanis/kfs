@@ -152,20 +152,15 @@ pub const Ext2Inode = struct {
         return new_dentry;
     }
 
-    pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
+    pub fn create(base: *fs.Inode, name: []const u8, _: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
         if (base.mode.type != fs.S_IFDIR)
             return error.NotDirectory;
-        if (!base.mode.isWriteable())
+        if (!base.mode.canWrite(base.uid, base.gid))
             return error.Access;
 
         // Lookup if file already exists.
         _ = base.ops.lookup(parent, name) catch {
-            const new_inode = try Ext2Inode.new(base.sb);
-            errdefer kernel.mm.kfree(new_inode);
-            new_inode.mode = mode;
-            var dent = try parent.new(name, new_inode);
-            dent.ref.ref();
-            return dent;
+            return kernel.errors.PosixError.EINVAL;
         };
         return error.Exists;
     }
@@ -188,6 +183,7 @@ pub const Ext2Inode = struct {
         const raw_inode: *Ext2InodeData = @ptrCast(@alignCast(&raw_buff[rel_offset]));
         inode.data = raw_inode.*;
         inode.base.size = inode.data.i_size;
+        inode.base.mode = inode.data.i_mode;
         kernel.mm.kfree(raw_buff.ptr);
     }
 };

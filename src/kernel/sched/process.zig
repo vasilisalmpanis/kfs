@@ -5,24 +5,29 @@ const errors = @import("../syscalls/error-codes.zig").PosixError;
 const kthread = @import("./kthread.zig");
 const arch = @import("arch");
 const fs = @import("../fs/fs.zig");
+const krn = @import("../main.zig");
 
 pub fn doFork() !u32 {
     var child: ?*tsk.Task = km.kmalloc(tsk.Task);
     if (child == null) {
+        krn.logger.ERROR("fork: failed to alloc child task", .{});
         return errors.ENOMEM;
     }
     const stack: u32 = kthread.kthreadStackAlloc(kthread.STACK_PAGES);
     if (stack == 0) {
+        krn.logger.ERROR("fork: failed to alloc kthread stack", .{});
         km.kfree(child.?);
         return errors.ENOMEM;
     }
     child.?.mm = tsk.current.mm.?.dup();
     if (child.?.mm == null) {
+        krn.logger.ERROR("fork: failed to dup mm", .{});
         kthread.kthreadStackFree(stack);
         mm.kfree(child.?);
         return errors.ENOMEM;
     }
     child.?.fs = tsk.current.fs.clone() catch {
+        krn.logger.ERROR("fork: failed to clone fs", .{});
         kthread.kthreadStackFree(stack);
         mm.kfree(child.?);
         return errors.ENOMEM;
@@ -40,9 +45,10 @@ pub fn doFork() !u32 {
         0, 
         tsk.current.pgid,
         .PROCESS,
-    ) catch {
+    ) catch |err| {
         // TODO: understand when error comes from kmalloc allocation of files
         // or from resizing of fds/map inside files to do deinit
+        krn.logger.ERROR("fork: failed to init child task: {!}", .{err});
         km.kfree(child.?.fs);
         km.kfree(child.?.mm.?);
         km.kfree(child.?);

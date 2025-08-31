@@ -100,7 +100,8 @@ pub const TaskFiles = struct {
         var fd_it = old.map.iterator(.{});
         while (fd_it.next()) |id| {
             if (id > self.map.capacity()) {
-                self.map.resize(self.map.capacity() * 2, false) catch {
+                self.map.resize(self.map.capacity() * 2, false) catch |err| {
+                    kernel.logger.ERROR("TaskFiles.dup(): failed to resize map: {!}", .{err});
                     return errors.ENOMEM;
                 };
             }
@@ -111,6 +112,7 @@ pub const TaskFiles = struct {
                     file.ref.ref();
                     try self.fds.put(id, file);
                 } else {
+                    kernel.logger.ERROR("TaskFiles.dup(): failed to get id {d} from fds", .{id});
                     return errors.ENOMEM;
                 }
             }
@@ -118,9 +120,9 @@ pub const TaskFiles = struct {
     }
 
     pub fn releaseFD(self: *TaskFiles, fd: u32) bool {
+        self.unsetFD(fd);
         if (self.fds.get(fd)) |file| {
             _ = self.fds.remove(fd);
-            self.unsetFD(fd);
             file.ref.unref();
             return true;
         }
