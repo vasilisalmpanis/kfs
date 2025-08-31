@@ -139,7 +139,10 @@ pub export fn main() linksection(".text.main") noreturn {
     const wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
     serial("result of writing to {d}:\n  len:{d}\n", .{fd, wl});
     _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-    const pid= os.linux.fork();
+    const pid = std.posix.fork() catch |err| blk: {
+        serial("fork error: {!}\n", .{err});
+        break :blk 3;
+    };
     if (pid == 0) {
         _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
         var buf1: [30]u8 = .{0} ** 30;
@@ -175,7 +178,10 @@ pub export fn main() linksection(".text.main") noreturn {
                 0,
                 null,
                 null
-            ) catch 0 == 0
+            ) catch |err| blk: {
+                serial("error receiving: {!}", .{err});
+                break :blk 1;
+            } == 0
         ) {}
 
         fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);

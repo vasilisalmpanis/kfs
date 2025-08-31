@@ -15,6 +15,7 @@ pub fn open(
     const fd = tsk.current.files.getNextFD() catch {
         return errors.EMFILE;
     };
+    errdefer _ = tsk.current.files.releaseFD(fd);
     const path = std.mem.span(filename);
     var file_segment: []const u8 = "";
     const parent_dir = fs.path.dir_resolve(path, &file_segment) catch {
@@ -48,6 +49,9 @@ pub fn open(
             return errors.ENOENT;
         }
     };
+    if (!target_path.dentry.inode.canAccess(flags)) {
+        return errors.EACCES;
+    }
     const new_file: *fs.File = fs.File.new(target_path) catch {
         target_path.dentry.tree.del();
         kernel.mm.kfree(target_path.dentry.inode);
