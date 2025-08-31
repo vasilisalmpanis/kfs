@@ -310,12 +310,7 @@ fn mount(_: *Shell, args: [][]const u8) void {
         );
         return ;
     }
-    if (krn.mm.kmallocArray(u8, args[2].len + 1)) |ftype| {
-        @memcpy(ftype[0..args[2].len], args[2][0..args[2].len]);
-        ftype[args[2].len] = 0;
-        _ = krn.mount(args[0], args[1], @ptrCast(ftype), 0, null) catch {};
-        krn.mm.kfree(ftype);
-    }
+    _ = krn.do_mount(args[0], args[1], args[2], 0, null) catch {};
 }
 
 fn ls(_: *Shell, args: [][]const u8) void {

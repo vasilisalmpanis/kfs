@@ -112,7 +112,10 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !Path {
             last.* = segment;
             return curr;
         }
-        try curr.stepInto(segment);
+        curr.stepInto(segment) catch |err| {
+            krn.logger.INFO("failed steping into {s}: {!}", .{segment, err});
+            return err;
+        };
     }
     return curr;
 }

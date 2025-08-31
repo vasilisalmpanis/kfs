@@ -103,6 +103,7 @@ pub const Ext2Inode = struct {
     }
 
     fn lookup(dir: *fs.Inode, name: []const u8) !*fs.DEntry {
+        kernel.logger.INFO("ext2 lookup {s}", .{name});
         const key: fs.DentryHash = fs.DentryHash{
             .sb = @intFromPtr(dir.sb),
             .ino = dir.i_no,
