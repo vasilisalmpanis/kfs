@@ -17,7 +17,7 @@ pub fn mknod(
     }
     var can_create_name: bool = false;
     _ = parent_dir.dentry.inode.ops.lookup(
-        parent_dir.dentry.inode,
+        parent_dir.dentry,
         name
     ) catch |err| {
         switch (err) {
