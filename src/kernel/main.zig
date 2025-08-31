@@ -46,4 +46,4 @@ pub const proc_mm = @import("./mm/proc_mm.zig");
 pub const fs = @import("fs/fs.zig");
 
 pub const mkdir = @import("./syscalls/mkdir.zig").mkdir;
-pub const mount = @import("./syscalls/mount.zig").mount;
+pub const do_mount = @import("./syscalls/mount.zig").do_mount;

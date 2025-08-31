@@ -49,6 +49,6 @@ multimonitor: $(NAME)
 	qemu-system-i386 -enable-kvm -device virtio-vga,max_outputs=2 -cdrom $(NAME) -serial stdio
 
 $(IMG):
-	mke2fs -L '' -N 0 -O ^64bit -d ${IMG_DIR} -m 5 -r 1 -t ext2 ${IMG} 32M
+	mke2fs -L '' -N 0 -O ^64bit -d ${IMG_DIR} -m 5 -r 1 -t ext2 -b 1024 ${IMG} 32M
 
 .PHONY: all clean qemu multimonitor
