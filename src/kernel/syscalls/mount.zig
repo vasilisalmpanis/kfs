@@ -14,11 +14,17 @@ pub fn do_mount(
     _: ?*anyopaque
 ) !u32 {
     if (fs.FileSystem.find(fs_type)) |_type| {
-        _ = fs.Mount.mount(dev_name, dir_name, _type) catch {
-            krn.logger.INFO("Error while mounting \n", .{});
+        _ = fs.Mount.mount(dev_name, dir_name, _type) catch |err| {
+            krn.logger.ERROR(
+                "Error while mounting {s} dev {s} to {s}: {!} \n",
+                .{fs_type, dev_name, dir_name, err}
+            );
             return errors.ENOENT;
         };
-        krn.logger.INFO("mounted successfuly {s} dev {s} to {s}", .{fs_type, dev_name, dir_name});
+        krn.logger.DEBUG(
+            "mounted successfuly {s} dev {s} to {s}",
+            .{fs_type, dev_name, dir_name}
+        );
         return 0;
     }
     return errors.ENOENT;

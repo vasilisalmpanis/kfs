@@ -19,10 +19,10 @@ pub const ExampleInode = struct {
         return error.OutOfMemory;
     }
 
-    fn lookup(dir: *fs.Inode, name: []const u8) !*fs.DEntry {
+    fn lookup(dir: *fs.DEntry, name: []const u8) !*fs.DEntry {
         const key: fs.DentryHash = fs.DentryHash{
             .sb = @intFromPtr(dir.sb),
-            .ino = dir.i_no,
+            .ino = dir.inode.i_no,
             .name = name,
         };
         if (fs.dcache.get(key)) |entry| {
@@ -57,7 +57,7 @@ pub const ExampleInode = struct {
             return error.Access;
 
         // Lookup if file already exists.
-        _ = base.ops.lookup(base, name) catch {
+        _ = base.ops.lookup(parent, name) catch {
             const new_inode = try ExampleInode.new(base.sb);
             errdefer kernel.mm.kfree(new_inode);
             new_inode.mode = mode;

@@ -64,9 +64,8 @@ pub const Path = struct {
                 }
             }
         } else if (!std.mem.eql(u8, segment, ".")) {
-            krn.logger.INFO("looking up {s} {s}\n", .{segment, self.dentry.inode.sb.fs.name});
             const dentry = self.dentry.inode.ops.lookup(
-                self.dentry.inode,
+                self.dentry,
                 segment
             ) catch |err| {
                 return err;
@@ -112,10 +111,7 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !Path {
             last.* = segment;
             return curr;
         }
-        curr.stepInto(segment) catch |err| {
-            krn.logger.INFO("failed steping into {s}: {!}", .{segment, err});
-            return err;
-        };
+        try curr.stepInto(segment);
     }
     return curr;
 }

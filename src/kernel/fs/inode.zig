@@ -57,6 +57,6 @@ pub const Inode = struct {
 pub const InodeOps = struct {
     create: *const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) anyerror!*fs.DEntry,
     mknod: ?*const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry, dev: drv.device.dev_t) anyerror!*fs.DEntry,
-    lookup: *const fn (base: *Inode, name: []const u8) anyerror!*fs.DEntry,
+    lookup: *const fn (parent: *fs.DEntry, name: []const u8) anyerror!*fs.DEntry,
     mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
 };
