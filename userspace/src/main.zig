@@ -206,6 +206,11 @@ pub export fn main() linksection(".text.main") noreturn {
         _ = std.posix.close(8);
         fd = std.os.linux.open("/dev/sda", .{ .CREAT = true }, 0o444);
 
+        // _ = std.posix.mkdir("ext2", 0) catch |err| {
+        //     serial("Error mkdir: {!}\n", .{err});
+        // };
+        _ = std.os.linux.mkdir("ext2", 0);
+        _ = std.os.linux.mount("/dev/sda", "ext2", "ext2", 0, 0);
         // var big_buf: [512]u8 = .{0} ** 512;
         // for (0..5000) |_| {
         //     const r = std.posix.read(@intCast(fd), &big_buf) catch 0;
