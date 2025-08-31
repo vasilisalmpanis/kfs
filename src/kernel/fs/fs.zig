@@ -103,16 +103,103 @@ pub const UMode = packed struct {
     }
 
     // Modify to add ownership
-    pub fn isReadable(self: *UMode) bool {
+    pub fn isUReadable(self: *UMode) bool {
         return self.usr & 0o4 != 0;
     }
 
-    pub fn isWriteable(self: *UMode) bool {
+    pub fn isUWriteable(self: *UMode) bool {
         return self.usr & 0o2 != 0;
     }
 
-    pub fn isExecutable(self: *UMode) bool {
+    pub fn isUExecutable(self: *UMode) bool {
         return self.usr & 0o1 != 0;
+    }
+
+    pub fn isGReadable(self: *UMode) bool {
+        return self.grp & 0o4 != 0;
+    }
+
+    pub fn isGWriteable(self: *UMode) bool {
+        return self.grp & 0o2 != 0;
+    }
+
+    pub fn isGExecutable(self: *UMode) bool {
+        return self.grp & 0o1 != 0;
+    }
+
+    pub fn isOReadable(self: *UMode) bool {
+        return self.other & 0o4 != 0;
+    }
+
+    pub fn isOWriteable(self: *UMode) bool {
+        return self.other & 0o2 != 0;
+    }
+
+    pub fn isOExecutable(self: *UMode) bool {
+        return self.other & 0o1 != 0;
+    }
+
+    pub fn canRead(self: *UMode, uid: u32, gid: u32) bool {
+        if (uid == 0) 
+            return true;
+        if (kernel.task.current.uid == uid) {
+            if (self.isUReadable()) {
+                return true;
+            }
+            return false;
+        }
+        if (kernel.task.current.gid == gid) {
+            if (self.isGReadable()) {
+                return true;
+            }
+            return false;
+        }
+        if (self.isOReadable()) {
+            return true;
+        }
+        return false;
+    }
+
+    pub fn canWrite(self: *UMode, uid: u32, gid: u32) bool {
+        if (uid == 0) 
+            return true;
+        if (kernel.task.current.uid == uid) {
+            if (self.isUWriteable()) {
+                return true;
+            }
+            return false;
+        }
+        if (kernel.task.current.gid == gid) {
+            if (self.isGWriteable()) {
+                return true;
+            }
+            return false;
+        }
+        if (self.isOWriteable()) {
+            return true;
+        }
+        return false;
+    }
+
+    pub fn canExecute(self: *UMode, uid: u32, gid: u32) bool {
+        if (uid == 0) 
+            return true;
+        if (kernel.task.current.uid == uid) {
+            if (self.isUExecutable()) {
+                return true;
+            }
+            return false;
+        }
+        if (kernel.task.current.gid == gid) {
+            if (self.isGExecutable()) {
+                return true;
+            }
+            return false;
+        }
+        if (self.isOExecutable()) {
+            return true;
+        }
+        return false;
     }
 };
 

@@ -190,6 +190,7 @@ pub const Task = struct {
                 try files.dup(current.files);
                 self.files = files;
             } else {
+                krn.logger.ERROR("task: initSelf: failed to alloc TaskFiles", .{});
                 return errors.ENOMEM;
             }
         }
