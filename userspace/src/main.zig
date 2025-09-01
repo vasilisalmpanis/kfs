@@ -220,9 +220,10 @@ pub export fn main() linksection(".text.main") noreturn {
         fd = std.os.linux.open("/ext2/test", .{ .CREAT = false }, 0o444);
         serial("/ext2/test fd: {d}\n", .{fd});
         var len: u32 = 1;
+        var buf2: [4096]u8 = .{0} ** 4096;
         while (len > 0) {
-            len = std.posix.read(@intCast(fd), &buf) catch 1;
-            serial("/ext2/test len: {d}, content: |{s}|\n", .{len, buf[0..len]});
+            len = std.posix.read(@intCast(fd), &buf2) catch 1;
+            serial("/ext2/test len: {d}, content: |{s}|\n", .{len, buf2[0..len]});
         }
         // var big_buf: [512]u8 = .{0} ** 512;
         // for (0..5000) |_| {
