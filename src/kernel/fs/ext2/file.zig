@@ -81,7 +81,52 @@ pub const Ext2File = struct {
             return ind_u32_ptr[second_index];
         }
 
-        // triple indirect not implemented here
+        const trpl_start = dbl_start + dbl_count;
+        const trpl_count = dbl_count * ptrs_per_block;
+        if (lbn >= trpl_start and lbn < trpl_start + trpl_count) {
+            const trpl_block: u32 = ino.data.i_block[14];
+            if (trpl_block == 0) return 0;
+
+            const trpl_ind_buf: []u32 = @ptrCast(@alignCast(
+                try ext2_sb.readBlocks(trpl_block, 1)
+            ));
+
+            defer krn.mm.kfree(trpl_ind_buf.ptr);
+
+            const rel = lbn - trpl_start;
+            const rem: u32 = @intCast(rel % (ptrs_per_block * ptrs_per_block));
+
+            const first_index: u32 = @intCast(rel / (ptrs_per_block * ptrs_per_block));
+            const second_index: u32 = @intCast(rem / ptrs_per_block);
+            const third_index: u32 = @intCast(rem % ptrs_per_block);
+
+            if (first_index >= trpl_ind_buf.len) {
+                return krn.errors.PosixError.EINVAL;
+            }
+            const dbl_indirect_block_num = trpl_ind_buf[first_index];
+            if (dbl_indirect_block_num == 0) return 0;
+
+            const dbl_ind_buf: []u32 = @ptrCast(@alignCast(
+                try ext2_sb.readBlocks(dbl_indirect_block_num, 1)
+            ));
+            defer krn.mm.kfree(dbl_ind_buf.ptr);
+
+            if (second_index >= dbl_ind_buf.len) {
+                return krn.errors.PosixError.EINVAL;
+            }
+            const indirect_block_num = dbl_ind_buf[second_index];
+            if (indirect_block_num == 0) return 0;
+
+            const ind_buf: []u32 = @ptrCast(@alignCast(
+                try ext2_sb.readBlocks(indirect_block_num, 1)
+            ));
+            defer krn.mm.kfree(ind_buf.ptr);
+
+            if (third_index >= ind_buf.len) {
+                return krn.errors.PosixError.EINVAL;
+            }
+            return ind_buf[third_index];
+        }
         return krn.errors.PosixError.EINVAL;
     }
 
@@ -94,8 +139,8 @@ pub const Ext2File = struct {
         }
 
         var to_read: u32 = size;
-        if (to_read > ino.base.size - base.pos) {
-            to_read = ino.base.size - base.pos;
+        if (to_read > ino.base.size -| base.pos) {
+            to_read = ino.base.size -| base.pos;
         }
         if (to_read == 0) return 0;
 
