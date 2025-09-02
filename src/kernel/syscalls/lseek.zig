@@ -18,6 +18,9 @@ pub fn lseek(fd: u32, offset: u32, whence: u32) !u32 {
             SEEK_END => new_pos = file.inode.size + offset,
             else => {}
         }
+        if (new_pos >= file.inode.size) {
+            return errors.PosixError.EINVAL;
+        }
         file.pos = new_pos;
         return new_pos;
     }
