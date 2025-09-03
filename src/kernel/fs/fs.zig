@@ -81,6 +81,7 @@ pub fn get_ino() u32 {
     return tmp;
 }
 
+pub const S_IFMT   = 0o170;
 pub const S_IFSOCK = 0o140;
 pub const S_IFLNK  = 0o120;
 pub const S_IFREG  = 0o100;
@@ -100,6 +101,10 @@ pub const UMode = packed struct {
 
     pub fn isDir(self: *UMode) bool {
         return self.type & S_IFDIR != 0;
+    }
+
+    pub fn isLink(self: *UMode) bool {
+        return self.type & S_IFMT != S_IFLNK;
     }
 
     // Modify to add ownership

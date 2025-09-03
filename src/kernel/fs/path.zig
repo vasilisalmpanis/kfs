@@ -2,10 +2,6 @@ const std = @import("std");
 const krn = @import("../main.zig");
 const fs = @import("./fs.zig");
 
-const PathError = error{
-    WrongPath,
-};
-
 pub const Path = struct {
     mnt: *fs.Mount,
     dentry: *fs.DEntry,
@@ -43,6 +39,18 @@ pub const Path = struct {
         self.dentry = dent;
     }
 
+    pub fn followLink(self: *Path) anyerror!void {
+        if (self.dentry.inode.ops.get_link) |getLink| {
+            const path = try getLink(self.dentry.inode);
+            const new_path = try resolve(path);
+            self.release();
+            self.dentry = new_path.dentry;
+            self.mnt = new_path.mnt;
+        } else {
+            return krn.errors.PosixError.EINVAL;
+        }
+    }
+
     pub fn stepInto(self: *Path, segment: [] const u8) !void {
         if (std.mem.eql(u8, segment, "..")) {
             if (self.isRoot()) {
@@ -51,16 +59,16 @@ pub const Path = struct {
                         self.mnt = p.entry(fs.Mount, "tree");
                         self.setDentry(d.entry(fs.DEntry, "tree"));
                     } else {
-                        return error.WrongPath;
+                        return krn.errors.PosixError.EINVAL;
                     }
                 } else {
-                    return error.WrongPath;
+                    return krn.errors.PosixError.EINVAL;
                 }
             } else {
                 if (self.dentry.tree.parent) |p| {
                     self.setDentry(p.entry(fs.DEntry, "tree"));
                 } else {
-                    return error.WrongPath;
+                    return krn.errors.PosixError.EINVAL;
                 }
             }
         } else if (!std.mem.eql(u8, segment, ".")) {
@@ -73,6 +81,11 @@ pub const Path = struct {
             self.setDentry(dentry);
         }
         self.resolveMount();
+        // if (self.dentry.inode.mode.isLink()) {
+        //     krn.logger.INFO("link found {s}\n",.{self.dentry.name});
+        //     while(true) {}
+        //     try self.followLink();
+        // }
     }
 };
 
@@ -89,7 +102,7 @@ pub fn remove_trailing_slashes(path: []const u8) []const u8 {
 
 pub fn dir_resolve(path: []const u8, last: *[]const u8) !Path {
     if (path.len == 0) {
-        return PathError.WrongPath;
+        return krn.errors.PosixError.EINVAL;
     }
 
     var cwd = krn.task.initial_task.fs.pwd;
