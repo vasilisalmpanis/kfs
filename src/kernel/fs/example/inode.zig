@@ -1,6 +1,7 @@
 const fs = @import("../fs.zig");
 const kernel = fs.kernel;
 const file = @import("file.zig");
+const std = @import("std");
 
 
 pub const ExampleInode = struct {
@@ -67,6 +68,13 @@ pub const ExampleInode = struct {
         };
         return error.Exists;
     }
+
+    pub fn getLink(base: *fs.Inode) ![]u8 {
+        // const example_inode = base.getImpl(ExampleInode, "base");
+        _ = base;
+        // return std.mem.span(&example_inode.buff);
+        return kernel.errors.PosixError.EINVAL;
+    }
 };
 
 const example_inode_ops = fs.InodeOps {
@@ -74,4 +82,5 @@ const example_inode_ops = fs.InodeOps {
     .mknod = null,
     .lookup = ExampleInode.lookup,
     .mkdir = ExampleInode.mkdir,
+    .get_link = ExampleInode.getLink,
 };

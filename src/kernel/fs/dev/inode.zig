@@ -98,4 +98,5 @@ var dev_inode_ops = fs.InodeOps {
     .mknod = DevInode.mknod,
     .lookup = DevInode.lookup,
     .mkdir = DevInode.mkdir,
+    .get_link = null,
 };
