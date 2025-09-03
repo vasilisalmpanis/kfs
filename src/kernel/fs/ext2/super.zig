@@ -102,6 +102,8 @@ pub const Ext2Super = struct {
             var number_of_block_groups: u32 = ext2_super_data.s_blocks_count / ext2_super_data.s_blocks_per_group;
             if (ext2_super_data.s_blocks_count % ext2_super_data.s_blocks_per_group != 0)
                 number_of_block_groups += 1;
+            if (file.pos % sb.block_size != 0)
+                file.pos += sb.block_size - (file.pos % sb.block_size);
             if (kernel.mm.kmallocArray(BGDT, number_of_block_groups)) |bgdt_array| {
                 errdefer kernel.mm.kfree(bgdt_array);
                 for (0..number_of_block_groups) |idx| {
