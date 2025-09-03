@@ -79,4 +79,5 @@ const sys_inode_ops = fs.InodeOps {
     .mknod = null,
     .lookup = SysInode.lookup,
     .mkdir = SysInode.mkdir,
+    .get_link = null,
 };

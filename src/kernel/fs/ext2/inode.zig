@@ -193,4 +193,5 @@ const ext2_inode_ops = fs.InodeOps {
     .mknod = null,
     .lookup = Ext2Inode.lookup,
     .mkdir = Ext2Inode.mkdir,
+    .get_link = null,
 };
