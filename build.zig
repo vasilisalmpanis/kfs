@@ -57,11 +57,13 @@ pub fn build(b: *std.Build) !void {
         target.cpu_features_add.addFeature(@intFromEnum(Features.soft_float));
         const kernel = b.addExecutable(.{
             .name = name,
-            .root_source_file = b.path(kernel_src),
-            .target = b.resolveTargetQuery(target),
-            .optimize = b.standardOptimizeOption(.{}),
-            .code_model = .kernel,
-            .strip = false,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(kernel_src),
+                .optimize = b.standardOptimizeOption(.{}),
+                .target = b.resolveTargetQuery(target),
+                .code_model = .kernel,
+                .strip = false,
+            }),
         });
         kernel.root_module.stack_protector = false;
         kernel.root_module.stack_check = false;
@@ -86,15 +88,17 @@ pub fn build(b: *std.Build) !void {
         target.os_tag = .linux;
         const userspace = b.addExecutable(.{
             .name = userspace_name,
-            .root_source_file = b.path("./userspace/src/main.zig"),
-            .target = b.resolveTargetQuery(target),
-            .optimize = .ReleaseSmall,
-            .code_model = .default,
-            .strip = false,
-            .error_tracing = false,
-            .link_libc = false,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("./userspace/src/main.zig"),
+                .target = b.resolveTargetQuery(target),
+                .optimize = .ReleaseSmall,
+                .code_model = .default,
+                .strip = false,
+                .error_tracing = false,
+                .link_libc = false,
+                .single_threaded = true,
+            }),
             .linkage = .static,
-            .single_threaded = true,
         });
         userspace.setLinkerScript(b.path("./userspace/linker.ld"));
         b.installArtifact(userspace);

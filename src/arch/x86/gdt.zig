@@ -61,7 +61,7 @@ pub fn gdtInit() void {
         \\  mov %ax, %gs
         :
         : [ptr] "{edi}" (&gdt_ptr),
-        : "rax"
+        : .{ .eax = true}
     );
     asm volatile (
         \\ mov $(8 * 5), %ax

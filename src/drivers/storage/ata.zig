@@ -572,9 +572,7 @@ pub const ATAManager = struct {
     drives: std.ArrayList(*ATADrive) = undefined,
 
     pub fn init(self: *ATAManager) void {
-        self.drives = std.ArrayList(*ATADrive).init(
-            kernel.mm.kernel_allocator.allocator(),
-        );
+        self.drives = std.ArrayList(*ATADrive){};
     }
 
     pub fn addDevice(self: *ATAManager, device: ATADrive) !*ATADrive {
@@ -584,7 +582,10 @@ pub const ATAManager = struct {
         if (kernel.mm.kmalloc(ATADrive)) |drive| {
             drive.* = device;
             errdefer kernel.mm.kfree(drive);
-            try self.drives.append(drive);
+            try self.drives.append(
+                kernel.mm.kernel_allocator.allocator(),
+                drive
+            );
             return drive;
         }
         return error.OutOfMemory;
