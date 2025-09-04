@@ -23,7 +23,7 @@ pub const PlatformDevice = struct {
 
     pub fn register(self: *PlatformDevice) !void {
         self.dev.bus.add_dev(&self.dev) catch |err| {
-            kernel.logger.ERROR("Failer to add Platform device: {!}", .{err});
+            kernel.logger.ERROR("Failer to add Platform device: {any}", .{err});
         };
     }
 

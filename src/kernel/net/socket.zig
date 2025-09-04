@@ -6,7 +6,8 @@ const mutex = @import("../sched/mutex.zig");
 pub const Socket = struct {
     id: u32,
     _buffer: [128]u8,
-    ringbuf: std.RingBuffer,
+    writer: std.Io.Writer,
+    reader: std.Io.Reader,
     conn: ?*Socket,
     list: lst.ListHead,
     lock: mutex.Mutex = mutex.Mutex.init(),
@@ -14,12 +15,8 @@ pub const Socket = struct {
     pub fn setup(self: *Socket, id: u32) void {
         self.id = id;
         self._buffer = .{0} ** 128;
-        var fbe = std.heap.FixedBufferAllocator.init(&self._buffer);
-        self.ringbuf = std.RingBuffer.init(fbe.allocator(), 128) catch std.RingBuffer{
-            .data = &self._buffer,
-            .read_index =  0,
-            .write_index = 0,
-        };
+        self.writer = std.Io.Writer.fixed(&self._buffer);
+        self.reader = std.Io.Reader.fixed(&self._buffer);
         self.conn = null;
         self.list.next = &self.list;
         self.list.prev = &self.list;

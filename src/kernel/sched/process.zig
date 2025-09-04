@@ -48,7 +48,7 @@ pub fn doFork() !u32 {
     ) catch |err| {
         // TODO: understand when error comes from kmalloc allocation of files
         // or from resizing of fds/map inside files to do deinit
-        krn.logger.ERROR("fork: failed to init child task: {!}", .{err});
+        krn.logger.ERROR("fork: failed to init child task: {any}", .{err});
         km.kfree(child.?.fs);
         km.kfree(child.?.mm.?);
         km.kfree(child.?);

@@ -19,7 +19,7 @@ pub var platform_bus: Bus = Bus{
 pub fn init() void {
     platform_bus.list.setup();
     platform_bus.register() catch |err| {
-        kernel.logger.ERROR("Error while registering platform bus: {!}", .{err});
+        kernel.logger.ERROR("Error while registering platform bus: {any}", .{err});
         return ;
     };
     kernel.logger.INFO("Platform bus is registered",.{});

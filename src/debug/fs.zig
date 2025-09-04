@@ -16,15 +16,15 @@ fn mountTreeHelper(mnt: *krn.fs.Mount, level: u32, last_child: bool) void {
         }
     }
     if (!last_child) {
-        fmt.formatText(
-            "\n",
-            "s",
-            .{
-                .width = level + 1,
-                .alignment = .left
-            },
-            writer
-        ) catch {};
+        // fmt.formatText(
+        //     "\n",
+        //     "s",
+        //     .{
+        //         .width = level + 1,
+        //         .alignment = .left
+        //     },
+        //     writer
+        // ) catch {};
     }
 }
 

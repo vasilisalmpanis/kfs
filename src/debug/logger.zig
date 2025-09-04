@@ -48,13 +48,13 @@ pub const Logger = struct {
             .ERROR => RED
         };
         const formatted_log = try std.fmt.allocPrint(krn.mm.kernel_allocator.allocator(),
-            "{s}[{s}]: " ++
+            "{s}[{t}]: " ++
                 format ++
                 DEFAULT ++
                 if (format[format.len - 1] == '\n') "" else "\n",
             .{
                 color,
-                @tagName(level)
+                level,
             } ++ args
         );
         krn.serial.print(formatted_log);

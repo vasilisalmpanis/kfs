@@ -104,7 +104,7 @@ pub var pci_bus: Bus = Bus{
 pub fn init() void {
     pci_bus.list.setup();
     pci_bus.register() catch |err| {
-        krn.logger.ERROR("Error while registering pci bus: {!}", .{err});
+        krn.logger.ERROR("Error while registering pci bus: {any}", .{err});
         return ;
     };
     krn.logger.INFO("PCI bus is registered",.{});

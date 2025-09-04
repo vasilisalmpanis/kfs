@@ -71,7 +71,7 @@ pub fn init() void {
         };
         kernel.logger.WARN("Device registered for serial", .{});
         pdrv.platform_register_driver(&serial_driver.driver) catch |err| {
-            kernel.logger.ERROR("Error registering platform driver: {!}", .{err});
+            kernel.logger.ERROR("Error registering platform driver: {any}", .{err});
             return ;
         };
         kernel.logger.WARN("Driver registered for serial", .{});
