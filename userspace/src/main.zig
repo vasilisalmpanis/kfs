@@ -22,11 +22,15 @@ pub fn myLogFn(
 }
 
 fn serial(comptime format: []const u8, args: anytype) void {
-    _ = std.io.getStdErr().writer().print(format, args) catch null;
+    var buf: [1024]u8 = .{0} ** 1024;
+    var writer = std.fs.File.stderr().writer(&buf).interface;
+    writer.print(format, args) catch {};
 }
 
 fn screen(comptime format: []const u8, args: anytype) void {
-    _ = std.io.getStdOut().writer().print(format, args) catch null;
+    var buf: [1024]u8 = .{0} ** 1024;
+    var writer = std.fs.File.stdout().writer(&buf).interface;
+    writer.print(format, args) catch {};
 }
 
 fn testWait() void {
@@ -99,7 +103,7 @@ fn pidUid(task: [] const u8) void {
 fn setAction() void {
     const action: std.posix.Sigaction = .{
         .handler = .{ .handler = &customHandler },
-        .mask = .{@as(u32,1) << std.c.SIG.TRAP - 1} ++ .{0} ** 31,
+        .mask = .{0} ** 2,
         .flags = 0,
     };
     _ = os.linux.sigaction(std.c.SIG.ABRT, &action, null);
@@ -140,7 +144,7 @@ pub export fn main() linksection(".text.main") noreturn {
     serial("result of writing to {d}:\n  len:{d}\n", .{fd, wl});
     _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
     const pid = std.posix.fork() catch |err| blk: {
-        serial("fork error: {!}\n", .{err});
+        serial("fork error: {any}\n", .{err});
         break :blk 3;
     };
     if (pid == 0) {
@@ -179,7 +183,7 @@ pub export fn main() linksection(".text.main") noreturn {
                 null,
                 null
             ) catch |err| blk: {
-                serial("error receiving: {!}", .{err});
+                serial("error receiving: {any}", .{err});
                 break :blk 1;
             } == 0
         ) {}

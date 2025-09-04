@@ -165,7 +165,7 @@ pub inline fn archReschedule() void {
         :
         : [code_seg] "i" (KERNEL_CODE_SEGMENT),
           [data_seg] "i" (KERNEL_DATA_SEGMENT)
-        : "memory"
+        : .{ .memory = true }
     );
 }
 
