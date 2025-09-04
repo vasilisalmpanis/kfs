@@ -137,7 +137,7 @@ pub const PCIDevice = struct {
 
     pub fn register(self: *PCIDevice) void {
         pci.bus.pci_bus.add_dev(&self.dev) catch |err| {
-            krn.logger.ERROR("Failer to add PCI device: {!}", .{err});
+            krn.logger.ERROR("Failer to add PCI device: {any}", .{err});
         };
     }
 

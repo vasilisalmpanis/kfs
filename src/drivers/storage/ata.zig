@@ -668,7 +668,7 @@ pub fn ata_init(pci_device: *pci.PCIDevice) void {
             ))|drive| {
                 if (getDriveName()) |name| {
                     createStorageDev(drive, name, manager) catch |err| {
-                        kernel.logger.ERROR("Failed to create Storage Device: {!}", .{err});
+                        kernel.logger.ERROR("Failed to create Storage Device: {any}", .{err});
                     };
                     kernel.mm.kfree(name.ptr);
                 } else kernel.logger.ERROR("Failed to alloc name for ATADrive", .{});

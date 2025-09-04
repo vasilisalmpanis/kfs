@@ -1,10 +1,10 @@
 const screen = @import("drivers").screen;
 const kernel = @import("kernel");
 const fmt = @import("std").fmt;
-const Writer = @import("std").io.Writer;
+const AnyWriter = @import("std").Io.AnyWriter;
 
 
-pub const writer = Writer(void, error{}, callback){ .context = {} };
+pub const writer = AnyWriter(void, error{}, callback){ .context = {} };
 
 fn callback(_: void, string: []const u8) error{}!usize {
     // Print the string passed to the callback

@@ -24,7 +24,7 @@ pub const StorageDevice = struct {
 
     pub fn register(self: *StorageDevice) !void {
         self.dev.bus.add_dev(&self.dev) catch |err| {
-            kernel.logger.ERROR("Failer to add Storage device: {!}", .{err});
+            kernel.logger.ERROR("Failer to add Storage device: {any}", .{err});
         };
     }
 

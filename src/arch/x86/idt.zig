@@ -21,9 +21,9 @@ pub const USER_DATA_SEGMENT   = 0x20;
 
 const ExceptionHandler  = fn (regs: *Regs) void;
 const SyscallHandler    = fn (regs: *Regs) void;
-const ISRHandler        = fn () callconv(.C) void;
+const ISRHandler        = fn () callconv(.c) void;
 
-pub export fn exceptionHandler(state: *Regs) callconv(.C) void {
+pub export fn exceptionHandler(state: *Regs) callconv(.c) void {
     krn.logger.DEBUG("EXC {d}", .{state.int_no});
     if (krn.irq.handlers[state.int_no] != null) {
         const handler: *const ExceptionHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
@@ -31,7 +31,7 @@ pub export fn exceptionHandler(state: *Regs) callconv(.C) void {
     }
 }
 
-pub export fn irqHandler(state: *Regs) callconv(.C) *Regs {
+pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     var new_state: *Regs = state;
     if (krn.irq.handlers[state.int_no] != null) {
         if (state.int_no == SYSCALL_INTERRUPT) {
@@ -167,6 +167,7 @@ comptime {
             ErrorCodes.get(except) orelse false
         );
     }
+    @setEvalBranchQuota(400000);
     for (CPU_EXCEPTION_COUNT..IDT_MAX_DESCRIPTORS) |i| {
         asm_source = asm_source ++ generateIRQStub(@intCast(i));
     }
@@ -177,6 +178,7 @@ comptime {
 // Create the ISR stub table
 pub export var isr_stub_table: [IDT_MAX_DESCRIPTORS]*const ISRHandler align(4) linksection(".data") = init: {
     var table: [IDT_MAX_DESCRIPTORS]*const ISRHandler = undefined;
+    @setEvalBranchQuota(200000);
     for (0..CPU_EXCEPTION_COUNT) |i| {
         table[i] = @extern(
             *const ISRHandler,

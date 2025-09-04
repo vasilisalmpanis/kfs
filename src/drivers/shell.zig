@@ -36,7 +36,7 @@ pub const Shell = struct {
         command: ShellCommand,
     ) void {
         self.commands.put(command.name, command) catch |err| {
-            printf("Error registering command: {!}\n", .{err});
+            printf("Error registering command: {any}\n", .{err});
         };
     }
 
@@ -319,7 +319,7 @@ fn ls(_: *Shell, args: [][]const u8) void {
         path = args[0];
     }
     const curr = krn.fs.path.resolve(path) catch |err| {
-        debug.printf("error: {!} for {s}\n", .{err, path});
+        debug.printf("error: {any} for {s}\n", .{err, path});
         return ;
     };
     defer curr.release();

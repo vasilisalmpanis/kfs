@@ -13,13 +13,13 @@ fn printTask(task: *tsk.Task) void {
         const name: []const u8 = if (task.threadfn) |f| if_lbl: {
         break :if_lbl if (lookupSymbol(@intFromPtr(f))) |s| s else "";
     } else else_lbl: {
-        _ = std.fmt.formatIntBuf(
-            buffer[2..],
-            task.regs.eip,
-            16,
-            .upper,
-            .{.alignment = .right, .width = 8, .fill = '0' }
-        );
+        // _ = std.fmt.formatIntBuf(
+        //     buffer[2..],
+        //     task.regs.eip,
+        //     16,
+        //     .upper,
+        //     .{.alignment = .right, .width = 8, .fill = '0' }
+        // );
         break :else_lbl &buffer;
     };
     printf("{d}: {s} {s} {s} {s} {d} | refs: {d}\n", .{
@@ -60,15 +60,15 @@ fn psTreeHelper(task: *tsk.Task, level: u32, last_child: bool) void {
         }
     }
     if (!last_child) {
-        fmt.formatText(
-            "\n",
-            "s",
-            .{
-                .width = level + 1,
-                .alignment = .left
-            },
-            writer
-        ) catch {};
+        // fmt.formatText(
+        //     "\n",
+        //     "s",
+        //     .{
+        //         .width = level + 1,
+        //         .alignment = .left
+        //     },
+        //     writer
+        // ) catch {};
     }
 }
 
