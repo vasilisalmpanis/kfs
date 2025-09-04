@@ -16,7 +16,7 @@ pub fn do_mount(
     if (fs.FileSystem.find(fs_type)) |_type| {
         _ = fs.Mount.mount(dev_name, dir_name, _type) catch |err| {
             krn.logger.ERROR(
-                "Error while mounting {s} dev {s} to {s}: {!} \n",
+                "Error while mounting {s} dev {s} to {s}: {any} \n",
                 .{fs_type, dev_name, dir_name, err}
             );
             return errors.ENOENT;
