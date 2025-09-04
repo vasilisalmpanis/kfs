@@ -40,7 +40,7 @@ pub fn enableWriteProtect() void {
         \\mov %%cr0, %%eax
         \\or $0x10000, %%eax    # Set WP bit (bit 16)
         \\mov %%eax, %%cr0
-        ::: "eax", "memory"
+        ::: .{ .eax = true, .memory = true }
     );
 }
 
@@ -50,7 +50,7 @@ pub fn disableWriteProtect() void {
         \\mov %%cr0, %%eax
         \\and $0xFFFEFFFF, %%eax    # Clear WP bit (bit 16)
         \\mov %%eax, %%cr0
-        ::: "eax", "memory"
+        ::: .{ .eax = true, .memory = true }
     );
 }
 

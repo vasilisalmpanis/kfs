@@ -27,7 +27,7 @@ pub inline fn traceStackTrace(maxFrames : u32 ) void {
     var stk : ?*StackFrame = 
      asm ("movl %ebp, %[result]"
         : [result] "={eax}" (-> *StackFrame),
-        : :
+        : : .{}
     );
     printf("Stack Trace:\n",.{});
     var frame : u32 = 0;
@@ -97,7 +97,7 @@ inline fn saveRegisters(state: *RegisterState) void {
         \\ pushfd
         \\ pop %[out]
         : [out] "={eax}" (-> usize)
-        ::
+        :: .{}
     );
     state.eflags = value;
 
@@ -181,6 +181,6 @@ pub inline fn dumpRegs() void {
         :
         : [code_seg] "i" (arch.idt.KERNEL_CODE_SEGMENT),
           [data_seg] "i" (arch.idt.KERNEL_DATA_SEGMENT)
-        : "memory"
+        : .{ .memory = true }
     );
 }
