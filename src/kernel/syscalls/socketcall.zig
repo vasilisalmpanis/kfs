@@ -98,10 +98,10 @@ pub fn recvfrom(
     if (krn.socket.findById(@intCast(fd))) |sock| {
         const u_buff: [*]u8 = @ptrCast(ubuff);
         sock.lock.lock();
-        const avail = sock.ringbuf.len();
+        const avail = sock.reader.end - sock.reader.seek;
         const to_read = if (avail > size) size else avail;
         defer sock.lock.unlock();
-        sock.ringbuf.readFirstAssumeLength(u_buff[0..to_read], to_read);
+        _ = sock.reader.readSliceShort(u_buff[0..to_read]) catch {};
         return @intCast(to_read);
     } else {
         return errors.EBADF;
@@ -124,10 +124,8 @@ pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, add
             const ubuff: [*]u8 = @ptrCast(buff);
             remote.lock.lock();
             defer remote.lock.unlock();
-            const free_space = remote.ringbuf.data.len - remote.ringbuf.len();
-            const to_write = if (free_space > len) len else free_space;
-            remote.ringbuf.writeSliceAssumeCapacity(ubuff[0..to_write]);
-            return @intCast(len);
+            const res = remote.writer.write(ubuff[0..len]) catch 0;
+            return @intCast(res);
         } else {
             return errors.ENOTCONN;
         }

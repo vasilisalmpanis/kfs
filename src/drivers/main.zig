@@ -29,7 +29,7 @@ pub fn init() void {
         @panic("unable to create /sys directory");
     };
     _ = krn.do_mount("sys", "/sys", "sysfs", 0, null) catch |err| {
-        krn.logger.ERROR("{!}", .{err});
+        krn.logger.ERROR("{any}", .{err});
         @panic("unable to mount sysfs");
     };
     _ = krn.mkdir("/sys/bus", 0) catch {
@@ -44,7 +44,7 @@ pub fn init() void {
         @panic("unable to create /dev directory");
     };
     _ = krn.do_mount("dev", "/dev", "devfs", 0, null) catch |err| {
-        krn.logger.ERROR("{!}", .{err});
+        krn.logger.ERROR("{any}", .{err});
         @panic("unable to mount devfs");
     };
     devfs_path = krn.fs.path.resolve("/dev") catch {

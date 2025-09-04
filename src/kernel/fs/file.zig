@@ -101,7 +101,7 @@ pub const TaskFiles = struct {
         while (fd_it.next()) |id| {
             if (id > self.map.capacity()) {
                 self.map.resize(self.map.capacity() * 2, false) catch |err| {
-                    kernel.logger.ERROR("TaskFiles.dup(): failed to resize map: {!}", .{err});
+                    kernel.logger.ERROR("TaskFiles.dup(): failed to resize map: {any}", .{err});
                     return errors.ENOMEM;
                 };
             }

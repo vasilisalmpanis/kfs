@@ -26,7 +26,7 @@ pub fn panic(
     first_trace_addr: ?usize
 ) noreturn {
     krn.logger.ERROR(
-        "\nPANIC: {s}\nfirst_trace_addr {?x}\nstack: {?}\n",
+        "\nPANIC: {s}\nfirst_trace_addr {?x}\nstack: {any}\n",
         .{msg, first_trace_addr, stack}
     );
     dbg.traceStackTrace(20);
