@@ -22,15 +22,15 @@ pub fn myLogFn(
 }
 
 fn serial(comptime format: []const u8, args: anytype) void {
-    var buf: [1024]u8 = .{0} ** 1024;
-    var writer = std.fs.File.stderr().writer(&buf).interface;
-    writer.print(format, args) catch {};
+    std.debug.print(format, args);
 }
 
 fn screen(comptime format: []const u8, args: anytype) void {
-    var buf: [1024]u8 = .{0} ** 1024;
-    var writer = std.fs.File.stdout().writer(&buf).interface;
-    writer.print(format, args) catch {};
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+    stdout.print(format, args) catch {};
+    stdout.flush() catch {};
 }
 
 fn testWait() void {
@@ -131,6 +131,7 @@ fn childProcess(sock_fd: i32) void {
 }
 
 pub export fn main() linksection(".text.main") noreturn {
+    screen("testing screen from userspace {d}\n", .{12343});
     var fds: [2]i32 = .{0, 0};
     _ = os.linux.socketpair(
         os.linux.AF.UNIX,
@@ -223,7 +224,7 @@ pub export fn main() linksection(".text.main") noreturn {
         _ = std.os.linux.mount("/dev/sda", "ext2", "ext2", 0, 0);
         fd = std.os.linux.open("/ext2/test", .{ .CREAT = false }, 0o444);
         serial("/ext2/test fd: {d}\n", .{fd});
-        _ = std.posix.lseek_SET(@intCast(fd), 79691776) catch null;
+        _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
         var len: u32 = 1;
         var buf2: [4096]u8 = .{0} ** 4096;
         while (len > 0) {

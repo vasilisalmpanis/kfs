@@ -170,7 +170,7 @@ pub const SyscallTable = brk: {
         .SYS_flock                      = &notImpl,
         .SYS_msync                      = &notImpl,
         .SYS_readv                      = &notImpl,
-        .SYS_writev                     = &notImpl,
+        .SYS_writev                     = @ptrCast(&@import("write.zig").writev),
         .SYS_getsid                     = &notImpl,
         .SYS_fdatasync                  = &notImpl,
         .SYS__sysctl                    = &notImpl,
@@ -222,6 +222,7 @@ pub const SyscallTable = brk: {
         .SYS_recvfrom                   = @ptrCast(&@import("socketcall.zig").recvfrom),
         .SYS_getuid32                   = @ptrCast(&@import("../sched/process.zig").getUID),
         .SYS_mknodat                    = &notImpl,
+        .SYS_pwritev                    = @ptrCast(&@import("write.zig").pwritev),
     });
 };
 
