@@ -132,7 +132,8 @@ pub fn hPageFault(regs: *Regs) void {
             regs.err_code & 0x10,
         });
     regs.dump();
-    while (true){}
+    dbg.traceStackTrace(20);
+    @panic("hPageFault");
 }
 
 pub fn hReserved_1(regs: *Regs) void {

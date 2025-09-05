@@ -56,7 +56,7 @@ pub const SysInode = struct {
     }
 
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
-        if (base.mode.type != fs.S_IFDIR)
+        if (!base.mode.isDir())
             return error.NotDirectory;
         if (!base.mode.canWrite(base.uid, base.gid))
             return error.Access;

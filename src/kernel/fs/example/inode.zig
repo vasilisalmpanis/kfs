@@ -52,7 +52,7 @@ pub const ExampleInode = struct {
     }
 
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
-        if (base.mode.type != fs.S_IFDIR)
+        if (!base.mode.isDir())
             return error.NotDirectory;
         if (!base.mode.canWrite(base.uid, base.gid))
             return error.Access;
@@ -69,9 +69,10 @@ pub const ExampleInode = struct {
         return error.Exists;
     }
 
-    pub fn getLink(base: *fs.Inode) ![]u8 {
+    pub fn getLink(base: *fs.Inode, resulting_link: *[]u8) !void {
         // const example_inode = base.getImpl(ExampleInode, "base");
         _ = base;
+        _ = resulting_link;
         // return std.mem.span(&example_inode.buff);
         return kernel.errors.PosixError.EINVAL;
     }

@@ -41,8 +41,12 @@ pub const Path = struct {
 
     pub fn followLink(self: *Path) anyerror!void {
         if (self.dentry.inode.ops.get_link) |getLink| {
-            const path = try getLink(self.dentry.inode);
-            const new_path = try resolve(path);
+            var path: [1024]u8 = .{0} ** 1024;
+            var path_slice: []u8 = path[0..1024];
+            try getLink(self.dentry.inode, &path_slice);
+            krn.logger.INFO("resulting path: {s}, len: {d}", .{path_slice, path_slice.len});
+            // TO DO: resolve path not from cwd, but from directory containing this inode
+            const new_path = try resolve(path_slice);
             self.release();
             self.dentry = new_path.dentry;
             self.mnt = new_path.mnt;
@@ -81,11 +85,10 @@ pub const Path = struct {
             self.setDentry(dentry);
         }
         self.resolveMount();
-        // if (self.dentry.inode.mode.isLink()) {
-        //     krn.logger.INFO("link found {s}\n",.{self.dentry.name});
-        //     while(true) {}
-        //     try self.followLink();
-        // }
+        if (self.dentry.inode.mode.isLink()) {
+            krn.logger.INFO("link found {s}\n",.{self.dentry.name});
+            try self.followLink();
+        }
     }
 };
 

@@ -100,11 +100,31 @@ pub const UMode = packed struct {
     type: u7 = 0,
 
     pub fn isDir(self: *UMode) bool {
-        return self.type & S_IFDIR != 0;
+        return self.type & S_IFMT == S_IFDIR;
     }
 
     pub fn isLink(self: *UMode) bool {
-        return self.type & S_IFMT != S_IFLNK;
+        return self.type & S_IFMT == S_IFLNK;
+    }
+
+    pub fn isReg(self: *UMode) bool {
+        return self.type & S_IFMT == S_IFREG;
+    }
+
+    pub fn isChr(self: *UMode) bool {
+        return self.type & S_IFMT == S_IFCHR;
+    }
+
+    pub fn isBlk(self: *UMode) bool {
+        return self.type & S_IFMT == S_IFBLK;
+    }
+
+    pub fn isFifo(self: *UMode) bool {
+        return self.type & S_IFMT == S_IFIFO;
+    }
+
+    pub fn isSock(self: *UMode) bool {
+        return self.type & S_IFMT == S_IFSOCK;
     }
 
     // Modify to add ownership
