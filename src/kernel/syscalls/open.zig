@@ -6,19 +6,18 @@ const fs = @import("../fs/fs.zig");
 const std = @import("std");
 const kernel = @import("../main.zig");
 
-pub fn open(
-    filename: [*:0]u8,
+pub fn do_open(
+    filename: []const u8,
     flags: u16,
-    mode: fs.UMode,
+    mode: fs.UMode
 ) !u32 {
     var new: bool = false;
     const fd = tsk.current.files.getNextFD() catch {
         return errors.EMFILE;
     };
     errdefer _ = tsk.current.files.releaseFD(fd);
-    const path = std.mem.span(filename);
     var file_segment: []const u8 = "";
-    const parent_dir = fs.path.dir_resolve(path, &file_segment) catch {
+    const parent_dir = fs.path.dir_resolve(filename, &file_segment) catch {
         return errors.ENOENT;
     };
     defer parent_dir.release();
@@ -76,4 +75,16 @@ pub fn open(
         return errors.ENOENT;
     };
     return fd;
+}
+
+pub fn open(
+    filename: ?[*:0]u8,
+    flags: u16,
+    mode: fs.UMode,
+) !u32 {
+    if (filename) |f| {
+        const path: []u8 = std.mem.span(f);
+        return try do_open(path, flags, mode);
+    }
+    return errors.EINVAL;
 }

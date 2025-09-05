@@ -88,5 +88,5 @@ pub const InodeOps = struct {
     mknod: ?*const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry, dev: drv.device.dev_t) anyerror!*fs.DEntry,
     lookup: *const fn (parent: *fs.DEntry, name: []const u8) anyerror!*fs.DEntry,
     mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
-    get_link: ?*const fn(base: *Inode) anyerror![]u8,
+    get_link: ?*const fn(base: *Inode, resulting_link: *[]u8) anyerror!void,
 };

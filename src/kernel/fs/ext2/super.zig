@@ -70,10 +70,11 @@ const Ext2SuperData = extern struct {
 };
 
 pub const Ext2Super = struct {
-        data: Ext2SuperData,
-        bgdt: []BGDT,
-        block_size: u32,
-        base: fs.SuperBlock,
+    data: Ext2SuperData,
+    bgdt: []BGDT,
+    block_size: u32,
+    base: fs.SuperBlock,
+    
     pub fn allocInode(_: *fs.SuperBlock) !*fs.Inode {
         return error.NotImplemented;
     }
@@ -178,6 +179,118 @@ pub const Ext2Super = struct {
         } else {
             return self.data.s_first_ino;
         }
+    }
+
+    // Helper: resolve logical block number -> physical block number
+    // Returns:
+    //  - Ok(0)    -> sparse hole (no block allocated)
+    //  - Ok(n>0)  -> physical block number on disk
+    //  - Err(...) -> error (e.g. out of range)
+    pub fn resolveLbn(ext2_sb: *Ext2Super, ino: *Ext2Inode, lbn: u64) !u32 {
+        const bs = ext2_sb.block_size;
+        const ptrs_per_block = bs / 4; // 4 bytes per block pointer (u32)
+
+        if (lbn <= 11) {
+            // direct
+            return ino.data.i_block[@intCast(lbn)];
+        }
+
+        // single indirect range: 12 .. 12 + ptrs_per_block - 1
+        if (lbn >= 12 and lbn < 12 + ptrs_per_block) {
+            const indirect_block = ino.data.i_block[12];
+            if (indirect_block == 0) return 0; // hole
+
+            const buf = try ext2_sb.readBlocks(indirect_block, 1);
+            defer kernel.mm.kfree(buf.ptr);
+
+            // treat buf as array of u32
+            const u32_ptr: [*]u32 = @ptrCast(@alignCast(buf.ptr));
+            const slice_len = buf.len / 4;
+            const slice: []const u32 = u32_ptr[0..slice_len];
+
+            const index: u32 = @intCast(lbn - 12);
+            if (index >= slice_len) return kernel.errors.PosixError.EINVAL;
+
+            return slice[index];
+        }
+
+        // double indirect range: start at 12 + ptrs_per_block
+        const dbl_start = 12 + ptrs_per_block;
+        const dbl_count = ptrs_per_block * ptrs_per_block;
+        if (lbn >= dbl_start and lbn < dbl_start + dbl_count) {
+            const dbl_block = ino.data.i_block[13];
+            if (dbl_block == 0) return 0; // hole
+
+            // index within the double-indirect space
+            const rel = lbn - dbl_start;
+            const first_index: u32 = @intCast(rel / ptrs_per_block); // index into dbl_block
+            const second_index: u32 = @intCast(rel % ptrs_per_block); // index inside referenced indirect block
+
+            // read double-indirect block (contains ptrs to indirect blocks)
+            const dbl_buf = try ext2_sb.readBlocks(dbl_block, 1);
+            defer kernel.mm.kfree(dbl_buf.ptr);
+            const dbl_u32_ptr: [*]u32 = @ptrCast(@alignCast(dbl_buf.ptr));
+            const dbl_slice_len = dbl_buf.len / 4;
+            if (first_index >= dbl_slice_len) return kernel.errors.PosixError.EINVAL;
+            const indirect_block_num = dbl_u32_ptr[first_index];
+            if (indirect_block_num == 0) return 0; // hole
+
+            // read the indirect block pointed to by double-indirect
+            const ind_buf = try ext2_sb.readBlocks(indirect_block_num, 1);
+            defer kernel.mm.kfree(ind_buf.ptr);
+            const ind_u32_ptr: [*]u32 = @ptrCast(@alignCast(ind_buf.ptr));
+            const ind_slice_len = ind_buf.len / 4;
+            if (second_index >= ind_slice_len) return kernel.errors.PosixError.EINVAL;
+            return ind_u32_ptr[second_index];
+        }
+
+        const trpl_start = dbl_start + dbl_count;
+        const trpl_count = dbl_count * ptrs_per_block;
+        if (lbn >= trpl_start and lbn < trpl_start + trpl_count) {
+            const trpl_block: u32 = ino.data.i_block[14];
+            if (trpl_block == 0) return 0;
+
+            const trpl_ind_buf: []u32 = @ptrCast(@alignCast(
+                try ext2_sb.readBlocks(trpl_block, 1)
+            ));
+
+            defer kernel.mm.kfree(trpl_ind_buf.ptr);
+
+            const rel = lbn - trpl_start;
+            const rem: u32 = @intCast(rel % (ptrs_per_block * ptrs_per_block));
+
+            const first_index: u32 = @intCast(rel / (ptrs_per_block * ptrs_per_block));
+            const second_index: u32 = @intCast(rem / ptrs_per_block);
+            const third_index: u32 = @intCast(rem % ptrs_per_block);
+
+            if (first_index >= trpl_ind_buf.len) {
+                return kernel.errors.PosixError.EINVAL;
+            }
+            const dbl_indirect_block_num = trpl_ind_buf[first_index];
+            if (dbl_indirect_block_num == 0) return 0;
+
+            const dbl_ind_buf: []u32 = @ptrCast(@alignCast(
+                try ext2_sb.readBlocks(dbl_indirect_block_num, 1)
+            ));
+            defer kernel.mm.kfree(dbl_ind_buf.ptr);
+
+            if (second_index >= dbl_ind_buf.len) {
+                return kernel.errors.PosixError.EINVAL;
+            }
+            const indirect_block_num = dbl_ind_buf[second_index];
+            if (indirect_block_num == 0) return 0;
+
+            const ind_buf: []u32 = @ptrCast(@alignCast(
+                try ext2_sb.readBlocks(indirect_block_num, 1)
+            ));
+            defer kernel.mm.kfree(ind_buf.ptr);
+
+            if (third_index >= ind_buf.len) {
+                return kernel.errors.PosixError.EINVAL;
+            }
+            return ind_buf[third_index];
+        }
+        return kernel.errors.PosixError.EINVAL;
     }
 };
 
