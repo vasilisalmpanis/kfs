@@ -31,7 +31,7 @@ pub fn mknod(
         return errors.EEXIST;
     }
 
-    switch (mode.type) {
+    switch (mode.type & fs.S_IFMT) {
         fs.S_IFBLK, fs.S_IFCHR => return do_mknod(
             parent_dir,
             name,

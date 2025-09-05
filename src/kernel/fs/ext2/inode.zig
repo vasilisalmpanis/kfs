@@ -153,7 +153,7 @@ pub const Ext2Inode = struct {
     }
 
     pub fn create(base: *fs.Inode, name: []const u8, _: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
-        if (base.mode.type != fs.S_IFDIR)
+        if (!base.mode.isDir())
             return error.NotDirectory;
         if (!base.mode.canWrite(base.uid, base.gid))
             return error.Access;
@@ -186,6 +186,24 @@ pub const Ext2Inode = struct {
         inode.base.mode = inode.data.i_mode;
         kernel.mm.kfree(raw_buff.ptr);
     }
+
+    pub fn getLink(base: *fs.Inode, resulting_link: *[]u8) !void {
+        const ext2_inode = base.getImpl(Ext2Inode, "base");
+        const ext2_s = base.sb.getImpl(ext2_sb.Ext2Super, "base");
+        if (ext2_inode.data.i_blocks > 0) {
+            const lbn = try ext2_s.resolveLbn(ext2_inode, 0);
+            const block = try ext2_s.readBlocks(lbn, 1);
+            kernel.logger.INFO("link block: {s}", .{block});
+        } else {
+            const block: [*:0]u8 = @ptrCast(&ext2_inode.data.i_block);
+            const span: []u8 = std.mem.span(block);
+            if (span.len > resulting_link.len)
+                return kernel.errors.PosixError.EINVAL;
+            @memcpy(resulting_link.*[0..span.len], span);
+            resulting_link.len = span.len;
+            return ;
+        }
+    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -193,5 +211,5 @@ const ext2_inode_ops = fs.InodeOps {
     .mknod = null,
     .lookup = Ext2Inode.lookup,
     .mkdir = Ext2Inode.mkdir,
-    .get_link = null,
+    .get_link = Ext2Inode.getLink,
 };

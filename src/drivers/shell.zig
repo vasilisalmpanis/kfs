@@ -67,6 +67,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "mkdir", .desc = "Create a new directory", .hndl = &mkdir });
         self.registerCommand(.{ .name = "cd", .desc = "Change pwd", .hndl = &cd });
         self.registerCommand(.{ .name = "date", .desc = "Current date and time", .hndl = &date });
+        self.registerCommand(.{ .name = "cat", .desc = "Output file content", .hndl = &cat });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -371,6 +372,41 @@ fn cd(_: *Shell, args: [][]const u8) void {
     krn.task.initial_task.fs.pwd.dentry = dir.dentry;
     krn.task.initial_task.fs.pwd.mnt = dir.mnt;
     // krn.task.initial_task.fs.pwd.mnt = ?;
+}
+
+fn cat(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf(
+            \\Usage: cat <path>
+            \\  Example: cat /ext2/test
+            \\
+            , .{}
+        );
+        return ;
+    }
+    const file_path = krn.fs.path.resolve(args[0]) catch |err| {
+        debug.printf("Failed to resolve path: {t}", .{err});
+        return ;
+    };
+    const new_file: *krn.fs.File = krn.fs.File.new(file_path) catch {
+        debug.printf("Failed to alloc mem for file", .{});
+        return ;
+    };
+    new_file.ops.open(new_file, new_file.inode) catch {
+        krn.mm.kfree(new_file);
+        debug.printf("Failed to open file", .{});
+        return ;
+    };
+
+    var len: u32 = 1;
+    var buf: [1024]u8 = .{0} ** 1024;
+    while (len > 0) {
+        len = new_file.ops.read(new_file, @ptrCast(&buf), 1024) catch 0;
+        if (len > 0) {
+            printf("{s}", .{buf[0..len]});
+        }
+    }
+    krn.mm.kfree(new_file);
 }
 
 fn date(_: *Shell, _: [][]const u8) void {
