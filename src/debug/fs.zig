@@ -1,5 +1,7 @@
+const std = @import("std");
 const fmt = @import("std").fmt;
 const krn = @import("kernel");
+const printf = @import("./printf.zig").printf;
 const printfLen = @import("./printf.zig").printfLen;
 const writer = @import("./printf.zig").writer;
 
@@ -16,15 +18,16 @@ fn mountTreeHelper(mnt: *krn.fs.Mount, level: u32, last_child: bool) void {
         }
     }
     if (!last_child) {
-        // fmt.formatText(
-        //     "\n",
-        //     "s",
-        //     .{
-        //         .width = level + 1,
-        //         .alignment = .left
-        //     },
-        //     writer
-        // ) catch {};
+        var buff: [20:0]u8 = .{0} ** 20;
+        _ = std.fmt.printInt(
+            &buff,
+            0,
+            10,
+            .upper,
+            .{ .alignment = .left, .fill = ' ', .width = level + 1 }
+        );
+        const slic: []u8 = std.mem.span(@as([*:0]u8, @ptrCast(&buff)));
+        printf("\n{s}", .{slic[1..]});
     }
 }
 
