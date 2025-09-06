@@ -39,14 +39,12 @@ pub const Path = struct {
         self.dentry = dent;
     }
 
-    pub fn followLink(self: *Path) anyerror!void {
+    pub fn followLink(self: *Path, prev_path: Path) anyerror!void {
         if (self.dentry.inode.ops.get_link) |getLink| {
             var path: [1024]u8 = .{0} ** 1024;
             var path_slice: []u8 = path[0..1024];
             try getLink(self.dentry.inode, &path_slice);
-            krn.logger.INFO("resulting path: {s}, len: {d}", .{path_slice, path_slice.len});
-            // TO DO: resolve path not from cwd, but from directory containing this inode
-            const new_path = try resolve(path_slice);
+            const new_path = try resolveFrom(path_slice, prev_path);
             self.release();
             self.dentry = new_path.dentry;
             self.mnt = new_path.mnt;
@@ -56,6 +54,7 @@ pub const Path = struct {
     }
 
     pub fn stepInto(self: *Path, segment: [] const u8) !void {
+        var prev_path: Path = self.clone();
         if (std.mem.eql(u8, segment, "..")) {
             if (self.isRoot()) {
                 if (self.mnt.root.tree.parent) |d| {
@@ -86,8 +85,8 @@ pub const Path = struct {
         }
         self.resolveMount();
         if (self.dentry.inode.mode.isLink()) {
-            krn.logger.INFO("link found {s}\n",.{self.dentry.name});
-            try self.followLink();
+            try self.followLink(prev_path);
+            prev_path.release();
         }
     }
 };
@@ -130,6 +129,44 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !Path {
         try curr.stepInto(segment);
     }
     return curr;
+}
+
+pub fn dir_resolve_from(path: []const u8, from: Path, last: *[]const u8) !Path {
+    if (path.len == 0) {
+        return krn.errors.PosixError.EINVAL;
+    }
+
+    var cwd = from;
+    if (path[0] == '/') {
+        cwd = krn.task.initial_task.fs.root;
+    }
+    var curr = Path.init(
+        cwd.mnt,
+        cwd.dentry
+    );
+    try curr.stepInto(".");
+    var it = std.mem.tokenizeScalar(
+        u8,
+        path,
+        '/'
+    );
+    while (it.next()) |segment| {
+        if (it.rest().len == 0) {
+            last.* = segment;
+            return curr;
+        }
+        try curr.stepInto(segment);
+    }
+    return curr;
+}
+
+pub fn resolveFrom(path: []const u8, from: Path) !Path {
+    var last: [] const u8 = "";
+    var res = try dir_resolve_from(path, from, &last);
+    if (last.len > 0) {
+        try res.stepInto(last);
+    }
+    return res;
 }
 
 pub fn resolve(path: []const u8) !Path {

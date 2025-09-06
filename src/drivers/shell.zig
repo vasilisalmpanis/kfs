@@ -388,6 +388,7 @@ fn cat(_: *Shell, args: [][]const u8) void {
         debug.printf("Failed to resolve path: {t}", .{err});
         return ;
     };
+    defer file_path.release();
     const new_file: *krn.fs.File = krn.fs.File.new(file_path) catch {
         debug.printf("Failed to alloc mem for file", .{});
         return ;

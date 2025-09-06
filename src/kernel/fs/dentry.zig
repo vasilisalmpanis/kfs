@@ -17,7 +17,7 @@ pub fn init_cache(allocator: std.mem.Allocator) void {
         fs.DentryHash,
         *fs.DEntry,
         fs.InoNameContext,
-        50,
+        99,
     ).init(allocator);
 }
 
