@@ -178,7 +178,7 @@ const ChannelType = enum {
     }
 
     pub fn getDevCmd(self: ChannelType) u8 {
-        return if (self.isPrimary()) 0xE0 else 0xF0;
+        return if (self.isMaster()) 0xE0 else 0xF0;
     }
 };
 
@@ -237,6 +237,7 @@ const ATADrive = struct {
         } else {
             return null;
         }
+        errdefer kernel.mm.kfree(drv.buffer.ptr);
         @memcpy(drv.name[0..41], name[0..41]);
         drv.lba28 = @as(*u32, @ptrCast(@alignCast(&ide_buf[60]))).*;
         drv.lba48 = @as(*u64, @ptrCast(@alignCast(&ide_buf[100]))).*;
@@ -300,16 +301,16 @@ const ATADrive = struct {
 
     fn delay(self: *const ATADrive) void {
         for (0..4) |_| {
-            _ = self.ata_read_reg(ATA_REG_ALTSTATUS);
+            _ = arch.io.inb(self.ctrl_base);
         }
     }
 
     fn poll_ide(self: *const ATADrive) void {
         self.delay();
-        while (self.ata_read_reg(ATA_REG_STATUS) & ATA_SR_BSY != 0) {}
+        while (self.ataReadReg(ATA_REG_STATUS) & ATA_SR_BSY != 0) {}
         var status: u8 = 0;
         while (status & ATA_SR_DRQ == 0) {
-            status = self.ata_read_reg(ATA_REG_STATUS);
+            status = self.ataReadReg(ATA_REG_STATUS);
             if (status & ATA_SR_ERR != 0) {
                 kernel.logger.INFO("error in polling", .{});
                 return;
@@ -318,13 +319,14 @@ const ATADrive = struct {
     }
 
     fn read_sectors(self: *const ATADrive, lba: u32, num_sectors: u8) []const u8 {
+        self.selectDeviceLBA(lba);
         const device_cmd: u8 = self.device_cmd | @as(u8, @truncate((lba >> 24) & 0x0F));
-        self.ata_write_reg(ATA_REG_SECCOUNT0, num_sectors);
-        self.ata_write_reg(ATA_REG_LBA0, @truncate(lba));
-        self.ata_write_reg(ATA_REG_LBA1, @truncate(lba >> 8));
-        self.ata_write_reg(ATA_REG_LBA2, @truncate(lba >> 16));
-        self.ata_write_reg(ATA_REG_HDDEVSEL, device_cmd);
-        self.ata_write_reg(ATA_REG_COMMAND, ATA_CMD_READ_PIO);
+        self.ataWriteReg(ATA_REG_SECCOUNT0, num_sectors);
+        self.ataWriteReg(ATA_REG_LBA0, @truncate(lba));
+        self.ataWriteReg(ATA_REG_LBA1, @truncate(lba >> 8));
+        self.ataWriteReg(ATA_REG_LBA2, @truncate(lba >> 16));
+        self.ataWriteReg(ATA_REG_HDDEVSEL, device_cmd);
+        self.ataWriteReg(ATA_REG_COMMAND, ATA_CMD_READ_PIO);
         self.poll_ide();
         const sectors: u32 = if (num_sectors == 0) 256 else num_sectors;
         for (0..256 * sectors) |i| {
@@ -339,7 +341,7 @@ const ATADrive = struct {
     fn waitNotBusy(self: *const ATADrive) bool {
         var timeout: u32 = TIMEOUT_READY;
         while (timeout > 0) {
-            const status = self.ata_read_reg(ATA_REG_STATUS);
+            const status = self.ataReadReg(ATA_REG_STATUS);
             if (status & ATA_SR_BSY == 0) {
                 return true;
             }
@@ -351,7 +353,7 @@ const ATADrive = struct {
     fn waitReady(self: *const ATADrive) bool {
         var timeout: u32 = TIMEOUT_READY;
         while (timeout > 0) {
-            const status = self.ata_read_reg(ATA_REG_STATUS);
+            const status = self.ataReadReg(ATA_REG_STATUS);
             if (status & ATA_SR_BSY == 0 and status & ATA_SR_DRDY != 0) {
                 return true;
             }
@@ -373,9 +375,11 @@ const ATADrive = struct {
             if (status & ATA_SR_DRQ != 0) return true;
             timeout -= 1;
         }
+        return false;
     }
 
     fn readSectorsDMA(self: *const ATADrive, lba: u32, num_sectors: u8) void {
+        self.selectDeviceLBA(lba);
         if (!self.dma_initialized or !self.waitReady()) {
             kernel.logger.ERROR("Drive not ready", .{});
             return;
@@ -390,14 +394,14 @@ const ATADrive = struct {
         arch.io.outb(self.bmide_base + BMIDE_COMMAND, BMIDE_CMD_READ);
 
         const device_cmd: u8 = self.device_cmd | @as(u8, @truncate((lba >> 24) & 0x0F));
-        self.ata_write_reg(ATA_REG_SECCOUNT0, num_sectors);
-        self.ata_write_reg(ATA_REG_LBA0, @truncate(lba));
-        self.ata_write_reg(ATA_REG_LBA1, @truncate(lba >> 8));
-        self.ata_write_reg(ATA_REG_LBA2, @truncate(lba >> 16));
-        self.ata_write_reg(ATA_REG_HDDEVSEL, device_cmd);
+        self.ataWriteReg(ATA_REG_SECCOUNT0, num_sectors);
+        self.ataWriteReg(ATA_REG_LBA0, @truncate(lba));
+        self.ataWriteReg(ATA_REG_LBA1, @truncate(lba >> 8));
+        self.ataWriteReg(ATA_REG_LBA2, @truncate(lba >> 16));
+        self.ataWriteReg(ATA_REG_HDDEVSEL, device_cmd);
 
         arch.io.outb(self.bmide_base + BMIDE_COMMAND, BMIDE_CMD_READ | BMIDE_CMD_START);
-        self.ata_write_reg(ATA_REG_COMMAND, ATA_CMD_READ_DMA);
+        self.ataWriteReg(ATA_REG_COMMAND, ATA_CMD_READ_DMA);
         
         self.delay();
         self.waitDMA();
@@ -409,7 +413,7 @@ const ATADrive = struct {
         
         while (timeout > 0) {
             const bmide_status = arch.io.inb(self.bmide_base + BMIDE_STATUS);
-            const ata_status = self.ata_read_reg(ATA_REG_STATUS);
+            const ata_status = self.ataReadReg(ATA_REG_STATUS);
             
             if (bmide_status & BMIDE_STATUS_ERROR != 0 or ata_status & ATA_SR_ERR != 0) {
                 kernel.logger.ERROR("DMA transfer error. BMIDE: 0x{X}, ATA: 0x{X}", .{bmide_status, ata_status});
@@ -440,16 +444,16 @@ const ATADrive = struct {
         arch.io.outb(self.bmide_base + BMIDE_COMMAND, 0x00);
     }
 
-    inline fn ata_write_reg(channel: *const ATADrive, reg: u8, value: u8) void {
+    inline fn ataWriteReg(channel: *const ATADrive, reg: u8, value: u8) void {
         arch.io.outb(channel.io_base + reg, value);
     }
 
-    inline fn ata_read_reg(channel: *const ATADrive, reg: u8) u8 {
+    inline fn ataReadReg(channel: *const ATADrive, reg: u8) u8 {
         return arch.io.inb(channel.io_base + reg);
     }
 
     pub fn read_full_drive(self: *const ATADrive) void {
-        self.selectChannel();
+        // self.selectChannel();
         const num_sec: u32 = 1;
         for (0..self.lba28 / num_sec) |i| {
             const lba = i * num_sec;
@@ -461,12 +465,28 @@ const ATADrive = struct {
     }
 
     pub fn read_full_drive_dma(self: *const ATADrive) void {
-        self.selectChannel();
+        // self.selectChannel();
         const num_sec: u32 = 1;
         for (0..self.lba28 / num_sec) |i| {
             const lba = i * num_sec;
             self.readSectorsDMA(lba, 1);
         }
+    }
+
+    fn setDMAAddr(self: *const ATADrive) void {
+        const status = arch.io.inb(self.bmide_base + BMIDE_STATUS);
+        arch.io.outb(self.bmide_base + BMIDE_STATUS, status | 0x06);
+        arch.io.outb(self.bmide_base + BMIDE_COMMAND, 0x00);
+        arch.io.outl(self.bmide_base + BMIDE_PRDT_ADDR, self.prdt_phys);
+    }
+
+    fn selectDeviceLBA(self: *const ATADrive, lba: u32) void {
+        var devsel: u8 = if (self.channel.isMaster()) 0xE0 else 0xF0;
+        devsel |= @as(u8, @truncate((lba >> 24) & 0x0F));
+        self.ataWriteReg(ATA_REG_HDDEVSEL, devsel);
+        self.delay();
+        self.setDMAAddr();
+        current_channel = self.channel;
     }
 };
 
@@ -482,9 +502,12 @@ pub fn ata_secondary() void {
 
 fn ideSelectChannel(ch_type: ChannelType) void {
     const io_base: u16 = ch_type.getIOReg();
-    const cmd: u8 = if (ch_type.isMaster()) 0xA0 else 0xB0;
+    const cmd: u8 = if (ch_type.isMaster()) 0xE0 else 0xF0;
     current_channel = ch_type;
     arch.io.outb(io_base + ATA_REG_HDDEVSEL, cmd);
+    for (0..4) |_| {
+        _ = arch.io.inb(ch_type.getStatusReg());
+    }
 }
 
 fn ata_identify(ch_type: ChannelType) u8 {
@@ -735,7 +758,7 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
         const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
         
         const lba: u32 = file.pos / ATADrive.SECTOR_SIZE;
-        ata_dev.selectChannel();
+        // ata_dev.selectChannel();
         ata_dev.readSectorsDMA(lba, 1);
         
         const offset: u32 = file.pos % ATADrive.SECTOR_SIZE;

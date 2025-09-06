@@ -8,7 +8,7 @@ const std = @import("std");
 pub const Driver = struct {
     name: []const u8,
     list: kern.list.ListHead,
-    minor_set: std.bit_set.StaticBitSet(256) = std.bit_set.StaticBitSet(256).initEmpty(),
+    minor_set: std.bit_set.ArrayBitSet(u8, 256) = std.bit_set.ArrayBitSet(u8, 256).initEmpty(),
     minor_mutex: kern.Mutex = kern.Mutex.init(),
     major: u8 = 0,
     fops: ?*kern.fs.FileOps = null,
@@ -62,11 +62,14 @@ pub const Driver = struct {
                         // Probe the device
                         bus_dev.id.major = self.major;
                         kern.logger.INFO("Probing dev {s} with driver {s}", .{bus_dev.name, self.name});
+                        bus_dev.id.minor = try self.getFreeMinor();
+                        kern.logger.INFO("dev {s} added with id {any}", .{bus_dev.name, bus_dev.id});
                         self.probe(self, bus_dev) catch {
                             kern.logger.ERROR("Probe failed", .{});
                             bus_dev.driver = null;
                             bus_dev.lock.unlock();
                             bus_dev.id.major = 0;
+                            self.minor_set.unset(bus_dev.id.minor);
                             continue;
                         };
                         bus_dev.lock.unlock();
@@ -97,6 +100,19 @@ pub const Driver = struct {
            }
            self.list.del();
         }
+    }
 
+    pub fn getFreeMinor(self: *Driver) !u8 {
+        self.minor_mutex.lock();
+        defer self.minor_mutex.unlock();
+
+        var it = self.minor_set.iterator(
+            .{ .direction = .forward, .kind = .unset }
+        );
+        if (it.next()) |_i| {
+            self.minor_set.set(_i);
+            return @intCast(_i);
+        }
+        return kern.errors.PosixError.ENODEV;
     }
 };

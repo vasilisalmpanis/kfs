@@ -23,14 +23,15 @@ pub const Ext2FileSystem = struct {
             if (!self.base.sbs.isEmpty()) {
                 kernel.logger.INFO("sb already exists\n", .{});
                 const sb = self.base.sbs.next.?.entry(fs.SuperBlock, "list");
-                return sb;
-            } else {
-                const sb: *fs.SuperBlock = super.Ext2Super.create(base, file) catch |err| {
-                    return err;
-                };
-                // here
-                return sb;
+                if (sb.dev_file.?.inode.dev_id == dev_file.?.inode.dev_id) {
+                    return sb;
+                }
             }
+            const sb: *fs.SuperBlock = super.Ext2Super.create(base, file) catch |err| {
+                return err;
+            };
+            // here
+            return sb;
         } else {
             return kernel.errors.PosixError.ENODEV;
         }
