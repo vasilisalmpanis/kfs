@@ -23,12 +23,12 @@ pub const Mount = struct {
     pub fn mount(
         source: []const u8, // device
         target: []const u8, // directory
-        fs_type: *fs.FileSystem) !*Mount {
+        fs_type: *fs.FileSystem
+    ) !*Mount {
         var blk_dev: ?*device.Device = null;
         var dummy_file: ?*fs.File = null;
         if (!fs_type.virtual) {
             // 1. Check that device exists
-            krn.logger.INFO("needs dev {s}\n", .{fs_type.name});
             const device_path = try fs.path.resolve(source);
             errdefer device_path.release();
             const device_inode: *fs.Inode = device_path.dentry.inode;
