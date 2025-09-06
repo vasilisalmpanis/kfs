@@ -70,11 +70,13 @@ pub const ExampleInode = struct {
     }
 
     pub fn getLink(base: *fs.Inode, resulting_link: *[]u8) !void {
-        // const example_inode = base.getImpl(ExampleInode, "base");
-        _ = base;
-        _ = resulting_link;
-        // return std.mem.span(&example_inode.buff);
-        return kernel.errors.PosixError.EINVAL;
+        const example_inode = base.getImpl(ExampleInode, "base");
+        const span = std.mem.span(@as([*:0]u8, @ptrCast(&example_inode.buff)));
+        if (span.len > resulting_link.len) {
+            return kernel.errors.PosixError.EINVAL;
+        }
+        @memcpy(resulting_link.*[0..span.len], span);
+        return ;
     }
 };
 

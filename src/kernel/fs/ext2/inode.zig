@@ -102,7 +102,6 @@ pub const Ext2Inode = struct {
     }
 
     fn lookup(dir: *fs.DEntry, name: []const u8) !*fs.DEntry {
-        kernel.logger.INFO("ext2 lookup {s}", .{name});
         const key: fs.DentryHash = fs.DentryHash{
             .sb = @intFromPtr(dir.sb),
             .ino = dir.inode.i_no,
@@ -193,7 +192,12 @@ pub const Ext2Inode = struct {
         if (ext2_inode.data.i_blocks > 0) {
             const lbn = try ext2_s.resolveLbn(ext2_inode, 0);
             const block = try ext2_s.readBlocks(lbn, 1);
-            kernel.logger.INFO("link block: {s}", .{block});
+            const span: []u8 = std.mem.span(@as([*:0]u8, @ptrCast(block.ptr)));
+            if (span.len > resulting_link.len)
+                return kernel.errors.PosixError.EINVAL;
+            @memcpy(resulting_link.*[0..span.len], span);
+            resulting_link.len = span.len;
+            return ;
         } else {
             const block: [*:0]u8 = @ptrCast(&ext2_inode.data.i_block);
             const span: []u8 = std.mem.span(block);
