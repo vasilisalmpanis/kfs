@@ -67,7 +67,7 @@ pub var dcache: std.HashMap(
     DentryHash,
     *DEntry,
     InoNameContext,
-    50
+    99
 ) = undefined;
 
 pub var last_ino: u32 = 0;
