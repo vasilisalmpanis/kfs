@@ -1,7 +1,9 @@
 const krn = @import("../../main.zig");
 const fs = @import("../fs.zig");
+const std = @import("std");
 const Ext2Inode = @import("./inode.zig").Ext2Inode;
 const Ext2Super = @import("./super.zig").Ext2Super;
+const Ext2DirEntry = @import("./inode.zig").Ext2DirEntry;
 
 pub const Ext2File = struct {
     fn open(_: *fs.File, _: *fs.Inode) !void {
@@ -67,10 +69,69 @@ pub const Ext2File = struct {
     }
 
     fn readdir(base: *fs.File, buf: []u8) !u32 {
-        _ = base;
-        _ = buf;
-        return 0;
+        const ext2_dir_inode = base.inode.getImpl(Ext2Inode, "base");
+        const ext2_super = base.inode.sb.getImpl(Ext2Super, "base");
+
+        const block_size = ext2_super.block_size;
+        const pos = base.pos;
+
+        if (pos >= ext2_dir_inode.data.i_size) {
+            return 0;
+        }
+
+        const blk_index: u32 = @intCast(pos / block_size);
+        var offset: u32 = @intCast(pos % block_size);
+
+        if (blk_index >= ext2_dir_inode.data.i_blocks) {
+            return krn.errors.PosixError.ENOENT;
+        }
+
+        const block: u32 = ext2_dir_inode.data.i_block[blk_index];
+        const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
+        defer krn.mm.kfree(block_slice.ptr);
+        var bytes_written: u32 = 0;
+
+        while (bytes_written < buf.len and offset < block_size) {
+            var ext_dir: *Ext2DirEntry = @ptrFromInt(@intFromPtr(block_slice.ptr) + offset);
+
+            if (ext_dir.inode == 0 or ext_dir.rec_len == 0) {
+                krn.logger.INFO("Corrupted directory\n", .{});
+                return krn.errors.PosixError.ENOENT;
+            }
+
+            const entry_size: u32 = @sizeOf(fs.LinuxDirent) + ext_dir.getName().len + 1; // For null termination
+            if (entry_size > buf.len - bytes_written)
+                return krn.errors.PosixError.EINVAL;
+            const dirent: *fs.LinuxDirent = @ptrFromInt(@intFromPtr(buf.ptr) + bytes_written);
+
+            dirent.ino = ext_dir.inode;
+            dirent.off = base.pos;
+            dirent.reclen = @intCast(entry_size);
+            if (dirent.reclen % @sizeOf(usize) != 0) dirent.reclen += @sizeOf(usize) - (dirent.reclen % @sizeOf(usize));
+            switch (ext_dir.file_type) {
+                0 => dirent.type = fs.DT_UNKNOWN,
+                1 => dirent.type = fs.DT_REG,
+                2 => dirent.type = fs.DT_DIR,
+                3 => dirent.type = fs.DT_CHR,
+                4 => dirent.type = fs.DT_BLK,
+                5 => dirent.type = fs.DT_FIFO,
+                6 => dirent.type = fs.DT_SOCK,
+                7 => dirent.type = fs.DT_LNK,
+                else => {
+                    dirent.type = fs.DT_UNKNOWN;
+                },
+            }
+            const name = ext_dir.getName();
+            const name_buff: [*]u8 = @ptrFromInt(@intFromPtr(buf.ptr) + @sizeOf(fs.LinuxDirent) + bytes_written);
+            @memcpy(name_buff[0..name.len], name);
+            name_buff[name.len] = 0;
+            base.pos += ext_dir.rec_len;
+            offset += ext_dir.rec_len;
+            bytes_written += dirent.reclen;
+        }
+        return bytes_written;
     }
+
 };
 
 pub const Ext2FileOps: fs.FileOps = fs.FileOps {
