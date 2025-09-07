@@ -130,6 +130,97 @@ fn childProcess(sock_fd: i32) void {
     os.linux.exit(5); 
 }
 
+const DIR = struct
+{
+    tell: u32 = 0,
+    fd: i32 = 0,
+    buf_pos: u32 = 0,
+    buf_end: u32 = 0,
+    buf: [2048]u8 = .{0} ** 2048,
+};
+
+fn opendir(_: [*]const u8, dir: *DIR) !void {
+    const fd: i32 = @intCast(std.os.linux.open("/ext2", .{ .CREAT = true }, 0o444));
+    if (fd < 0) return error.WTF;
+    dir.fd = fd;
+    dir.buf_pos = 0;
+    dir.buf_end = 0;
+    dir.buf = .{0} ** 2048;
+}
+
+const LinuxDirent = struct {
+        ino: u32,
+        off: u32,
+        reclen: u16,
+        type: u8,
+};
+
+const ZigDirent = struct {
+    dirent: *LinuxDirent,
+    name: []u8,
+};
+
+fn readdir(dir: *DIR) ?ZigDirent {
+    if (dir.buf_pos >= dir.buf_end) {
+        const len: i32 = @intCast(std.os.linux.getdents64(dir.fd, @ptrCast(&dir.buf), 2048));
+        if (len <= 0) {
+            return null;
+        }
+        dir.buf_end = @intCast(len);
+        dir.buf_pos = 0;
+    }
+    const dirent: *LinuxDirent = @ptrFromInt(@intFromPtr(&dir.buf) + dir.buf_pos);
+    const name_len = dirent.reclen - 12;
+    const zig_dir = ZigDirent{
+        .dirent = dirent,
+        .name = dir.buf[dir.buf_pos + 11 .. dir.buf_pos + 11 + name_len],
+    };
+    dir.buf_pos += dirent.reclen;
+    dir.tell += dirent.off;
+    return zig_dir;
+}
+
+fn test_getdents() void {
+    var dir: DIR = DIR{};
+    var err: u32 = 0;
+    opendir("/ext2", &dir) catch {
+        serial("[parent] error opening dir\n", .{});
+        err = 1;
+    };
+    if (err == 0) {
+        if (readdir(&dir)) |entity| {
+            serial("[parent] readdir entity {any} {s}\n", .{entity.dirent, entity.name});
+        }
+        if (readdir(&dir)) |entity| {
+            serial("[parent] readdir entity {any} {s}\n", .{entity.dirent, entity.name});
+        }
+        if (readdir(&dir)) |entity| {
+            serial("[parent] readdir entity {any} {s}\n", .{entity.dirent, entity.name});
+        }
+        if (readdir(&dir)) |entity| {
+            serial("[parent] readdir entity {any} {s}\n", .{entity.dirent, entity.name});
+        }
+        if (readdir(&dir)) |entity| {
+            serial("[parent] readdir entity {any} {s}\n", .{entity.dirent, entity.name});
+        }
+        if (readdir(&dir)) |entity| {
+            serial("[parent] readdir entity {any} {s}\n", .{entity.dirent, entity.name});
+        }
+        if (readdir(&dir)) |entity| {
+            serial("[parent] readdir entity {any} {s}\n", .{entity.dirent, entity.name});
+        }
+        if (readdir(&dir)) |entity| {
+            serial("[parent] readdir entity {any} {s}\n", .{entity.dirent, entity.name});
+        }
+        if (readdir(&dir)) |entity| {
+            serial("[parent] readdir entity {any} {s}\n", .{entity.dirent, entity.name});
+        }
+        if (readdir(&dir)) |entity| {
+            serial("[parent] readdir entity {any} {s}\n", .{entity.dirent, entity.name});
+        }
+    }
+}
+
 pub export fn main() linksection(".text.main") noreturn {
     screen("testing screen from userspace {d}\n", .{12343});
     var fds: [2]i32 = .{0, 0};
@@ -239,7 +330,7 @@ pub export fn main() linksection(".text.main") noreturn {
         //         serial("result of reading:\n{s}\n", .{big_buf[0..r]});
         //     }
         // }
-
+        test_getdents();
         // Signaling
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
