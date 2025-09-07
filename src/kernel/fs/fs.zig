@@ -111,17 +111,36 @@ pub const LinuxDirent = extern struct {
     reclen: u16,
     type: u8,
 
-    pub fn setMode(self: *LinuxDirent, mode: UMode) void {
+    pub fn setType(self: *LinuxDirent, mode: UMode) void {
         switch (mode.type & S_IFMT) {
-            .S_IFREG => self.type = DT_REG,
-            .S_IFDIR => self.type = DT_DIR,
-            .S_IFBLK => self.type = DT_BLK,
-            .S_IFCHR => self.type = DT_CHR,
-            .S_IFLNK => self.type = DT_LNK,
-            .S_IFIFO => self.type = DT_FIFO,
-            .S_IFSOCK => self.type = DT_SOCK,
+            S_IFREG => self.type = DT_REG,
+            S_IFDIR => self.type = DT_DIR,
+            S_IFBLK => self.type = DT_BLK,
+            S_IFCHR => self.type = DT_CHR,
+            S_IFLNK => self.type = DT_LNK,
+            S_IFIFO => self.type = DT_FIFO,
+            S_IFSOCK => self.type = DT_SOCK,
             else => self.type = DT_UNKNOWN,
         }
+    }
+
+    pub fn getName(self: *LinuxDirent) []u8 {
+        const name_addr: u32 = @intFromPtr(self) + @sizeOf(LinuxDirent);
+        return std.mem.span(@as([*:0]u8, @ptrFromInt(name_addr)));
+    }
+
+    pub fn verboseType(self: *LinuxDirent) u8 {
+        switch (self.type) {
+            DT_REG => return 'r',
+            DT_DIR => return 'd',
+            DT_LNK => return 'l',
+            DT_CHR => return 'c',
+            DT_BLK => return 'b',
+            DT_FIFO => return 'f',
+            DT_SOCK => return 's',
+            else => {}
+        }
+        return 'u';
     }
 };
 

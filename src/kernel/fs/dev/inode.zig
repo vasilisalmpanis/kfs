@@ -12,6 +12,7 @@ pub const DevInode = struct {
         if (kernel.mm.kmalloc(DevInode)) |inode| {
             inode.base.setup(sb);
             inode.base.ops = &dev_inode_ops;
+            inode.base.fops = &file.DevFileOps;
             inode.base.size = 50;
             inode.buff = .{0} ** 50;
             return &inode.base;

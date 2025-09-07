@@ -315,23 +315,63 @@ fn mount(_: *Shell, args: [][]const u8) void {
 }
 
 fn ls(_: *Shell, args: [][]const u8) void {
+    var l_opt = false;
     var path: []const u8 = ".";
-    if (args.len > 0) {
+    if (args.len > 1) {
+        if (std.mem.eql(u8, args[0], "-l")) {
+            l_opt = true;
+        } else {
+            printf("Unknown argument: {s}\n", .{args[0]});
+            return ;
+        }
+        path = args[1];
+    } else if (args.len > 0) {
         path = args[0];
     }
-    const curr = krn.fs.path.resolve(path) catch |err| {
-        debug.printf("error: {any} for {s}\n", .{err, path});
+    const dir_path = krn.fs.path.resolve(path) catch |err| {
+        debug.printf("Failed to resolve path: {t}\n", .{err});
         return ;
     };
-    defer curr.release();
-    debug.printf("items in {s}:\n", .{curr.dentry.name});
-    if (curr.dentry.tree.child) |ch| {
-        var it = ch.siblingsIterator();
-        while (it.next()) |d| {
-            const _d = d.curr.entry(krn.fs.DEntry, "tree");
-            debug.printf("  {s} {d}\n", .{_d.name, _d.ref.count.raw});
+    defer dir_path.release();
+    if (!dir_path.dentry.inode.mode.isDir()) {
+        printf("{s}: not a directory!\n", .{path});
+        return ;
+    }
+    const dir_file: *krn.fs.File = krn.fs.File.new(dir_path) catch {
+        debug.printf("Failed to alloc mem for file\n", .{});
+        return ;
+    };
+    dir_file.ops.open(dir_file, dir_file.inode) catch {
+        krn.mm.kfree(dir_file);
+        debug.printf("Failed to open directory\n", .{});
+        return ;
+    };
+
+    var len: u32 = 1;
+    var buf: [1024]u8 = .{0} ** 1024;
+    const buf_slice: []u8 = buf[0..1024];
+    while (len > 0) {
+        if (dir_file.ops.readdir) |_readdir| {
+            len = _readdir(dir_file, buf_slice) catch 0;
+            var offset: u32 = 0;
+            while (offset + @sizeOf(krn.fs.LinuxDirent) < len) {
+                const dirent: *krn.fs.LinuxDirent = @ptrCast(@alignCast(&buf[offset]));
+                if (l_opt) {
+                    printf("{c} {d:0>4} {s}\n", .{dirent.verboseType(), dirent.ino, dirent.getName()});
+                } else {
+                    printf("{s}\n", .{dirent.getName()});
+                }
+                offset += dirent.reclen;
+            }
+        } else {
+            printf(
+                "Readdir is not implemented for {s} filesystem!\n",
+                .{dir_file.inode.sb.fs.name}
+            );
+            return ;
         }
     }
+    krn.mm.kfree(dir_file);
 }
 
 fn mkdir(_: *Shell, args: [][]const u8) void {
