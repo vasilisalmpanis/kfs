@@ -35,5 +35,4 @@ pub const DevFileOps: fs.FileOps = fs.FileOps {
     .write = DevFile.write,
     .read = DevFile.read,
     .lseek = null,
-    .readdir = null,
 };

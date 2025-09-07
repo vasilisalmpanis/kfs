@@ -78,7 +78,7 @@ pub const FileOps = struct {
     write: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
     read: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
     lseek: ?*const fn (base: *File, offset: u32, origin: u32) anyerror!u32 = null,
-    readdir: ?*const fn (base: *File, buf: []u8) anyerror!u32 = null,
+    readdir: ?*const fn (base: *File, buf: []u8) anyerror!u32 = readdirVFS,
 };
 
 pub const TaskFiles = struct {
@@ -150,3 +150,41 @@ pub const TaskFiles = struct {
         }
     }
 };
+
+pub fn readdirVFS(base: *fs.File, buf: []u8) !u32 {
+    if (base.path.dentry.tree.child) |ch| {
+        var it = ch.siblingsIterator();
+        var off: u32 = 0;
+        var idx: u32 = 0;
+        while (it.next()) |d| {
+            if (idx < base.pos) {
+                idx += 1;
+                continue;
+            }
+            idx += 1;
+            const _d = d.curr.entry(fs.DEntry, "tree");
+            var dent = fs.LinuxDirent{
+                .ino = _d.inode.i_no,
+                .type = 0,
+                .reclen = @intCast(@sizeOf(fs.LinuxDirent) + _d.name.len + 1),
+                .off = off,
+            };
+            dent.setType(_d.inode.mode);
+            if (dent.reclen % @sizeOf(usize) != 0) {
+                dent.reclen += @sizeOf(usize) - (dent.reclen % @sizeOf(usize));
+            }
+            if (off + dent.reclen > buf.len) {
+                base.pos = idx - 1;
+                return off;
+            }
+            const name_offset = off + @sizeOf(fs.LinuxDirent);
+            @memcpy(buf[off..name_offset], @as([*]u8, @ptrCast(&dent)));
+            @memcpy(buf[name_offset..name_offset + _d.name.len], _d.name);
+            buf[name_offset + _d.name.len] = 0;
+            off += dent.reclen;
+        }
+        base.pos = idx;
+        return off;
+    }
+    return 0;
+}
