@@ -80,6 +80,50 @@ pub fn get_ino() u32 {
     last_ino += 1;
     return tmp;
 }
+pub const DT_UNKNOWN	        = 0;
+pub const DT_FIFO		= 1;
+pub const DT_CHR		= 2;
+pub const DT_DIR		= 4;
+pub const DT_BLK		= 6;
+pub const DT_REG		= 8;
+pub const DT_LNK		= 10;
+pub const DT_SOCK		= 12;
+pub const DT_WHT		= 14;
+
+pub const Dirent = extern struct {
+    ino: u32,
+    off: u32,
+    reclen: u16,
+    name: [256]u8,
+};
+
+pub const Dirent64 = extern struct {
+    ino: u64,
+    off: u64,
+    reclen: u16,
+    type: u8,
+    name: [256]u8,
+};
+
+pub const LinuxDirent = extern struct {
+    ino: u32,
+    off: u32,
+    reclen: u16,
+    type: u8,
+
+    pub fn setMode(self: *LinuxDirent, mode: UMode) void {
+        switch (mode.type & S_IFMT) {
+            .S_IFREG => self.type = DT_REG,
+            .S_IFDIR => self.type = DT_DIR,
+            .S_IFBLK => self.type = DT_BLK,
+            .S_IFCHR => self.type = DT_CHR,
+            .S_IFLNK => self.type = DT_LNK,
+            .S_IFIFO => self.type = DT_FIFO,
+            .S_IFSOCK => self.type = DT_SOCK,
+            else => self.type = DT_UNKNOWN,
+        }
+    }
+};
 
 pub const S_IFMT   = 0o170;
 pub const S_IFSOCK = 0o140;

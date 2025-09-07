@@ -14,19 +14,19 @@ pub const EXT2_N_BLOCKS             = 15;
 /// ext2 on-disk inode (little-endian fields). Classic 128-byte layout.
 /// Use `le16/le32` helpers below if you need host-endian values.
 ///
-const Ext2DirEntry = struct {
+pub const Ext2DirEntry = struct {
     inode: u32,       // inode number
     rec_len: u16,     // total size of this entry
     name_len: u8,     // length of name
     file_type: u8,    // (ext2 rev>=1)
                       //
-    fn getName(self: *Ext2DirEntry) []u8 {
+    pub fn getName(self: *Ext2DirEntry) []u8 {
         const addr: u32 = @intFromPtr(self) + @sizeOf(Ext2DirEntry);
         const name: [*]u8 = @ptrFromInt(addr);
         return name[0..self.name_len];
     }
 
-    fn getNext(self: *Ext2DirEntry) ?*Ext2DirEntry {
+    pub fn getNext(self: *Ext2DirEntry) ?*Ext2DirEntry {
         if (self.rec_len == 0)
             return null;
         const addr: u32 = @intFromPtr(self) + self.rec_len;
