@@ -26,6 +26,7 @@ var serial_file_ops = kernel.fs.FileOps{
     .read = serial_read,
     .write = serial_write,
     .lseek = null,
+    .readdir = null,
 };
 
 fn serial_open(_: *kernel.fs.File, _: *kernel.fs.Inode) !void {
