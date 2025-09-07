@@ -68,6 +68,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "cd", .desc = "Change pwd", .hndl = &cd });
         self.registerCommand(.{ .name = "date", .desc = "Current date and time", .hndl = &date });
         self.registerCommand(.{ .name = "cat", .desc = "Output file content", .hndl = &cat });
+        self.registerCommand(.{ .name = "pwd", .desc = "Current working directory", .hndl = &pwd });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -448,6 +449,17 @@ fn cat(_: *Shell, args: [][]const u8) void {
         }
     }
     krn.mm.kfree(new_file);
+}
+
+fn pwd(_: *Shell, _: [][]const u8) void {
+    var buf: [1024]u8 = .{0} ** 1024;
+    const buf_s = buf[0..1024];
+    buf_s[0] = '/';
+    const res = krn.task.initial_task.fs.pwd.getAbsPath(buf_s) catch |err| {
+        printf("Error: {t}\n", .{err});
+        return ;
+    };
+    printf("{s}\n", .{buf_s[0..if (res.len == 0) 1 else res.len]});
 }
 
 fn date(_: *Shell, _: [][]const u8) void {
