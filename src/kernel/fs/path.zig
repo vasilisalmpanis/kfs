@@ -22,7 +22,7 @@ pub const Path = struct {
         self.dentry.ref.unref();
     }
 
-    pub fn isRoot(self: *Path) bool {
+    pub fn isRoot(self: *const Path) bool {
         return self.dentry.sb.root == self.dentry;
     }
 
@@ -88,6 +88,31 @@ pub const Path = struct {
             try self.followLink(prev_path);
             prev_path.release();
         }
+    }
+
+    pub fn getAbsPath(self: Path, buf: []u8) ![]u8 {
+        if (
+            self.isRoot() and self.mnt.isGlobalRoot() 
+        ) {
+            return buf[0..0];
+        }
+        var curr = try resolveFrom("..", self);
+        const res = try curr.getAbsPath(buf);
+        buf[res.len] = '/';
+        var _d: *fs.DEntry = undefined;
+        if (self.isRoot()) {
+            _d = self.mnt.root;
+        } else {
+            _d = self.dentry;
+        }
+        if (res.len + _d.name.len + 1  > buf.len) {
+            return krn.errors.PosixError.ENOMEM;
+        }
+        @memcpy(
+            buf[res.len + 1..res.len + _d.name.len + 1],
+            _d.name
+        );
+        return buf[0..res.len + _d.name.len + 1];
     }
 };
 

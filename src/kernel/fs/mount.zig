@@ -93,4 +93,8 @@ pub const Mount = struct {
         }
         return null;
     }
+
+    pub fn isGlobalRoot(self: *Mount) bool {
+        return self == krn.task.initial_task.fs.root.mnt;
+    }
 };
