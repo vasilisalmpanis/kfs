@@ -1,4 +1,5 @@
 const fs = @import("../fs.zig");
+const krn = @import("../../main.zig");
 const ExampleInode = @import("./inode.zig").ExampleInode;
 
 pub const ExampleFile = struct {
@@ -35,5 +36,4 @@ pub const ExampleFileOps: fs.FileOps = fs.FileOps {
     .write = ExampleFile.write,
     .read = ExampleFile.read,
     .lseek = null,
-    .readdir = null,
 };
