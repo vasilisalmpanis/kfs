@@ -65,6 +65,12 @@ pub const Ext2File = struct {
 
     fn close(_: *fs.File) void {
     }
+
+    fn readdir(base: *fs.File, buf: []u8) !u32 {
+        _ = base;
+        _ = buf;
+        return 0;
+    }
 };
 
 pub const Ext2FileOps: fs.FileOps = fs.FileOps {
@@ -73,4 +79,5 @@ pub const Ext2FileOps: fs.FileOps = fs.FileOps {
     .write = Ext2File.write,
     .read = Ext2File.read,
     .lseek = null,
+    .readdir = Ext2File.readdir,
 };

@@ -48,6 +48,7 @@ pub const cdev_default_ops: krn.fs.FileOps = .{
     .read = cdev_read,
     .write = cdev_write,
     .lseek = null,
+    .readdir = null,
 };
 
 pub fn addCdev(device: *dev.Device) !void {

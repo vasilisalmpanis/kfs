@@ -35,4 +35,5 @@ pub const ExampleFileOps: fs.FileOps = fs.FileOps {
     .write = ExampleFile.write,
     .read = ExampleFile.read,
     .lseek = null,
+    .readdir = null,
 };
