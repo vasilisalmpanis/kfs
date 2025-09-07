@@ -77,7 +77,8 @@ pub const FileOps = struct {
     close: *const fn(base: *File) void,
     write: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
     read: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
-    lseek: ?*const fn (base: *File, offset: u32, origin: u32) anyerror!u32,
+    lseek: ?*const fn (base: *File, offset: u32, origin: u32) anyerror!u32 = null,
+    readdir: ?*const fn (base: *File, buf: []u8) anyerror!u32 = null,
 };
 
 pub const TaskFiles = struct {

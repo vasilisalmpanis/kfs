@@ -165,7 +165,7 @@ pub const SyscallTable = brk: {
         .SYS_setfsuid                   = &notImpl,
         .SYS_setfsgid                   = &notImpl,
         .SYS__llseek                    = @ptrCast(&@import("./lseek.zig").llseek),
-        .SYS_getdents                   = &notImpl,
+        .SYS_getdents                   = @ptrCast(&@import("./getdents.zig").getdents),
         .SYS__newselect                 = &notImpl,
         .SYS_flock                      = &notImpl,
         .SYS_msync                      = &notImpl,
@@ -223,6 +223,7 @@ pub const SyscallTable = brk: {
         .SYS_getuid32                   = @ptrCast(&@import("../sched/process.zig").getUID),
         .SYS_mknodat                    = &notImpl,
         .SYS_pwritev                    = @ptrCast(&@import("write.zig").pwritev),
+        .SYS_getdents64                 = @ptrCast(&@import("./getdents.zig").getdents64),
     });
 };
 

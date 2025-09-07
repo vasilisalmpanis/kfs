@@ -51,6 +51,7 @@ pub const bdev_default_ops: krn.fs.FileOps = .{
     .read = bdev_read,
     .write = bdev_write,
     .lseek = null,
+    .readdir = null,
 };
 
 pub fn addbdev(device: *dev.Device) !void {
