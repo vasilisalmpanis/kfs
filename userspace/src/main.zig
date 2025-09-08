@@ -313,8 +313,10 @@ pub export fn main() linksection(".text.main") noreturn {
         // };
         _ = std.os.linux.mkdir("ext2", 0);
         _ = std.os.linux.mount("/dev/sda", "ext2", "ext2", 0, 0);
-        fd = std.os.linux.open("/ext2/test", .{ .CREAT = false }, 0o444);
-        serial("/ext2/test fd: {d}\n", .{fd});
+        // fd = std.os.linux.open("/ext2/root/test", .{ .CREAT = false }, 0o444);
+        // @memcpy(buf[0..30], "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        _ = std.os.linux.write(@intCast(fd), @ptrCast(@alignCast(&buf)), 30);
+        serial("/ext2/root/test fd: {d}\n", .{fd});
         _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
         var len: u32 = 1;
         var buf2: [4096]u8 = .{0} ** 4096;

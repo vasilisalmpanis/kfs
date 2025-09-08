@@ -10,14 +10,49 @@ pub const Ext2File = struct {
         krn.logger.INFO("ext2 file open", .{});
     }
 
-    fn write(base: *fs.File, _: [*]u8, size: u32) !u32 {
+    // fn write(base: *fs.File, _: [*]u8, size: u32) !u32 {
+    //     const ino = base.inode.getImpl(Ext2Inode, "base");
+    //     var to_write = size;
+    //     if (to_write > ino.base.size - base.pos)
+    //         to_write = ino.base.size - base.pos;
+    //     // @memcpy(ino.buff[base.pos..base.pos + to_write], buf[0..to_write]);
+    //     base.pos += to_write;
+    //     return to_write;
+    // }
+    fn write(base: *fs.File, buf: [*]u8, size: u32) !u32 {
         const ino = base.inode.getImpl(Ext2Inode, "base");
-        var to_write = size;
-        if (to_write > ino.base.size - base.pos)
-            to_write = ino.base.size - base.pos;
-        // @memcpy(ino.buff[base.pos..base.pos + to_write], buf[0..to_write]);
-        base.pos += to_write;
-        return to_write;
+        const ext2_sb = base.inode.sb.getImpl(Ext2Super, "base");
+
+        if (ino.base.mode.isDir()) {
+            return krn.errors.PosixError.EISDIR;
+        }
+
+        const to_write: u32 = size;
+        // if (to_write > ino.base.size -| base.pos) {
+        //     to_write = ino.base.size -| base.pos;
+        // }
+        if (to_write == 0) return 0;
+
+        const bs = ext2_sb.block_size;
+        const lbn = base.pos / bs;
+        // const write_offset: u32 = @intCast(base.pos % bs);
+
+        // resolve lbn -> physical block number
+        const pbn = try ext2_sb.resolveLbn(ino, lbn);
+
+        // if pbn == 0 => sparse hole: return zeroed bytes up to block boundary
+        if (pbn == 0) {
+            // TODO
+            return 0;
+        }
+
+        // read the actual data block
+        const written = try ext2_sb.writeBuff(pbn, buf, size);
+
+        base.pos += written;
+        if (base.pos > ino.base.size)
+            ino.base.size = base.pos;
+        return  written;
     }
 
     fn read(base: *fs.File, buf: [*]u8, size: u32) !u32 {

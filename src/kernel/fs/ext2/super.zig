@@ -173,6 +173,20 @@ pub const Ext2Super = struct {
         }
     }
 
+    pub fn writeBuff(sb: *Ext2Super, block: u32, buff: [*]u8, size: u32) !u32 {
+            var to_write: u32 = size;
+            sb.base.dev_file.?.pos = sb.block_size * block;
+            var written: u32 = 0;
+            while (written < size) {
+                const single_write: u32 = try sb.base.dev_file.?.ops.write(sb.base.dev_file.?, @ptrCast(&buff[written]), to_write);
+                sb.base.dev_file.?.pos += single_write;
+                to_write -= single_write;
+                if (single_write == 0) break;
+                written += single_write;
+            }
+            return written;
+    }
+
     pub fn getFirstInodeIdx(self: *Ext2Super) u32 {
         if (self.data.s_rev_level == 0) {
             return 11;
