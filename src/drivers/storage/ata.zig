@@ -378,6 +378,38 @@ const ATADrive = struct {
         return false;
     }
 
+    fn writeSectorsDMA(self: *const ATADrive, lba: u32, num_sectors: u8) void {
+        self.selectDeviceLBA(lba);
+        if (!self.dma_initialized or !self.waitReady()) {
+            kernel.logger.ERROR("Drive not ready", .{});
+            return;
+        }
+
+        const prdt: *PRDEntry = @ptrFromInt(self.prdt_virt);
+        const transfer_size = @as(u16, if (num_sectors == 0) 256 else num_sectors) * 512;
+        prdt.size = transfer_size;
+
+        const status = arch.io.inb(self.bmide_base + BMIDE_STATUS);
+        arch.io.outb(self.bmide_base + BMIDE_STATUS, status | 0x06);
+        const prev_reg = arch.io.inb(self.bmide_base + BMIDE_COMMAND);
+        const read: u8 = BMIDE_CMD_READ;
+        arch.io.outb(self.bmide_base + BMIDE_COMMAND, prev_reg & ~read);
+
+        const device_cmd: u8 = self.device_cmd | @as(u8, @truncate((lba >> 24) & 0x0F));
+        self.ataWriteReg(ATA_REG_SECCOUNT0, num_sectors);
+        self.ataWriteReg(ATA_REG_LBA0, @truncate(lba));
+        self.ataWriteReg(ATA_REG_LBA1, @truncate(lba >> 8));
+        self.ataWriteReg(ATA_REG_LBA2, @truncate(lba >> 16));
+        self.ataWriteReg(ATA_REG_HDDEVSEL, device_cmd);
+
+        arch.io.outb(self.bmide_base + BMIDE_COMMAND, BMIDE_CMD_START);
+        self.ataWriteReg(ATA_REG_COMMAND, ATA_CMD_WRITE_DMA);
+
+        self.delay();
+        self.waitDMA();
+        return;
+    }
+
     fn readSectorsDMA(self: *const ATADrive, lba: u32, num_sectors: u8) void {
         self.selectDeviceLBA(lba);
         if (!self.dma_initialized or !self.waitReady()) {
@@ -400,7 +432,7 @@ const ATADrive = struct {
         self.ataWriteReg(ATA_REG_LBA2, @truncate(lba >> 16));
         self.ataWriteReg(ATA_REG_HDDEVSEL, device_cmd);
 
-        arch.io.outb(self.bmide_base + BMIDE_COMMAND, BMIDE_CMD_READ | BMIDE_CMD_START);
+        arch.io.outb(self.bmide_base + BMIDE_COMMAND, BMIDE_CMD_START);
         self.ataWriteReg(ATA_REG_COMMAND, ATA_CMD_READ_DMA);
         
         self.delay();
@@ -774,6 +806,21 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
     return 0;
 }
 
-fn ata_write(_: *kernel.fs.File, _: [*]u8, _: u32) !u32 {
+fn ata_write(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
+    if( file.inode.dev) |d| {
+        const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
+
+        const lba: u32 = file.pos / ATADrive.SECTOR_SIZE;
+        const offset: u32 = file.pos % ATADrive.SECTOR_SIZE;
+        var to_write = ATADrive.SECTOR_SIZE - offset;
+
+        if (size < to_write) to_write = size;
+        kernel.logger.INFO("writing to ata {d} {d}\n", .{size, to_write});
+        ata_dev.readSectorsDMA(lba, 1);
+        const dma_buf: [*]u8 = @ptrFromInt(ata_dev.dma_buff_virt);
+        @memcpy(dma_buf[offset..offset + to_write], buff[0..to_write]);
+        ata_dev.writeSectorsDMA(lba, 1);
+        return to_write;
+    }
     return 0;
 }

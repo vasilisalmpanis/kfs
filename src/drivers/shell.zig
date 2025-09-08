@@ -426,17 +426,17 @@ fn cat(_: *Shell, args: [][]const u8) void {
         return ;
     }
     const file_path = krn.fs.path.resolve(args[0]) catch |err| {
-        debug.printf("Failed to resolve path: {t}", .{err});
+        debug.printf("Failed to resolve path: {t}\n", .{err});
         return ;
     };
     defer file_path.release();
     const new_file: *krn.fs.File = krn.fs.File.new(file_path) catch {
-        debug.printf("Failed to alloc mem for file", .{});
+        debug.printf("Failed to alloc mem for file\n", .{});
         return ;
     };
     new_file.ops.open(new_file, new_file.inode) catch {
         krn.mm.kfree(new_file);
-        debug.printf("Failed to open file", .{});
+        debug.printf("Failed to open file\n", .{});
         return ;
     };
 
