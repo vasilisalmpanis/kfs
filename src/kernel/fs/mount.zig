@@ -19,6 +19,7 @@ pub const Mount = struct {
     sb: *fs.SuperBlock,
     root: *fs.DEntry,
     tree: tree.TreeNode,
+    count: krn.task.RefCount,
 
     pub fn mount(
         source: []const u8, // device
@@ -68,6 +69,8 @@ pub const Mount = struct {
             mnt.sb = sb;
             mnt.tree.setup();
             mnt_lock.lock();
+            mnt.count = krn.task.RefCount.init();
+            mnt.count.ref();
             defer mnt_lock.unlock();
             if (mountpoints == null) {
                 mountpoints = mnt;
@@ -79,6 +82,16 @@ pub const Mount = struct {
             sb.ref.unref(); // later maybe something else
             return error.OutOfMemory;
         }
+    }
+
+    pub fn remove(self: *Mount) void {
+        mnt_lock.lock();
+        defer mnt_lock.unlock();
+        if (self == mountpoints) {
+            mountpoints = null;
+            return ;
+        }
+        self.tree.del();
     }
 
     pub fn checkChildMount(self: *Mount, dentry: *fs.DEntry) ?*Mount {

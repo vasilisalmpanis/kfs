@@ -20,12 +20,14 @@ pub const Ext2DirEntry = struct {
     name_len: u8,     // length of name
     file_type: u8,    // (ext2 rev>=1)
                       //
+    // FIXME: panic with getName
     pub fn getName(self: *Ext2DirEntry) []u8 {
         const addr: u32 = @intFromPtr(self) + @sizeOf(Ext2DirEntry);
         const name: [*]u8 = @ptrFromInt(addr);
         return name[0..self.name_len];
     }
 
+    // FIXME: incorrect alignment in some cases.
     pub fn getNext(self: *Ext2DirEntry) ?*Ext2DirEntry {
         if (self.rec_len == 0)
             return null;

@@ -24,12 +24,14 @@ pub const Ext2FileSystem = struct {
                 kernel.logger.INFO("sb already exists\n", .{});
                 const sb = self.base.sbs.next.?.entry(fs.SuperBlock, "list");
                 if (sb.dev_file.?.inode.dev_id == dev_file.?.inode.dev_id) {
+                    sb.ref.ref();
                     return sb;
                 }
             }
             const sb: *fs.SuperBlock = super.Ext2Super.create(base, file) catch |err| {
                 return err;
             };
+            sb.ref.ref();
             // here
             return sb;
         } else {
