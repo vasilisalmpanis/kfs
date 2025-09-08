@@ -48,3 +48,27 @@ pub fn mount(
     krn.logger.DEBUG("sys mount {s} {s} {s} {x}", .{_dev, _dir, _fs, new_flags});
     return try do_mount(_dev, _dir, _fs, new_flags, data);
 }
+
+pub fn do_umount(
+    name: []u8,
+) !u32 {
+    const path = try krn.fs.path.resolve(name); // /ext2
+    krn.logger.INFO("UMOUNT {s}\n", .{path.mnt.root.name});
+    if (path.isRoot()) {
+        if (path.mnt.tree.hasChildren())
+            return errors.EBUSY;
+        // Umount
+        const mountpoint: *fs.Mount = path.mnt;
+        mountpoint.remove(); // Removed from tree. Now we can free all the children.
+        mountpoint.sb.ref.unref();
+        krn.logger.INFO("mountpoint count {d}\n", .{path.mnt.count.count.raw});
+        return 0;
+    }
+    return errors.EINVAL;
+}
+
+pub fn umount(
+    name: [*:0]u8,
+) !u32 {
+    return try do_umount(std.mem.span(name));
+}
