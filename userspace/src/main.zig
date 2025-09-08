@@ -315,14 +315,14 @@ pub export fn main() linksection(".text.main") noreturn {
         _ = std.os.linux.mount("/dev/sda", "ext2", "ext2", 0, 0);
         // fd = std.os.linux.open("/ext2/root/test", .{ .CREAT = false }, 0o444);
         // @memcpy(buf[0..30], "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-        _ = std.os.linux.write(@intCast(fd), @ptrCast(@alignCast(&buf)), 30);
-        serial("/ext2/root/test fd: {d}\n", .{fd});
-        _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-        var len: u32 = 1;
-        var buf2: [4096]u8 = .{0} ** 4096;
+        // _ = std.os.linux.write(@intCast(fd), @ptrCast(@alignCast(&buf)), 30);
+        // serial("/ext2/root/test fd: {d}\n", .{fd});
+        // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
+        // var len: u32 = 1;
+        // var buf2: [4096]u8 = .{0} ** 4096;
         // while (len > 0) {
-            len = std.posix.read(@intCast(fd), &buf2) catch 1;
-            serial("/ext2/test len: {d}, content: |{s}|\n", .{len, buf2[0..len]});
+            // len = std.posix.read(@intCast(fd), &buf2) catch 1;
+            // serial("/ext2/test len: {d}, content: |{s}|\n", .{len, buf2[0..len]});
         // }
 
         // var big_buf: [512]u8 = .{0} ** 512;
@@ -332,11 +332,12 @@ pub export fn main() linksection(".text.main") noreturn {
         //         serial("result of reading:\n{s}\n", .{big_buf[0..r]});
         //     }
         // }
-        test_getdents();
+        // test_getdents();
         // Signaling
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
         // waiting.
+        // _ = std.os.linux.umount("/ext2");
         var status: u32 = 0;
         _ = os.linux.wait4(@intCast(pid), &status, 0, null);
         serial("[PARENT] Child process exited with status: {d}\n", .{status});

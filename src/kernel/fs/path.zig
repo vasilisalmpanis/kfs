@@ -8,6 +8,7 @@ pub const Path = struct {
 
     pub fn init(mnt: *fs.Mount, dentry: *fs.DEntry) Path {
         dentry.ref.ref();
+        mnt.count.ref();
         return Path{
             .mnt = mnt,
             .dentry = dentry,
@@ -20,6 +21,7 @@ pub const Path = struct {
 
     pub fn release(self: *const Path) void {
         self.dentry.ref.unref();
+        self.mnt.count.unref();
     }
 
     pub fn isRoot(self: *const Path) bool {
@@ -28,6 +30,8 @@ pub const Path = struct {
 
     pub fn resolveMount(self: *Path) void {
         if (self.mnt.checkChildMount(self.dentry)) |child_mnt| {
+            child_mnt.count.ref();
+            self.mnt.count.unref();
             self.mnt = child_mnt;
             self.setDentry(child_mnt.sb.root);
         }
