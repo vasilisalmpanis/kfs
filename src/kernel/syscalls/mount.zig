@@ -50,19 +50,18 @@ pub fn mount(
 }
 
 pub fn do_umount(
-    name: []u8,
+    name: []const u8,
 ) !u32 {
     const path = try krn.fs.path.resolve(name); // /ext2
-    krn.logger.INFO("UMOUNT {s}\n", .{path.mnt.root.name});
     if (path.isRoot()) {
-        if (path.mnt.tree.hasChildren())
+        if (path.mnt.tree.hasChildren() or path.mnt.count.getValue() > 2)
             return errors.EBUSY;
-        // Umount
         const mountpoint: *fs.Mount = path.mnt;
         mountpoint.remove(); // Removed from tree. Now we can free all the children.
         mountpoint.sb.ref.unref();
-        krn.logger.INFO("mountpoint count {d}\n", .{path.mnt.count.count.raw});
         return 0;
+    } else  {
+        krn.logger.INFO("{s}: not a mountpoint!", .{name});
     }
     return errors.EINVAL;
 }

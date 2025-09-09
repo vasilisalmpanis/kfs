@@ -230,20 +230,20 @@ pub export fn main() linksection(".text.main") noreturn {
         0,
         &fds
     );
-    var fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
-    fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
-    const wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
-    serial("result of writing to {d}:\n  len:{d}\n", .{fd, wl});
-    _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
+    // var fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
+    // fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
+    // const wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
+    // serial("result of writing to {d}:\n  len:{d}\n", .{fd, wl});
+    // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
     const pid = std.posix.fork() catch |err| blk: {
         serial("fork error: {any}\n", .{err});
         break :blk 3;
     };
     if (pid == 0) {
-        _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-        var buf1: [30]u8 = .{0} ** 30;
-        const rl = std.posix.read(@intCast(fd), &buf1) catch 1;
-        serial("\n\n\nChild process read:\n  len:{d}\n  data: {s}\n\n\n", .{rl, buf1[0..rl]});
+        // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
+        // var buf1: [30]u8 = .{0} ** 30;
+        // const rl = std.posix.read(@intCast(fd), &buf1) catch 1;
+        // serial("\n\n\nChild process read:\n  len:{d}\n  data: {s}\n\n\n", .{rl, buf1[0..rl]});
         childProcess(fds[1]);
     } else { 
         // Parent
@@ -280,39 +280,39 @@ pub export fn main() linksection(".text.main") noreturn {
             } == 0
         ) {}
 
-        fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
-        serial("new fd {any}\n", .{fd});
-        fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
-        serial("new fd {any}\n", .{fd});
-        fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
-        serial("new fd {any}\n", .{fd});
-        const _wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
-        serial("result of writing:\n  len:{d}\n", .{_wl});
-        _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-        serial("after lseek\n",.{});
-        var rl = std.posix.read(@intCast(fd), &buf) catch 1;
-        serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
-        serial("new fd {any}\n", .{fd});
-        fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
-        _ = std.posix.close(3);
-        _ = std.posix.close(4);
-        _ = std.posix.close(5);
-        _ = std.posix.close(6);
-        _ = std.posix.close(7);
-        _ = std.posix.lseek_SET(@intCast(8), 0) catch null;
-        rl = std.posix.read(@intCast(8), &buf) catch 1;
-        fd = std.os.linux.open("/dev/8250", .{ .CREAT = true }, 0o444);
-        serial("new fd for dev {any}\n", .{fd});
-        _ = std.posix.write(@intCast(fd), "We can now print to serial from userspace\n") catch 0;
-        serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
-        _ = std.posix.close(8);
-        fd = std.os.linux.open("/dev/sda", .{ .CREAT = true }, 0o444);
+        // fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
+        // serial("new fd {any}\n", .{fd});
+        // fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
+        // serial("new fd {any}\n", .{fd});
+        // fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
+        // serial("new fd {any}\n", .{fd});
+        // const _wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
+        // serial("result of writing:\n  len:{d}\n", .{_wl});
+        // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
+        // serial("after lseek\n",.{});
+        // var rl = std.posix.read(@intCast(fd), &buf) catch 1;
+        // serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
+        // serial("new fd {any}\n", .{fd});
+        // fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
+        // _ = std.posix.close(3);
+        // _ = std.posix.close(4);
+        // _ = std.posix.close(5);
+        // _ = std.posix.close(6);
+        // _ = std.posix.close(7);
+        // _ = std.posix.lseek_SET(@intCast(8), 0) catch null;
+        // rl = std.posix.read(@intCast(8), &buf) catch 1;
+        // var fd = std.os.linux.open("/dev/8250", .{ .CREAT = true }, 0o444);
+        // serial("new fd for dev {any}\n", .{fd});
+        // _ = std.posix.write(@intCast(fd), "We can now print to serial from userspace\n") catch 0;
+        // // serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
+        // _ = std.posix.close(8);
+        // fd = std.os.linux.open("/dev/sda", .{ .CREAT = true }, 0o444);
 
         // _ = std.posix.mkdir("ext2", 0) catch |err| {
         //     serial("Error mkdir: {any}\n", .{err});
         // };
-        _ = std.os.linux.mkdir("ext2", 0);
-        _ = std.os.linux.mount("/dev/sda", "ext2", "ext2", 0, 0);
+        // _ = std.os.linux.mkdir("ext2", 0);
+        // _ = std.os.linux.mount("/dev/sda", "ext2", "ext2", 0, 0);
         // fd = std.os.linux.open("/ext2/root/test", .{ .CREAT = false }, 0o444);
         // @memcpy(buf[0..30], "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         // _ = std.os.linux.write(@intCast(fd), @ptrCast(@alignCast(&buf)), 30);

@@ -65,6 +65,7 @@ pub const Mount = struct {
             errdefer curr.release();
         }
         if (krn.mm.kmalloc(Mount)) |mnt| {
+            krn.logger.INFO("root deantry of {s}: {s} {x}", .{sb.fs.name, curr.dentry.name, @intFromPtr(curr.dentry)});
             mnt.root = curr.dentry;
             mnt.sb = sb;
             mnt.tree.setup();
@@ -89,7 +90,6 @@ pub const Mount = struct {
         defer mnt_lock.unlock();
         if (self == mountpoints) {
             mountpoints = null;
-            return ;
         }
         self.tree.del();
     }
@@ -99,6 +99,22 @@ pub const Mount = struct {
             var it = self.tree.child.?.siblingsIterator();
             while (it.next()) |i| {
                 const m = i.curr.entry(Mount, "tree");
+                krn.logger.INFO(
+                    "checking child mnt fs: {s}, dentry: ({s} {x} {s} ino {d} {x}) ||| ({s} {x} {s} ino {d} {x})",
+                    .{
+                        m.sb.fs.name,
+                        m.root.name,
+                        @intFromPtr(m.root),
+                        m.root.sb.fs.name,
+                        m.root.inode.i_no,
+                        @intFromPtr(m.root.inode),
+                        dentry.name,
+                        @intFromPtr(dentry),
+                        dentry.sb.fs.name,
+                        dentry.inode.i_no,
+                        @intFromPtr(dentry.inode)
+                    }
+                );
                 if (m.root == dentry) {
                     return m;
                 }
