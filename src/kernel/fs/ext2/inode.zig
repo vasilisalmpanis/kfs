@@ -14,7 +14,7 @@ pub const EXT2_N_BLOCKS             = 15;
 /// ext2 on-disk inode (little-endian fields). Classic 128-byte layout.
 /// Use `le16/le32` helpers below if you need host-endian values.
 ///
-pub const Ext2DirEntry = struct {
+pub const Ext2DirEntry = extern struct {
     inode: u32,       // inode number
     rec_len: u16,     // total size of this entry
     name_len: u8,     // length of name
@@ -110,6 +110,7 @@ pub const Ext2Inode = struct {
             .name = name,
         };
         if (fs.dcache.get(key)) |entry| {
+            kernel.logger.INFO("found in cache {any}", .{key});
             return entry;
         }
         // Get from disk
@@ -135,22 +136,11 @@ pub const Ext2Inode = struct {
     }
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
-        const cash_key = fs.DentryHash{
-            .sb = @intFromPtr(parent.sb),
-            .ino = base.i_no,
-            .name = name,
-        };
-        if (fs.dcache.get(cash_key)) |_| {
-            return error.Exists;
-        }
-        var new_inode = try Ext2Inode.new(base.sb);
-        new_inode.mode = mode;
-        errdefer kernel.mm.kfree(new_inode);
-        var new_dentry = try fs.DEntry.alloc(name, base.sb, new_inode);
-        errdefer kernel.mm.kfree(new_dentry);
-        parent.tree.addChild(&new_dentry.tree);
-        try fs.dcache.put(cash_key, new_dentry);
-        return new_dentry;
+        _ = base;
+        _ = parent;
+        _ = mode;
+        kernel.logger.ERROR("Ext2 mkdir: not implemented! Unable to create {s}!", .{name});
+        return kernel.errors.PosixError.ENONET;
     }
 
     pub fn create(base: *fs.Inode, name: []const u8, _: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {

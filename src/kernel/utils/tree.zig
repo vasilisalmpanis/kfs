@@ -70,11 +70,13 @@ pub const TreeNode = struct {
             }
             self.prev.?.next = self.next;
             self.next.?.prev = self.prev;
-        } else {
-            self.parent.?.child = null;
+        } else if (self.parent) |prnt| {
+            prnt.child = null;
         }
         if (self.hasChildren()) {
-            self.parent.?.addChildren(self.child.?);
+            if (self.parent) |prnt| {
+                prnt.addChildren(self.child.?);
+            }
         }
         self.setup();
     }

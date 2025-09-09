@@ -26,7 +26,9 @@ pub const ExampleInode = struct {
             .ino = dir.inode.i_no,
             .name = name,
         };
+        kernel.logger.INFO("ExampleInode.lookup(): {s}", .{name});
         if (fs.dcache.get(key)) |entry| {
+            kernel.logger.INFO("ExampleInode.lookup(): {s} found", .{name});
             return entry;
         }
         return error.InodeNotFound;

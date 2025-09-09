@@ -49,3 +49,4 @@ pub const mkdir = @import("./syscalls/mkdir.zig").mkdir;
 pub const read = @import("./syscalls/read.zig").read;
 pub const do_open = @import("./syscalls/open.zig").do_open;
 pub const do_mount = @import("./syscalls/mount.zig").do_mount;
+pub const do_umount = @import("./syscalls/mount.zig").do_umount;
