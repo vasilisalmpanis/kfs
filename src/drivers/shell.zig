@@ -62,7 +62,8 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "vmas", .desc = "Print task's VMAs", .hndl = &vmas });
         self.registerCommand(.{ .name = "layout", .desc = "Change keyboard layout", .hndl = &layout });
         self.registerCommand(.{ .name = "filesystems", .desc = "Print available filesystems", .hndl = &filesystems });
-        self.registerCommand(.{ .name = "mount", .desc = "Print mount points", .hndl = &mount });
+        self.registerCommand(.{ .name = "mount", .desc = "Mount filesystem", .hndl = &mount });
+        self.registerCommand(.{ .name = "umount", .desc = "Unmount", .hndl = &umount });
         self.registerCommand(.{ .name = "ls", .desc = "List directory content", .hndl = &ls });
         self.registerCommand(.{ .name = "mkdir", .desc = "Create a new directory", .hndl = &mkdir });
         self.registerCommand(.{ .name = "cd", .desc = "Change pwd", .hndl = &cd });
@@ -312,27 +313,45 @@ fn mount(_: *Shell, args: [][]const u8) void {
         );
         return ;
     }
-    _ = krn.do_mount(args[0], args[1], args[2], 0, null) catch {};
+    _ = krn.do_mount(args[0], args[1], args[2], 0, null) catch |err| {
+        debug.printf("Error nmounting: {t}!\n", .{err});
+    };
 }
+
+fn umount(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf(
+            \\Usage: umount target
+            \\  Example: umount /home/user
+            \\
+            , .{}
+        );
+        return ;
+    }
+
+    _ = krn.do_umount(args[0]) catch |err| {
+        debug.printf("Error unmounting: {t}!\n", .{err});
+    };
+}
+
 
 fn ls(_: *Shell, args: [][]const u8) void {
     var l_opt = false;
     var path: []const u8 = ".";
-    if (args.len > 1) {
+    if (args.len > 0) {
         if (std.mem.eql(u8, args[0], "-l")) {
             l_opt = true;
+            if (args.len > 1)
+                path = args[1];
         } else {
-            printf("Unknown argument: {s}\n", .{args[0]});
-            return ;
+            path = args[0];
         }
-        path = args[1];
-    } else if (args.len > 0) {
-        path = args[0];
     }
     const dir_path = krn.fs.path.resolve(path) catch |err| {
         debug.printf("Failed to resolve path: {t}\n", .{err});
         return ;
     };
+    krn.logger.INFO("dir_path: {s}, {s}", .{dir_path.mnt.root.name, dir_path.mnt.sb.fs.name});
     defer dir_path.release();
     if (!dir_path.dentry.inode.mode.isDir()) {
         printf("{s}: not a directory!\n", .{path});
@@ -389,8 +408,8 @@ fn mkdir(_: *Shell, args: [][]const u8) void {
     if (_name) |name| {
         @memcpy(name[0..args[0].len], args[0]);
         name[args[0].len] = 0;
-        _ = krn.mkdir(@ptrCast(name), 0) catch {
-            debug.printf("directory exists!\n", .{});
+        _ = krn.mkdir(@ptrCast(name), 0) catch |err| {
+            debug.printf("directory cannot be created: {t}!\n", .{err});
         };
     }
 }
