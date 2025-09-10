@@ -110,7 +110,6 @@ pub const Ext2Inode = struct {
             .name = name,
         };
         if (fs.dcache.get(key)) |entry| {
-            kernel.logger.INFO("found in cache {any}", .{key});
             return entry;
         }
         // Get from disk
@@ -127,6 +126,7 @@ pub const Ext2Inode = struct {
                     const new_inode = (try Ext2Inode.new(dir.sb)).getImpl(Ext2Inode, "base");
                     errdefer kernel.mm.kfree(new_inode);
                     try new_inode.iget(ext2_super, curr_dir.inode);
+                    new_inode.base.i_no = curr_dir.inode;
                     return try dir.new(name, &new_inode.base);
                 }
                 ext_dir = curr_dir.getNext();
