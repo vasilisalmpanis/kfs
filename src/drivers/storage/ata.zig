@@ -378,7 +378,7 @@ const ATADrive = struct {
         return false;
     }
 
-    fn writeSectorsDMA(self: *const ATADrive, lba: u32, num_sectors: u8) void {
+    fn writeSectorsDMA(self: *const ATADrive, lba: u32, num_sectors: u8) !void {
         self.selectDeviceLBA(lba);
         if (!self.dma_initialized or !self.waitReady()) {
             kernel.logger.ERROR("Drive not ready", .{});
@@ -406,11 +406,11 @@ const ATADrive = struct {
         self.ataWriteReg(ATA_REG_COMMAND, ATA_CMD_WRITE_DMA);
 
         self.delay();
-        self.waitDMA();
+        try self.waitDMA();
         return;
     }
 
-    fn readSectorsDMA(self: *const ATADrive, lba: u32, num_sectors: u8) void {
+    fn readSectorsDMA(self: *const ATADrive, lba: u32, num_sectors: u8) !void {
         self.selectDeviceLBA(lba);
         if (!self.dma_initialized or !self.waitReady()) {
             kernel.logger.ERROR("Drive not ready", .{});
@@ -436,11 +436,11 @@ const ATADrive = struct {
         self.ataWriteReg(ATA_REG_COMMAND, ATA_CMD_READ_DMA);
         
         self.delay();
-        self.waitDMA();
+        try self.waitDMA();
         return;
     }
 
-    fn waitDMA(self: *const ATADrive) void {
+    fn waitDMA(self: *const ATADrive) !void {
         var timeout: u32 = TIMEOUT_DMA;
         
         while (timeout > 0) {
@@ -450,7 +450,7 @@ const ATADrive = struct {
             if (bmide_status & BMIDE_STATUS_ERROR != 0 or ata_status & ATA_SR_ERR != 0) {
                 kernel.logger.ERROR("DMA transfer error. BMIDE: 0x{X}, ATA: 0x{X}", .{bmide_status, ata_status});
                 self.stopDMA();
-                return;
+                return kernel.errors.PosixError.EIO;
             }
             
             if (bmide_status & BMIDE_STATUS_INTERRUPT != 0 and ata_status & ATA_SR_BSY == 0) {
@@ -469,7 +469,7 @@ const ATADrive = struct {
         
         kernel.logger.ERROR("DMA transfer timeout", .{});
         self.stopDMA();
-        return;
+        return kernel.errors.PosixError.EIO;
     }
 
     fn stopDMA(self: *const ATADrive) void {
@@ -501,7 +501,7 @@ const ATADrive = struct {
         const num_sec: u32 = 1;
         for (0..self.lba28 / num_sec) |i| {
             const lba = i * num_sec;
-            self.readSectorsDMA(lba, 1);
+            self.readSectorsDMA(lba, 1) catch {};
         }
     }
 
@@ -791,7 +791,7 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
         
         const lba: u32 = file.pos / ATADrive.SECTOR_SIZE;
         // ata_dev.selectChannel();
-        ata_dev.readSectorsDMA(lba, 1);
+        try ata_dev.readSectorsDMA(lba, 1);
         
         const offset: u32 = file.pos % ATADrive.SECTOR_SIZE;
         var to_read: u32 = ATADrive.SECTOR_SIZE - offset;
@@ -816,10 +816,10 @@ fn ata_write(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
 
         if (size < to_write) to_write = size;
         kernel.logger.INFO("writing to ata {d} {d}\n", .{size, to_write});
-        ata_dev.readSectorsDMA(lba, 1);
+        try ata_dev.readSectorsDMA(lba, 1);
         const dma_buf: [*]u8 = @ptrFromInt(ata_dev.dma_buff_virt);
         @memcpy(dma_buf[offset..offset + to_write], buff[0..to_write]);
-        ata_dev.writeSectorsDMA(lba, 1);
+        try ata_dev.writeSectorsDMA(lba, 1);
         return to_write;
     }
     return 0;
