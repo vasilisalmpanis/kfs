@@ -462,7 +462,7 @@ fn cat(_: *Shell, args: [][]const u8) void {
     var buf: [1024]u8 = .{0} ** 1024;
     while (len > 0) {
         len = new_file.ops.read(new_file, @ptrCast(&buf), 1024) catch 0;
-        if (len > 0) {
+        if (len > 0 and !std.mem.allEqual(u8, &buf, 0)) {
             printf("{s}", .{buf[0..len]});
         }
     }
