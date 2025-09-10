@@ -59,6 +59,7 @@ pub const Path = struct {
 
     pub fn stepInto(self: *Path, segment: [] const u8) !void {
         var prev_path: Path = self.clone();
+        defer prev_path.release();
         if (std.mem.eql(u8, segment, "..")) {
             if (self.isRoot()) {// and !(self.mnt == krn.task.initial_task.fs.root.mnt)) {
                 if (self.mnt.root.tree.parent) |d| {
@@ -90,7 +91,6 @@ pub const Path = struct {
         self.resolveMount();
         if (self.dentry.inode.mode.isLink()) {
             try self.followLink(prev_path);
-            prev_path.release();
         }
     }
 
