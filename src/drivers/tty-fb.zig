@@ -338,7 +338,7 @@ pub const TTY = struct {
                     self._y
                 )
             );
-            self._input_len -= 1;
+            self._input_len -|= 1;
             self.render();
         }
     }
