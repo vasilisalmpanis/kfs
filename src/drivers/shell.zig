@@ -351,7 +351,6 @@ fn ls(_: *Shell, args: [][]const u8) void {
         debug.printf("Failed to resolve path: {t}\n", .{err});
         return ;
     };
-    krn.logger.INFO("dir_path: {s}, {s}", .{dir_path.mnt.root.name, dir_path.mnt.sb.fs.name});
     defer dir_path.release();
     if (!dir_path.dentry.inode.mode.isDir()) {
         printf("{s}: not a directory!\n", .{path});

@@ -126,40 +126,40 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     } else {
             dbg.printf("Unknown filesystem type\n",.{});
     }
-    // if (krn.fs.FileSystem.find("devfs")) |fs| {
-    //     _ = krn.fs.Mount.mount("devfs", "/ext2/dev", fs) catch {
-    //         dbg.printf("Failed to mount devfs to rootfs\n",.{});
-    //         @panic("Not able to mount\n");
-    //     };
-    //     // _ = krn.do_umount("/dev") catch |err| {
-    //     //     krn.logger.ERROR("Error umounting /dev: {t}", .{err});
-    //     // };
-    // } else {
-    //         dbg.printf("Unknown filesystem type\n",.{});
-    // }
-    // if (krn.fs.FileSystem.find("sysfs")) |fs| {
-    //     _ = krn.fs.Mount.mount("sysfs", "/ext2/sys", fs) catch {
-    //         dbg.printf("Failed to mount sysfs to rootfs\n",.{});
-    //         @panic("Not able to mount\n");
-    //     };
-    //     // _ = krn.do_umount("/sys") catch |err| {
-    //     //     krn.logger.ERROR("Error umounting /sys: {t}", .{err});
-    //     // };
-    // } else {
-    //         dbg.printf("Unknown filesystem type\n",.{});
-    // }
-    // if (root_mountpoint) |point| {
-    //     krn.task.initial_task.fs.root = krn.fs.path.Path.init(
-    //         point,
-    //         point.sb.root,
-    //     );
-    //     krn.task.initial_task.fs.pwd = krn.fs.path.Path.init(
-    //         point,
-    //         point.sb.root,
-    //     );
-    //     krn.fs.mount.mountpoints.?.remove();
-    //     krn.fs.mount.mountpoints = point;
-    // }
+    if (krn.fs.FileSystem.find("devfs")) |fs| {
+        _ = krn.fs.Mount.mount("devfs", "/ext2/dev", fs) catch {
+            dbg.printf("Failed to mount devfs to rootfs\n",.{});
+            @panic("Not able to mount\n");
+        };
+        // _ = krn.do_umount("/dev") catch |err| {
+        //     krn.logger.ERROR("Error umounting /dev: {t}", .{err});
+        // };
+    } else {
+            dbg.printf("Unknown filesystem type\n",.{});
+    }
+    if (krn.fs.FileSystem.find("sysfs")) |fs| {
+        _ = krn.fs.Mount.mount("sysfs", "/ext2/sys", fs) catch {
+            dbg.printf("Failed to mount sysfs to rootfs\n",.{});
+            @panic("Not able to mount\n");
+        };
+        // _ = krn.do_umount("/sys") catch |err| {
+        //     krn.logger.ERROR("Error umounting /sys: {t}", .{err});
+        // };
+    } else {
+            dbg.printf("Unknown filesystem type\n",.{});
+    }
+    if (root_mountpoint) |point| {
+        krn.task.initial_task.fs.root = krn.fs.path.Path.init(
+            point,
+            point.sb.root,
+        );
+        krn.task.initial_task.fs.pwd = krn.fs.path.Path.init(
+            point,
+            point.sb.root,
+        );
+        krn.fs.mount.mountpoints.?.remove();
+        krn.fs.mount.mountpoints = point;
+    }
 
     // @import("drivers").pci.init();
     // @import("drivers").ata.ata_init();

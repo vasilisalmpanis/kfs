@@ -34,7 +34,7 @@ pub const DevInode = struct {
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
         if (kernel.mm.dupSlice(u8, name)) |_name| {
-            const cash_key = fs.DentryHash{
+            var cash_key = fs.DentryHash{
                 .sb = @intFromPtr(parent.sb),
                 .ino = base.i_no,
                 .name = _name,
@@ -49,6 +49,7 @@ pub const DevInode = struct {
             var new_dentry = try fs.DEntry.alloc(_name, base.sb, new_inode);
             errdefer kernel.mm.kfree(new_dentry);
             parent.tree.addChild(&new_dentry.tree);
+            cash_key.name = new_dentry.name;
             try fs.dcache.put(cash_key, new_dentry);
             return new_dentry;
         } else {
