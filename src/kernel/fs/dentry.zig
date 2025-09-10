@@ -65,7 +65,7 @@ pub const DEntry = struct {
             fs.DentryHash{
                 .sb = @intFromPtr(parent.sb),
                 .ino = parent.inode.i_no,
-                .name = name,
+                .name = new_dentry.name,
             },
             new_dentry
         ) catch {

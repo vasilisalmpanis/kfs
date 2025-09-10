@@ -29,9 +29,7 @@ pub const Path = struct {
     }
 
     pub fn resolveMount(self: *Path) void {
-        krn.logger.INFO("resolve mount {s}, {s}", .{self.dentry.name, self.dentry.sb.fs.name});
         if (self.mnt.checkChildMount(self.dentry)) |child_mnt| {
-            krn.logger.INFO("resolving...", .{});
             child_mnt.count.ref();
             self.mnt.count.unref();
             self.mnt = child_mnt;
@@ -203,7 +201,6 @@ pub fn resolveFrom(path: []const u8, from: Path) !Path {
 pub fn resolve(path: []const u8) !Path {
     var last: [] const u8 = "";
     var res = try dir_resolve(path, &last);
-    krn.logger.INFO("dentry: {s}, mnt: {s}, {s}", .{res.dentry.name, res.mnt.root.name, res.mnt.sb.fs.name});
     if (last.len > 0) {
         try res.stepInto(last);
     }
