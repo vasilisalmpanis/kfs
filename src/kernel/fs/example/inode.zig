@@ -26,16 +26,14 @@ pub const ExampleInode = struct {
             .ino = dir.inode.i_no,
             .name = name,
         };
-        kernel.logger.INFO("ExampleInode.lookup(): {s}", .{name});
         if (fs.dcache.get(key)) |entry| {
-            kernel.logger.INFO("ExampleInode.lookup(): {s} found", .{name});
             return entry;
         }
         return error.InodeNotFound;
     }
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
-        const cash_key = fs.DentryHash{
+        var cash_key = fs.DentryHash{
             .sb = @intFromPtr(parent.sb),
             .ino = base.i_no,
             .name = name,
@@ -49,6 +47,7 @@ pub const ExampleInode = struct {
         var new_dentry = try fs.DEntry.alloc(name, base.sb, new_inode);
         errdefer kernel.mm.kfree(new_dentry);
         parent.tree.addChild(&new_dentry.tree);
+        cash_key.name = new_dentry.name;
         try fs.dcache.put(cash_key, new_dentry);
         return new_dentry;
     }
