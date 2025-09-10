@@ -54,6 +54,7 @@ pub const Mount = struct {
         if (mountpoints != null) {
             const point = fs.path.remove_trailing_slashes(target);
             curr = try fs.path.resolve(point);
+            defer curr.release();
             sb = try fs_type.ops.getSB(fs_type, dummy_file);
             errdefer sb.ref.unref();
         } else {
@@ -75,6 +76,7 @@ pub const Mount = struct {
             if (mountpoints == null) {
                 mountpoints = mnt;
             } else {
+                curr.mnt.count.ref();
                 curr.mnt.tree.addChild(&mnt.tree);
             }
             return mnt;
@@ -90,7 +92,12 @@ pub const Mount = struct {
         if (self == mountpoints) {
             mountpoints = null;
         }
+        const parent = self.tree.parent;
         self.tree.del();
+        if (parent) |_parent| {
+            const parent_mount = _parent.entry(Mount, "tree");
+            parent_mount.count.unref();
+        }
     }
 
     pub fn checkChildMount(self: *Mount, dentry: *fs.DEntry) ?*Mount {
