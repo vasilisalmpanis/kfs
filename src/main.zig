@@ -158,7 +158,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     // Devices
     drv.init();
     // Mount disk as /
-    // move_root();
+    move_root();
 
 
     _ = krn.kthreadCreate(&testp, null) catch null;
