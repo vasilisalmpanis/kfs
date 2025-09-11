@@ -14,7 +14,11 @@ pub fn syscallsManager(state: *arch.Regs) void {
         return;
     }
     const sys: systable.Syscall = @enumFromInt(state.eax);
-    if (sys != .SYS_write and sys != .SYS_read) {
+    if (sys != .SYS_write
+        and sys != .SYS_read
+        and sys != .SYS_writev
+        and sys != .SYS_pwritev
+    ) {
         krn.logger.INFO("[PID {d:<2}]: {d:>4} {s}", .{
             tsk.current.pid,
             state.eax,

@@ -19,7 +19,7 @@ pub const Ext2File = struct {
     //     base.pos += to_write;
     //     return to_write;
     // }
-    fn write(base: *fs.File, buf: [*]u8, size: u32) !u32 {
+    fn write(base: *fs.File, buf: [*]const u8, size: u32) !u32 {
         const ino = base.inode.getImpl(Ext2Inode, "base");
         const ext2_sb = base.inode.sb.getImpl(Ext2Super, "base");
 

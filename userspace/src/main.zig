@@ -2,6 +2,7 @@ const os = @import("std").os;
 const std = @import("std");
 const root = @import("root");
 const builtin = @import("builtin");
+const shell = @import("./shell.zig");
 
 pub const std_options = std.Options{
     .log_level = .debug,
@@ -52,19 +53,6 @@ fn customHandler(_: i32) callconv(.c) void {
     serial("[CHILD] Custom handler for child process\n", .{});
     std.posix.exit(55);
 }
-
-// var idx: u32 = 0;
-// fn siginfo_hand(a: i32, b: *const os.linux.siginfo_t, c: ?*anyopaque) callconv(.c) void {
-//     const ucontext: ?*os.linux.ucontext_t = @ptrCast(@alignCast(c));
-//     serial("siginfo args: {d} {any} {any}\n", .{a, b, ucontext});
-//     serial("raising signal\n", .{});
-//     idx += 1;
-//     if (idx < 3) {
-//         _ = os.linux.kill(0, 1);
-//         serial("raised signal\n", .{});
-//     }
-//     serial("exiting handler\n", .{});
-// }
 
 fn allocateMemory() void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -222,7 +210,6 @@ fn test_getdents() void {
 }
 
 pub export fn main() linksection(".text.main") noreturn {
-    screen("testing screen from userspace {d}\n", .{12343});
     var fds: [2]i32 = .{0, 0};
     _ = os.linux.socketpair(
         os.linux.AF.UNIX,
@@ -230,24 +217,13 @@ pub export fn main() linksection(".text.main") noreturn {
         0,
         &fds
     );
-    // var fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
-    // fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
-    // const wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
-    // serial("result of writing to {d}:\n  len:{d}\n", .{fd, wl});
-    // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
     const pid = std.posix.fork() catch |err| blk: {
         serial("fork error: {any}\n", .{err});
         break :blk 3;
     };
     if (pid == 0) {
-        // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-        // var buf1: [30]u8 = .{0} ** 30;
-        // const rl = std.posix.read(@intCast(fd), &buf1) catch 1;
-        // serial("\n\n\nChild process read:\n  len:{d}\n  data: {s}\n\n\n", .{rl, buf1[0..rl]});
         childProcess(fds[1]);
     } else { 
-        // Parent
-        // PID / UID
         serial("[PARENT] PID of new Child {d}\n", .{pid});
         pidUid("[PARENT]");
 
@@ -280,64 +256,22 @@ pub export fn main() linksection(".text.main") noreturn {
             } == 0
         ) {}
 
-        // fd = std.os.linux.open("lol", .{ .CREAT = true }, 0o444);
-        // serial("new fd {any}\n", .{fd});
-        // fd = std.os.linux.open("lol2", .{ .CREAT = true }, 0o444);
-        // serial("new fd {any}\n", .{fd});
-        // fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
-        // serial("new fd {any}\n", .{fd});
-        // const _wl = std.posix.write(@intCast(fd), "testing write and read") catch 0;
-        // serial("result of writing:\n  len:{d}\n", .{_wl});
-        // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-        // serial("after lseek\n",.{});
-        // var rl = std.posix.read(@intCast(fd), &buf) catch 1;
-        // serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
-        // serial("new fd {any}\n", .{fd});
-        // fd = std.os.linux.open("lol3", .{ .CREAT = true }, 0o444);
-        // _ = std.posix.close(3);
-        // _ = std.posix.close(4);
-        // _ = std.posix.close(5);
-        // _ = std.posix.close(6);
-        // _ = std.posix.close(7);
-        // _ = std.posix.lseek_SET(@intCast(8), 0) catch null;
-        // rl = std.posix.read(@intCast(8), &buf) catch 1;
-        // var fd = std.os.linux.open("/dev/8250", .{ .CREAT = true }, 0o444);
-        // serial("new fd for dev {any}\n", .{fd});
-        // _ = std.posix.write(@intCast(fd), "We can now print to serial from userspace\n") catch 0;
-        // // serial("result of reading:\n  len:{d}\n  data: {s}\n", .{rl, buf[0..rl]});
-        // _ = std.posix.close(8);
-        // fd = std.os.linux.open("/dev/sda", .{ .CREAT = true }, 0o444);
-
-        // _ = std.posix.mkdir("ext2", 0) catch |err| {
-        //     serial("Error mkdir: {any}\n", .{err});
-        // };
-        // _ = std.os.linux.mkdir("ext2", 0);
-        // _ = std.os.linux.mount("/dev/sda", "ext2", "ext2", 0, 0);
-        // fd = std.os.linux.open("/ext2/root/test", .{ .CREAT = false }, 0o444);
-        // @memcpy(buf[0..30], "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-        // _ = std.os.linux.write(@intCast(fd), @ptrCast(@alignCast(&buf)), 30);
-        // serial("/ext2/root/test fd: {d}\n", .{fd});
-        // _ = std.posix.lseek_SET(@intCast(fd), 0) catch null;
-        // var len: u32 = 1;
-        // var buf2: [4096]u8 = .{0} ** 4096;
-        // while (len > 0) {
-            // len = std.posix.read(@intCast(fd), &buf2) catch 1;
-            // serial("/ext2/test len: {d}, content: |{s}|\n", .{len, buf2[0..len]});
-        // }
-
-        // var big_buf: [512]u8 = .{0} ** 512;
-        // for (0..5000) |_| {
-        //     const r = std.posix.read(@intCast(fd), &big_buf) catch 0;
-        //     if (!std.mem.allEqual(u8, &big_buf, 0)) {
-        //         serial("result of reading:\n{s}\n", .{big_buf[0..r]});
-        //     }
-        // }
-        // test_getdents();
-        // Signaling
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
-        // waiting.
-        // _ = std.os.linux.umount("/ext2");
+
+        const stdin = std.os.linux.open("/dev/tty", .{ .CREAT = false }, 0o444);
+        var len: u32 = 1;
+        var input: [1024]u8 = .{0} ** 1024;
+        var sh = shell.Shell.init(stdin);
+        while (true) {
+            len = std.os.linux.read(@intCast(stdin), &input, 1024);
+            if (len > 0) {
+                sh.handleInput(input[0..len - 1]);
+            } else {
+                break;
+            }
+        }
+
         var status: u32 = 0;
         _ = os.linux.wait4(@intCast(pid), &status, 0, null);
         serial("[PARENT] Child process exited with status: {d}\n", .{status});

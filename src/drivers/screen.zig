@@ -1,4 +1,4 @@
-const tty = @import("tty-fb.zig");
+const tty = @import("./platform/tty.zig");
 const fb = @import("./framebuffer.zig");
 const multiboot = @import("arch").multiboot;
 const printf = @import("debug").printf;
@@ -14,13 +14,13 @@ pub const Screen = struct {
     
     pub fn init(boot_info: *multiboot.Multiboot) Screen {
         const frm = fb.FrameBuffer.init(boot_info, &fonts.VGA16x32);
-        var scr = Screen{
+        const scr = Screen{
             .frmb = frm,
         };
         framebuffer = scr.frmb;
-        for (0..1) |index| {
-            scr.tty[index] = tty.TTY.init(frm.cwidth, frm.cheight);
-        }
+        // for (0..1) |index| {
+        //     scr.tty[index] = tty.TTY.init(frm.cwidth, frm.cheight);
+        // }
         return scr;
     }
 
@@ -32,5 +32,5 @@ pub const Screen = struct {
 
 pub fn initScreen(scr: *Screen, boot_info: *multiboot.Multiboot) void {
     scr.* = Screen.init(boot_info);
-    current_tty = &scr.tty[0];
+    current_tty = null;
 }
