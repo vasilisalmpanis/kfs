@@ -59,6 +59,7 @@ pub fn init() void {
     storage.bus.init();
 
     platform.serial.init();
+    platform.tty.init();
     pci.ide.init();
     storage.ata.init();
 }

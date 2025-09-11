@@ -173,7 +173,7 @@ pub const Ext2Super = struct {
         }
     }
 
-    pub fn writeBuff(sb: *Ext2Super, block: u32, buff: [*]u8, size: u32) !u32 {
+    pub fn writeBuff(sb: *Ext2Super, block: u32, buff: [*]const u8, size: u32) !u32 {
             var to_write: u32 = size;
             sb.base.dev_file.?.pos = sb.block_size * block;
             var written: u32 = 0;

@@ -158,12 +158,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     // Devices
     drv.init();
     // Mount disk as /
-    move_root();
+    // move_root();
 
-    // @import("drivers").pci.init();
-    // @import("drivers").ata.ata_init();
-    _ = krn.kthreadCreate(&tty_thread, null) catch null;
-    krn.logger.INFO("TTY thread started", .{});
 
     _ = krn.kthreadCreate(&testp, null) catch null;
     // _ = krn.kthreadCreate(&testp, null) catch null;

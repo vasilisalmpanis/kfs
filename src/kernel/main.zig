@@ -17,6 +17,7 @@ pub const exceptions = @import("./irq/exceptions.zig");
 pub const syscalls = @import("./irq/syscalls.zig");
 pub const list = @import("./utils/list.zig");
 pub const tree = @import("./utils/tree.zig");
+pub const ringbuf = @import("./utils/ringbuf.zig");
 pub const kthreadCreate = @import("./sched/kthread.zig").kthreadCreate;
 pub const kthreadStop = @import("./sched/kthread.zig").kthreadStop;
 pub const task = @import("./sched/task.zig");

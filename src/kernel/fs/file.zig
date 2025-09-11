@@ -75,7 +75,7 @@ pub const File = struct {
 pub const FileOps = struct {
     open: *const fn (base: *File, inode: *fs.Inode) anyerror!void,
     close: *const fn(base: *File) void,
-    write: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
+    write: *const fn (base: *File, buf: [*]const u8, size: u32) anyerror!u32,
     read: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
     lseek: ?*const fn (base: *File, offset: u32, origin: u32) anyerror!u32 = null,
     readdir: ?*const fn (base: *File, buf: []u8) anyerror!u32 = readdirVFS,
