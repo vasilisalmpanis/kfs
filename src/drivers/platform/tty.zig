@@ -282,17 +282,20 @@ pub const TTY = struct {
             const x2 = @min(self._dirty_rect.x2, self.width - 1);
             const y2 = @min(self._dirty_rect.y2, self.height - 1);
 
-            for (y1..(y2 + 1)) |row| {
-                for (x1..(x2 + 1)) |col| {
-                    const c = self._buffer[row * self.width + col];
-                    if (c != self._prev_buffer[row * self.width + col]) {
-                        scr.framebuffer.putchar(
-                            c,
-                            col, row,
-                            self._bg_colour,
-                            self._fg_colour
-                        );
-                        self._prev_buffer[row * self.width + col] = c;
+            if (x1 <= x2 and y1 <= y2) {
+                for (y1..(y2 + 1)) |row| {
+                    for (x1..(x2 + 1)) |col| {
+                        const off = row * self.width + col;
+                        const c = self._buffer[off];
+                        if (c != self._prev_buffer[off]) {
+                            scr.framebuffer.putchar(
+                                c,
+                                col, row,
+                                self._bg_colour,
+                                self._fg_colour
+                            );
+                            self._prev_buffer[off] = c;
+                        }
                     }
                 }
             }
@@ -413,26 +416,39 @@ pub const TTY = struct {
     }
 
     fn shiftBufferLeft(self: *TTY) void {
+        if (self._input_len == 0) return;
         var i = self._x;
         const pos = self._y * self.width;
-        while (i < self._input_len -| 1): (i += 1) {
+        while (i + 1 < self._input_len and i + 1 < self.width): (i += 1) {
             self._buffer[pos + i] = self._buffer[pos + i + 1];
         }
-        self._buffer[pos + self._input_len -| 1] = 0;
+        const last = @min(self._input_len - 1, self.width - 1);
+        self._buffer[pos + last] = 0;
+    }
+
+    fn currentLineLen(self: *TTY) u32 {
+        var len: u32 = 0;
+        const pos = self._y * self.width;
+        while (len < self.width
+            and self._buffer[pos + len] != 0)
+        {
+            len += 1;
+        }
+        return len;
     }
 
     fn insertAtCursor(self: *TTY, c: u8) void {
         if (self._x < self.width - 1) {
+            if (self._input_len == 0)
+                self._input_len = self.currentLineLen();
             self.shiftBufferRight();
             self._buffer[self._y * self.width + self._x] = c;
-            self._input_len += 1;
+            if (self._input_len < self.width)
+                self._input_len += 1;
+
+            const end   = @min(self.width - 1, self._input_len);
             self.markDirty(
-                DirtyRect.init(
-                    self._x,
-                    self._y,
-                    self._input_len,
-                    self._y
-                )
+                DirtyRect.init(self._x, self._y, end, self._y)
             );
             self.saveCursor();
             self._x += 1;
@@ -442,18 +458,30 @@ pub const TTY = struct {
 
     fn removeAtCursor(self: *TTY) void {
         if (self._x > 0) {
+            if (self._input_len == 0)
+                self._input_len = self.currentLineLen();
+            if (self._input_len == 0) {
+                self.saveCursor();
+                self.render();
+                return;
+            }
             self.saveCursor();
             self._x -= 1;
-            self.shiftBufferLeft();
+            if (self._x < self._input_len) {
+                self.shiftBufferLeft();
+                self._input_len -= 1;
+            } else {
+                if (self._input_len > 0) {
+                    self._input_len -= 1;
+                    const last = @min(self._input_len, self.width - 1);
+                    self._buffer[self._y * self.width + last] = 0;
+                }
+            }
+            const end = if (self._input_len == 0) self._x
+                else @min(self._input_len, self.width - 1);
             self.markDirty(
-                DirtyRect.init(
-                    self._x,
-                    self._y,
-                    self._input_len,
-                    self._y
-                )
+                DirtyRect.init(self._x, self._y, end, self._y)
             );
-            self._input_len -= 1;
             self.render();
         }
     }
