@@ -64,6 +64,7 @@ pub const Path = struct {
             if (self.isRoot()) {// and !(self.mnt == krn.task.initial_task.fs.root.mnt)) {
                 if (self.mnt.root.tree.parent) |d| {
                     if (self.mnt.tree.parent) |p| {
+                        self.mnt.count.unref();
                         self.mnt = p.entry(fs.Mount, "tree");
                         self.setDentry(d.entry(fs.DEntry, "tree"));
                     } else {

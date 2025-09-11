@@ -54,7 +54,7 @@ pub const Mount = struct {
         if (mountpoints != null) {
             const point = fs.path.remove_trailing_slashes(target);
             curr = try fs.path.resolve(point);
-            errdefer curr.release();
+            defer curr.release();
             if (!curr.dentry.inode.mode.isDir()) {
                 return krn.errors.PosixError.ENOTDIR;
             }
