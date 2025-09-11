@@ -1,4 +1,5 @@
 const std = @import("std");
+const su = @import("./su.zig").su;
 
 const ShellCommandHandler = fn (self: *Shell, args: [][]const u8) void;
 
@@ -62,6 +63,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "cat", .desc = "Output file content", .hndl = &cat });
         self.registerCommand(.{ .name = "echo", .desc = "Output text", .hndl = &echo });
         self.registerCommand(.{ .name = "pwd", .desc = "Current working directory", .hndl = &pwd });
+        self.registerCommand(.{ .name = "su", .desc = "Change user", .hndl = &su });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -255,6 +257,9 @@ fn cd(self: *Shell, args: [][]const u8) void {
         );
         return ;
     }
+    std.posix.chdir(args[0]) catch |err| {
+        self.print("Error: {t}\n", .{err});
+    };
 }
 
 fn cat(self: *Shell, args: [][]const u8) void {
