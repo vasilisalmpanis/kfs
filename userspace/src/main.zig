@@ -264,6 +264,7 @@ pub export fn main() linksection(".text.main") noreturn {
         var input: [1024]u8 = .{0} ** 1024;
         var sh = shell.Shell.init(stdin);
         while (true) {
+            sh.print("> ", .{});
             len = std.os.linux.read(@intCast(stdin), &input, 1024);
             if (len > 0) {
                 sh.handleInput(input[0..len - 1]);

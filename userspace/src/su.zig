@@ -15,7 +15,7 @@ fn suParsePasswdLine(self: *Shell, username: []const u8, line: []const u8) !bool
         if (std.mem.eql(u8, psw_username, username)) {
             if (it.next()) |psw_pass| {
                 var password: [128]u8 = .{0} ** 128;
-                self.print("Password:\n", .{});
+                self.print("Password: ", .{});
                 const pass_len = self.stdout.file.read(password[0..128]) catch |err| {
                     self.print("Error: {t}\n", .{err});
                     return err;
