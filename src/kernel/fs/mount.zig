@@ -54,7 +54,13 @@ pub const Mount = struct {
         if (mountpoints != null) {
             const point = fs.path.remove_trailing_slashes(target);
             curr = try fs.path.resolve(point);
-            defer curr.release();
+            errdefer curr.release();
+            if (!curr.dentry.inode.mode.isDir()) {
+                return krn.errors.PosixError.ENOTDIR;
+            }
+            if (curr.isRoot()) {
+                return krn.errors.PosixError.EBUSY;
+            }
             sb = try fs_type.ops.getSB(fs_type, dummy_file);
             errdefer sb.ref.unref();
         } else {
