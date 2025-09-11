@@ -69,6 +69,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "cd", .desc = "Change pwd", .hndl = &cd });
         self.registerCommand(.{ .name = "date", .desc = "Current date and time", .hndl = &date });
         self.registerCommand(.{ .name = "cat", .desc = "Output file content", .hndl = &cat });
+        self.registerCommand(.{ .name = "echo", .desc = "Output text", .hndl = &echo });
         self.registerCommand(.{ .name = "pwd", .desc = "Current working directory", .hndl = &pwd });
     }
 
@@ -482,4 +483,40 @@ fn pwd(_: *Shell, _: [][]const u8) void {
 
 fn date(_: *Shell, _: [][]const u8) void {
     krn.cmos.printTime();
+}
+
+
+fn echo(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        debug.printf(
+            \\Usage: echo <text> [file]
+            \\  Example: echo hello /dev/8250 
+            \\
+            , .{}
+        );
+        return ;
+    }
+    if (args.len == 1) {
+        debug.printf("{s}\n", .{args[0]});
+        return ;
+    }
+    const file_path = krn.fs.path.resolve(args[1]) catch |err| {
+        debug.printf("Failed to resolve path: {t}\n", .{err});
+        return ;
+    };
+    defer file_path.release();
+    const new_file: *krn.fs.File = krn.fs.File.new(file_path) catch {
+        debug.printf("Failed to alloc mem for file\n", .{});
+        return ;
+    };
+    new_file.ops.open(new_file, new_file.inode) catch {
+        krn.mm.kfree(new_file);
+        debug.printf("Failed to open file\n", .{});
+        return ;
+    };
+
+    _ = new_file.ops.write(new_file, args[0].ptr, args[0].len) catch |err| {
+        debug.printf("Failed to write to file: {t}\n", .{err});
+    };
+    krn.mm.kfree(new_file);
 }

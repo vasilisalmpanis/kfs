@@ -752,7 +752,7 @@ fn ata_probe(device: *driver.storage.StorageDevice) !void {
         .{drive.channel, drive.name}
     );
     drive.initDMA();
-    try driver.bdev.addbdev(&device.dev);
+    try driver.bdev.addBdev(&device.dev);
     // Create block device for drive
     // Maybe: think about creating bdevs for partitions
 }
@@ -806,7 +806,7 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
     return 0;
 }
 
-fn ata_write(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
+fn ata_write(file: *kernel.fs.File, buff: [*]const u8, size: u32) !u32 {
     if( file.inode.dev) |d| {
         const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
 

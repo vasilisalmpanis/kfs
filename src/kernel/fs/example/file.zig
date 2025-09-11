@@ -6,7 +6,7 @@ pub const ExampleFile = struct {
     fn open(_: *fs.File, _: *fs.Inode) !void {
     }
 
-    fn write(base: *fs.File, buf: [*]u8, size: u32) !u32 {
+    fn write(base: *fs.File, buf: [*]const u8, size: u32) !u32 {
         const ino = base.inode.getImpl(ExampleInode, "base");
         var to_write = size;
         if (to_write > ino.buff.len - base.pos)
