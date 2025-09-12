@@ -88,10 +88,14 @@ pub const Shell = struct {
         
         const cmd_name = self.arg_buf[0];
         const cmd_args = self.arg_buf[1..arg_count];
-        if (self.commands.get(cmd_name)) |cmd| {
-            cmd.hndl(self, cmd_args);
+        self.exec(cmd_name, cmd_args);
+    }
+
+    pub fn exec(self: *Shell, cmd: []const u8, args: [][]const u8) void {
+        if (self.commands.get(cmd)) |_cmd| {
+            _cmd.hndl(self, args);
         } else {
-            printf("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{input});
+            printf("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{cmd});
         }
     }
 };

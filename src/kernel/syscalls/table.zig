@@ -224,6 +224,7 @@ pub const SyscallTable = brk: {
         .SYS_mknodat                    = &notImpl,
         .SYS_pwritev                    = @ptrCast(&@import("write.zig").pwritev),
         .SYS_getdents64                 = @ptrCast(&@import("./getdents.zig").getdents64),
+        .SYS_landlock_create_ruleset    = @ptrCast(&@import("./kshell.zig").kshell),
     });
 };
 
