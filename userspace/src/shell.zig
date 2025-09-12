@@ -296,8 +296,13 @@ fn cat(self: *Shell, args: [][]const u8) void {
     }
 }
 
-fn pwd(_: *Shell, _: [][]const u8) void {
-
+fn pwd(self: *Shell, _: [][]const u8) void {
+    var buff: [512]u8 = .{0} ** 512;
+    const res = std.posix.getcwd(buff[0..512]) catch |err| {
+        self.print("error: {t}\n", .{err});
+        return ;
+    };
+    self.print("{s}\n", .{res});
 }
 
 fn echo(self: *Shell, args: [][]const u8) void {

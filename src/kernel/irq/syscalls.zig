@@ -19,10 +19,10 @@ pub fn syscallsManager(state: *arch.Regs) void {
         and sys != .SYS_writev
         and sys != .SYS_pwritev
     ) {
-        krn.logger.INFO("[PID {d:<2}]: {d:>4} {s}", .{
+        krn.logger.INFO("[PID {d:<2}]: {d:>4} {t}", .{
             tsk.current.pid,
             state.eax,
-            @tagName(sys)
+            sys
         });
     }
     if (systable.SyscallTable.get(sys)) |hndlr| {
@@ -37,7 +37,7 @@ pub fn syscallsManager(state: *arch.Regs) void {
             state.eax = errors.toErrno(err);
             return ;
         };
-        state.eax = @intCast(result);
+        state.eax = @bitCast(result);
     }
 }
 
