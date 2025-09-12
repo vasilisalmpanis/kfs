@@ -62,15 +62,9 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "vmas", .desc = "Print task's VMAs", .hndl = &vmas });
         self.registerCommand(.{ .name = "layout", .desc = "Change keyboard layout", .hndl = &layout });
         self.registerCommand(.{ .name = "filesystems", .desc = "Print available filesystems", .hndl = &filesystems });
-        self.registerCommand(.{ .name = "mount", .desc = "Mount filesystem", .hndl = &mount });
         self.registerCommand(.{ .name = "umount", .desc = "Unmount", .hndl = &umount });
-        self.registerCommand(.{ .name = "ls", .desc = "List directory content", .hndl = &ls });
-        self.registerCommand(.{ .name = "mkdir", .desc = "Create a new directory", .hndl = &mkdir });
-        self.registerCommand(.{ .name = "cd", .desc = "Change pwd", .hndl = &cd });
         self.registerCommand(.{ .name = "date", .desc = "Current date and time", .hndl = &date });
-        self.registerCommand(.{ .name = "cat", .desc = "Output file content", .hndl = &cat });
         self.registerCommand(.{ .name = "echo", .desc = "Output text", .hndl = &echo });
-        self.registerCommand(.{ .name = "pwd", .desc = "Current working directory", .hndl = &pwd });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -298,31 +292,6 @@ fn filesystems(_: *Shell, _: [][]const u8) void {
     }
 }
 
-fn mount(_: *Shell, args: [][]const u8) void {
-    if (args.len < 1) {
-        krn.fs.mount.mnt_lock.lock();
-        defer krn.fs.mount.mnt_lock.unlock();
-        if (krn.fs.mount.mountpoints) |_| {
-            debug.printMountTree();
-        } else {
-            debug.printf("No mounts\n", .{});
-        }
-        return ;
-    }
-    if (args.len < 3) {
-        debug.printf(
-            \\Usage: mount source target type
-            \\  Example: mount PLACEHOLDER /home/user examplefs
-            \\
-            , .{}
-        );
-        return ;
-    }
-    _ = krn.do_mount(args[0], args[1], args[2], 0, null) catch |err| {
-        debug.printf("Error nmounting: {t}!\n", .{err});
-    };
-}
-
 fn umount(_: *Shell, args: [][]const u8) void {
     if (args.len < 1) {
         debug.printf(
@@ -337,152 +306,6 @@ fn umount(_: *Shell, args: [][]const u8) void {
     _ = krn.do_umount(args[0]) catch |err| {
         debug.printf("Error unmounting: {t}!\n", .{err});
     };
-}
-
-
-fn ls(_: *Shell, args: [][]const u8) void {
-    var l_opt = false;
-    var path: []const u8 = ".";
-    if (args.len > 0) {
-        if (std.mem.eql(u8, args[0], "-l")) {
-            l_opt = true;
-            if (args.len > 1)
-                path = args[1];
-        } else {
-            path = args[0];
-        }
-    }
-    const dir_path = krn.fs.path.resolve(path) catch |err| {
-        debug.printf("Failed to resolve path: {t}\n", .{err});
-        return ;
-    };
-    defer dir_path.release();
-    if (!dir_path.dentry.inode.mode.isDir()) {
-        printf("{s}: not a directory!\n", .{path});
-        return ;
-    }
-    const dir_file: *krn.fs.File = krn.fs.File.new(dir_path) catch {
-        debug.printf("Failed to alloc mem for file\n", .{});
-        return ;
-    };
-    dir_file.ops.open(dir_file, dir_file.inode) catch {
-        krn.mm.kfree(dir_file);
-        debug.printf("Failed to open directory\n", .{});
-        return ;
-    };
-
-    var len: u32 = 1;
-    var buf: [1024]u8 = .{0} ** 1024;
-    const buf_slice: []u8 = buf[0..1024];
-    while (len > 0) {
-        if (dir_file.ops.readdir) |_readdir| {
-            len = _readdir(dir_file, buf_slice) catch 0;
-            var offset: u32 = 0;
-            while (offset + @sizeOf(krn.fs.LinuxDirent) < len) {
-                const dirent: *krn.fs.LinuxDirent = @ptrCast(@alignCast(&buf[offset]));
-                if (l_opt) {
-                    printf("{c} {d:0>4} {s}\n", .{dirent.verboseType(), dirent.ino, dirent.getName()});
-                } else {
-                    printf("{s}\n", .{dirent.getName()});
-                }
-                offset += dirent.reclen;
-            }
-        } else {
-            printf(
-                "Readdir is not implemented for {s} filesystem!\n",
-                .{dir_file.inode.sb.fs.name}
-            );
-            return ;
-        }
-    }
-    krn.mm.kfree(dir_file);
-}
-
-fn mkdir(_: *Shell, args: [][]const u8) void {
-    if (args.len < 1) {
-        debug.printf(
-            \\Usage: mkdir <name>
-            \\  Example: mkdir test
-            \\
-            , .{}
-        );
-        return ;
-    }
-    const _name: ?[*:0]u8 = @ptrCast(krn.mm.kmallocArray(u8, args[0].len + 1));
-    if (_name) |name| {
-        @memcpy(name[0..args[0].len], args[0]);
-        name[args[0].len] = 0;
-        _ = krn.mkdir(@ptrCast(name), 0) catch |err| {
-            debug.printf("directory cannot be created: {t}!\n", .{err});
-        };
-    }
-}
-
-fn cd(_: *Shell, args: [][]const u8) void {
-    if (args.len < 1) {
-        debug.printf(
-            \\Usage: cd <path>
-            \\  Example: cd /
-            \\
-            , .{}
-        );
-        return ;
-    }
-    const dir = krn.fs.path.resolve(args[0]) catch {
-        debug.printf("wrong path!\n", .{});
-        return ;
-    };
-    defer dir.release();
-    krn.task.initial_task.fs.pwd.dentry = dir.dentry;
-    krn.task.initial_task.fs.pwd.mnt = dir.mnt;
-    // krn.task.initial_task.fs.pwd.mnt = ?;
-}
-
-fn cat(_: *Shell, args: [][]const u8) void {
-    if (args.len < 1) {
-        debug.printf(
-            \\Usage: cat <path>
-            \\  Example: cat /ext2/test
-            \\
-            , .{}
-        );
-        return ;
-    }
-    const file_path = krn.fs.path.resolve(args[0]) catch |err| {
-        debug.printf("Failed to resolve path: {t}\n", .{err});
-        return ;
-    };
-    defer file_path.release();
-    const new_file: *krn.fs.File = krn.fs.File.new(file_path) catch {
-        debug.printf("Failed to alloc mem for file\n", .{});
-        return ;
-    };
-    new_file.ops.open(new_file, new_file.inode) catch {
-        krn.mm.kfree(new_file);
-        debug.printf("Failed to open file\n", .{});
-        return ;
-    };
-
-    var len: u32 = 1;
-    var buf: [1024]u8 = .{0} ** 1024;
-    while (len > 0) {
-        len = new_file.ops.read(new_file, @ptrCast(&buf), 1024) catch 0;
-        if (len > 0 and !std.mem.allEqual(u8, &buf, 0)) {
-            printf("{s}", .{buf[0..len]});
-        }
-    }
-    krn.mm.kfree(new_file);
-}
-
-fn pwd(_: *Shell, _: [][]const u8) void {
-    var buf: [1024]u8 = .{0} ** 1024;
-    const buf_s = buf[0..1024];
-    buf_s[0] = '/';
-    const res = krn.task.initial_task.fs.pwd.getAbsPath(buf_s) catch |err| {
-        printf("Error: {t}\n", .{err});
-        return ;
-    };
-    printf("{s}\n", .{buf_s[0..if (res.len == 0) 1 else res.len]});
 }
 
 fn date(_: *Shell, _: [][]const u8) void {
