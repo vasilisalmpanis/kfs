@@ -76,6 +76,7 @@ pub fn getUID() !u32 {
 }
 
 pub fn setUID(uid: u16) !u32 {
+    // TODO implement correctly
     tsk.current.uid = uid;
     return 0;
 }
@@ -85,6 +86,7 @@ pub fn getGID() !u32 {
 }
 
 pub fn setGID(gid: u16) !u32 {
+    // TODO implement correctly
     tsk.current.gid = gid;
     return 0;
 }

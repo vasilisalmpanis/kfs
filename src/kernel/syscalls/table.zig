@@ -130,7 +130,7 @@ pub const SyscallTable = brk: {
         .SYS_syslog                     = &notImpl,
         .SYS_setitimer                  = &notImpl,
         .SYS_getitimer                  = &notImpl,
-        .SYS_stat                       = &notImpl,
+        .SYS_stat                       = @ptrCast(&@import("stat.zig").stat),
         .SYS_lstat                      = &notImpl,
         .SYS_fstat                      = &notImpl,
         .SYS_olduname                   = &notImpl,
@@ -225,6 +225,10 @@ pub const SyscallTable = brk: {
         .SYS_pwritev                    = @ptrCast(&@import("write.zig").pwritev),
         .SYS_getdents64                 = @ptrCast(&@import("./getdents.zig").getdents64),
         .SYS_landlock_create_ruleset    = @ptrCast(&@import("./kshell.zig").kshell),
+        .SYS_setuid32                   = @ptrCast(&@import("../sched/process.zig").setUID),
+        .SYS_setgid32                   = @ptrCast(&@import("../sched/process.zig").setGID),
+        .SYS_getgid32                   = @ptrCast(&@import("../sched/process.zig").getUID),
+        .SYS_stat64                     = @ptrCast(&@import("stat.zig").stat),
     });
 };
 

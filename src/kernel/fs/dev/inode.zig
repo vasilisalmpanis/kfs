@@ -10,6 +10,10 @@ pub const DevInode = struct {
 
     pub fn new(sb: *fs.SuperBlock) !*fs.Inode {
         if (kernel.mm.kmalloc(DevInode)) |inode| {
+            inode.base.dev_id = drv.device.dev_t{
+                .major = 0,
+                .minor = 0,
+            };
             inode.base.setup(sb);
             inode.base.ops = &dev_inode_ops;
             inode.base.fops = &file.DevFileOps;
@@ -85,6 +89,7 @@ pub const DevInode = struct {
         // Lookup if file already exists.
         _ = base.ops.lookup(parent, name) catch {
             const new_inode = try DevInode.new(base.sb);
+            // new_inode.dev_id = 0;
             errdefer kernel.mm.kfree(new_inode);
             new_inode.mode = mode;
             var dent = try parent.new(name, new_inode);
