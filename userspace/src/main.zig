@@ -260,6 +260,15 @@ pub export fn main() linksection(".text.main") noreturn {
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
 
         const stdin = std.os.linux.open("/dev/tty", .{ .CREAT = false }, 0o444);
+        std.posix.dup2(@intCast(stdin), 0) catch |err| {
+            serial("dup2 error {d} -> 0 {t}\n", .{stdin, err});
+        };
+        std.posix.dup2(@intCast(stdin), 1) catch |err| {
+            serial("dup2 error {d} -> 1 {t}\n", .{stdin, err});
+        };
+        std.posix.dup2(@intCast(stdin), 2) catch |err| {
+            serial("dup2 error {d} -> 2 {t}\n", .{stdin, err});
+        };
         var len: u32 = 1;
         var input: [1024]u8 = .{0} ** 1024;
         var sh = shell.Shell.init(stdin);
