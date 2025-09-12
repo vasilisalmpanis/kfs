@@ -292,7 +292,8 @@ fn cat(self: *Shell, args: [][]const u8) void {
         if (res == 0) {
             break;
         } else {
-            self.print("{s}", .{buff_slice[0..res]});
+            if (!std.mem.allEqual(u8, buff_slice[0..res], 0))
+                self.print("{s}", .{buff_slice[0..res]});
         }
     }
 }
