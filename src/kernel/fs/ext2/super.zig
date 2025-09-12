@@ -72,7 +72,6 @@ const Ext2SuperData = extern struct {
 pub const Ext2Super = struct {
     data: Ext2SuperData,
     bgdt: []BGDT,
-    block_size: u32,
     base: fs.SuperBlock,
     
     pub fn allocInode(_: *fs.SuperBlock) !*fs.Inode {
@@ -99,12 +98,12 @@ pub const Ext2Super = struct {
                 return kernel.errors.PosixError.EINVAL;
             }
             sb.data = ext2_super_data.*;
-            sb.block_size = @as(u32, 1024) << @as(u5, @truncate(sb.data.s_log_block_size));
+            sb.base.block_size = @as(u32, 1024) << @as(u5, @truncate(sb.data.s_log_block_size));
             var number_of_block_groups: u32 = ext2_super_data.s_blocks_count / ext2_super_data.s_blocks_per_group;
             if (ext2_super_data.s_blocks_count % ext2_super_data.s_blocks_per_group != 0)
                 number_of_block_groups += 1;
-            if (file.pos % sb.block_size != 0)
-                file.pos += sb.block_size - (file.pos % sb.block_size);
+            if (file.pos % sb.base.block_size != 0)
+                file.pos += sb.base.block_size - (file.pos % sb.base.block_size);
             if (kernel.mm.kmallocArray(BGDT, number_of_block_groups)) |bgdt_array| {
                 errdefer kernel.mm.kfree(bgdt_array);
                 for (0..number_of_block_groups) |idx| {
@@ -154,14 +153,14 @@ pub const Ext2Super = struct {
     }
 
     pub fn readBlocks(sb: *Ext2Super, block: u32, count: u32) ![]u8 {
-        const alloc_size: u32 = sb.block_size * count;
+        const alloc_size: u32 = sb.base.block_size * count;
         if (kernel.mm.kmallocArray(u8, alloc_size)) |raw_buff| {
             errdefer kernel.mm.kfree(raw_buff);
             @memset(raw_buff[0..alloc_size], 0);
-            sb.base.dev_file.?.pos = sb.block_size * block;
+            sb.base.dev_file.?.pos = sb.base.block_size * block;
             var read: u32 = 0;
             while (read < alloc_size) {
-                const single_read: u32 = try sb.base.dev_file.?.ops.read(sb.base.dev_file.?, @ptrCast(&raw_buff[read]), sb.block_size);
+                const single_read: u32 = try sb.base.dev_file.?.ops.read(sb.base.dev_file.?, @ptrCast(&raw_buff[read]), sb.base.block_size);
                 // FIXME:
                 if (single_read == 0) break;
                 read += single_read;
@@ -175,7 +174,7 @@ pub const Ext2Super = struct {
 
     pub fn writeBuff(sb: *Ext2Super, block: u32, buff: [*]const u8, size: u32) !u32 {
             var to_write: u32 = size;
-            sb.base.dev_file.?.pos = sb.block_size * block;
+            sb.base.dev_file.?.pos = sb.base.block_size * block;
             var written: u32 = 0;
             while (written < size) {
                 const single_write: u32 = try sb.base.dev_file.?.ops.write(sb.base.dev_file.?, @ptrCast(&buff[written]), to_write);
@@ -201,7 +200,7 @@ pub const Ext2Super = struct {
     //  - Ok(n>0)  -> physical block number on disk
     //  - Err(...) -> error (e.g. out of range)
     pub fn resolveLbn(ext2_sb: *Ext2Super, ino: *Ext2Inode, lbn: u64) !u32 {
-        const bs = ext2_sb.block_size;
+        const bs = ext2_sb.base.block_size;
         const ptrs_per_block = bs / 4; // 4 bytes per block pointer (u32)
 
         if (lbn <= 11) {

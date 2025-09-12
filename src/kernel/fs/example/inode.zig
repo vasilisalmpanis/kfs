@@ -2,6 +2,7 @@ const fs = @import("../fs.zig");
 const kernel = fs.kernel;
 const file = @import("file.zig");
 const std = @import("std");
+const drv = @import("drivers");
 
 
 pub const ExampleInode = struct {
@@ -10,6 +11,10 @@ pub const ExampleInode = struct {
 
     pub fn new(sb: *fs.SuperBlock) !*fs.Inode {
         if (kernel.mm.kmalloc(ExampleInode)) |inode| {
+            inode.base.dev_id = drv.device.dev_t{
+                .major = 0,
+                .minor = 0,
+            };
             inode.base.setup(sb);
             inode.base.ops = &example_inode_ops;
             inode.base.size = 50;
