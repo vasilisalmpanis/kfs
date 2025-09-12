@@ -6,8 +6,8 @@ const utils = @import("kernel").list;
 const std = @import("std");
 const arch = @import("arch");
 const krn = @import("kernel");
-const identifyDevice = @import("../pci-vendors.zig").identifyDevice;
-const identifyClass = @import("../pci-vendors.zig").identifyClass;
+const identifyDevice = @import("pci-vendors.zig").identifyDevice;
+const identifyClass = @import("pci-vendors.zig").identifyClass;
 const ConfigCommand = @import("./bus.zig").ConfigCommand;
 
 const CONFIG_ADDRESS               = 0xCF8;
