@@ -149,6 +149,27 @@ pub const TaskFiles = struct {
             self.map.unset(fd);
         }
     }
+
+    pub fn setFD(self: *TaskFiles, fd: u32, file: *File) !void {
+        if (fd >= self.map.capacity()) {
+            self.map.resize(fd + 1, false) catch |err| {
+                kernel.logger.ERROR(
+                    "TaskFiles.setFD(): failed to resize map: {t}",
+                    .{err}
+                );
+                return errors.ENOMEM;
+            };
+        }
+        self.map.set(fd);
+        errdefer self.map.unset(fd);
+        self.fds.put(fd, file) catch |err| {
+            kernel.logger.ERROR(
+                "TaskFiles.setFD(): failed to put fd {d} into fds: {t}",
+                .{fd, err}
+            );
+            return errors.ENOMEM;
+        };
+    }
 };
 
 pub fn readdirVFS(base: *fs.File, buf: []u8) !u32 {
