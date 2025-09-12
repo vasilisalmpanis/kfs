@@ -64,6 +64,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "echo", .desc = "Output text", .hndl = &echo });
         self.registerCommand(.{ .name = "pwd", .desc = "Current working directory", .hndl = &pwd });
         self.registerCommand(.{ .name = "su", .desc = "Change user", .hndl = &su });
+        self.registerCommand(.{ .name = "k", .desc = "Kernelspace command", .hndl = &kshell });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -315,4 +316,19 @@ fn echo(self: *Shell, args: [][]const u8) void {
         );
         return ;
     }
+}
+
+fn kshell(self: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        self.print(
+            \\Usage: k <command> <args>
+            \\  Example: k ps
+            \\
+            , .{}
+        );
+        return ;
+    }
+    const sys = std.os.linux.SYS.landlock_create_ruleset;
+    const k_args = args[0..];
+    _ = std.os.linux.syscall1(sys, @intFromPtr(&k_args));
 }
