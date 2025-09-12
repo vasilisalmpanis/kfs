@@ -162,6 +162,9 @@ pub const UMode = packed struct {
     other: u3 = 0,
     type: u7 = 0,
 
+    pub fn fromInt(self: *UMode, other: u32) void {
+        self.* = @bitCast(other);
+    }
     pub fn isDir(self: *UMode) bool {
         return self.type & S_IFMT == S_IFDIR;
     }

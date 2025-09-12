@@ -15,6 +15,7 @@ pub const SuperBlock = struct {
     fs: *fs.FileSystem,
     ref: Refcount,
     list: list.ListHead,
+    block_size: u32,
     inode_map: std.AutoHashMap(u32, *fs.Inode),
     dev_file: ?*fs.File = null,
     

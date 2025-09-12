@@ -170,11 +170,16 @@ pub const Ext2Inode = struct {
 
 
         const raw_buff: []u8 = try sb.readBlocks(block, 1);
-        rel_offset &= (sb.block_size - 1);
+        rel_offset &= (sb.base.block_size - 1);
         const raw_inode: *Ext2InodeData = @ptrCast(@alignCast(&raw_buff[rel_offset]));
         inode.data = raw_inode.*;
         inode.base.size = inode.data.i_size;
-        inode.base.mode = inode.data.i_mode;
+        inode.base.size = raw_inode.i_size;
+        inode.base.setCreds(
+            raw_inode.i_uid,
+            raw_inode.i_gid,
+            raw_inode.i_mode,
+        );
         kernel.mm.kfree(raw_buff.ptr);
     }
 

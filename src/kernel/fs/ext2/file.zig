@@ -33,7 +33,7 @@ pub const Ext2File = struct {
         // }
         if (to_write == 0) return 0;
 
-        const bs = ext2_sb.block_size;
+        const bs = ext2_sb.base.block_size;
         const lbn = base.pos / bs;
         // const write_offset: u32 = @intCast(base.pos % bs);
 
@@ -69,7 +69,7 @@ pub const Ext2File = struct {
         }
         if (to_read == 0) return 0;
 
-        const bs = ext2_sb.block_size;
+        const bs = ext2_sb.base.block_size;
         const lbn = base.pos / bs;
         const read_offset: u32 = @intCast(base.pos % bs);
 
@@ -107,7 +107,7 @@ pub const Ext2File = struct {
         const ext2_dir_inode = base.inode.getImpl(Ext2Inode, "base");
         const ext2_super = base.inode.sb.getImpl(Ext2Super, "base");
 
-        const block_size = ext2_super.block_size;
+        const block_size = ext2_super.base.block_size;
         const pos = base.pos;
 
         if (pos >= ext2_dir_inode.data.i_size) {

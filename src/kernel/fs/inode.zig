@@ -42,6 +42,12 @@ pub const Inode = struct {
         };
     }
 
+    pub fn setCreds(self: *Inode, uid: u32, gid: u32, mode: fs.UMode) void {
+        self.uid = uid;
+        self.gid = gid;
+        self.mode = mode;
+    }
+
     pub fn getImpl(base: *Inode, comptime T: type, comptime member: []const u8) *T {
         return @fieldParentPtr(member, base);
     }

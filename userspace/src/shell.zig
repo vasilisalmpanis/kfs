@@ -65,6 +65,8 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "pwd", .desc = "Current working directory", .hndl = &pwd });
         self.registerCommand(.{ .name = "su", .desc = "Change user", .hndl = &su });
         self.registerCommand(.{ .name = "k", .desc = "Kernelspace command", .hndl = &kshell });
+        self.registerCommand(.{ .name = "creds", .desc = "Print user credentials", .hndl = &creds });
+        self.registerCommand(.{ .name = "stat", .desc = "Stat file", .hndl = &stat });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -90,6 +92,27 @@ pub const Shell = struct {
     }
 };
 
+fn stat(self: *Shell, args: [][]const u8) void {
+    if (args.len != 1) {
+            self.print("Provide path argument\n", .{});
+            return ;
+    }
+    var temp: std.os.linux.Stat = undefined;
+    var buffer: [100]u8 = .{0} ** 100;
+    @memcpy(buffer[0..args[0].len], args[0]);
+    buffer[args[0].len] = 0;
+    if (std.os.linux.stat(@ptrCast(&buffer), &temp) == 0) {
+        self.print("Stat: {any}\n", .{temp});
+    } else {
+        self.print("Stat failed\n", .{});
+    }
+}
+
+fn creds(self: *Shell, _: [][]const u8) void {
+    const uid = std.os.linux.getuid();
+    const gid = std.os.linux.getgid();
+    self.print("User's uid {d} gid {d}\n", .{uid, gid});
+}
 
 fn help(self: *Shell, args: [][]const u8) void {
     _ = args;

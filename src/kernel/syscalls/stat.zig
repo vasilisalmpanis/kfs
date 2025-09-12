@@ -1,0 +1,73 @@
+const tsk = @import("../sched/task.zig");
+const errors = @import("./error-codes.zig").PosixError;
+const arch = @import("arch");
+const sockets = @import("../net/socket.zig");
+const fs = @import("../fs/fs.zig");
+const std = @import("std");
+const kernel = @import("../main.zig");
+// Manual translation for LP64 (e.g. x86_64 Linux).
+// Use `extern` so the layout/ABI matches C when linking with C code.
+pub const Timespec = extern struct {
+    tv_sec: u32,   // time_t -> signed 64-bit on LP64
+    tv_nsec: u32,  // long -> signed 64-bit
+                   //
+    fn init() Timespec {
+        return Timespec{
+            .tv_sec = 0,
+            .tv_nsec = 0,
+        };
+    }
+};
+
+pub const Stat = extern struct {
+    st_dev: u64,         // dev_t
+    __padding: u32,      // padding
+    _st_ino: u32,        // ino_t
+    st_mode: u32,        // mode_t (often 32-bit)
+    st_nlink: u32,       // nlink_t
+    st_uid: u32,         // uid_t (32-bit)
+    st_gid: u32,         // gid_t (32-bit)
+    st_rdev: u64,        // dev_t (special device)
+    __pad0: u32,         // unsigned int __pad0
+    st_size: i64,        // off_t
+    st_blksize: u32,     // blksize_t (signed long)
+    st_blocks: u64,      // blkcnt_t (signed long)
+    st_atim: Timespec,   // struct timespec
+    st_mtim: Timespec,   // struct timespec
+    st_ctim: Timespec,   // struct timespec
+    st_ino: u64,
+};
+
+pub fn stat(path: ?[*:0]u8, buf: ?*Stat) !u32 {
+    if (path == null or buf == null) return errors.EINVAL;
+
+    const path_slice = std.mem.span(path.?);
+    const stat_buf: *Stat = buf.?;
+    const inode_path: fs.path.Path = try fs.path.resolve(path_slice);
+    const inode: *fs.Inode = inode_path.dentry.inode;
+
+    stat_buf.st_dev = 0;
+    if (inode.sb.dev_file) |blkdev| {
+        const dev: u16 = @bitCast(blkdev.inode.dev_id);
+        stat_buf.st_dev = @intCast(dev);
+    }
+    stat_buf._st_ino = inode.i_no;
+    stat_buf.st_ino = inode.i_no;
+    stat_buf.st_nlink = 0; // No hard links yet.
+    const mode: u16 = @bitCast(inode.mode);
+    kernel.logger.INFO("MODE {d} {any}\n", .{mode, inode.mode});
+    stat_buf.__padding = 0;
+    stat_buf.__pad0 = 0;
+    stat_buf.st_mode = @intCast(mode);
+    stat_buf.st_uid = @intCast(inode.uid);
+    stat_buf.st_gid = @intCast(inode.gid);
+    const dev: u16 = @bitCast(inode.dev_id);
+    stat_buf.st_rdev = @intCast(dev);
+    stat_buf.st_size = inode.size; stat_buf.st_blksize = inode.sb.block_size;
+    stat_buf.st_blocks = 0;
+
+    stat_buf.st_atim = Timespec.init();
+    stat_buf.st_mtim = Timespec.init();
+    stat_buf.st_ctim = Timespec.init();
+    return 0;
+}
