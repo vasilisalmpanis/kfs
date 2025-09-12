@@ -62,6 +62,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "vmas", .desc = "Print task's VMAs", .hndl = &vmas });
         self.registerCommand(.{ .name = "layout", .desc = "Change keyboard layout", .hndl = &layout });
         self.registerCommand(.{ .name = "filesystems", .desc = "Print available filesystems", .hndl = &filesystems });
+        self.registerCommand(.{ .name = "mount", .desc = "Mount filesystem", .hndl = &mount });
         self.registerCommand(.{ .name = "umount", .desc = "Unmount", .hndl = &umount });
         self.registerCommand(.{ .name = "date", .desc = "Current date and time", .hndl = &date });
         self.registerCommand(.{ .name = "echo", .desc = "Output text", .hndl = &echo });
@@ -290,6 +291,31 @@ fn filesystems(_: *Shell, _: [][]const u8) void {
     } else {
         debug.printf("No registered filesystems\n", .{});
     }
+}
+
+fn mount(_: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        krn.fs.mount.mnt_lock.lock();
+        defer krn.fs.mount.mnt_lock.unlock();
+        if (krn.fs.mount.mountpoints) |_| {
+            debug.printMountTree();
+        } else {
+            debug.printf("No mounts\n", .{});
+        }
+        return ;
+    }
+    if (args.len < 3) {
+        debug.printf(
+            \\Usage: mount source target type
+            \\  Example: mount PLACEHOLDER /home/user examplefs
+            \\
+            , .{}
+        );
+        return ;
+    }
+    _ = krn.do_mount(args[0], args[1], args[2], 0, null) catch |err| {
+        debug.printf("Error nmounting: {t}!\n", .{err});
+    };
 }
 
 fn umount(_: *Shell, args: [][]const u8) void {
