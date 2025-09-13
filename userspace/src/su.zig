@@ -48,6 +48,7 @@ pub fn su(self: *Shell, args: [][]const u8) void {
         return ;
     };
     if (pid == 0) {
+        self.running += 1;
         do_su(self, args);
         return ;
     }
