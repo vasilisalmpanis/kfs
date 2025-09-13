@@ -78,7 +78,7 @@ pub const Inode = struct {
         if (kernel.task.current.uid == 0) {
             return true;
         }
-        if (((flags & fs.file.O_RDONLY != 0) and self.canRead()))
+        if (((flags & 0b11 == 0) and self.canRead()))
             return true;
         if (flags & fs.file.O_WRONLY != 0 and self.canWrite())
             return true;
