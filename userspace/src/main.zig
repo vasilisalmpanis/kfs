@@ -210,86 +210,21 @@ fn test_getdents() void {
 }
 
 pub export fn main() linksection(".text.main") noreturn {
-    var fds: [2]i32 = .{0, 0};
-    _ = os.linux.socketpair(
-        os.linux.AF.UNIX,
-        os.linux.SOCK.STREAM,
-        0,
-        &fds
-    );
-    const pid = std.posix.fork() catch |err| blk: {
-        serial("fork error: {any}\n", .{err});
-        break :blk 3;
+    const tty = std.posix.open(
+        "/dev/tty",
+        std.os.linux.O{ .ACCMODE = .RDWR },
+        0o666
+    ) catch 0;
+    std.posix.dup2(@intCast(tty), 0) catch |err| {
+        serial("dup2 error {d} -> 0 {t}\n", .{tty, err});
     };
-    if (pid == 0) {
-        childProcess(fds[1]);
-    } else { 
-        serial("[PARENT] PID of new Child {d}\n", .{pid});
-        pidUid("[PARENT]");
-
-        // IPC in parent
-        const res = std.posix.sendto(
-            fds[0],
-            "test send",
-            0,
-            null,
-            0
-        ) catch |err| brk: {
-            serial("[PARENT] error: {any}", .{err});
-            break :brk 0;
-        };
-        serial("[PARENT] Parent sent {d} bytes to child process\n", .{res});
-        
-
-        // // Waiting for child to send message
-        var buf: [30]u8 = .{0} ** 30;
-        while (
-            std.posix.recvfrom(
-                fds[0],
-                @ptrCast(&buf),
-                0,
-                null,
-                null
-            ) catch |err| blk: {
-                serial("error receiving: {any}", .{err});
-                break :blk 1;
-            } == 0
-        ) {}
-
-        serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
-        _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
-
-        const _stdin = std.posix.open(
-            "/dev/tty",
-            std.os.linux.O{ .ACCMODE = .RDWR },
-            0o666
-        ) catch 0;
-        const stdin: u32 = @intCast(_stdin);
-        std.posix.dup2(@intCast(stdin), 0) catch |err| {
-            serial("dup2 error {d} -> 0 {t}\n", .{stdin, err});
-        };
-        std.posix.dup2(@intCast(stdin), 1) catch |err| {
-            serial("dup2 error {d} -> 1 {t}\n", .{stdin, err});
-        };
-        std.posix.dup2(@intCast(stdin), 2) catch |err| {
-            serial("dup2 error {d} -> 2 {t}\n", .{stdin, err});
-        };
-        var len: u32 = 1;
-        var input: [1024]u8 = .{0} ** 1024;
-        var sh = shell.Shell.init(stdin);
-        while (true) {
-            sh.print("> ", .{});
-            len = std.os.linux.read(@intCast(stdin), &input, 1024);
-            if (len > 0) {
-                sh.handleInput(input[0..len - 1]);
-            } else {
-                break;
-            }
-        }
-
-        var status: u32 = 0;
-        _ = os.linux.wait4(@intCast(pid), &status, 0, null);
-        serial("[PARENT] Child process exited with status: {d}\n", .{status});
-    }
+    std.posix.dup2(@intCast(tty), 1) catch |err| {
+        serial("dup2 error {d} -> 1 {t}\n", .{tty, err});
+    };
+    std.posix.dup2(@intCast(tty), 2) catch |err| {
+        serial("dup2 error {d} -> 2 {t}\n", .{tty, err});
+    };
+    var sh = shell.Shell.init();
+    sh.start();
     while (true) {}
 }

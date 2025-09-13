@@ -16,13 +16,13 @@ pub const Shell = struct {
     stdout_buff: [1024]u8 = undefined,
     arg_buf: [MAX_ARGS][]const u8 = undefined,
     commands: std.StringHashMap(ShellCommand) = undefined,
+    running: bool = true,
 
-    pub fn init(stdout: usize) Shell {
-        var file = std.fs.File{
-            .handle = @intCast(stdout),
-        };
+    pub fn init() Shell {
+        var file = std.fs.File.stdout();
         var shell = Shell{
             .stdout_buff = .{0} ** 1024,
+            .running = true,
         };
         shell.stdout = file.writer(&shell.stdout_buff);
 
@@ -67,6 +67,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "k", .desc = "Kernelspace command", .hndl = &kshell });
         self.registerCommand(.{ .name = "creds", .desc = "Print user credentials", .hndl = &creds });
         self.registerCommand(.{ .name = "stat", .desc = "Stat file", .hndl = &stat });
+        self.registerCommand(.{ .name = "exit", .desc = "Exit", .hndl = &exit });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -90,7 +91,23 @@ pub const Shell = struct {
             self.print("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{input});
         }
     }
+
+    pub fn start(self: *Shell) void {
+        var len: u32 = 0;
+        var input: [1024]u8 = .{0} ** 1024;
+        while (self.running) {
+            self.print("> ", .{});
+            len = std.os.linux.read(0, &input, 1024);
+            if (len > 0) {
+                self.handleInput(input[0..len - 1]);
+            }
+        }
+    }
 };
+
+fn exit(self: *Shell, _: [][]const u8) void {
+    self.running = false;
+}
 
 fn stat(self: *Shell, args: [][]const u8) void {
     if (args.len != 1) {
