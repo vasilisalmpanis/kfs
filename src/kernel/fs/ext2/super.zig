@@ -21,7 +21,7 @@ const BGDT = extern struct {
 };
 
 const Ext2SuperData = extern struct {
-        s_inodes_count		        :u32,	// Inodes count
+    s_inodes_count		    :u32,	// Inodes count
 	s_blocks_count			:u32,	// Blocks count
 	s_r_blocks_count		:u32,	// Reserved blocks count
 	s_free_blocks_count		:u32,	// Free blocks count
@@ -34,16 +34,16 @@ const Ext2SuperData = extern struct {
 	s_inodes_per_group		:u32,	// # Inodes per group
 	s_mtime		        	:u32,	// Mount time
 	s_wtime		        	:u32,	// Write time
-	s_mnt_count			:u16,	// Mount count
+	s_mnt_count			    :u16,	// Mount count
 	s_max_mnt_count 		:i16,	// Maximal mount count
 	s_magic		        	:u16,	// Magic signature
 	s_state		        	:u16,	// File system state
-	s_errors			:u16,	// Behaviour when detecting errors
+	s_errors			    :u16,	// Behaviour when detecting errors
 	s_minor_rev_level 		:u16,	// minor revision level
-	s_lastcheck			:u32,	// time of last check
-	s_checkinterval	        	:u32,	// max. time between checks
+	s_lastcheck			    :u32,	// time of last check
+	s_checkinterval	        :u32,	// max. time between checks
 	s_creator_os			:u32,	// OS
-	s_rev_level			:u32,	// Revision level
+	s_rev_level			    :u32,	// Revision level
 	s_def_resuid			:u16,	// Default uid for reserved blocks 
 	s_def_resgid			:u16,	// Default gid for reserved blocks
 
@@ -60,13 +60,13 @@ const Ext2SuperData = extern struct {
 	// feature set, it must abort and not try to meddle with
 	// things it doesn't understand...
 	//
-	s_first_ino 		:u32,           // First non-reserved inode */
-	s_inode_size 		:u16,           // size of inode structure */
-	s_block_group_nr 	:u16,           // block group # of this superblock */
-	s_feature_compat 	:u32,           // compatible feature set */
-	s_feature_incompat 	:u32,           // incompatible feature set */
-	s_feature_ro_compat 	:u32,           // readonly-compatible feature set */
-	s_reserved	        :[230] u32,     // Padding to the end of the block */
+	s_first_ino 		    :u32,           // First non-reserved inode */
+	s_inode_size 		    :u16,           // size of inode structure */
+	s_block_group_nr 	    :u16,           // block group # of this superblock */
+	s_feature_compat 	    :u32,           // compatible feature set */
+	s_feature_incompat 	    :u32,           // incompatible feature set */
+	s_feature_ro_compat     :u32,           // readonly-compatible feature set */
+	s_reserved	            :[230] u32,     // Padding to the end of the block */
 };
 
 pub const Ext2Super = struct {

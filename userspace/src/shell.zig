@@ -199,7 +199,7 @@ const Dirent = extern struct{
 
     pub fn verboseType(self: *Dirent) u8 {
         switch (self.type) {
-            std.os.linux.DT.REG => return 'r',
+            std.os.linux.DT.REG => return '-',
             std.os.linux.DT.DIR => return 'd',
             std.os.linux.DT.LNK => return 'l',
             std.os.linux.DT.CHR => return 'c',
@@ -211,6 +211,32 @@ const Dirent = extern struct{
         return 'u';
     }
 };
+
+const Mode = packed struct {
+    other_x: bool = false,
+    other_w: bool = false,
+    other_r: bool = false,
+    grp_x: bool = false,
+    grp_w: bool = false,
+    grp_r: bool = false,
+    usr_x: bool = false,
+    usr_w: bool = false,
+    usr_r: bool = false,
+    type: u7 = 0,
+};
+
+fn verboseMode(res: *[9]u8, mode: u32) void {
+    const _mode: Mode = @bitCast(@as(u16, @truncate(mode)));
+    res[0] = if (_mode.usr_r) 'r' else '-';
+    res[1] = if (_mode.usr_w) 'w' else '-';
+    res[2] = if (_mode.usr_x) 'x' else '-';
+    res[3] = if (_mode.grp_r) 'r' else '-';
+    res[4] = if (_mode.grp_w) 'w' else '-';
+    res[5] = if (_mode.grp_x) 'x' else '-';
+    res[6] = if (_mode.other_r) 'r' else '-';
+    res[7] = if (_mode.other_w) 'w' else '-';
+    res[8] = if (_mode.other_x) 'x' else '-';
+}
 
 fn ls(self: *Shell, args: [][]const u8) void {
     var l_opt = false;
@@ -243,13 +269,29 @@ fn ls(self: *Shell, args: [][]const u8) void {
     var pos: u32 = 0;
     while (pos < len) {
         const dirent: *Dirent = @ptrFromInt(@intFromPtr(&dirp) + pos);
+        const name = dirent.getName();
         if (l_opt) {
+            const curr_stat = std.posix.fstatat(fd, name, 0) catch |err| {
+                self.print("{s} error: {t}\n", .{name, err});
+                pos += dirent.reclen;
+                continue ;
+            };
+            var perms: [9]u8 = .{0} ** 9;
+            verboseMode(&perms, curr_stat.mode);
             self.print(
-                "{c} {d:0>4} {s}\n", 
-                .{dirent.verboseType(), dirent.ino, dirent.getName()}
+                "{c}{s} {d:0>6} {d:0>6} {d:0>4} {d:>8} {s}\n", 
+                .{
+                    dirent.verboseType(),
+                    perms[0..9],
+                    curr_stat.uid,
+                    curr_stat.gid,
+                    dirent.ino,
+                    curr_stat.size,
+                    name
+                }
             );
         } else {
-            self.print("{s}\n", .{dirent.getName()});
+            self.print("{s}\n", .{name});
         }
         pos += dirent.reclen;
     }

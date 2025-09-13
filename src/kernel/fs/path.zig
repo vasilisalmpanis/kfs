@@ -61,7 +61,7 @@ pub const Path = struct {
         var prev_path: Path = self.clone();
         defer prev_path.release();
         if (std.mem.eql(u8, segment, "..")) {
-            if (self.isRoot()) {// and !(self.mnt == krn.task.initial_task.fs.root.mnt)) {
+            if (self.isRoot() and !(self.mnt == krn.task.current.fs.root.mnt)) {
                 if (self.mnt.root.tree.parent) |d| {
                     if (self.mnt.tree.parent) |p| {
                         self.mnt.count.unref();

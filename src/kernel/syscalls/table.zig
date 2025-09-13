@@ -130,7 +130,7 @@ pub const SyscallTable = brk: {
         .SYS_syslog                     = &notImpl,
         .SYS_setitimer                  = &notImpl,
         .SYS_getitimer                  = &notImpl,
-        .SYS_stat                       = @ptrCast(&@import("stat.zig").stat),
+        .SYS_stat                       = &notImpl,
         .SYS_lstat                      = &notImpl,
         .SYS_fstat                      = &notImpl,
         .SYS_olduname                   = &notImpl,
@@ -228,7 +228,9 @@ pub const SyscallTable = brk: {
         .SYS_setuid32                   = @ptrCast(&@import("../sched/process.zig").setUID),
         .SYS_setgid32                   = @ptrCast(&@import("../sched/process.zig").setGID),
         .SYS_getgid32                   = @ptrCast(&@import("../sched/process.zig").getUID),
-        .SYS_stat64                     = @ptrCast(&@import("stat.zig").stat),
+        .SYS_stat64                     = @ptrCast(&@import("stat.zig").stat64),
+        .SYS_fstat64                    = @ptrCast(&@import("stat.zig").fstat64),
+        .SYS_fstatat64                  = @ptrCast(&@import("stat.zig").fstatat64),
     });
 };
 
