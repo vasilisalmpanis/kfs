@@ -105,8 +105,8 @@ pub const Shell = struct {
     }
 };
 
-fn exit(self: *Shell, _: [][]const u8) void {
-    self.running = false;
+fn exit(_: *Shell, _: [][]const u8) void {
+    std.os.linux.exit(0);
 }
 
 fn stat(self: *Shell, args: [][]const u8) void {

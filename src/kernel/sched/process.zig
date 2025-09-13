@@ -32,6 +32,21 @@ pub fn doFork() !u32 {
         mm.kfree(child.?);
         return errors.ENOMEM;
     };
+    if (fs.TaskFiles.new()) |files| {
+        child.?.files = files;
+        child.?.files.dup(tsk.current.files) catch {
+            // TODO: free mm and free fs.
+            krn.logger.ERROR("fork: failed to clone files", .{});
+            kthread.kthreadStackFree(stack);
+            mm.kfree(child.?);
+            return errors.ENOMEM;
+        };
+    } else {
+            krn.logger.ERROR("fork: failed to clone files", .{});
+            kthread.kthreadStackFree(stack);
+            mm.kfree(child.?);
+            return errors.ENOMEM;
+    }
 
     const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
     const parent_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));

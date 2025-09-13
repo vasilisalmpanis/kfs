@@ -54,8 +54,8 @@ pub const File = struct {
     pub fn release(ref: *kernel.task.RefCount) void {
         const file: *File = kernel.list.containerOf(File, @intFromPtr(ref), "ref");
         const inode: *fs.Inode = file.inode;
-        file.path.dentry.ref.unref();
         file.ops.close(file);
+        file.path.release();
         inode.ref.unref();
         kernel.mm.kfree(file);
     }
@@ -122,14 +122,13 @@ pub const TaskFiles = struct {
             }
             self.map.set(id);
             errdefer self.map.unset(id);
-            if (id > 2) { // standard IO don't exist yet
-                if (old.fds.get(id)) |file| {
-                    file.ref.ref();
-                    try self.fds.put(id, file);
-                } else {
-                    kernel.logger.ERROR("TaskFiles.dup(): failed to get id {d} from fds", .{id});
-                    return errors.ENOMEM;
-                }
+            if (old.fds.get(id)) |file| {
+                file.ref.ref();
+                errdefer file.ref.unref();
+                try self.fds.put(id, file);
+            } else {
+                kernel.logger.ERROR("TaskFiles.dup(): failed to get id {d} from fds", .{id});
+                return errors.ENOMEM;
             }
         }
     }

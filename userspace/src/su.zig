@@ -44,6 +44,17 @@ fn suParsePasswdLine(self: *Shell, username: []const u8, line: []const u8) !bool
 }
 
 pub fn su(self: *Shell, args: [][]const u8) void {
+    const pid = std.posix.fork() catch {
+        return ;
+    };
+    if (pid == 0) {
+        do_su(self, args);
+        return ;
+    }
+    _ = std.posix.wait4(pid, 0, null);
+}
+
+pub fn do_su(self: *Shell, args: [][]const u8) void {
     var username: []const u8 = "root";
     if (args.len > 0) {
         username = args[0];

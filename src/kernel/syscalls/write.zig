@@ -10,6 +10,7 @@ pub fn write(fd: u32, buf: u32, size: u32) !u32 {
             return errors.PosixError.EACCES;
         return try file.ops.write(file, data, size);
     }
+    krn.logger.INFO("Error {d}\n", .{krn.task.current.pid});
     return errors.PosixError.ENOENT;
 }
 
