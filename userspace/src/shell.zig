@@ -16,13 +16,13 @@ pub const Shell = struct {
     stdout_buff: [1024]u8 = undefined,
     arg_buf: [MAX_ARGS][]const u8 = undefined,
     commands: std.StringHashMap(ShellCommand) = undefined,
-    running: bool = true,
+    running: u32 = 0,
 
     pub fn init() Shell {
         var file = std.fs.File.stdout();
         var shell = Shell{
             .stdout_buff = .{0} ** 1024,
-            .running = true,
+            .running = 1,
         };
         shell.stdout = file.writer(&shell.stdout_buff);
 
@@ -95,7 +95,7 @@ pub const Shell = struct {
     pub fn start(self: *Shell) void {
         var len: u32 = 0;
         var input: [1024]u8 = .{0} ** 1024;
-        while (self.running) {
+        while (self.running > 0) {
             self.print("> ", .{});
             len = std.os.linux.read(0, &input, 1024);
             if (len > 0) {
@@ -105,8 +105,12 @@ pub const Shell = struct {
     }
 };
 
-fn exit(_: *Shell, _: [][]const u8) void {
-    std.os.linux.exit(0);
+fn exit(self: *Shell, _: [][]const u8) void {
+    if (self.running > 1) {
+        std.os.linux.exit(0);
+    } else {
+        self.running = 0;
+    }
 }
 
 fn stat(self: *Shell, args: [][]const u8) void {
