@@ -69,6 +69,20 @@ pub const File = struct {
             return error.OutOfMemory;
         }
     }
+
+    pub inline fn canRead(self: *File) bool {
+        return (
+            self.flags & 0b11 == 0
+            or self.flags & O_RDWR != 0
+        );
+    }
+
+    pub inline fn canWrite(self: *File) bool {
+        return (
+            self.flags & O_WRONLY != 0
+            or self.flags & O_RDWR != 0
+        );
+    }
 };
 
 // TODO: define and document the file operations callbacks.
@@ -173,6 +187,9 @@ pub const TaskFiles = struct {
 };
 
 pub fn readdirVFS(base: *fs.File, buf: []u8) !u32 {
+    if (!base.path.dentry.inode.mode.isDir()) {
+        return errors.ENOTDIR;
+    }
     if (base.path.dentry.tree.child) |ch| {
         var it = ch.siblingsIterator();
         var off: u32 = 0;

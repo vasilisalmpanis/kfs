@@ -25,6 +25,15 @@ pub const SysInode = struct {
     }
 
     fn lookup(dir: *fs.DEntry, name: []const u8) !*fs.DEntry {
+        if (!dir.inode.mode.isDir()) {
+            return kernel.errors.PosixError.ENOTDIR;
+        }
+        if (!dir.inode.mode.canExecute(
+            dir.inode.uid,
+            dir.inode.gid
+        )) {
+            return kernel.errors.PosixError.EACCES;
+        }
         const key: fs.DentryHash = fs.DentryHash{
             .sb = @intFromPtr(dir.sb),
             .ino = dir.inode.i_no,
@@ -47,7 +56,11 @@ pub const SysInode = struct {
                 return error.Exists;
             }
             var new_inode = try SysInode.new(base.sb);
-            new_inode.mode = mode;
+            new_inode.setCreds(
+                kernel.task.current.uid,
+                kernel.task.current.gid,
+                mode
+            );
             new_inode.mode.type |= kernel.fs.S_IFDIR;
             errdefer kernel.mm.kfree(new_inode);
             var new_dentry = try fs.DEntry.alloc(_name, base.sb, new_inode);
@@ -71,7 +84,11 @@ pub const SysInode = struct {
         _ = base.ops.lookup(parent, name) catch {
             const new_inode = try SysInode.new(base.sb);
             errdefer kernel.mm.kfree(new_inode);
-            new_inode.mode = mode;
+            new_inode.setCreds(
+                kernel.task.current.uid,
+                kernel.task.current.gid,
+                mode
+            );
             var dent = try parent.new(name, new_inode);
             dent.ref.ref();
             return dent;

@@ -9,11 +9,21 @@ pub fn mknod(
     mode: fs.UMode,
     dev: u32,
 ) !u32 {
+    if (kernel.task.current.uid != 0)
+        return errors.EACCES;
     var name: []const u8 = undefined;
     const path = std.mem.span(pathname);
     const parent_dir = try fs.path.dir_resolve(path, &name);
     if (!parent_dir.dentry.inode.mode.isDir()) {
         return errors.ENOENT;
+    }
+    if (
+        !parent_dir.dentry.inode.mode.canWrite(
+            parent_dir.dentry.inode.uid,
+            parent_dir.dentry.inode.gid
+        )
+    ) {
+        return errors.EACCES;
     }
     var can_create_name: bool = false;
     _ = parent_dir.dentry.inode.ops.lookup(

@@ -17,6 +17,7 @@ pub const ExampleSuper = struct {
         if (kernel.mm.kmalloc(ExampleSuper)) |sb| {
             sb.base.inode_map = std.AutoHashMap(u32, *fs.Inode).init(kernel.mm.kernel_allocator.allocator());
             sb.base.block_size = 0;
+            sb.base.dev_file = null;
             const root_inode = ExampleInode.new(&sb.base) catch |err| {
                 kernel.mm.kfree(sb);
                 return err;

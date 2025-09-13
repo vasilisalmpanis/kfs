@@ -55,7 +55,8 @@ pub fn do_stat64(inode: *fs.Inode, buf: *Stat) void {
     buf.st_gid = @intCast(inode.gid);
     const dev: u16 = @bitCast(inode.dev_id);
     buf.st_rdev = @intCast(dev);
-    buf.st_size = inode.size; buf.st_blksize = inode.sb.block_size;
+    buf.st_size = inode.size;
+    buf.st_blksize = inode.sb.block_size;
     buf.st_blocks = 0;
 
     buf.st_atim = Timespec.init();
