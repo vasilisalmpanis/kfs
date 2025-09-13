@@ -157,9 +157,9 @@ pub const S_ISGID  = 0o002;
 pub const S_ISVTX  = 0o001;
 
 pub const UMode = packed struct {
+    other: u3 = 0,
     grp: u3 = 0,
     usr: u3 = 0,
-    other: u3 = 0,
     type: u7 = 0,
 
     pub fn fromInt(self: *UMode, other: u32) void {

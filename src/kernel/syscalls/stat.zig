@@ -4,7 +4,7 @@ const arch = @import("arch");
 const sockets = @import("../net/socket.zig");
 const fs = @import("../fs/fs.zig");
 const std = @import("std");
-const kernel = @import("../main.zig");
+const krn = @import("../main.zig");
 // Manual translation for LP64 (e.g. x86_64 Linux).
 // Use `extern` so the layout/ABI matches C when linking with C code.
 pub const Timespec = extern struct {
@@ -38,36 +38,82 @@ pub const Stat = extern struct {
     st_ino: u64,
 };
 
-pub fn stat(path: ?[*:0]u8, buf: ?*Stat) !u32 {
-    if (path == null or buf == null) return errors.EINVAL;
+pub fn do_stat64(inode: *fs.Inode, buf: *Stat) void {
+    buf.st_dev = 0;
+    if (inode.sb.dev_file) |blkdev| {
+        const dev: u16 = @bitCast(blkdev.inode.dev_id);
+        buf.st_dev = @intCast(dev);
+    }
+    buf._st_ino = inode.i_no;
+    buf.st_ino = inode.i_no;
+    buf.st_nlink = 0; // No hard links yet.
+    const mode: u16 = @bitCast(inode.mode);
+    buf.__padding = 0;
+    buf.__pad0 = 0;
+    buf.st_mode = @intCast(mode);
+    buf.st_uid = @intCast(inode.uid);
+    buf.st_gid = @intCast(inode.gid);
+    const dev: u16 = @bitCast(inode.dev_id);
+    buf.st_rdev = @intCast(dev);
+    buf.st_size = inode.size; buf.st_blksize = inode.sb.block_size;
+    buf.st_blocks = 0;
+
+    buf.st_atim = Timespec.init();
+    buf.st_mtim = Timespec.init();
+    buf.st_ctim = Timespec.init();
+}
+
+pub fn stat64(path: ?[*:0]u8, buf: ?*Stat) !u32 {
+    if (path == null or buf == null) return errors.EFAULT;
 
     const path_slice = std.mem.span(path.?);
     const stat_buf: *Stat = buf.?;
     const inode_path: fs.path.Path = try fs.path.resolve(path_slice);
     const inode: *fs.Inode = inode_path.dentry.inode;
 
-    stat_buf.st_dev = 0;
-    if (inode.sb.dev_file) |blkdev| {
-        const dev: u16 = @bitCast(blkdev.inode.dev_id);
-        stat_buf.st_dev = @intCast(dev);
-    }
-    stat_buf._st_ino = inode.i_no;
-    stat_buf.st_ino = inode.i_no;
-    stat_buf.st_nlink = 0; // No hard links yet.
-    const mode: u16 = @bitCast(inode.mode);
-    kernel.logger.INFO("MODE {d} {any}\n", .{mode, inode.mode});
-    stat_buf.__padding = 0;
-    stat_buf.__pad0 = 0;
-    stat_buf.st_mode = @intCast(mode);
-    stat_buf.st_uid = @intCast(inode.uid);
-    stat_buf.st_gid = @intCast(inode.gid);
-    const dev: u16 = @bitCast(inode.dev_id);
-    stat_buf.st_rdev = @intCast(dev);
-    stat_buf.st_size = inode.size; stat_buf.st_blksize = inode.sb.block_size;
-    stat_buf.st_blocks = 0;
-
-    stat_buf.st_atim = Timespec.init();
-    stat_buf.st_mtim = Timespec.init();
-    stat_buf.st_ctim = Timespec.init();
+    do_stat64(inode, stat_buf);
     return 0;
+}
+
+pub fn fstat64(fd: u32, buf: ?*Stat) !u32 {
+    if (buf == null) {
+        return errors.EFAULT;
+    } 
+    if (krn.task.current.files.fds.get(fd)) |file| {
+        do_stat64(file.inode, buf.?);
+        return 0;
+    }
+    return errors.EBADF;
+}
+
+pub fn fstatat64(
+    dir_fd: u32,
+    path: ?[*:0]u8,
+    buf: ?*Stat,
+    flags: u32
+) !u32 {
+    _ = flags;
+    if (buf == null) {
+        return errors.EFAULT;
+    }
+    if (path == null) {
+        return errors.ENOENT;
+    }
+    const path_slice = std.mem.span(path.?);
+    if (path_slice.len == 0) {
+        return errors.ENOENT;
+    }
+    if (path_slice[0] == '/') {
+        return stat64(path, buf);
+    } else if (krn.task.current.files.fds.get(dir_fd)) |file| {
+        if (!file.inode.mode.isDir()) {
+            return errors.ENOTDIR;
+        }
+        const from_path = file.path.clone();
+        defer from_path.release();
+        const target = try fs.path.resolveFrom(path_slice, from_path);
+        do_stat64(target.dentry.inode, buf.?);
+        return 0;
+    } 
+    return errors.EBADF;
 }

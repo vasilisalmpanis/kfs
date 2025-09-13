@@ -176,8 +176,8 @@ pub const Ext2Inode = struct {
         inode.base.size = inode.data.i_size;
         inode.base.size = raw_inode.i_size;
         inode.base.setCreds(
-            raw_inode.i_uid,
-            raw_inode.i_gid,
+            raw_inode.i_uid | (@as(u32, raw_inode.osd2.linux2.l_i_uid_high) << 16),
+            raw_inode.i_gid | (@as(u32, raw_inode.osd2.linux2.l_i_gid_high) << 16),
             raw_inode.i_mode,
         );
         kernel.mm.kfree(raw_buff.ptr);
