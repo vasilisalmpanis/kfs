@@ -56,8 +56,8 @@ pub fn doFork() !u32 {
     child.?.initSelf(
         stack_top,
         stack,
-        0,
-        0, 
+        tsk.current.uid,
+        tsk.current.gid,
         tsk.current.pgid,
         .PROCESS,
     ) catch |err| {
