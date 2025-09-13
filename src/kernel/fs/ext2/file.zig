@@ -104,6 +104,9 @@ pub const Ext2File = struct {
     }
 
     fn readdir(base: *fs.File, buf: []u8) !u32 {
+        if (!base.path.dentry.inode.mode.isDir()) {
+            return krn.errors.PosixError.ENOTDIR;
+        }
         const ext2_dir_inode = base.inode.getImpl(Ext2Inode, "base");
         const ext2_super = base.inode.sb.getImpl(Ext2Super, "base");
 

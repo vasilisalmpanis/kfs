@@ -24,14 +24,14 @@ pub const pci = @import("./pci/main.zig");
 pub var devfs_path: krn.fs.path.Path = undefined;
 
 pub fn init() void {
-    _ = krn.mkdir("/sys", 0) catch {
+    _ = krn.mkdir("/sys", 0o444) catch {
         @panic("unable to create /sys directory");
     };
     _ = krn.do_mount("sys", "/sys", "sysfs", 0, null) catch |err| {
         krn.logger.ERROR("{any}", .{err});
         @panic("unable to mount sysfs");
     };
-    _ = krn.mkdir("/sys/bus", 0) catch {
+    _ = krn.mkdir("/sys/bus", 0o444) catch {
         @panic("unable to create /sys/bus directory");
     };
     const path = krn.fs.path.resolve("/sys/bus") catch {
@@ -39,7 +39,7 @@ pub fn init() void {
     };
     bus.sysfs_bus_dentry = path.dentry;
 
-    _ = krn.mkdir("/dev", 0) catch {
+    _ = krn.mkdir("/dev", 0o444) catch {
         @panic("unable to create /dev directory");
     };
     _ = krn.do_mount("dev", "/dev", "devfs", 0, null) catch |err| {

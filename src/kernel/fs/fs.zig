@@ -231,7 +231,7 @@ pub const UMode = packed struct {
     }
 
     pub fn canRead(self: *UMode, uid: u32, gid: u32) bool {
-        if (uid == 0) 
+        if (kernel.task.current.uid == 0) 
             return true;
         if (kernel.task.current.uid == uid) {
             if (self.isUReadable()) {
@@ -252,7 +252,7 @@ pub const UMode = packed struct {
     }
 
     pub fn canWrite(self: *UMode, uid: u32, gid: u32) bool {
-        if (uid == 0) 
+        if (kernel.task.current.uid == 0) 
             return true;
         if (kernel.task.current.uid == uid) {
             if (self.isUWriteable()) {
@@ -273,7 +273,7 @@ pub const UMode = packed struct {
     }
 
     pub fn canExecute(self: *UMode, uid: u32, gid: u32) bool {
-        if (uid == 0) 
+        if (kernel.task.current.uid == 0) 
             return true;
         if (kernel.task.current.uid == uid) {
             if (self.isUExecutable()) {

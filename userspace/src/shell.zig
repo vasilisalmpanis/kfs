@@ -271,15 +271,18 @@ fn ls(self: *Shell, args: [][]const u8) void {
         const dirent: *Dirent = @ptrFromInt(@intFromPtr(&dirp) + pos);
         const name = dirent.getName();
         if (l_opt) {
-            const curr_stat = std.posix.fstatat(fd, name, 0) catch |err| {
-                self.print("{s} error: {t}\n", .{name, err});
+            const curr_stat = std.posix.fstatat(fd, name, 0) catch {
+                self.print(
+                    "{c}????????? ? ? ? ?            ? {s}\n",
+                    .{dirent.verboseType(), name}
+                );
                 pos += dirent.reclen;
                 continue ;
             };
             var perms: [9]u8 = .{0} ** 9;
             verboseMode(&perms, curr_stat.mode);
             self.print(
-                "{c}{s} {d:0>6} {d:0>6} {d:0>4} {d:>8} {s}\n", 
+                "{c}{s} {d:>6} {d:>6} {d:>4} {d:>8} {s}\n", 
                 .{
                     dirent.verboseType(),
                     perms[0..9],

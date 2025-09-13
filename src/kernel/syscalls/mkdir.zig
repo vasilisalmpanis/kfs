@@ -18,6 +18,18 @@ pub fn mkdir(
     const parent = fs.path.dir_resolve(stripped_path, &dir_name) catch {
         return errors.ENOTDIR;
     };
+    if (
+        !parent.dentry.inode.mode.canExecute(
+            parent.dentry.inode.uid,
+            parent.dentry.inode.gid
+        )
+        or !parent.dentry.inode.mode.canWrite(
+            parent.dentry.inode.uid,
+            parent.dentry.inode.gid
+        )
+    ) {
+        return errors.EACCES;
+    }
     var dir_mode: fs.UMode = @bitCast(mode);
     dir_mode.type = fs.S_IFDIR;
     _ = parent.dentry.inode.ops.mkdir(

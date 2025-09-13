@@ -259,7 +259,12 @@ pub export fn main() linksection(".text.main") noreturn {
         serial("[PARENT] sending signal {any} to child\n", .{os.linux.SIG.ABRT});
         _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
 
-        const stdin = std.os.linux.open("/dev/tty", .{ .CREAT = false }, 0o444);
+        const _stdin = std.posix.open(
+            "/dev/tty",
+            std.os.linux.O{ .ACCMODE = .RDWR },
+            0o666
+        ) catch 0;
+        const stdin: u32 = @intCast(_stdin);
         std.posix.dup2(@intCast(stdin), 0) catch |err| {
             serial("dup2 error {d} -> 0 {t}\n", .{stdin, err});
         };

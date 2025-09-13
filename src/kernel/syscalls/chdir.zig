@@ -16,6 +16,12 @@ pub fn chdir(path: ?[*:0]const u8) !u32 {
     if (!p.dentry.inode.mode.isDir()) {
         return errors.ENOTDIR;
     }
+    if (!p.dentry.inode.mode.canExecute(
+        p.dentry.inode.uid,
+        p.dentry.inode.gid
+    )) {
+        return errors.EACCES;
+    }
     krn.task.current.fs.pwd = p;
     return 0;
 }
@@ -24,6 +30,12 @@ pub fn fchdir(fd: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
         if (!file.inode.mode.isDir()) {
             return errors.ENOTDIR;
+        }
+        if (!file.inode.mode.canExecute(
+            file.inode.uid,
+            file.inode.gid
+        )) {
+            return errors.EACCES;
         }
         krn.task.current.fs.pwd = file.path;
         return 0;

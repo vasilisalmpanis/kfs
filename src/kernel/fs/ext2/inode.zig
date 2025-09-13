@@ -3,6 +3,7 @@ const fs = @import("../fs.zig");
 const kernel = fs.kernel;
 const file = @import("file.zig");
 const ext2_sb = @import("./super.zig");
+const drv = @import("drivers");
 
 // Special inode numbers
 pub const EXT2_BAD_INO	          = 1; // Bad blocks inode
@@ -97,6 +98,10 @@ pub const Ext2Inode = struct {
             inode.base.setup(sb);
             inode.base.ops = &ext2_inode_ops;
             inode.base.size = 50;
+            inode.base.dev_id = drv.device.dev_t{
+                .major = 0,
+                .minor = 0,
+            };
             inode.base.fops = &file.Ext2FileOps;
             return &inode.base;
         }
@@ -104,6 +109,15 @@ pub const Ext2Inode = struct {
     }
 
     fn lookup(dir: *fs.DEntry, name: []const u8) !*fs.DEntry {
+        if (!dir.inode.mode.isDir()) {
+            return kernel.errors.PosixError.ENOTDIR;
+        }
+        if (!dir.inode.mode.canExecute(
+            dir.inode.uid,
+            dir.inode.gid
+        )) {
+            return kernel.errors.PosixError.EACCES;
+        }
         const key: fs.DentryHash = fs.DentryHash{
             .sb = @intFromPtr(dir.sb),
             .ino = dir.inode.i_no,
