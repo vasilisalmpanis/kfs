@@ -192,7 +192,10 @@ fn mount(self: *Shell, args: [][]const u8) void {
     fstype_buff[args[2].len] = 0;
     const fstype: [*:0]u8 = @ptrCast(&fstype_buff);
 
-    _ = std.os.linux.mount(source, target, fstype, 0o666, 0);
+    const res: u32 = std.os.linux.mount(source, target, fstype, 0o666, 0);
+    if (res != 0) {
+        self.print("mount: {s}: must be superuser to use mount.\n",.{args[1]});
+    }
 }
 
 fn umount(self: *Shell, args: [][]const u8) void {

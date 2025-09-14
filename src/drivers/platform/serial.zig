@@ -50,7 +50,7 @@ fn serial_write(_: *kernel.fs.File, buf: [*]const u8, size: u32) !u32 {
 fn serial_probe(device: *pdev.PlatformDevice) !void {
     const serial: *Serial = @ptrCast(@alignCast(device.dev.data));
     serial.setup();
-    try cdev.addCdev(&device.dev);
+    try cdev.addCdev(&device.dev, kernel.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0o6});
 }
 
 fn serial_remove(device: *pdev.PlatformDevice) !void {
