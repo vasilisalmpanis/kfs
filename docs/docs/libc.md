@@ -1,1 +1,1 @@
-../../libc_compat.md
+../libc_compat.md

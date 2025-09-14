@@ -38,9 +38,10 @@ pub const Stat = extern struct {
     st_ino: u64,
 };
 
-pub fn do_stat64(inode: *fs.Inode, buf: *Stat) void {
+pub fn do_stat64(inode: *fs.Inode, buf: *Stat) !void {
+    const sb = if (inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
     buf.st_dev = 0;
-    if (inode.sb.dev_file) |blkdev| {
+    if (sb.dev_file) |blkdev| {
         const dev: u16 = @bitCast(blkdev.inode.dev_id);
         buf.st_dev = @intCast(dev);
     }
@@ -56,7 +57,7 @@ pub fn do_stat64(inode: *fs.Inode, buf: *Stat) void {
     const dev: u16 = @bitCast(inode.dev_id);
     buf.st_rdev = @intCast(dev);
     buf.st_size = inode.size;
-    buf.st_blksize = inode.sb.block_size;
+    buf.st_blksize = sb.block_size;
     buf.st_blocks = 0;
 
     buf.st_atim = Timespec.init();
@@ -72,7 +73,7 @@ pub fn stat64(path: ?[*:0]u8, buf: ?*Stat) !u32 {
     const inode_path: fs.path.Path = try fs.path.resolve(path_slice);
     const inode: *fs.Inode = inode_path.dentry.inode;
 
-    do_stat64(inode, stat_buf);
+    try do_stat64(inode, stat_buf);
     return 0;
 }
 
@@ -81,7 +82,7 @@ pub fn fstat64(fd: u32, buf: ?*Stat) !u32 {
         return errors.EFAULT;
     } 
     if (krn.task.current.files.fds.get(fd)) |file| {
-        do_stat64(file.inode, buf.?);
+        try do_stat64(file.inode, buf.?);
         return 0;
     }
     return errors.EBADF;
@@ -110,10 +111,12 @@ pub fn fstatat64(
         if (!file.inode.mode.isDir()) {
             return errors.ENOTDIR;
         }
-        const from_path = file.path.clone();
+        if (file.path == null)
+            return errors.ENOENT;
+        const from_path = file.path.?.clone();
         defer from_path.release();
         const target = try fs.path.resolveFrom(path_slice, from_path);
-        do_stat64(target.dentry.inode, buf.?);
+        try do_stat64(target.dentry.inode, buf.?);
         return 0;
     } 
     return errors.EBADF;
