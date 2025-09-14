@@ -28,9 +28,20 @@ pub const Ext2DirEntry = extern struct {
         return name[0..self.name_len];
     }
 
+    pub fn isRecLenWrong(self: *Ext2DirEntry) bool {
+        var reclen = @sizeOf(Ext2DirEntry) + self.name_len;
+        if (reclen % 4 != 0)
+            reclen += (4 - (reclen % 4));
+        if (self.rec_len > reclen)
+            return true;
+        return false;
+    }
+
     // FIXME: incorrect alignment in some cases.
     pub fn getNext(self: *Ext2DirEntry) ?*Ext2DirEntry {
         if (self.rec_len == 0)
+            return null;
+        if (self.isRecLenWrong())
             return null;
         const addr: u32 = @intFromPtr(self) + self.rec_len;
         return @ptrFromInt(addr);
