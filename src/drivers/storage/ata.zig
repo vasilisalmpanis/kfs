@@ -779,7 +779,7 @@ var ata_file_ops = kernel.fs.FileOps{
 };
 
 fn ata_open(file: *kernel.fs.File, _: *kernel.fs.Inode) !void {
-    kernel.logger.WARN("ata file opened {s}\n", .{file.path.dentry.name});
+    kernel.logger.WARN("ata file opened {s}\n", .{file.path.?.dentry.name});
 }
 
 fn ata_close(_: *kernel.fs.File) void {

@@ -82,7 +82,7 @@ pub fn addBdev(device: *dev.Device, mode: krn.fs.UMode) !void {
     } else {
         krn.logger.ERROR(
             "No mknod operation in {s}\n", 
-            .{drivers.devfs_path.dentry.inode.sb.fs.name}
+            .{drivers.devfs_path.dentry.inode.sb.?.fs.name}
         );
         return krn.errors.PosixError.ENOSYS;
     }

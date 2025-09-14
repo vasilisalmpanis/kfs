@@ -51,7 +51,6 @@ fn testWait() void {
 
 fn customHandler(_: i32) callconv(.c) void {
     serial("[CHILD] Custom handler for child process\n", .{});
-    std.posix.exit(55);
 }
 
 fn allocateMemory() void {
@@ -79,6 +78,7 @@ fn ipc(sock_fd: i32) void {
         null
     ) == 0)
     {}
+    serial("[CHILD] reached IPC\n", .{});
     serial("[CHILD] received: {s}\n", .{message[0..10]});
 }
 
@@ -98,9 +98,9 @@ fn setAction() void {
 }
 
 fn childProcess(sock_fd: i32) void {
+    setAction();
     testWait();
     pidUid("[CHILD]");
-    setAction();
     ipc(sock_fd);
     allocateMemory();
 
@@ -209,6 +209,53 @@ fn test_getdents() void {
     }
 }
 
+pub fn run_test() void {
+    var fds: [2]i32 = .{0, 0};
+    _ = os.linux.socketpair(
+        os.linux.AF.UNIX,
+        os.linux.SOCK.STREAM,
+        0,
+        &fds
+    );
+    const pid = std.posix.fork() catch {
+        return ;
+    };
+    if (pid == 0) {
+        childProcess(fds[1]);
+        std.posix.exit(0);
+    }
+    // IPC in parent
+    _ = std.posix.sendto(
+        fds[0],
+        "test send",
+        0,
+        null,
+        0
+    ) catch |err| brk: {
+        serial("[PARENT] error: {any}", .{err});
+        break :brk 0;
+    };
+
+    // // Waiting for child to send message
+    var buf: [30]u8 = .{0} ** 30;
+    while (
+        std.posix.recvfrom(
+            fds[0],
+            @ptrCast(&buf),
+            0,
+            null,
+            null
+        ) catch |err| blk: {
+            serial("error receiving: {any}", .{err});
+            break :blk 1;
+        } == 0
+    ) {}
+
+    serial("[PARENT] received from child {s}\n", .{buf});
+    _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
+    _ = std.posix.wait4(pid, 0, null);
+}
+
 pub export fn main() linksection(".text.main") noreturn {
     const tty = std.posix.open(
         "/dev/tty",
@@ -224,6 +271,7 @@ pub export fn main() linksection(".text.main") noreturn {
     std.posix.dup2(@intCast(tty), 2) catch |err| {
         serial("dup2 error {d} -> 2 {t}\n", .{tty, err});
     };
+    // run_test();
     var sh = shell.Shell.init();
     sh.start();
     while (true) {}

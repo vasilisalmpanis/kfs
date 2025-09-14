@@ -8,10 +8,13 @@ const Socket = @import("../net/socket.zig").Socket;
 /// Inode: Represents an object in the filesystem.
 /// only one copy of a specific inode exists at every point
 /// in time but each inode can have multiple dentries.
+pub const SockInode = struct {
+    base: Inode,
+};
 
 pub const Inode = struct {
     i_no: u32 = 0,
-    sb: *fs.SuperBlock,
+    sb: ?*fs.SuperBlock,
     ref: Refcount = Refcount.init(),
     mode: fs.UMode = fs.UMode{},
     uid: u32 = 0,
@@ -21,14 +24,13 @@ pub const Inode = struct {
         dev: ?*drv.device.Device,
         sock: ?*Socket,
     },
-    is_dirty: bool = false,
     size: u32 = 0,
     ops: *const InodeOps,
     fops: *const fs.FileOps,
 
     pub fn setup(
         self: *Inode,
-        sb: *fs.SuperBlock,
+        sb: ?*fs.SuperBlock,
     ) void {
         self.i_no = fs.get_ino();
         self.sb = sb;
@@ -36,7 +38,6 @@ pub const Inode = struct {
         self.ref.ref();
         self.size = 0;
         self.mode = UMode{};
-        self.is_dirty = false;
         self.data.dev = null;
         self.data.sock = null;
         self.uid = 0;
@@ -45,6 +46,14 @@ pub const Inode = struct {
             .minor = 0,
             .major = 0,
         };
+    }
+
+    pub fn allocEmpty() !*Inode{
+        if (kernel.mm.kmalloc(Inode)) |node| {
+            node.setup(null);
+            return node;
+        }
+        return kernel.errors.PosixError.ENOMEM;
     }
 
     pub fn setCreds(self: *Inode, uid: u32, gid: u32, mode: fs.UMode) void {

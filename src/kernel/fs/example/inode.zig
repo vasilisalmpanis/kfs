@@ -47,6 +47,7 @@ pub const ExampleInode = struct {
     }
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
+        const sb: *fs.SuperBlock = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         var cash_key = fs.DentryHash{
             .sb = @intFromPtr(parent.sb),
             .ino = base.i_no,
@@ -55,14 +56,14 @@ pub const ExampleInode = struct {
         if (fs.dcache.get(cash_key)) |_| {
             return error.Exists;
         }
-        var new_inode = try ExampleInode.new(base.sb);
+        var new_inode = try ExampleInode.new(sb);
         new_inode.setCreds(
             kernel.task.current.uid,
             kernel.task.current.gid,
             mode
         );
         errdefer kernel.mm.kfree(new_inode);
-        var new_dentry = try fs.DEntry.alloc(name, base.sb, new_inode);
+        var new_dentry = try fs.DEntry.alloc(name, sb, new_inode);
         errdefer kernel.mm.kfree(new_dentry);
         parent.tree.addChild(&new_dentry.tree);
         cash_key.name = new_dentry.name;
@@ -71,6 +72,7 @@ pub const ExampleInode = struct {
     }
 
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
+        const sb: *fs.SuperBlock = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         if (!base.mode.isDir())
             return error.NotDirectory;
         if (!base.mode.canWrite(base.uid, base.gid))
@@ -78,7 +80,7 @@ pub const ExampleInode = struct {
 
         // Lookup if file already exists.
         _ = base.ops.lookup(parent, name) catch {
-            const new_inode = try ExampleInode.new(base.sb);
+            const new_inode = try ExampleInode.new(sb);
             errdefer kernel.mm.kfree(new_inode);
             new_inode.setCreds(
                 kernel.task.current.uid,
