@@ -12,8 +12,8 @@ pub fn init() void {
 
 fn cdev_open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
     krn.logger.WARN("dev file opened\n",.{});
-    if (inode.dev == null) inode.dev = try getCdev(inode.dev_id);
-    if (inode.dev) |_dev| {
+    if (inode.data.dev == null) inode.data.dev = try getCdev(inode.dev_id);
+    if (inode.data.dev) |_dev| {
         if (_dev.driver) |drv| {
             if (drv.fops) |ops| {
                 base.ops = ops;

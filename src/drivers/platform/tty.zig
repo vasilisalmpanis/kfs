@@ -41,7 +41,7 @@ fn tty_close(_: *krn.fs.File) void {
 }
 
 fn tty_read(file: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
-    if (file.inode.dev) |_d| {
+    if (file.inode.data.dev) |_d| {
         const tty: *TTY = @ptrCast(@alignCast(_d.data));
 
         while (!tty.file_buff.hasLine()) {}
@@ -55,7 +55,7 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
 
 fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
     const msg_slice: []const u8 = buf[0..size];
-    if (file.inode.dev) |_d| {
+    if (file.inode.data.dev) |_d| {
         const tty: *TTY = @ptrCast(@alignCast(_d.data));
         tty.print(msg_slice);
         return size;
