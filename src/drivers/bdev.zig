@@ -54,7 +54,7 @@ pub const bdev_default_ops: krn.fs.FileOps = .{
     .readdir = null,
 };
 
-pub fn addBdev(device: *dev.Device) !void {
+pub fn addBdev(device: *dev.Device, mode: krn.fs.UMode) !void {
     if (bdev_map.get((device.id))) |_d| {
         krn.logger.ERROR(
             "Bdev with id {d}:{d} already exists: {s}\n",
@@ -67,15 +67,11 @@ pub fn addBdev(device: *dev.Device) !void {
         bdev_map_mtx.lock();
         defer bdev_map_mtx.unlock();
 
-        const mode  = krn.fs.UMode{
-            .type = krn.fs.S_IFBLK,
-            .usr = 0o6,
-            .grp = 0o6,
-            .other = 0o6,
-        };
+        var new_mode  = mode;
+        new_mode.type = krn.fs.S_IFBLK;
         _ = _mknod(drivers.devfs_path.dentry.inode,
             device.name,
-            mode,
+            new_mode,
             drivers.devfs_path.dentry,
             device.id
         ) catch |err| {

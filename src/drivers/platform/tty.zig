@@ -66,7 +66,7 @@ fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
 fn tty_probe(device: *pdev.PlatformDevice) !void {
     const tty: *TTY = @ptrCast(@alignCast(device.dev.data));
     tty.clear();
-    try cdev.addCdev(&device.dev);
+    try cdev.addCdev(&device.dev, krn.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0o6});
 }
 
 fn tty_remove(device: *pdev.PlatformDevice) !void {

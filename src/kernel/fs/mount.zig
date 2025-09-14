@@ -26,6 +26,8 @@ pub const Mount = struct {
         target: []const u8, // directory
         fs_type: *fs.FileSystem
     ) !*Mount {
+        if (krn.task.current.uid != 0)
+            return krn.errors.PosixError.EACCES;
         var blk_dev: ?*device.Device = null;
         var dummy_file: ?*fs.File = null;
         if (!fs_type.virtual) {
@@ -33,6 +35,9 @@ pub const Mount = struct {
             const device_path = try fs.path.resolve(source);
             errdefer device_path.release();
             const device_inode: *fs.Inode = device_path.dentry.inode;
+            if (!device_inode.canRead() or !device_inode.canWrite()) {
+                return krn.errors.PosixError.EACCES;
+            }
             // 2. Check that its a block device
             if (device_inode.mode.type & fs.S_IFBLK == 0) {
                 return krn.errors.PosixError.ENOTBLK;
