@@ -58,6 +58,7 @@ pub const Path = struct {
     }
 
     pub fn stepInto(self: *Path, segment: [] const u8) !void {
+        if (segment.len == 0) return;
         var prev_path: Path = self.clone();
         defer prev_path.release();
         if (std.mem.eql(u8, segment, "..")) {
