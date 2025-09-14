@@ -36,7 +36,7 @@ pub const File = struct {
     pos: u32,
     inode: *fs.Inode,
     ref: Refcount,
-    path: fs.path.Path,
+    path: ?fs.path.Path,
 
     pub fn init(
         self: *File,
@@ -54,8 +54,9 @@ pub const File = struct {
     pub fn release(ref: *kernel.task.RefCount) void {
         const file: *File = kernel.list.containerOf(File, @intFromPtr(ref), "ref");
         const inode: *fs.Inode = file.inode;
-        file.ops.close(file);
-        file.path.release();
+        file.ops.close(file); //?
+        if (file.path != null)
+            file.path.?.release();
         inode.ref.unref();
         kernel.mm.kfree(file);
     }
@@ -64,6 +65,16 @@ pub const File = struct {
         if (kernel.mm.kmalloc(File)) |new_file| {
             new_file.init(path.dentry.inode.fops, path.dentry.inode);
             new_file.path = path;
+            return new_file;
+        } else {
+            return error.OutOfMemory;
+        }
+    }
+
+    pub fn pseudo(inode: *fs.Inode) !*File {
+        if (kernel.mm.kmalloc(File)) |new_file| {
+            new_file.init(inode.fops, inode);
+            new_file.path = null;
             return new_file;
         } else {
             return error.OutOfMemory;
@@ -186,10 +197,10 @@ pub const TaskFiles = struct {
 };
 
 pub fn readdirVFS(base: *fs.File, buf: []u8) !u32 {
-    if (!base.path.dentry.inode.mode.isDir()) {
+    if (!base.path.?.dentry.inode.mode.isDir()) {
         return errors.ENOTDIR;
     }
-    if (base.path.dentry.tree.child) |ch| {
+    if (base.path.?.dentry.tree.child) |ch| {
         var it = ch.siblingsIterator();
         var off: u32 = 0;
         var idx: u32 = 0;

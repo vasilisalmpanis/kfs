@@ -20,8 +20,9 @@ pub const Ext2File = struct {
     //     return to_write;
     // }
     fn write(base: *fs.File, buf: [*]const u8, size: u32) !u32 {
+        const sb: *fs.SuperBlock = if (base.inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
         const ino = base.inode.getImpl(Ext2Inode, "base");
-        const ext2_sb = base.inode.sb.getImpl(Ext2Super, "base");
+        const ext2_sb = sb.getImpl(Ext2Super, "base");
 
         if (ino.base.mode.isDir()) {
             return krn.errors.PosixError.EISDIR;
@@ -56,8 +57,9 @@ pub const Ext2File = struct {
     }
 
     fn read(base: *fs.File, buf: [*]u8, size: u32) !u32 {
+        const sb: *fs.SuperBlock = if (base.inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
         const ino = base.inode.getImpl(Ext2Inode, "base");
-        const ext2_sb = base.inode.sb.getImpl(Ext2Super, "base");
+        const ext2_sb = sb.getImpl(Ext2Super, "base");
 
         if (ino.base.mode.isDir()) {
             return krn.errors.PosixError.EISDIR;
@@ -104,11 +106,12 @@ pub const Ext2File = struct {
     }
 
     fn readdir(base: *fs.File, buf: []u8) !u32 {
-        if (!base.path.dentry.inode.mode.isDir()) {
+        const sb: *fs.SuperBlock = if (base.inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
+        if (!base.path.?.dentry.inode.mode.isDir()) {
             return krn.errors.PosixError.ENOTDIR;
         }
         const ext2_dir_inode = base.inode.getImpl(Ext2Inode, "base");
-        const ext2_super = base.inode.sb.getImpl(Ext2Super, "base");
+        const ext2_super = sb.getImpl(Ext2Super, "base");
 
         const block_size = ext2_super.base.block_size;
         const pos = base.pos;

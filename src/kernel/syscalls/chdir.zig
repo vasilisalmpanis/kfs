@@ -37,7 +37,8 @@ pub fn fchdir(fd: u32) !u32 {
         )) {
             return errors.EACCES;
         }
-        krn.task.current.fs.pwd = file.path;
+        if (file.path != null) return krn.errors.PosixError.ENOENT;
+        krn.task.current.fs.pwd = file.path.?;
         return 0;
     }
     return errors.EBADF;

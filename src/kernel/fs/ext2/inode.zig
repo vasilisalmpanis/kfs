@@ -237,8 +237,9 @@ pub const Ext2Inode = struct {
     }
 
     pub fn getLink(base: *fs.Inode, resulting_link: *[]u8) !void {
+        const sb = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         const ext2_inode = base.getImpl(Ext2Inode, "base");
-        const ext2_s = base.sb.getImpl(ext2_sb.Ext2Super, "base");
+        const ext2_s = sb.getImpl(ext2_sb.Ext2Super, "base");
         if (ext2_inode.data.i_blocks > 0) {
             const lbn = try ext2_s.resolveLbn(ext2_inode, 0);
             const block = try ext2_s.readBlocks(lbn, 1);

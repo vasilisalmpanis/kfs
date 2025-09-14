@@ -65,12 +65,34 @@ pub fn socketcall(call: i32, args: [*]u32) !u32 {
 
 pub fn socketpair(family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) !u32 {
     krn.logger.INFO("socketpair: {d} {d} {d} {any}", .{family, s_type, protocol, usockvec});
+    var file1: *krn.fs.File = undefined;
+    var file2: *krn.fs.File = undefined;
+    const fd1: u32 = try krn.task.current.files.getNextFD();
+    const fd2: u32 = try krn.task.current.files.getNextFD();
+    errdefer _ = krn.task.current.files.releaseFD(fd1);
+    errdefer _ = krn.task.current.files.releaseFD(fd2);
     if (krn.socket.newSocket()) |sock_a| {
+        errdefer krn.mm.kfree(sock_a);
         if (krn.socket.newSocket()) |sock_b| {
+            errdefer krn.mm.kfree(sock_b);
             sock_a.conn = sock_b;
             sock_b.conn = sock_a;
-            usockvec[0] = @intCast(sock_a.id);
-            usockvec[1] = @intCast(sock_b.id);
+            const inode1 = try krn.fs.Inode.allocEmpty();
+            errdefer krn.mm.kfree(inode1);
+            inode1.fops = &krn.socket.SocketFileOps;
+            inode1.data.sock = sock_a;
+            const inode2 = try krn.fs.Inode.allocEmpty();
+            errdefer krn.mm.kfree(inode2);
+            inode2.fops = &krn.socket.SocketFileOps;
+            inode2.data.sock = sock_b;
+            file1 = try krn.fs.File.pseudo(inode1);
+            errdefer file1.ref.unref();
+            file2 = try krn.fs.File.pseudo(inode2);
+            errdefer file2.ref.unref();
+            try krn.task.current.files.setFD(fd1, file1);
+            try krn.task.current.files.setFD(fd2, file2);
+            usockvec[0] = @intCast(fd1);
+            usockvec[1] = @intCast(fd2);
         } else {
             sock_a.delete();
             return errors.ENOMEM;
@@ -95,14 +117,8 @@ pub fn recvfrom(
     if (ubuff == null) {
         return errors.EFAULT;
     }
-    if (krn.socket.findById(@intCast(fd))) |sock| {
-        const u_buff: [*]u8 = @ptrCast(ubuff);
-        sock.lock.lock();
-        const avail = sock.reader.end - sock.reader.seek;
-        const to_read = if (avail > size) size else avail;
-        defer sock.lock.unlock();
-        _ = sock.reader.readSliceShort(u_buff[0..to_read]) catch {};
-        return @intCast(to_read);
+    if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
+        return try krn.socket.do_recvfrom(file, @ptrCast(ubuff), size);
     } else {
         return errors.EBADF;
     }
@@ -119,16 +135,8 @@ pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, add
     if (len > 128) {
         return errors.EFAULT;
     }
-    if (krn.socket.findById(@intCast(fd))) |sock| {
-        if (sock.conn) |remote| {
-            const ubuff: [*]u8 = @ptrCast(buff);
-            remote.lock.lock();
-            defer remote.lock.unlock();
-            const res = remote.writer.write(ubuff[0..len]) catch 0;
-            return @intCast(res);
-        } else {
-            return errors.ENOTCONN;
-        }
+    if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
+        return try krn.socket.do_sendto(file, @ptrCast(buff), len);
     } else {
         return errors.EBADF;
     }
