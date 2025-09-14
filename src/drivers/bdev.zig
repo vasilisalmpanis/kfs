@@ -13,8 +13,8 @@ pub fn init() void {
 const disk_names = std.StaticBitSet(26);
 
 fn bdev_open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
-    if (inode.dev == null) inode.dev = try getBdev(inode.dev_id);
-    if (inode.dev) |_dev| {
+    if (inode.data.dev == null) inode.data.dev = try getBdev(inode.dev_id);
+    if (inode.data.dev) |_dev| {
         if (_dev.driver) |drv| {
             if (drv.fops) |ops| {
                 base.ops = ops;

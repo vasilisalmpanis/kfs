@@ -786,7 +786,7 @@ fn ata_close(_: *kernel.fs.File) void {
 }
 
 fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
-    if( file.inode.dev) |d| {
+    if( file.inode.data.dev) |d| {
         const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
         
         const lba: u32 = file.pos / ATADrive.SECTOR_SIZE;
@@ -807,7 +807,7 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
 }
 
 fn ata_write(file: *kernel.fs.File, buff: [*]const u8, size: u32) !u32 {
-    if( file.inode.dev) |d| {
+    if( file.inode.data.dev) |d| {
         const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
 
         const lba: u32 = file.pos / ATADrive.SECTOR_SIZE;
