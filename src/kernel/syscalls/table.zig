@@ -204,7 +204,7 @@ pub const SyscallTable = brk: {
         .SYS_rt_sigtimedwait            = &notImpl,
         .SYS_rt_sigqueueinfo            = &notImpl,
         .SYS_rt_sigsuspend              = &notImpl,
-        .SYS_pread                      = &notImpl,
+        .SYS_pread                      = @ptrCast(&@import("read.zig").pread),
         .SYS_pwrite                     = &notImpl,
         .SYS_chown                      = &notImpl,
         .SYS_getcwd                     = @ptrCast(&@import("./getcwd.zig").getcwd),
@@ -231,6 +231,7 @@ pub const SyscallTable = brk: {
         .SYS_stat64                     = @ptrCast(&@import("stat.zig").stat64),
         .SYS_fstat64                    = @ptrCast(&@import("stat.zig").fstat64),
         .SYS_fstatat64                  = @ptrCast(&@import("stat.zig").fstatat64),
+        .SYS_openat                     = @ptrCast(&@import("open.zig").openat),
     });
 };
 

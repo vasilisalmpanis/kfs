@@ -7,7 +7,8 @@ const std = @import("std");
 const kernel = @import("../main.zig");
 
 pub fn do_open(
-    filename: []const u8,
+    parent_dir: fs.path.Path,
+    name: []const u8,
     flags: u16,
     mode: fs.UMode
 ) !u32 {
@@ -16,18 +17,13 @@ pub fn do_open(
         return errors.EMFILE;
     };
     errdefer _ = tsk.current.files.releaseFD(fd);
-    var file_segment: []const u8 = "";
-    const parent_dir = fs.path.dir_resolve(filename, &file_segment) catch {
-        return errors.ENOENT;
-    };
-    defer parent_dir.release();
     const parent_inode: *fs.Inode = parent_dir.dentry.inode;
     var target_path = parent_dir.clone();
-    target_path.stepInto(file_segment) catch {
+    target_path.stepInto(name) catch {
         if (flags & fs.file.O_CREAT != 0) {
             const new_dentry = parent_inode.ops.create(
                 parent_inode,
-                file_segment,
+                name,
                 mode,
                 parent_dir.dentry
             ) catch |err| {
@@ -84,7 +80,49 @@ pub fn open(
 ) !u32 {
     if (filename) |f| {
         const path: []u8 = std.mem.span(f);
-        return try do_open(path, flags, mode);
+        var file_segment: []const u8 = "";
+        const parent_dir = try fs.path.dir_resolve(
+            path,
+            &file_segment
+        );
+        defer parent_dir.release();
+        return try do_open(
+            parent_dir,
+            file_segment,
+            flags,
+            mode
+        );
     }
-    return errors.EINVAL;
+    return errors.EFAULT;
+}
+
+pub fn openat(
+    dirfd: u32,
+    path: ?[*:0]const u8,
+    flags: u16,
+    mode: fs.UMode,
+) !u32 {
+    if (path == null) {
+        return errors.EFAULT;
+    }
+    if (kernel.task.current.files.fds.get(dirfd)) |dir| {
+        if (dir.path == null)
+            return errors.EBADF;
+        const path_sl: []const u8 = std.mem.span(path.?);
+        var file_segment: []const u8 = "";
+        const parent_dir = try fs.path.dir_resolve_from(
+            path_sl,
+            dir.path.?,
+            &file_segment
+        );
+        defer parent_dir.release();
+        return try do_open(
+            parent_dir,
+            file_segment,
+            flags,
+            mode
+        );
+    } else {
+        return errors.EBADF;
+    }
 }
