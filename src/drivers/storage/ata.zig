@@ -752,7 +752,7 @@ fn ata_probe(device: *driver.storage.StorageDevice) !void {
         .{drive.channel, drive.name}
     );
     drive.initDMA();
-    try driver.bdev.addBdev(&device.dev);
+    try driver.bdev.addBdev(&device.dev, kernel.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0});
     // Create block device for drive
     // Maybe: think about creating bdevs for partitions
 }
