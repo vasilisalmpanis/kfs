@@ -48,7 +48,7 @@ pub const Mount = struct {
             errdefer krn.mm.kfree(dummy_file.?);
             try device_inode.fops.open(dummy_file.?, device_inode);
             errdefer dummy_file.?.ops.close(dummy_file.?);
-            blk_dev = device_inode.dev;
+            blk_dev = device_inode.data.dev;
         }
         //
         // For directory

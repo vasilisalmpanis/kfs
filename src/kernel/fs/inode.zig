@@ -3,6 +3,7 @@ const drv = @import("drivers");
 const Refcount = fs.Refcount;
 const kernel = fs.kernel;
 const UMode = fs.UMode;
+const Socket = @import("../net/socket.zig").Socket;
 
 /// Inode: Represents an object in the filesystem.
 /// only one copy of a specific inode exists at every point
@@ -16,7 +17,10 @@ pub const Inode = struct {
     uid: u32 = 0,
     gid: u32 = 0,
     dev_id: drv.device.dev_t,
-    dev: ?*drv.device.Device,
+    data: extern union {
+        dev: ?*drv.device.Device,
+        sock: ?*Socket,
+    },
     is_dirty: bool = false,
     size: u32 = 0,
     ops: *const InodeOps,
@@ -33,7 +37,8 @@ pub const Inode = struct {
         self.size = 0;
         self.mode = UMode{};
         self.is_dirty = false;
-        self.dev = null;
+        self.data.dev = null;
+        self.data.sock = null;
         self.uid = 0;
         self.gid = 0;
         self.dev_id = drv.device.dev_t {
