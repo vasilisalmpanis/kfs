@@ -1,5 +1,6 @@
 const std = @import("std");
 const su = @import("./su.zig").su;
+const passwd = @import("./passwd.zig");
 
 const ShellCommandHandler = fn (self: *Shell, args: [][]const u8) void;
 
@@ -68,6 +69,8 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "creds", .desc = "Print user credentials", .hndl = &creds });
         self.registerCommand(.{ .name = "stat", .desc = "Stat file", .hndl = &stat });
         self.registerCommand(.{ .name = "exit", .desc = "Exit", .hndl = &exit });
+        self.registerCommand(.{ .name = "whoami", .desc = "Who am I?", .hndl = &whoami });
+        self.registerCommand(.{ .name = "users", .desc = "Print users", .hndl = &users });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -424,4 +427,49 @@ fn kshell(self: *Shell, args: [][]const u8) void {
     const sys = std.os.linux.SYS.landlock_create_ruleset;
     const k_args = args[0..];
     _ = std.os.linux.syscall1(sys, @intFromPtr(&k_args));
+}
+
+fn whoami(self: *Shell, _: [][]const u8) void {
+    const uid = std.posix.getuid();
+    const pass = passwd.PasswdEntry.findByUID(uid) catch |err| {
+        self.print("error: {t}\n", .{err});
+        return ;
+    };
+    if (pass == null) {
+        self.print("Not found /etc/passwd entry for uid {d}\n", .{uid});
+        return;
+    }
+    self.print(
+        \\  user:   {s}
+        \\  uid:    {d}
+        \\  gid:    {d}
+        \\  groups: {s}
+        \\  shell:  {s}
+        \\
+        , .{
+            pass.?.name,
+            pass.?.uid,
+            pass.?.gid,
+            pass.?.groups,
+            pass.?.shell,
+        }
+    );
+}
+
+fn users(self: *Shell, _: [][]const u8) void {
+    var it = passwd.PasswdEntry.iterator() catch |err| {
+        self.print("error: {t}\n", .{err});
+        return ;
+    };
+    defer it.deinit();
+    while (it.next() catch |err| {
+        self.print("error: {t}\n", .{err});
+        return;
+    }) |entry| {
+        self.print(" {s:<20} {d:>6} {d:>6}\n", .{
+            entry.name,
+            entry.uid,
+            entry.gid,
+        });
+    }
 }
