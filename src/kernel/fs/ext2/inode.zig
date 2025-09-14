@@ -15,35 +15,60 @@ pub const EXT2_N_BLOCKS             = 15;
 /// ext2 on-disk inode (little-endian fields). Classic 128-byte layout.
 /// Use `le16/le32` helpers below if you need host-endian values.
 ///
+///
+pub const Ext2DirIterator = struct {
+    current: *Ext2DirEntry = undefined,
+    sum: u32 = 0,
+    block_size: u32 = 0,
+
+    pub fn init(start: *Ext2DirEntry, block_size: u32) Ext2DirIterator {
+        return Ext2DirIterator{
+            .current = start,
+            .sum = 0,
+            .block_size = block_size,
+        };
+    }
+
+    pub inline fn isLast(self: *Ext2DirIterator) bool {
+        if (self.sum >= self.block_size) return true;
+        if (self.current.rec_len == 0) return true;
+        return false;
+    }
+
+    pub fn next(self: *Ext2DirIterator) ?*Ext2DirEntry {
+        if (self.isLast())
+            return null;
+        const current: *Ext2DirEntry = self.current;
+        self.current = self.current.getNext();
+        self.sum += current.rec_len;
+        return current;
+    }
+};
+
 pub const Ext2DirEntry = extern struct {
     inode: u32,       // inode number
     rec_len: u16,     // total size of this entry
     name_len: u8,     // length of name
     file_type: u8,    // (ext2 rev>=1)
                       //
-    // FIXME: panic with getName
+                      //
+    pub fn iterator(self: *Ext2DirEntry, block_size: u32) Ext2DirIterator{
+        return Ext2DirIterator.init(self, block_size);
+    }
+
     pub fn getName(self: *Ext2DirEntry) []u8 {
         const addr: u32 = @intFromPtr(self) + @sizeOf(Ext2DirEntry);
         const name: [*]u8 = @ptrFromInt(addr);
         return name[0..self.name_len];
     }
 
-    pub fn isRecLenWrong(self: *Ext2DirEntry) bool {
-        var reclen = @sizeOf(Ext2DirEntry) + self.name_len;
-        if (reclen % 4 != 0)
-            reclen += (4 - (reclen % 4));
-        if (self.rec_len > reclen)
-            return true;
-        return false;
-    }
 
     // FIXME: incorrect alignment in some cases.
-    pub fn getNext(self: *Ext2DirEntry) ?*Ext2DirEntry {
-        if (self.rec_len == 0)
-            return null;
-        if (self.isRecLenWrong())
-            return null;
+    pub fn getNext(self: *Ext2DirEntry) *Ext2DirEntry {
         const addr: u32 = @intFromPtr(self) + self.rec_len;
+        if (addr % 4 != 0) {
+            @panic("TODO: fix alignment with ext2\n");
+        }
         return @ptrFromInt(addr);
     }
 };
@@ -142,19 +167,22 @@ pub const Ext2Inode = struct {
         const ext2_super = dir.sb.getImpl(ext2_sb.Ext2Super, "base");
         for (0..ext2_dir_inode.data.i_blocks) |idx| {
             const block: u32 = ext2_dir_inode.data.i_block[idx];
+            // TODO: read dir entries of other blocks too.
             const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
             defer kernel.mm.kfree(block_slice.ptr);
-            var ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
-            while (ext_dir) |curr_dir| {
-                const curr_name = curr_dir.getName();
-                if (std.mem.eql(u8, name, curr_name)) {
-                    const new_inode = (try Ext2Inode.new(dir.sb)).getImpl(Ext2Inode, "base");
-                    errdefer kernel.mm.kfree(new_inode);
-                    try new_inode.iget(ext2_super, curr_dir.inode);
-                    new_inode.base.i_no = curr_dir.inode;
-                    return try dir.new(name, &new_inode.base);
+            const ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
+            if (ext_dir) |first| {
+                var it = first.iterator(ext2_super.base.block_size);
+                while (it.next()) |curr_dir| {
+                    const curr_name = curr_dir.getName();
+                    if (std.mem.eql(u8, name, curr_name)) {
+                        const new_inode = (try Ext2Inode.new(dir.sb)).getImpl(Ext2Inode, "base");
+                        errdefer kernel.mm.kfree(new_inode);
+                        try new_inode.iget(ext2_super, curr_dir.inode);
+                        new_inode.base.i_no = curr_dir.inode;
+                        return try dir.new(name, &new_inode.base);
+                    }
                 }
-                ext_dir = curr_dir.getNext();
             }
         }
         return error.InodeNotFound;
