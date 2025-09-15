@@ -116,6 +116,7 @@ pub fn fstatat64(
         const from_path = file.path.?.clone();
         defer from_path.release();
         const target = try fs.path.resolveFrom(path_slice, from_path);
+        defer target.release();
         try do_stat64(target.dentry.inode, buf.?);
         return 0;
     } 
