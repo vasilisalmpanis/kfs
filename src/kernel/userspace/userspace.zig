@@ -15,6 +15,25 @@ const HeaderFlags = packed struct (u32) {
     _pad: u29,
 };
 
+const argv_init: [1][]const u8 = .{ "init" };
+const envp_init: [2][]const u8 = .{ "HOME=/", "TERM=kfs" };
+
+const AuxEntry = struct {
+    key: u32,
+    val: u32,
+};
+
+const auxv: [2]AuxEntry = .{
+    AuxEntry{
+        .key = 6,
+        .val = krn.mm.PAGE_SIZE,
+    },
+    AuxEntry{
+        .key = 0,
+        .val = 0,
+    }
+};
+
 pub fn goUserspace(userspace: []const u8) void {
     const stack_pages: u32 = 40;
     const userspace_offset: u32 = 0x1000;
@@ -75,6 +94,67 @@ pub fn goUserspace(userspace: []const u8) void {
     const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
     @memset(stack_ptr[0..stack_size], 0);
 
+    // Auxiliary vector
+    var argv_str_size: u32 = 0;
+    for (argv_init) |arg| {
+        argv_str_size += arg.len + 1;
+    }
+    var envp_str_size: u32 = 0;
+    for (envp_init) |env| {
+        envp_str_size += env.len + 1;
+    }
+    const argv_ptr_size = @sizeOf(u32) * argv_init.len + 1;
+    const envp_ptr_size = @sizeOf(u32) * envp_init.len + 1;
+    const auxv_size = @sizeOf(AuxEntry) * auxv.len;
+    const argc_size = @sizeOf(u32);
+    const end_marker_size = @sizeOf(u32);
+
+    const size = argv_ptr_size + argv_str_size + envp_ptr_size +
+                        envp_str_size + auxv_size + argc_size + end_marker_size;
+    var aligned_size = size;
+    if (aligned_size % 16 != 0)
+        aligned_size += 16 - (aligned_size % 16);
+    
+    const stack_ptr_addr: u32 = stack_bottom + stack_size - aligned_size;
+    var strings: [*]u8 = @ptrFromInt(stack_bottom + stack_size - end_marker_size - argv_str_size - envp_str_size);
+    var pointers: [*]u32 = @ptrFromInt(stack_ptr_addr);
+    var str_off: u32 = 0;
+    var ptr_off: u32 = 0;
+    
+    // Set argc
+    pointers[ptr_off] = argv_init.len;
+    ptr_off += 1;
+
+    // Set argv
+    for (argv_init) |arg| {
+        @memcpy(strings[str_off..str_off + arg.len], arg);
+        strings[str_off + arg.len] = 0;
+        pointers[ptr_off] = @intFromPtr(&strings[str_off]);
+        str_off += arg.len + 1;
+        ptr_off += 1;
+    }
+    pointers[ptr_off] = 0;
+    ptr_off += 1;
+
+    // Set envp
+    for (envp_init) |env| {
+        @memcpy(strings[str_off..str_off + env.len], env);
+        strings[str_off + env.len] = 0;
+        pointers[ptr_off] = @intFromPtr(&strings[str_off]);
+        str_off += env.len + 1;
+        ptr_off += 1;
+    }
+    pointers[ptr_off] = 0;
+    ptr_off += 1;
+
+    // Set auxv
+    var aux_ptr: [*]AuxEntry = @ptrCast(&pointers[ptr_off]);
+    ptr_off = 0;
+    for (auxv) |aux| {
+        aux_ptr[ptr_off] = aux;
+        ptr_off += 1;
+    }
+
     krn.logger.INFO("Userspace code:  0x{X:0>8}", .{userspace_offset});
     krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack_bottom, stack_bottom + stack_size});
     krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{ehdr.e_entry});
@@ -84,7 +164,7 @@ pub fn goUserspace(userspace: []const u8) void {
     krn.logger.INFO("heap_start 0x{X:0>8}\n", .{heap_start});
     krn.mm.proc_mm.init_mm.heap = heap_start;
     krn.mm.proc_mm.init_mm.stack_bottom = stack_bottom;
-    krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size - arch.PAGE_SIZE;
+    krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size;// - arch.PAGE_SIZE;
 
     asm volatile(
         \\ cli
@@ -105,8 +185,7 @@ pub fn goUserspace(userspace: []const u8) void {
         \\ iret
         \\
         ::
-        // [uc] "r" (ehdr.e_entry),  // Should be like this, but libc initialization is not working now
-        [uc] "r" (userspace_offset),           // main is always at 0x1000 from start
-        [us] "r" (stack_bottom + stack_size - arch.PAGE_SIZE),
+        [uc] "r" (ehdr.e_entry),
+        [us] "r" (stack_ptr_addr),
     );
 }

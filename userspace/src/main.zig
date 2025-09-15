@@ -256,7 +256,7 @@ pub fn run_test() void {
     _ = std.posix.wait4(pid, 0, null);
 }
 
-pub export fn main() linksection(".text.main") noreturn {
+pub export fn main() noreturn {
     const tty = std.posix.open(
         "/dev/tty",
         std.os.linux.O{ .ACCMODE = .RDWR },
