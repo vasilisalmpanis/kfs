@@ -22,7 +22,7 @@ fn notImpl(_: u32, _: u32, _: u32, _: u32, _: u32, _: u32) !u32 {
 }
 
 pub const SyscallTable = brk: {
-    @setEvalBranchQuota(1500);
+    @setEvalBranchQuota(1700);
     break :brk std.EnumMap(Syscall, *const SyscallHandler).init(.{
         .SYS_setup                      = &notImpl,
         .SYS_exit                       = @ptrCast(&@import("exit.zig").exit),
@@ -147,7 +147,7 @@ pub const SyscallTable = brk: {
         .SYS_clone                      = &notImpl,
         .SYS_setdomainname              = &notImpl,
         .SYS_uname                      = &notImpl,
-        .SYS_modify_ldt                 = &notImpl,
+        .SYS_modify_ldt                 = @ptrCast(&@import("thread.zig").modify_ldt),
         .SYS_adjtimex                   = &notImpl,
         .SYS_mprotect                   = &notImpl,
         .SYS_sigprocmask                = @ptrCast(&@import("./sigaction.zig").sigprocmask),
@@ -232,6 +232,8 @@ pub const SyscallTable = brk: {
         .SYS_fstat64                    = @ptrCast(&@import("stat.zig").fstat64),
         .SYS_fstatat64                  = @ptrCast(&@import("stat.zig").fstatat64),
         .SYS_openat                     = @ptrCast(&@import("open.zig").openat),
+        .SYS_set_thread_area            = @ptrCast(&@import("thread.zig").set_thread_area),
+        .SYS_set_tid_address            = @ptrCast(&@import("thread.zig").set_tid_address),
     });
 };
 

@@ -107,6 +107,8 @@ pub const Ext2File = struct {
 
     fn readdir(base: *fs.File, buf: []u8) !u32 {
         const sb: *fs.SuperBlock = if (base.inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
+        if (base.path == null) return krn.errors.PosixError.EINVAL;
+
         if (!base.path.?.dentry.inode.mode.isDir()) {
             return krn.errors.PosixError.ENOTDIR;
         }
