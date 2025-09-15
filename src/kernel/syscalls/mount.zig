@@ -69,7 +69,14 @@ pub fn do_umount(
 }
 
 pub fn umount(
-    name: [*:0]u8,
+    name: ?[*:0]u8,
 ) !u32 {
-    return try do_umount(std.mem.span(name));
+    if (name) |_name| {
+        const target: []const u8 = std.mem.span(_name);
+        if (target.len == 0) {
+            return errors.EINVAL;
+        }
+        return try do_umount(target);
+    }
+    return errors.EFAULT;
 }
