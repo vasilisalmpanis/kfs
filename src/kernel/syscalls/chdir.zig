@@ -22,7 +22,9 @@ pub fn chdir(path: ?[*:0]const u8) !u32 {
     )) {
         return errors.EACCES;
     }
+    const old = krn.task.current.fs.pwd;
     krn.task.current.fs.pwd = p;
+    old.release();
     return 0;
 }
 
@@ -38,7 +40,9 @@ pub fn fchdir(fd: u32) !u32 {
             return errors.EACCES;
         }
         if (file.path != null) return krn.errors.PosixError.ENOENT;
+        const old = krn.task.current.fs.pwd;
         krn.task.current.fs.pwd = file.path.?;
+        old.release();
         return 0;
     }
     return errors.EBADF;
