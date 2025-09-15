@@ -211,6 +211,15 @@ fn umount(self: *Shell, args: [][]const u8) void {
         );
         return ;
     }
+    var target_buff: [256]u8 = .{0} ** 256;
+    @memcpy(target_buff[0..], args[1]);
+    target_buff[args[1].len] = 0;
+    const target: [*:0]u8 = @ptrCast(&target_buff);
+
+    const res: u32 = std.os.linux.umount(target);
+    if (res != 0) {
+        self.print("error: umount: {d}\n",.{res});
+    }
 }
 
 const Dirent = extern struct{
