@@ -72,6 +72,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "exit", .desc = "Exit", .hndl = &exit });
         self.registerCommand(.{ .name = "whoami", .desc = "Who am I?", .hndl = &whoami });
         self.registerCommand(.{ .name = "users", .desc = "Print users", .hndl = &users });
+        self.registerCommand(.{ .name = "env", .desc = "Print environment variables", .hndl = &env });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -485,5 +486,12 @@ fn users(self: *Shell, _: [][]const u8) void {
             entry.uid,
             entry.gid,
         });
+    }
+}
+
+
+fn env(self: *Shell, _: [][]const u8) void {
+    for (std.os.environ) |entry| {
+        self.print("{s}\n", .{entry});
     }
 }
