@@ -15,6 +15,7 @@ pub const ShellCommand = struct {
 pub const Shell = struct {
     stdout: std.fs.File.Writer = undefined,
     stdout_buff: [1024]u8 = undefined,
+    line_buff: [4096]u8 = undefined,
     arg_buf: [MAX_ARGS][]const u8 = undefined,
     commands: std.StringHashMap(ShellCommand) = undefined,
     running: u32 = 0,
@@ -76,8 +77,10 @@ pub const Shell = struct {
     pub fn handleInput(self: *Shell, input: []const u8) void {
         if (input.len == 0) return;
 
+        @memcpy(self.line_buff[0..input.len], input);
+        const _line: []const u8 = self.line_buff[0..input.len];
         var arg_count: usize = 0;
-        var it = std.mem.tokenizeAny(u8, input, " \t");
+        var it = std.mem.tokenizeAny(u8, _line, " \t\n");
         while (it.next()) |arg| {
             if (arg_count < MAX_ARGS) {
                 self.arg_buf[arg_count] = arg;
@@ -91,18 +94,18 @@ pub const Shell = struct {
         if (self.commands.get(cmd_name)) |cmd| {
             cmd.hndl(self, cmd_args);
         } else {
-            self.print("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{input});
+            self.print("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{_line});
         }
     }
 
     pub fn start(self: *Shell) void {
         var len: u32 = 0;
-        var input: [1024]u8 = .{0} ** 1024;
+        var input: [4096]u8 = .{0} ** 4096;
         while (self.running > 0) {
             self.print("> ", .{});
-            len = std.os.linux.read(0, &input, 1024);
+            len = std.os.linux.read(0, &input, 4096);
             if (len > 0) {
-                self.handleInput(input[0..len - 1]);
+                self.handleInput(input[0..len]);
             }
         }
     }
@@ -212,8 +215,8 @@ fn umount(self: *Shell, args: [][]const u8) void {
         return ;
     }
     var target_buff: [256]u8 = .{0} ** 256;
-    @memcpy(target_buff[0..], args[1]);
-    target_buff[args[1].len] = 0;
+    @memcpy(target_buff[0..], args[0]);
+    target_buff[args[0].len] = 0;
     const target: [*:0]u8 = @ptrCast(&target_buff);
 
     const res: u32 = std.os.linux.umount(target);
@@ -453,6 +456,7 @@ fn whoami(self: *Shell, _: [][]const u8) void {
         \\  uid:    {d}
         \\  gid:    {d}
         \\  groups: {s}
+        \\  home:   {s}
         \\  shell:  {s}
         \\
         , .{
@@ -460,6 +464,7 @@ fn whoami(self: *Shell, _: [][]const u8) void {
             pass.?.uid,
             pass.?.gid,
             pass.?.groups,
+            pass.?.home,
             pass.?.shell,
         }
     );

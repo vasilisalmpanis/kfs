@@ -45,7 +45,6 @@ pub fn mount(
     const _fs: []const u8 = std.mem.span(fs_type.?);
     // TO DO: copy above values from userspace to kernelspace
 
-    krn.logger.DEBUG("sys mount {s} {s} {s} {x}", .{_dev, _dir, _fs, new_flags});
     return try do_mount(_dev, _dir, _fs, new_flags, data);
 }
 
@@ -70,6 +69,20 @@ pub fn do_umount(
 
 pub fn umount(
     name: ?[*:0]u8,
+) !u32 {
+    if (name) |_name| {
+        const target: []const u8 = std.mem.span(_name);
+        if (target.len == 0) {
+            return errors.EINVAL;
+        }
+        return try do_umount(target);
+    }
+    return errors.EFAULT;
+}
+
+pub fn umount2(
+    name: ?[*:0]u8,
+    _: u32,
 ) !u32 {
     if (name) |_name| {
         const target: []const u8 = std.mem.span(_name);
