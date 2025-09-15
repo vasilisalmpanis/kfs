@@ -8,10 +8,6 @@ const Socket = @import("../net/socket.zig").Socket;
 /// Inode: Represents an object in the filesystem.
 /// only one copy of a specific inode exists at every point
 /// in time but each inode can have multiple dentries.
-pub const SockInode = struct {
-    base: Inode,
-};
-
 pub const Inode = struct {
     i_no: u32 = 0,
     sb: ?*fs.SuperBlock,
