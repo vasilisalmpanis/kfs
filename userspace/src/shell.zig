@@ -95,7 +95,7 @@ pub const Shell = struct {
         if (self.commands.get(cmd_name)) |cmd| {
             cmd.hndl(self, cmd_args);
         } else {
-            self.print("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{_line});
+            self.print("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{cmd_name});
         }
     }
 

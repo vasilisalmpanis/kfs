@@ -146,6 +146,8 @@ pub fn goUserspace(userspace: []const u8) void {
     }
     pointers[ptr_off] = 0;
     ptr_off += 1;
+    // end marker after strings
+    @memset(strings[str_off..str_off + 4], 0);
 
     // Set auxv
     var aux_ptr: [*]AuxEntry = @ptrCast(&pointers[ptr_off]);
