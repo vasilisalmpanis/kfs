@@ -103,8 +103,8 @@ pub fn goUserspace(userspace: []const u8) void {
     for (envp_init) |env| {
         envp_str_size += env.len + 1;
     }
-    const argv_ptr_size = @sizeOf(u32) * argv_init.len + 1;
-    const envp_ptr_size = @sizeOf(u32) * envp_init.len + 1;
+    const argv_ptr_size = @sizeOf(u32) * (argv_init.len + 1);
+    const envp_ptr_size = @sizeOf(u32) * (envp_init.len + 1);
     const auxv_size = @sizeOf(AuxEntry) * auxv.len;
     const argc_size = @sizeOf(u32);
     const end_marker_size = @sizeOf(u32);
