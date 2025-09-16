@@ -22,49 +22,21 @@ pub const Socket = struct {
     }
 
     pub fn delete(self: *Socket) void {
-        sockets_lock.lock();
-        defer sockets_lock.unlock();
         self.lock.lock();
-        self.list.del();
         if (self.conn) |remote| {
             remote.conn = null;
         }
         krn.mm.kfree(self);
     }
+
+    pub fn newSocket() ?*Socket {
+        const sock: ?*Socket = krn.mm.kmalloc(Socket);
+        if (sock) |_sock| {
+            _sock.setup();
+        }
+        return sock;
+    }
 };
-
-pub fn newSocket() ?*Socket {
-    const sock: ?*Socket = krn.mm.kmalloc(Socket);
-    if (sock) |_sock| {
-        sockets_lock.lock();
-        if (sockets) |first| {
-            _sock.setup();
-            first.addTail(&_sock.list);
-        } else {
-            _sock.setup();
-            sockets = &_sock.list;
-        }
-        sockets_lock.unlock();
-    }
-    return sock;
-}
-
-pub fn findById(id: u32) ?*Socket {
-    sockets_lock.lock();
-    defer sockets_lock.unlock();
-    if (sockets) |first| {
-        var it = first.iterator();
-        while (it.next()) |i| {
-            const sock = i.curr.entry(Socket, "list");
-            if (sock.id == id)
-                return sock;
-        }
-    }
-    return null;
-}
-
-var sockets_lock: mutex.Mutex = mutex.Mutex.init();
-pub var sockets: ?*lst.ListHead = null;
 
 pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
     var sock: *krn.socket.Socket = undefined;
