@@ -309,6 +309,10 @@ pub const FSInfo = struct {
     pub fn clone(self: *FSInfo) !*FSInfo {
         const _fs = try FSInfo.alloc();
         _fs.* = self.*;
+        _fs.pwd.dentry.ref.ref();
+        _fs.pwd.mnt.count.ref();
+        _fs.root.dentry.ref.ref();
+        _fs.root.mnt.count.ref();
         return _fs;
     }
 };
