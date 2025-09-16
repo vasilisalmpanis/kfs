@@ -71,9 +71,9 @@ pub fn socketpair(family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) !u3
     const fd2: u32 = try krn.task.current.files.getNextFD();
     errdefer _ = krn.task.current.files.releaseFD(fd1);
     errdefer _ = krn.task.current.files.releaseFD(fd2);
-    if (krn.socket.newSocket()) |sock_a| {
+    if (krn.socket.Socket.newSocket()) |sock_a| {
         errdefer krn.mm.kfree(sock_a);
-        if (krn.socket.newSocket()) |sock_b| {
+        if (krn.socket.Socket.newSocket()) |sock_b| {
             errdefer krn.mm.kfree(sock_b);
             sock_a.conn = sock_b;
             sock_b.conn = sock_a;
