@@ -11,6 +11,10 @@ const dbg = @import("debug");
 
 pub const proc_mm = @import("./proc_mm.zig");
 pub const MM = @import("./proc_mm.zig").MM;
+pub const MAP = @import("./proc_mm.zig").MAP;
+pub const PROC_READ = @import("./proc_mm.zig").PROT_READ;
+pub const PROC_WRITE = @import("./proc_mm.zig").PROT_WRITE;
+pub const PROC_RW: u32 = PROC_READ | PROC_WRITE;
 
 pub const kmalloc = @import("./kmalloc.zig").kmalloc;
 pub const kmallocArray = @import("./kmalloc.zig").kmallocArray;
