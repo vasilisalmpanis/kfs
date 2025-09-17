@@ -44,6 +44,13 @@ pub const MAP = packed struct(u32) {
         _21: u5 = 0,
         UNINITIALIZED: bool = false,
         _: u5 = 0,
+
+        pub fn anonymous() MAP{
+            return MAP{
+                .TYPE = .PRIVATE,
+                .ANONYMOUS = true,
+            };
+        }
 };
 
 pub const VMA = struct {
