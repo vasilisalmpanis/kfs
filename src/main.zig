@@ -166,7 +166,11 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     // _ = krn.kthreadCreate(&testp, null) catch null;
 
     krn.logger.INFO("Go usermode", .{});
-    krn.goUserspace(@embedFile("userspace"));
+    krn.userspace.goUserspace(
+        @embedFile("userspace"),
+        krn.userspace.argv_init,
+        krn.userspace.envp_init,
+    );
     
     while (true) {
         asm volatile ("hlt");

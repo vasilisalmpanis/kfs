@@ -71,6 +71,14 @@ pub const VMA = struct {
         try self.allocFullVMA();
     }
 
+    pub fn dup(self: *VMA, other: *VMA, pair: krn.mm.VASpair) !void{
+        try mm.virt_memory_manager.dupArea(self.start, self.end, pair, self.flags.TYPE);
+        other.start = self.start;
+        other.end = self.end;
+        other.flags = self.flags;
+        other.prot = self.prot;
+    }
+
     pub fn allocatePages(self: *VMA, start: u32, end: u32) !void {
         const num_of_pages = (end - start) / arch.PAGE_SIZE;
         for (0..num_of_pages) |index| {
@@ -104,6 +112,20 @@ pub const VMA = struct {
                 krn.mm.kfree(_vma);
                 return null;
             };
+        }
+        return vma;
+    }
+
+    pub fn allocEmpty() ?*VMA {
+        const vma: ?*VMA = mm.kmalloc(VMA);
+        if (vma) |_vma| {
+            _vma.mm = null;
+            _vma.start = 0;
+            _vma.end = 0;
+            _vma.list = krn.list.ListHead.init();
+            _vma.list.setup();
+            _vma.prot = 0;
+            _vma.flags = undefined;
         }
         return vma;
     }
@@ -267,29 +289,60 @@ pub const MM = struct {
     pub fn dup(self: *MM) ?*MM {
         const mmap: ?*MM = MM.new();
         if (mmap) |_mmap| {
-            // TODO: Clone mappings.
-            const vas: u32 = mm.virt_memory_manager.cloneVirtualSpace(); // it needs to take mappings into account
-            if (vas == 0) {
+            const vas_pair: krn.mm.VASpair = mm.virt_memory_manager.newVAS() catch {
+                return null;
+            };
+            defer mm.virt_memory_manager.unmapPage(vas_pair.virt, false);
+            _mmap.vas = vas_pair.phys;
+            if (_mmap.vas == 0) {
                 mm.kfree(_mmap);
                 return null;
             }
-            _mmap.vas = vas;
+            if (self.vmas) |head| {
+                var it = head.list.iterator();
+                while (it.next()) |entry| {
+                    const vma = entry.curr.entry(VMA, "list");
+                    if (VMA.allocEmpty()) |new_vma| {
+                        errdefer krn.mm.kfree(new_vma);
+                        new_vma.mm = _mmap;
+                        vma.dup(new_vma, vas_pair) catch {
+                            _mmap.delete();
+                            mm.virt_memory_manager.pmm.freePage(vas_pair.phys);
+                            krn.mm.kfree(_mmap);
+                            return null;
+                        };
+                        if (_mmap.vmas) |c| c.list.addTail(&new_vma.list) else _mmap.vmas = new_vma;
+                    }
+                }
+            }
             _mmap.stack_top = self.stack_top;
             _mmap.stack_bottom = self.stack_bottom;
             _mmap.bss = self.bss;
             _mmap.code = self.code;
             _mmap.data = self.data;
             _mmap.heap = self.heap;
+            krn.logger.INFO("created vas {x}\n", .{_mmap.vas});
         }
         return mmap;
     }
 
     pub fn delete(self: *MM) void {
+        krn.mm.kfree(self);
+    }
+
+    pub fn releaseMappings(self: *MM) void {
         if (self == &init_mm)
             return ;
-        mm.virt_memory_manager.deinitVirtualSpace(self.vas);
-        // TODO: free vmas
-        mm.kfree(self);
+        // const pair: krn.mm.VASpair = mm.virt_memory_manager.mapVAS(self.vas);
+        // defer mm.virt_memory_manager.unmapVAS(pair);
+
+        if (self.vmas) |head| {
+            var it = head.list.iterator();
+            while (it.next()) |node| {
+                const vma: *VMA = node.curr.entry(VMA, "list");
+                mm.virt_memory_manager.releaseArea(vma.start, vma.end, vma.flags.TYPE);
+            }
+        }
     }
 };
 

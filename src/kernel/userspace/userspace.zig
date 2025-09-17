@@ -15,8 +15,13 @@ const HeaderFlags = packed struct (u32) {
     _pad: u29,
 };
 
-const argv_init: [1][]const u8 = .{ "init" };
-const envp_init: [2][]const u8 = .{ "HOME=/", "TERM=kfs" };
+pub const argv_init: []const []const u8 = &[_][]const u8{
+    "init",
+};
+pub const envp_init: []const []const u8 = &[_][]const u8{
+    "HOME=/",
+    "TERM=kfs",
+};
 
 const AuxEntry = struct {
     key: u32,
@@ -34,7 +39,73 @@ const auxv: [2]AuxEntry = .{
     }
 };
 
-pub fn goUserspace(userspace: []const u8) void {
+pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const u8, envp: []const []const u8) u32{
+    // Auxiliary vector
+    var argv_str_size: u32 = 0;
+    for (argv) |arg| {
+        argv_str_size += arg.len + 1;
+    }
+    var envp_str_size: u32 = 0;
+    for (envp) |env| {
+        envp_str_size += env.len + 1;
+    }
+    const argv_ptr_size = @sizeOf(u32) * (argv.len + 1);
+    const envp_ptr_size = @sizeOf(u32) * (envp.len + 1);
+    const auxv_size = @sizeOf(AuxEntry) * auxv.len;
+    const argc_size = @sizeOf(u32);
+    const end_marker_size = @sizeOf(u32);
+
+    const size = argv_ptr_size + argv_str_size + envp_ptr_size +
+                        envp_str_size + auxv_size + argc_size + end_marker_size;
+    var aligned_size = size;
+    if (aligned_size % 16 != 0)
+        aligned_size += 16 - (aligned_size % 16);
+    
+    const stack_ptr_addr: u32 = stack_bottom + stack_size - aligned_size;
+    var strings: [*]u8 = @ptrFromInt(stack_bottom + stack_size - end_marker_size - argv_str_size - envp_str_size);
+    var pointers: [*]u32 = @ptrFromInt(stack_ptr_addr);
+    var str_off: u32 = 0;
+    var ptr_off: u32 = 0;
+    
+    // Set argc
+    pointers[ptr_off] = argv.len;
+    ptr_off += 1;
+
+    // Set argv
+    for (argv) |arg| {
+        @memcpy(strings[str_off..str_off + arg.len], arg);
+        strings[str_off + arg.len] = 0;
+        pointers[ptr_off] = @intFromPtr(&strings[str_off]);
+        str_off += arg.len + 1;
+        ptr_off += 1;
+    }
+    pointers[ptr_off] = 0;
+    ptr_off += 1;
+
+    // Set envp
+    for (envp) |env| {
+        @memcpy(strings[str_off..str_off + env.len], env);
+        strings[str_off + env.len] = 0;
+        pointers[ptr_off] = @intFromPtr(&strings[str_off]);
+        str_off += env.len + 1;
+        ptr_off += 1;
+    }
+    pointers[ptr_off] = 0;
+    ptr_off += 1;
+    // end marker after strings
+    @memset(strings[str_off..str_off + 4], 0);
+
+    // Set auxv
+    var aux_ptr: [*]AuxEntry = @ptrCast(&pointers[ptr_off]);
+    ptr_off = 0;
+    for (auxv) |aux| {
+        aux_ptr[ptr_off] = aux;
+        ptr_off += 1;
+    }
+    return stack_ptr_addr;
+}
+
+pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) void {
     const stack_pages: u32 = 10;
     var heap_start: u32 = 0;
 
@@ -53,6 +124,7 @@ pub fn goUserspace(userspace: []const u8) void {
             num_pages += 1;
 
         // Create anonymous mapping for each section
+        krn.logger.INFO("mapping 0x{x}-0x{x}\n", .{p_hdr.p_vaddr, arch.pageAlign(p_hdr.p_memsz,false)});
         _ = krn.task.current.mm.?.mmap_area(
             p_hdr.p_vaddr,
             arch.pageAlign(p_hdr.p_memsz, false),
@@ -85,68 +157,7 @@ pub fn goUserspace(userspace: []const u8) void {
     const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
     @memset(stack_ptr[0..stack_size], 0);
 
-    // Auxiliary vector
-    var argv_str_size: u32 = 0;
-    for (argv_init) |arg| {
-        argv_str_size += arg.len + 1;
-    }
-    var envp_str_size: u32 = 0;
-    for (envp_init) |env| {
-        envp_str_size += env.len + 1;
-    }
-    const argv_ptr_size = @sizeOf(u32) * (argv_init.len + 1);
-    const envp_ptr_size = @sizeOf(u32) * (envp_init.len + 1);
-    const auxv_size = @sizeOf(AuxEntry) * auxv.len;
-    const argc_size = @sizeOf(u32);
-    const end_marker_size = @sizeOf(u32);
-
-    const size = argv_ptr_size + argv_str_size + envp_ptr_size +
-                        envp_str_size + auxv_size + argc_size + end_marker_size;
-    var aligned_size = size;
-    if (aligned_size % 16 != 0)
-        aligned_size += 16 - (aligned_size % 16);
-    
-    const stack_ptr_addr: u32 = stack_bottom + stack_size - aligned_size;
-    var strings: [*]u8 = @ptrFromInt(stack_bottom + stack_size - end_marker_size - argv_str_size - envp_str_size);
-    var pointers: [*]u32 = @ptrFromInt(stack_ptr_addr);
-    var str_off: u32 = 0;
-    var ptr_off: u32 = 0;
-    
-    // Set argc
-    pointers[ptr_off] = argv_init.len;
-    ptr_off += 1;
-
-    // Set argv
-    for (argv_init) |arg| {
-        @memcpy(strings[str_off..str_off + arg.len], arg);
-        strings[str_off + arg.len] = 0;
-        pointers[ptr_off] = @intFromPtr(&strings[str_off]);
-        str_off += arg.len + 1;
-        ptr_off += 1;
-    }
-    pointers[ptr_off] = 0;
-    ptr_off += 1;
-
-    // Set envp
-    for (envp_init) |env| {
-        @memcpy(strings[str_off..str_off + env.len], env);
-        strings[str_off + env.len] = 0;
-        pointers[ptr_off] = @intFromPtr(&strings[str_off]);
-        str_off += env.len + 1;
-        ptr_off += 1;
-    }
-    pointers[ptr_off] = 0;
-    ptr_off += 1;
-    // end marker after strings
-    @memset(strings[str_off..str_off + 4], 0);
-
-    // Set auxv
-    var aux_ptr: [*]AuxEntry = @ptrCast(&pointers[ptr_off]);
-    ptr_off = 0;
-    for (auxv) |aux| {
-        aux_ptr[ptr_off] = aux;
-        ptr_off += 1;
-    }
+    const stack_ptr_addr: u32 = setEnvironment(stack_bottom, stack_size, argv, envp);
 
     krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack_bottom, stack_bottom + stack_size});
     krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{ehdr.e_entry});
@@ -156,7 +167,7 @@ pub fn goUserspace(userspace: []const u8) void {
     krn.logger.INFO("heap_start 0x{X:0>8}\n", .{heap_start});
     krn.mm.proc_mm.init_mm.heap = heap_start;
     krn.mm.proc_mm.init_mm.stack_bottom = stack_bottom;
-    krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size;// - arch.PAGE_SIZE;
+    krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size;
 
     asm volatile(
         \\ cli

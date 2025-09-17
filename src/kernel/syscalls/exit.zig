@@ -20,6 +20,9 @@ pub fn exit(error_code: i32) !u32 {
     tsk.current.files.map.deinit();
     tsk.current.fs.pwd.release();
     tsk.current.fs.root.release();
+    if (tsk.current.mm) |_mm| {
+        _mm.releaseMappings();
+    }
 
     tsk.current.result = error_code;
     tsk.current.state = .ZOMBIE;
