@@ -1,0 +1,6 @@
+#! /bin/sh
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH;
+IFS=' 	
+'; export IFS;
+LANG=C; LC_ALL=C; export LANG LC_ALL;
+PS1='# ';

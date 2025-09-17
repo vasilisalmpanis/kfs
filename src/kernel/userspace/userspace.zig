@@ -16,7 +16,7 @@ const HeaderFlags = packed struct (u32) {
 };
 
 const argv_init: [1][]const u8 = .{ "init" };
-const envp_init: [2][]const u8 = .{ "HOME=/", "TERM=kfs" };
+const envp_init: [2][]const u8 = .{ "HOME=/", "TERM=vt100" };
 
 const AuxEntry = struct {
     key: u32,
@@ -33,6 +33,20 @@ const auxv: [2]AuxEntry = .{
         .val = 0,
     }
 };
+
+pub fn openStdFds() !void {
+    const path = try krn.fs.path.resolve("/dev");
+    defer path.release();
+    const fd = try krn.do_open(
+        path,
+        "tty",
+        0o0000002,
+        .{ .grp = 0o6, .other = 0o6, .usr = 0o6 }
+    );
+    _ = try krn.dup2(fd, 0);
+    _ = try krn.dup2(fd, 1);
+    _ = try krn.dup2(fd, 2);
+}
 
 pub fn goUserspace(userspace: []const u8) void {
     const stack_pages: u32 = 40;
@@ -167,6 +181,10 @@ pub fn goUserspace(userspace: []const u8) void {
     krn.mm.proc_mm.init_mm.heap = heap_start;
     krn.mm.proc_mm.init_mm.stack_bottom = stack_bottom;
     krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size;// - arch.PAGE_SIZE;
+
+    openStdFds() catch |err| {
+        krn.logger.ERROR("cannot open stdin stdout stderr: {t}\n", .{err});
+    };
 
     asm volatile(
         \\ cli

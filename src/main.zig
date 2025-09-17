@@ -94,6 +94,14 @@ fn move_root() void {
         krn.fs.mount.mountpoints.?.remove();
         krn.fs.mount.mountpoints = point;
     }
+    if (krn.fs.FileSystem.find("examplefs")) |fs| {
+        _ = krn.fs.Mount.mount("examplefs", "/tmp", fs) catch {
+            dbg.printf("Failed to mount examplefs to /tmp\n",.{});
+            @panic("Not able to mount\n");
+        };
+    } else {
+        dbg.printf("Unknown filesystem type\n",.{});
+    }
 }
 
 export fn kernel_main(magic: u32, address: u32) noreturn {
