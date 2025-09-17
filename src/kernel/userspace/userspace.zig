@@ -44,6 +44,7 @@ pub fn goUserspace(userspace: []const u8) void {
     //     krn.mm.virt_memory_manager.pmm.allocPage(),
     //     .{.user = true}
     // );
+    const prot: u32 = krn.mm.PROC_RW;
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
     for (0..ehdr.e_phnum) |i| {
         const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
@@ -56,16 +57,14 @@ pub fn goUserspace(userspace: []const u8) void {
         var num_pages = p_hdr.p_memsz / arch.PAGE_SIZE;
         if (!arch.isPageAligned(p_hdr.p_memsz))
             num_pages += 1;
-        const phys = krn.mm.virt_memory_manager.pmm.allocPages(num_pages);
-        if (phys == 0)
-            @panic("Cannot go to userspace");
-        for (0..num_pages) |idx| {
-            krn.mm.virt_memory_manager.mapPage(
-                p_hdr.p_vaddr + (idx * arch.PAGE_SIZE),
-                phys + (idx * arch.PAGE_SIZE),
-                .{ .user = true, }
-            );
-        }
+
+        // Create anonymous mapping for each section
+        _ = krn.task.current.mm.?.mmap_area(
+            p_hdr.p_vaddr,
+            arch.pageAlign(p_hdr.p_memsz, false),
+            prot,
+            krn.mm.MAP.anonymous()
+        ) catch {return ;};
         const section_ptr: [*]u8 = @ptrFromInt(p_hdr.p_vaddr);
         if (p_hdr.p_filesz > 0) {
             @memcpy(
@@ -83,14 +82,13 @@ pub fn goUserspace(userspace: []const u8) void {
     const stack_phys: u32 = krn.mm.virt_memory_manager.pmm.allocPages(stack_size / arch.PAGE_SIZE);
     if (stack_phys == 0)
         @panic("cannot allocate stack\n");
-    const stack_bottom: u32 = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE;
-    for (0..stack_pages) |idx| {
-        krn.mm.virt_memory_manager.mapPage(
-            stack_bottom + idx * arch.PAGE_SIZE,
-            stack_phys + (idx * arch.PAGE_SIZE),
-            .{ .user = true }
-        );
-    }
+    var stack_bottom: u32 = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE;
+    stack_bottom = krn.task.current.mm.?.mmap_area(
+        stack_bottom,
+        stack_size,
+        prot,
+        krn.mm.MAP.anonymous()
+    ) catch {return ;};
     const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
     @memset(stack_ptr[0..stack_size], 0);
 
