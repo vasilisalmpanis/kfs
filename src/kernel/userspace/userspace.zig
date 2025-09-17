@@ -35,15 +35,9 @@ const auxv: [2]AuxEntry = .{
 };
 
 pub fn goUserspace(userspace: []const u8) void {
-    const stack_pages: u32 = 40;
-    const userspace_offset: u32 = 0x1000;
+    const stack_pages: u32 = 10;
     var heap_start: u32 = 0;
 
-    // krn.mm.virt_memory_manager.mapPage(
-    //     0,
-    //     krn.mm.virt_memory_manager.pmm.allocPage(),
-    //     .{.user = true}
-    // );
     const prot: u32 = krn.mm.PROC_RW;
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
     for (0..ehdr.e_phnum) |i| {
@@ -79,16 +73,15 @@ pub fn goUserspace(userspace: []const u8) void {
             heap_start = p_hdr.p_vaddr + p_hdr.p_memsz;
     }
     const stack_size: u32 = stack_pages * arch.PAGE_SIZE;
-    const stack_phys: u32 = krn.mm.virt_memory_manager.pmm.allocPages(stack_size / arch.PAGE_SIZE);
-    if (stack_phys == 0)
-        @panic("cannot allocate stack\n");
     var stack_bottom: u32 = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE;
     stack_bottom = krn.task.current.mm.?.mmap_area(
         stack_bottom,
         stack_size,
         prot,
         krn.mm.MAP.anonymous()
-    ) catch {return ;};
+    ) catch {
+        @panic("Unable to go to userspace\n");
+    };
     const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
     @memset(stack_ptr[0..stack_size], 0);
 
@@ -155,7 +148,6 @@ pub fn goUserspace(userspace: []const u8) void {
         ptr_off += 1;
     }
 
-    krn.logger.INFO("Userspace code:  0x{X:0>8}", .{userspace_offset});
     krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack_bottom, stack_bottom + stack_size});
     krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{ehdr.e_entry});
 
