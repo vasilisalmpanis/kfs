@@ -8,6 +8,7 @@ pub fn sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) 
     if (sig > 31)
         return errors.EINVAL;
     const signal: signals.Signal = @enumFromInt(sig);
+    krn.logger.DEBUG("sigaction sig {t}\n", .{signal});
     if (signal == .SIGKILL or signal == .SIGSTOP)
         return errors.EINVAL;
     if (oact) |old_act| {
@@ -106,4 +107,19 @@ pub fn sigpending(uset: ?*signals.sigset_t) u32 {
         _uset.* = set;
     }
     return 0;
+}
+
+pub fn sigsuspend(mask: ?*signals.sigset_t) !u32 {
+    if (mask == null)
+        return errors.EINVAL;
+    const old_mask = tsk.current.sigmask;
+    tsk.current.sigmask = mask.?.*;
+    tsk.current.sigmask = old_mask;
+    return errors.EINTR;
+}
+
+pub fn rt_sigsuspend(mask: ?*signals.sigset_t, sigsetsize: usize) !u32 {
+    if (sigsetsize != @sizeOf(signals.sigset_t))
+        return errors.EINVAL;
+    return try sigsuspend(mask);
 }

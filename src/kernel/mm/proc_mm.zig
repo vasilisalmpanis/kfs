@@ -80,6 +80,7 @@ pub const VMA = struct {
     }
 
     pub fn allocatePages(self: *VMA, start: u32, end: u32) !void {
+        _ = self;
         const num_of_pages = (end - start) / arch.PAGE_SIZE;
         for (0..num_of_pages) |index| {
             const page: u32 = krn.mm.virt_memory_manager.pmm.allocPage();
@@ -90,7 +91,7 @@ pub const VMA = struct {
                 return error.OutOfMemory;
             }
             const flags = arch.vmm.PagingFlags{
-                .writable = if (self.prot & PROT_WRITE > 0) true else false,
+                .writable = true, //if (self.prot & PROT_WRITE > 0) true else false,
                 .user = true,
                 .present = true,
             };
@@ -203,6 +204,10 @@ pub const MM = struct {
                     next.list.del();
                     krn.mm.kfree(next);
                 }
+                krn.logger.DEBUG(
+                    "Merged VMA 0x{x:0>8} - 0x{x:0>8}\n", 
+                    .{new_vma.?.start, new_vma.?.end}
+                );
                 return new_vma;
             } else if (
                 next.start > vma.start
@@ -210,6 +215,10 @@ pub const MM = struct {
             ) {
                 try next.allocatePages(addr, next.start);
                 next.start = addr;
+                krn.logger.DEBUG(
+                    "Merged VMA 0x{x:0>8} - 0x{x:0>8}\n", 
+                    .{next.start, next.end}
+                );
                 return next;
             } else if (vma.mergable(addr, length, prot, flags)) {
                 if (vma.end == addr) {
@@ -219,6 +228,10 @@ pub const MM = struct {
                     try vma.allocatePages(addr, vma.start);
                     vma.start = addr;
                 }
+                krn.logger.DEBUG(
+                    "Merged VMA 0x{x:0>8} - 0x{x:0>8}\n", 
+                    .{vma.start, vma.end}
+                );
                 return vma;
             }
         }
@@ -226,6 +239,10 @@ pub const MM = struct {
         if (new_vma == null)
             return error.OutOfMemory;
         if (curr) |c| c.addTail(&new_vma.?.list);
+        krn.logger.DEBUG(
+            "Allocated VMA 0x{x:0>8} - 0x{x:0>8}\n", 
+            .{new_vma.?.start, new_vma.?.end}
+        );
         return new_vma;
     }
 
@@ -283,6 +300,10 @@ pub const MM = struct {
         if (self.vmas == null or hint < self.vmas.?.start) {
             self.vmas = new_vma;
         }
+        krn.logger.DEBUG(
+            "mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+            .{hint, end}
+        );
         return @intCast(hint);
     }
 

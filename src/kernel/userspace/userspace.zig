@@ -39,6 +39,34 @@ const auxv: [2]AuxEntry = .{
     }
 };
 
+pub fn openStdFds() !void {
+    const path = try krn.fs.path.resolve("/dev");
+    defer path.release();
+    const fd = try krn.do_open(
+        path,
+        "tty",
+        0o0000002,
+        .{ .grp = 0o6, .other = 0o6, .usr = 0o6 }
+    );
+    _ = try krn.dup2(fd, 0);
+    _ = try krn.dup2(fd, 1);
+    _ = try krn.dup2(fd, 2);
+}
+
+pub fn openStdFds() !void {
+    const path = try krn.fs.path.resolve("/dev");
+    defer path.release();
+    const fd = try krn.do_open(
+        path,
+        "tty",
+        0o0000002,
+        .{ .grp = 0o6, .other = 0o6, .usr = 0o6 }
+    );
+    _ = try krn.dup2(fd, 0);
+    _ = try krn.dup2(fd, 1);
+    _ = try krn.dup2(fd, 2);
+}
+
 pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const u8, envp: []const []const u8) u32{
     // Auxiliary vector
     var argv_str_size: u32 = 0;
@@ -169,6 +197,10 @@ pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []cons
     krn.mm.proc_mm.init_mm.stack_bottom = stack_bottom;
     krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size;
     krn.task.current.tsktype = .PROCESS;
+
+    openStdFds() catch |err| {
+        krn.logger.ERROR("cannot open stdin stdout stderr: {t}\n", .{err});
+    };
 
     asm volatile(
         \\ cli

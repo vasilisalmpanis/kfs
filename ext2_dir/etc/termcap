@@ -1,0 +1,6 @@
+vt100|kfs|KFS console (vt100-ish):\
+    :co#80:li#25:am:bs:km:\
+    :cl=\E[H\E[2J:ce=\E[K:cd=\E[J:\
+    :cm=\E[%i%p1%d;%p2%dH:nd=\E[C:up=\E[A:le=\E[D:do=\E[B:\
+    :so=\E[7m:se=\E[27m:us=\E[4m:ue=\E[24m:\
+    :kh=\E[H:kH=\E[F:

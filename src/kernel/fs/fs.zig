@@ -292,6 +292,10 @@ pub const UMode = packed struct {
         }
         return false;
     }
+
+    pub fn toU16(self: *const UMode) u16 {
+        return @bitCast(self.*);
+    }
 };
 
 

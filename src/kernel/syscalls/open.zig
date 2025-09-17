@@ -81,6 +81,10 @@ pub fn open(
     mode: fs.UMode,
 ) !u32 {
     if (filename) |f| {
+        kernel.logger.DEBUG(
+            "open {s}, flags: {x}, mode: {o}",
+            .{f, flags, mode.toU16()}
+        );
         const path: []u8 = std.mem.span(f);
         var file_segment: []const u8 = "";
         const parent_dir = try fs.path.dir_resolve(
