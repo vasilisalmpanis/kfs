@@ -271,7 +271,7 @@ pub export fn main() noreturn {
     std.posix.dup2(@intCast(tty), 2) catch |err| {
         serial("dup2 error {d} -> 2 {t}\n", .{tty, err});
     };
-    run_test();
+    // run_test();
     var sh = shell.Shell.init();
     sh.start();
     while (true) {}
