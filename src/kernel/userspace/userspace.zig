@@ -111,6 +111,7 @@ pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []cons
 
     const prot: u32 = krn.mm.PROC_RW;
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
+    krn.logger.INFO("Goind to userspace {any}\n", .{ehdr});
     for (0..ehdr.e_phnum) |i| {
         const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
             @constCast(@alignCast(&userspace[ehdr.e_phoff + (ehdr.e_phentsize * i)]))

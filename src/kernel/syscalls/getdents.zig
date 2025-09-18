@@ -11,6 +11,7 @@ pub fn getdents64(fd: u32, dirents: [*]u8, size: u32) !u32 {
         if (dir_file.inode.mode.isDir()) {
             if (dir_file.ops.readdir) |readdir| {
                 const buf_slice = dirents[0..size];
+                krn.logger.INFO("about to read dir\n",.{});
                 return try readdir(dir_file, buf_slice);
             }
             return errors.ENOENT;
