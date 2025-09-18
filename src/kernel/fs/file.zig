@@ -165,7 +165,7 @@ pub const TaskFiles = struct {
         }
         const result = self.map.capacity(); // Look into if capacity is taken or not
         try self.map.resize(self.map.capacity() * 2 , false);
-        try self.map.set(result);
+        self.map.set(result);
         return result;
     }
 
