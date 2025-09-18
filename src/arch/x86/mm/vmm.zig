@@ -1,6 +1,7 @@
 const printf = @import("debug").printf;
 const PMM = @import("./pmm.zig").PMM;
 const krn = @import("kernel");
+const std = @import("std");
 const PAGE_SIZE = @import("./pmm.zig").PAGE_SIZE;
 const PAGE_OFFSET: u32 = 0xC0000000;
 const KERNEL_START: u32 = PAGE_OFFSET >> 22;
@@ -363,7 +364,6 @@ pub const VMM = struct {
                         new_pt[pt_idx] = old_pt[pt_idx];
                     }
                 }
-                krn.logger.INFO("PTE {d} {x}", .{pt_idx, new_pt[pt_idx]});
             }
             pt_start_idx = 0;
             pd[temp_idx] = 0;
@@ -418,9 +418,10 @@ pub const VMM = struct {
                     pt[pt_idx] = 0; // Clear the PTE
                 }
             }
-
-            self.pmm.freePage(pd[pd_idx] >> 12);
-            pd[pd_idx] = 0;
+            if (std.mem.allEqual(u32, pt[0..1024], 0)) {
+                self.pmm.freePage(pd[pd_idx] >> 12);
+                pd[pd_idx] = 0;
+            }
 
             pt_start_idx = 0;
         }
