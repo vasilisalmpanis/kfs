@@ -252,7 +252,7 @@ pub fn run_test() void {
     ) {}
 
     serial("[PARENT] received from child {s}\n", .{buf});
-    _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
+    // _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
     _ = std.posix.wait4(pid, 0, null);
 }
 
@@ -271,7 +271,7 @@ pub export fn main() noreturn {
     std.posix.dup2(@intCast(tty), 2) catch |err| {
         serial("dup2 error {d} -> 2 {t}\n", .{tty, err});
     };
-    // run_test();
+    run_test();
     var sh = shell.Shell.init();
     sh.start();
     while (true) {}
