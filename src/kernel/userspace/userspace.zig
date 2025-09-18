@@ -168,6 +168,7 @@ pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []cons
     krn.mm.proc_mm.init_mm.heap = heap_start;
     krn.mm.proc_mm.init_mm.stack_bottom = stack_bottom;
     krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size;
+    krn.task.current.tsktype = .PROCESS;
 
     asm volatile(
         \\ cli

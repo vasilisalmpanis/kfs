@@ -252,7 +252,7 @@ pub fn run_test() void {
     ) {}
 
     serial("[PARENT] received from child {s}\n", .{buf});
-    // _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
+    _ = os.linux.kill(@intCast(pid), os.linux.SIG.ABRT);
     _ = std.posix.wait4(pid, 0, null);
 }
 
