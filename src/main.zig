@@ -96,6 +96,23 @@ fn move_root() void {
     }
 }
 
+fn user_thread(_: ?*const anyopaque) i32 {
+    while (kernel_ready == false)
+        krn.sched.reschedule();
+
+    krn.task.current.mm = krn.task.initial_task.mm;
+    krn.task.current.fs = krn.task.initial_task.fs;
+    krn.task.current.files = krn.task.initial_task.files;
+    krn.userspace.goUserspace(
+        @embedFile("userspace"),
+        krn.userspace.argv_init,
+        krn.userspace.envp_init,
+    );
+    return 0;
+}
+
+var kernel_ready: bool = false;
+
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x36d76289) {
         system.halt();
@@ -144,9 +161,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
             root_mount.sb.root
         );
         if (krn.fs.TaskFiles.new()) |files| {
-            files.map.set(0); // No stdin
-            files.map.set(1); // No stdout
-            files.map.set(2); // No stderr
             krn.task.initial_task.files = files;
         } else {
             @panic("PID 0 doesn't have TaskFiles struct, OOM\n");
@@ -155,23 +169,14 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
             dbg.printf("Unknown filesystem type\n",.{});
     }
 
+    // Get PID1
+    _ = krn.kthreadCreate(&user_thread, null) catch null;
+
     // Devices
     drv.init();
-    // Mount disk as /
     move_root();
+    kernel_ready = true;
 
-
-    _ = krn.kthreadCreate(&testp, null) catch null;
-    // _ = krn.kthreadCreate(&testp, null) catch null;
-    // _ = krn.kthreadCreate(&testp, null) catch null;
-
-    krn.logger.INFO("Go usermode", .{});
-    krn.userspace.goUserspace(
-        @embedFile("userspace"),
-        krn.userspace.argv_init,
-        krn.userspace.envp_init,
-    );
-    
     while (true) {
         asm volatile ("hlt");
     }
