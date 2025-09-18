@@ -1,6 +1,10 @@
+ENTRY(_start)
+
 SECTIONS
 {
-  .text : ALIGN(0x1000){
+  . = 0x10000;  /* For some reason i686 toolchain was putting section at address 0*/
+
+  .text : ALIGN(0x1000) {
     *(.text*)
   }
 

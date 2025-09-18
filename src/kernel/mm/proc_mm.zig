@@ -343,6 +343,7 @@ pub const MM = struct {
                 mm.virt_memory_manager.releaseArea(vma.start, vma.end, vma.flags.TYPE);
             }
         }
+        self.vmas = null;
     }
 };
 
