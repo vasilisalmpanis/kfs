@@ -73,6 +73,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "whoami", .desc = "Who am I?", .hndl = &whoami });
         self.registerCommand(.{ .name = "users", .desc = "Print users", .hndl = &users });
         self.registerCommand(.{ .name = "env", .desc = "Print environment variables", .hndl = &env });
+        self.registerCommand(.{ .name = "execve", .desc = "Execute a program", .hndl = &execve });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -300,6 +301,15 @@ fn ls(self: *Shell, args: [][]const u8) void {
     };
     defer std.posix.close(fd);
 
+    var stat_buf: std.os.linux.Stat = undefined;
+    var buffer: [64]u8 = .{0} ** 64;
+    @memcpy(buffer[0..path.len], path);
+    buffer[path.len] = 0;
+    _ = std.os.linux.stat(@ptrCast(&buffer), &stat_buf);
+    if (stat_buf.mode & std.os.linux.S.IFMT != std.os.linux.S.IFDIR) {
+        self.print("{s}\n", .{path});
+        return ;
+    }
     var dirp: [1024]u8 = .{0} ** 1024;
     const len = std.os.linux.getdents64(fd, &dirp, 1024);
     if (len < 0) {
@@ -494,4 +504,23 @@ fn env(self: *Shell, _: [][]const u8) void {
     for (std.os.environ) |entry| {
         self.print("{s}\n", .{entry});
     }
+}
+
+fn execve(self: *Shell, args: [][]const u8) void {
+    if (args.len < 1)
+        return;
+    const pid = std.posix.fork() catch return;
+    if (pid == 0) {
+        var buffer: [64]u8 = .{0} ** 64;
+        @memcpy(buffer[0..args[0].len], args[0]);
+        buffer[args[0].len] = 0;
+        const argv: [*:null]const ?[*:0]const u8 = @ptrCast(&[_]?[*:0]const u8{ null });
+        const envp: [*:null]const ?[*:0]const u8 = @ptrCast(&[_]?[*:0]const u8{ null });
+        _ = self;
+        std.posix.execveZ(@ptrCast(&buffer), argv, envp) catch  {return;};
+            // self.print("exec failed: {}\n", .{err});
+            // std.posix.exit(1);
+        // };
+    }
+    _ = std.posix.waitpid(pid, 0);
 }

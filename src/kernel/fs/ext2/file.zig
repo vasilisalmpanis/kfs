@@ -6,8 +6,9 @@ const Ext2Super = @import("./super.zig").Ext2Super;
 const Ext2DirEntry = @import("./inode.zig").Ext2DirEntry;
 
 pub const Ext2File = struct {
-    fn open(_: *fs.File, _: *fs.Inode) !void {
-        krn.logger.INFO("ext2 file open", .{});
+    fn open(base: *fs.File, _: *fs.Inode) !void {
+        if (base.path == null) return krn.errors.PosixError.EINVAL;
+        krn.logger.INFO("ext2 file open {s}", .{base.path.?.dentry.name});
     }
 
     // fn write(base: *fs.File, _: [*]u8, size: u32) !u32 {
