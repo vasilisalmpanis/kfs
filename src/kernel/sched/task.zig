@@ -127,6 +127,7 @@ pub const Task = struct {
     pub fn setup(self: *Task, virt: u32, task_stack_top: u32, task_stack_bottom: u32) void {
         self.pid = pid;
         self.uid = 0;
+        self.pgid = 1;
         pid += 1;
         self.regs.esp = task_stack_top;
         self.stack_bottom = task_stack_bottom;

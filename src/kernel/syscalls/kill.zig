@@ -2,6 +2,7 @@ const tsk = @import("../sched/task.zig");
 const errors = @import("./error-codes.zig").PosixError;
 const arch = @import("arch");
 const signals = @import("../sched/signals.zig");
+const krn = @import("../main.zig");
 
 fn send_signal(task: *tsk.Task, signal: signals.Signal) !u32 {
     if (tsk.current.uid != task.uid)
@@ -16,6 +17,10 @@ fn send_signal(task: *tsk.Task, signal: signals.Signal) !u32 {
 
 pub fn kill(pid: i32, sig: u32) !u32 {
     const signal: signals.Signal = @enumFromInt(sig);
+    krn.logger.DEBUG(
+        "kill pid {d}, sig {t}",
+        .{pid, signal}
+    );
     if (pid == 0 or pid < -1) {
         tsk.tasks_mutex.lock();
         var it = tsk.initial_task.list.iterator();
