@@ -14,14 +14,14 @@ pub fn doExecve(
     errdefer path.release();
     const file = try krn.fs.File.new(path);
     errdefer file.ref.unref();
+    const slice = if (krn.mm.kmallocSlice(u8, file.inode.size)) |_slice| _slice else return errors.ENOMEM;
+    var read: u32 = 0;
+    krn.logger.INFO("Executing {s} {d}\n", .{filename, file.inode.size});
+    while (read < file.inode.size) {
+        read += try file.ops.read(file, @ptrCast(&slice[read]), slice.len);
+    }
     if (krn.task.current.mm) |_mm| {
         _mm.releaseMappings();
-    }
-    const slice = if (krn.mm.kmallocSlice(u8, file.inode.size)) |_slice| _slice else return errors.ENOMEM;
-    var read: u32 = 1;
-    while (read < file.inode.size) {
-        krn.logger.INFO("read {d} of {d}\n", .{read, file.inode.size});
-        read += try file.ops.read(file, slice.ptr, slice.len);
     }
     krn.userspace.goUserspace(
         slice,
@@ -38,7 +38,7 @@ pub fn execve(
         return errors.EINVAL;
     const span = std.mem.span(filename.?);
     return doExecve(
-        span, 
+        span,
         krn.userspace.argv_init,
         krn.userspace.envp_init,
     );

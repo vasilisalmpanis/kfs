@@ -2,17 +2,24 @@ const std = @import("std");
 const arch = @import("arch");
 const krn = @import("../main.zig");
 
+// ELF constants
+const EI_CLASS = 4;
+const EI_DATA = 5;
+const EI_VERSION = 6;
+
+const ELFCLASS32 = 1;
+const ELFCLASS64 = 2;
+
+const ELFDATA2LSB = 1;
+
+const EV_CURRENT = 1;
+
 const PT_TYPE = enum (u32) {
     PT_NULL = 0,
     PT_LOAD = 1,
+    PT_DYNAMIC = 2,
+    PT_INTERP = 3,
     _,
-};
-
-const HeaderFlags = packed struct (u32) {
-    exec: bool,
-    write: bool,
-    read: bool,
-    _pad: u29,
 };
 
 pub const argv_init: []const []const u8 = &[_][]const u8{
@@ -38,6 +45,78 @@ const auxv: [2]AuxEntry = .{
         .val = 0,
     }
 };
+
+pub const ElfValidationError = error {
+    InvalidMagic,
+    UnsupportedClass,
+    UnsupportedEndianness,
+    UnsupportedVersion,
+    UnsupportedMachine,
+    InvalidHeaderSize,
+    FileTooSmall,
+    Dynamic,
+};
+
+pub fn validateElfHeader(userspace: []const u8) !void{
+
+    if (userspace.len < @sizeOf(std.elf.Elf32_Ehdr)) {
+        return ElfValidationError.FileTooSmall;
+    }
+
+    if (!std.mem.eql(u8, userspace[0..4], &[4]u8{0x7F, 'E', 'L', 'F'})) {
+        return ElfValidationError.InvalidMagic;
+    }
+
+    const ei_class = userspace[EI_CLASS];
+    if (ei_class != ELFCLASS32)
+        return ElfValidationError.UnsupportedClass;
+
+    const ei_data = userspace[EI_DATA];
+    if (ei_data != ELFDATA2LSB) {
+        return ElfValidationError.UnsupportedEndianness;
+    }
+    const ei_version = userspace[EI_VERSION];
+    if (ei_version != EV_CURRENT) {
+        return ElfValidationError.UnsupportedVersion;
+    }
+
+    const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
+
+    if (ehdr.e_machine != std.elf.EM.@"386") {
+        return ElfValidationError.UnsupportedMachine;
+    }
+
+    if (ehdr.e_ehsize != @sizeOf(std.elf.Elf32_Ehdr)) {
+        return ElfValidationError.InvalidHeaderSize;
+    }
+
+    const is_statically_linked = checkStaticLinking32(userspace, ehdr);
+    if (!is_statically_linked)
+        return ElfValidationError.Dynamic;
+}
+
+fn checkStaticLinking32(userspace: []const u8, ehdr: *const std.elf.Elf32_Ehdr) bool {
+    var has_interp = false;
+    var has_dynamic = false;
+
+    for (0..ehdr.e_phnum) |i| {
+        if (ehdr.e_phoff + (ehdr.e_phentsize * i) + @sizeOf(std.elf.Elf32_Phdr) > userspace.len) {
+            break;
+        }
+
+        const p_hdr: *const std.elf.Elf32_Phdr = @ptrCast(
+            @alignCast(&userspace[ehdr.e_phoff + (ehdr.e_phentsize * i)])
+        );
+
+        const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
+        switch (header_type) {
+            .PT_INTERP => has_interp = true,
+            .PT_DYNAMIC => has_dynamic = true,
+            else => {},
+        }
+    }
+    return !has_interp and !has_dynamic;
+}
 
 pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const u8, envp: []const []const u8) u32{
     // Auxiliary vector
@@ -106,6 +185,14 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
 }
 
 pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) void {
+    validateElfHeader(userspace) catch |err| {
+        krn.logger.ERROR("ELF validation failed: {}\n", .{err});
+        while (true) {}
+        return;
+    };
+
+    krn.logger.INFO("Binary validation: 32-bit and statically_linked\n", .{});
+
     const stack_pages: u32 = 10;
     var heap_start: u32 = 0;
 
