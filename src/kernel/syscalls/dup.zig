@@ -10,9 +10,10 @@ pub fn dup2(old_fd: u32, new_fd: u32) !u32 {
         if (old_fd == new_fd) {
             return new_fd;
         }
-        if (krn.task.current.files.fds.get(new_fd)) |old_file| {
-            old_file.ops.close(old_file);
+        if (krn.task.current.files.fds.get(new_fd)) |_| {
+            _ = krn.task.current.files.releaseFD(new_fd);
         }
+        file.ref.ref();
         try krn.task.current.files.setFD(new_fd, file);
         return new_fd;
     }
@@ -25,6 +26,7 @@ pub fn dup(old_fd: u32) !u32 {
             krn.logger.ERROR("dup: failed to get next fd: {any}", .{err});
             return errors.EMFILE;
         };
+        file.ref.ref();
         try krn.task.current.files.setFD(new_fd, file);
         return new_fd;
     }
@@ -56,8 +58,8 @@ pub fn fcntl64(fd: u32, cmd: u32, arg: u32) !u32 {
         );
         switch (cmd) {
             F_DUPFD => {
-                // TO DO: find lowest fd >= arg
-                return try dup2(fd, arg + 1);
+                const new_fd = try krn.task.current.files.getNextFromFD(arg);
+                return try dup2(fd, new_fd);
             },
             F_GETFD => {
                 return 0; // close_on_exec not supported
@@ -73,8 +75,8 @@ pub fn fcntl64(fd: u32, cmd: u32, arg: u32) !u32 {
                 return 0;
             },
             F_DUPFD_CLOEXEC => {
-                // TO DO: find lowest fd >= arg
-                return try dup2(fd, arg + 1);
+                const new_fd = try krn.task.current.files.getNextFromFD(arg);
+                return try dup2(fd, new_fd);
             },
             else => return errors.EINVAL,
         }

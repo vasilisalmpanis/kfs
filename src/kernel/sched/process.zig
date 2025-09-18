@@ -120,6 +120,10 @@ pub fn getPGID(pid_arg: u32) !u32 {
 }
 
 pub fn setPGID(pid_arg: u32, pgid_arg: u32) !u32 {
+    krn.logger.DEBUG(
+        "setpgid pid {d}, pgid {d}",
+        .{pid_arg, pgid_arg}
+    );
     const pid: i32 = @intCast(pid_arg);
     const pgid: i32 = @intCast(pgid_arg);
     if (pid < 0) {

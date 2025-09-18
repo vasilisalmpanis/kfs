@@ -18,6 +18,7 @@ pub fn syscallsManager(state: *arch.Regs) void {
         and sys != .SYS_read
         and sys != .SYS_writev
         and sys != .SYS_pwritev
+        and sys != .SYS_poll
     ) {
         krn.logger.INFO("[PID {d:<2}]: {d:>4} {t}", .{
             tsk.current.pid,

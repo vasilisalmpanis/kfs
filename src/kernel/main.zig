@@ -52,3 +52,4 @@ pub const do_open = @import("./syscalls/open.zig").do_open;
 pub const do_mount = @import("./syscalls/mount.zig").do_mount;
 pub const do_umount = @import("./syscalls/mount.zig").do_umount;
 pub const dup2 = @import("./syscalls/dup.zig").dup2;
+pub const kill = @import("./syscalls/kill.zig").kill;
