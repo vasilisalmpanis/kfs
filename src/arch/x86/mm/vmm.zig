@@ -331,8 +331,7 @@ pub const VMM = struct {
 
             // Add range validation to prevent integer overflow
             if (pt_start_idx >= pt_end) {
-                pt_start_idx = 0;
-                continue;
+                @panic("VMM.dupArea() pt_start_idx >= pt_end!");
             }
 
             // Either allocate or map the already existing page table
@@ -407,20 +406,26 @@ pub const VMM = struct {
             pt += 0x400 * pd_idx;
 
             if (pt_start_idx >= pt_end) {
-                pt_start_idx = 0;
-                continue;
+                @panic("VMM.releaseArea() pt_start_idx >= pt_end!");
             }
 
             for (pt_start_idx .. pt_end) |pt_idx| {
                 if (pt[pt_idx] != 0) {
-                    const phys: u32 = pt[pt_idx] >> 12;
-                    self.pmm.freePage(phys);
-                    pt[pt_idx] = 0; // Clear the PTE
+                    self.unmapPage(
+                        self.pageTableToAddr(
+                            pd_idx,
+                            pt_idx,
+                        ),
+                        true
+                    );
                 }
             }
             if (std.mem.allEqual(u32, pt[0..1024], 0)) {
                 self.pmm.freePage(pd[pd_idx] >> 12);
                 pd[pd_idx] = 0;
+                invalidatePage(
+                    self.pageTableToAddr(pd_idx, 0)
+                );
             }
 
             pt_start_idx = 0;
