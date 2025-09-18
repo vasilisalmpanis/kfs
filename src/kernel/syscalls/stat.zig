@@ -52,6 +52,7 @@ pub fn do_stat64(inode: *fs.Inode, buf: *Stat) !void {
     buf.__padding = 0;
     buf.__pad0 = 0;
     buf.st_mode = @intCast(mode);
+    krn.logger.INFO("mode {any}\n", .{mode});
     buf.st_uid = @intCast(inode.uid);
     buf.st_gid = @intCast(inode.gid);
     const dev: u16 = @bitCast(inode.dev_id);
@@ -126,6 +127,7 @@ pub fn fstatat64(
         defer from_path.release();
         const target = try fs.path.resolveFrom(path_slice, from_path);
         defer target.release();
+        krn.logger.INFO(" target {s} {any}\n", .{target.dentry.name, target.dentry.inode.mode.isDir()});
         try do_stat64(target.dentry.inode, buf.?);
         return 0;
     } 
