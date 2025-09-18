@@ -20,11 +20,10 @@ pub fn exit(error_code: i32) !u32 {
     tsk.current.files.map.deinit();
     tsk.current.fs.pwd.release();
     tsk.current.fs.root.release();
+    if (tsk.current.mm) |_mm| {
+        _mm.releaseMappings();
+    }
 
-    // TODO: Big one. Free memory mappings.
-    // This means that in mm dup we already copied the mappings
-    // which we don't do. We need to start by fixing this for fork
-    // and then free them here.
     tsk.current.result = error_code;
     tsk.current.state = .ZOMBIE;
     if (tsk.current.tree.parent) |p| {

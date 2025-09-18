@@ -33,9 +33,88 @@ pub fn mmap2(
         if (hint < krn.task.current.mm.?.heap)
             hint = krn.task.current.mm.?.heap;
     } else {
-        hint = krn.task.current.mm.?.heap;
-        krn.logger.INFO("heap_start mmap {x}\n", .{krn.task.current.mm.?.heap});
         // look through mappings and just give back one.
+        hint = krn.task.current.mm.?.heap;
     }
     return try krn.task.current.mm.?.mmap_area(hint, len, prot, flags);
+}
+
+pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
+    if (task_mm.vmas) |head| {
+        var current_node: ?*krn.list.ListHead = &head.list;
+
+        while (current_node) |node| {
+            const vma = node.entry(krn.mm.VMA, "list");
+            if (vma.start > end)
+                break;
+            const next_node = if (node.next == &head.list) null else node.next;
+
+            // Check if this VMA overlaps with the unmap range
+            if (vma.end <= start or vma.start >= end) {
+                current_node = next_node;
+                continue;
+            }
+
+            if (vma.start >= start and vma.end <= end) {
+                // 1. Remove the whole mapping.
+                if (node == &head.list) {
+                    if (next_node) |next| {
+                        task_mm.vmas = next.entry(krn.mm.VMA, "list");
+                    } else {
+                        task_mm.vmas = null;
+                    }
+                }
+
+                node.del();
+                krn.mm.virt_memory_manager.releaseArea(vma.start, vma.end, vma.flags.TYPE);
+                krn.mm.kfree(vma);
+            } else if (vma.start < start and vma.end > end) {
+                // 2. Split mapping into 2 parts.
+                const new_vma = mm.VMA.allocEmpty();
+                if (new_vma == null) return errors.ENOMEM;
+                new_vma.?.start = end;
+                new_vma.?.end = vma.end;
+                new_vma.?.mm = task_mm;
+                new_vma.?.prot = vma.prot;
+                new_vma.?.flags = vma.flags;
+                new_vma.?.mm = task_mm;
+                vma.end = start;
+                node.add(&new_vma.?.list);
+
+                krn.mm.virt_memory_manager.releaseArea(start, end, vma.flags.TYPE);
+            } else if (vma.start < start and vma.end > start) {
+                // 3. Partially remove mapping from the end.
+                krn.mm.virt_memory_manager.releaseArea(start, vma.end, vma.flags.TYPE);
+                vma.end = start;
+
+            } else if (vma.start < end and vma.end > end) {
+                // 4. Partially remove mapping from the beginning.
+                krn.mm.virt_memory_manager.releaseArea(vma.start, end, vma.flags.TYPE);
+                vma.start = end;
+            }
+
+            current_node = next_node;
+        }
+    }
+    return 0;
+}
+
+// munmap() removes any mappings in the specified address range, and causes further references to
+// addresses within the range to generate invalid memory references.
+// It is not an error if the indicated range does not contain any mapped pages.
+//
+// On success, munmap() returns 0, on failure -1, and errno is set (probably to
+pub fn munmap(
+    addr: ?*anyopaque,
+    length: u32,
+) !u32 {
+    const len: u32 = arch.pageAlign(length, false);
+    const start: u32 = @intFromPtr(addr);
+    if (start & (arch.PAGE_SIZE - 1) > 0)
+        return errors.EINVAL;
+    if (start + len > krn.mm.PAGE_OFFSET)
+        return errors.EINVAL;
+    if (krn.task.current.mm == null)
+        return errors.EINVAL;
+    return try do_munmap(krn.task.current.mm.?, start, start + len);
 }

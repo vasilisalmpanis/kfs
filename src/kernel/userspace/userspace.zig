@@ -2,21 +2,33 @@ const std = @import("std");
 const arch = @import("arch");
 const krn = @import("../main.zig");
 
+// ELF constants
+const EI_CLASS = 4;
+const EI_DATA = 5;
+const EI_VERSION = 6;
+
+const ELFCLASS32 = 1;
+const ELFCLASS64 = 2;
+
+const ELFDATA2LSB = 1;
+
+const EV_CURRENT = 1;
+
 const PT_TYPE = enum (u32) {
     PT_NULL = 0,
     PT_LOAD = 1,
+    PT_DYNAMIC = 2,
+    PT_INTERP = 3,
     _,
 };
 
-const HeaderFlags = packed struct (u32) {
-    exec: bool,
-    write: bool,
-    read: bool,
-    _pad: u29,
+pub const argv_init: []const []const u8 = &[_][]const u8{
+    "init",
 };
-
-const argv_init: [1][]const u8 = .{ "init" };
-const envp_init: [2][]const u8 = .{ "HOME=/", "TERM=kfs" };
+pub const envp_init: []const []const u8 = &[_][]const u8{
+    "HOME=/",
+    "TERM=kfs",
+};
 
 const AuxEntry = struct {
     key: u32,
@@ -34,77 +46,90 @@ const auxv: [2]AuxEntry = .{
     }
 };
 
-pub fn goUserspace(userspace: []const u8) void {
-    const stack_pages: u32 = 40;
-    const userspace_offset: u32 = 0x1000;
-    var heap_start: u32 = 0;
+pub const ElfValidationError = error {
+    InvalidMagic,
+    UnsupportedClass,
+    UnsupportedEndianness,
+    UnsupportedVersion,
+    UnsupportedMachine,
+    InvalidHeaderSize,
+    FileTooSmall,
+    Dynamic,
+};
 
-    // krn.mm.virt_memory_manager.mapPage(
-    //     0,
-    //     krn.mm.virt_memory_manager.pmm.allocPage(),
-    //     .{.user = true}
-    // );
+pub fn validateElfHeader(userspace: []const u8) !void{
+
+    if (userspace.len < @sizeOf(std.elf.Elf32_Ehdr)) {
+        return ElfValidationError.FileTooSmall;
+    }
+
+    if (!std.mem.eql(u8, userspace[0..4], &[4]u8{0x7F, 'E', 'L', 'F'})) {
+        return ElfValidationError.InvalidMagic;
+    }
+
+    const ei_class = userspace[EI_CLASS];
+    if (ei_class != ELFCLASS32)
+        return ElfValidationError.UnsupportedClass;
+
+    const ei_data = userspace[EI_DATA];
+    if (ei_data != ELFDATA2LSB) {
+        return ElfValidationError.UnsupportedEndianness;
+    }
+    const ei_version = userspace[EI_VERSION];
+    if (ei_version != EV_CURRENT) {
+        return ElfValidationError.UnsupportedVersion;
+    }
+
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
-    for (0..ehdr.e_phnum) |i| {
-        const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
-            @constCast(@alignCast(&userspace[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
-        );
-        const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
-        if (header_type != PT_TYPE.PT_LOAD) {
-            continue;
-        }
-        var num_pages = p_hdr.p_memsz / arch.PAGE_SIZE;
-        if (!arch.isPageAligned(p_hdr.p_memsz))
-            num_pages += 1;
-        const phys = krn.mm.virt_memory_manager.pmm.allocPages(num_pages);
-        if (phys == 0)
-            @panic("Cannot go to userspace");
-        for (0..num_pages) |idx| {
-            krn.mm.virt_memory_manager.mapPage(
-                p_hdr.p_vaddr + (idx * arch.PAGE_SIZE),
-                phys + (idx * arch.PAGE_SIZE),
-                .{ .user = true, }
-            );
-        }
-        const section_ptr: [*]u8 = @ptrFromInt(p_hdr.p_vaddr);
-        if (p_hdr.p_filesz > 0) {
-            @memcpy(
-                section_ptr[0..p_hdr.p_filesz],
-                userspace[p_hdr.p_offset..p_hdr.p_offset + p_hdr.p_filesz]
-            );
-        }
-        if (p_hdr.p_memsz > p_hdr.p_filesz) {
-            @memset(section_ptr[p_hdr.p_filesz..p_hdr.p_memsz], 0);
-        }
-        if (p_hdr.p_vaddr + p_hdr.p_memsz > heap_start)
-            heap_start = p_hdr.p_vaddr + p_hdr.p_memsz;
-    }
-    const stack_size: u32 = stack_pages * arch.PAGE_SIZE;
-    const stack_phys: u32 = krn.mm.virt_memory_manager.pmm.allocPages(stack_size / arch.PAGE_SIZE);
-    if (stack_phys == 0)
-        @panic("cannot allocate stack\n");
-    const stack_bottom: u32 = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE;
-    for (0..stack_pages) |idx| {
-        krn.mm.virt_memory_manager.mapPage(
-            stack_bottom + idx * arch.PAGE_SIZE,
-            stack_phys + (idx * arch.PAGE_SIZE),
-            .{ .user = true }
-        );
-    }
-    const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
-    @memset(stack_ptr[0..stack_size], 0);
 
+    if (ehdr.e_machine != std.elf.EM.@"386") {
+        return ElfValidationError.UnsupportedMachine;
+    }
+
+    if (ehdr.e_ehsize != @sizeOf(std.elf.Elf32_Ehdr)) {
+        return ElfValidationError.InvalidHeaderSize;
+    }
+
+    const is_statically_linked = checkStaticLinking32(userspace, ehdr);
+    if (!is_statically_linked)
+        return ElfValidationError.Dynamic;
+}
+
+fn checkStaticLinking32(userspace: []const u8, ehdr: *const std.elf.Elf32_Ehdr) bool {
+    var has_interp = false;
+    var has_dynamic = false;
+
+    for (0..ehdr.e_phnum) |i| {
+        if (ehdr.e_phoff + (ehdr.e_phentsize * i) + @sizeOf(std.elf.Elf32_Phdr) > userspace.len) {
+            break;
+        }
+
+        const p_hdr: *const std.elf.Elf32_Phdr = @ptrCast(
+            @alignCast(&userspace[ehdr.e_phoff + (ehdr.e_phentsize * i)])
+        );
+
+        const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
+        switch (header_type) {
+            .PT_INTERP => has_interp = true,
+            .PT_DYNAMIC => has_dynamic = true,
+            else => {},
+        }
+    }
+    return !has_interp and !has_dynamic;
+}
+
+pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const u8, envp: []const []const u8) u32{
     // Auxiliary vector
     var argv_str_size: u32 = 0;
-    for (argv_init) |arg| {
+    for (argv) |arg| {
         argv_str_size += arg.len + 1;
     }
     var envp_str_size: u32 = 0;
-    for (envp_init) |env| {
+    for (envp) |env| {
         envp_str_size += env.len + 1;
     }
-    const argv_ptr_size = @sizeOf(u32) * (argv_init.len + 1);
-    const envp_ptr_size = @sizeOf(u32) * (envp_init.len + 1);
+    const argv_ptr_size = @sizeOf(u32) * (argv.len + 1);
+    const envp_ptr_size = @sizeOf(u32) * (envp.len + 1);
     const auxv_size = @sizeOf(AuxEntry) * auxv.len;
     const argc_size = @sizeOf(u32);
     const end_marker_size = @sizeOf(u32);
@@ -122,11 +147,11 @@ pub fn goUserspace(userspace: []const u8) void {
     var ptr_off: u32 = 0;
     
     // Set argc
-    pointers[ptr_off] = argv_init.len;
+    pointers[ptr_off] = argv.len;
     ptr_off += 1;
 
     // Set argv
-    for (argv_init) |arg| {
+    for (argv) |arg| {
         @memcpy(strings[str_off..str_off + arg.len], arg);
         strings[str_off + arg.len] = 0;
         pointers[ptr_off] = @intFromPtr(&strings[str_off]);
@@ -137,7 +162,7 @@ pub fn goUserspace(userspace: []const u8) void {
     ptr_off += 1;
 
     // Set envp
-    for (envp_init) |env| {
+    for (envp) |env| {
         @memcpy(strings[str_off..str_off + env.len], env);
         strings[str_off + env.len] = 0;
         pointers[ptr_off] = @intFromPtr(&strings[str_off]);
@@ -156,8 +181,72 @@ pub fn goUserspace(userspace: []const u8) void {
         aux_ptr[ptr_off] = aux;
         ptr_off += 1;
     }
+    return stack_ptr_addr;
+}
 
-    krn.logger.INFO("Userspace code:  0x{X:0>8}", .{userspace_offset});
+pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) void {
+    validateElfHeader(userspace) catch |err| {
+        krn.logger.ERROR("ELF validation failed: {}\n", .{err});
+        while (true) {}
+        return;
+    };
+
+    krn.logger.INFO("Binary validation: 32-bit and statically_linked\n", .{});
+
+    const stack_pages: u32 = 10;
+    var heap_start: u32 = 0;
+
+    const prot: u32 = krn.mm.PROC_RW;
+    const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
+    krn.logger.INFO("Goind to userspace {any}\n", .{ehdr});
+    for (0..ehdr.e_phnum) |i| {
+        const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
+            @constCast(@alignCast(&userspace[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
+        );
+        const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
+        if (header_type != PT_TYPE.PT_LOAD) {
+            continue;
+        }
+        var num_pages = p_hdr.p_memsz / arch.PAGE_SIZE;
+        if (!arch.isPageAligned(p_hdr.p_memsz))
+            num_pages += 1;
+
+        // Create anonymous mapping for each section
+        krn.logger.INFO("mapping 0x{x}-0x{x}\n", .{p_hdr.p_vaddr, arch.pageAlign(p_hdr.p_memsz,false)});
+        _ = krn.task.current.mm.?.mmap_area(
+            p_hdr.p_vaddr,
+            arch.pageAlign(p_hdr.p_memsz, false),
+            prot,
+            krn.mm.MAP.anonymous()
+        ) catch {return ;};
+        const section_ptr: [*]u8 = @ptrFromInt(p_hdr.p_vaddr);
+        if (p_hdr.p_filesz > 0) {
+            @memcpy(
+                section_ptr[0..p_hdr.p_filesz],
+                userspace[p_hdr.p_offset..p_hdr.p_offset + p_hdr.p_filesz]
+            );
+        }
+        if (p_hdr.p_memsz > p_hdr.p_filesz) {
+            @memset(section_ptr[p_hdr.p_filesz..p_hdr.p_memsz], 0);
+        }
+        if (p_hdr.p_vaddr + p_hdr.p_memsz > heap_start)
+            heap_start = p_hdr.p_vaddr + p_hdr.p_memsz;
+    }
+    const stack_size: u32 = stack_pages * arch.PAGE_SIZE;
+    var stack_bottom: u32 = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE;
+    stack_bottom = krn.task.current.mm.?.mmap_area(
+        stack_bottom,
+        stack_size,
+        prot,
+        krn.mm.MAP.anonymous()
+    ) catch {
+        @panic("Unable to go to userspace\n");
+    };
+    const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
+    @memset(stack_ptr[0..stack_size], 0);
+
+    const stack_ptr_addr: u32 = setEnvironment(stack_bottom, stack_size, argv, envp);
+
     krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack_bottom, stack_bottom + stack_size});
     krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{ehdr.e_entry});
 
@@ -166,7 +255,8 @@ pub fn goUserspace(userspace: []const u8) void {
     krn.logger.INFO("heap_start 0x{X:0>8}\n", .{heap_start});
     krn.mm.proc_mm.init_mm.heap = heap_start;
     krn.mm.proc_mm.init_mm.stack_bottom = stack_bottom;
-    krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size;// - arch.PAGE_SIZE;
+    krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size;
+    krn.task.current.tsktype = .PROCESS;
 
     asm volatile(
         \\ cli
