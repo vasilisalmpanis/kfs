@@ -198,6 +198,7 @@ pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []cons
 
     const prot: u32 = krn.mm.PROC_RW;
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
+
     krn.logger.INFO("Goind to userspace {any}\n", .{ehdr});
     for (0..ehdr.e_phnum) |i| {
         const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
@@ -211,11 +212,14 @@ pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []cons
         if (!arch.isPageAligned(p_hdr.p_memsz))
             num_pages += 1;
 
-        // Create anonymous mapping for each section
-        krn.logger.INFO("mapping 0x{x}-0x{x}\n", .{p_hdr.p_vaddr, arch.pageAlign(p_hdr.p_memsz,false)});
+        // Create anonymous mapping for each section with proper page alignment
+        const page_start = arch.pageAlign(p_hdr.p_vaddr, true);  // Round down to page boundary
+        const page_end = arch.pageAlign(p_hdr.p_vaddr + p_hdr.p_memsz, false);  // Round up to page boundary
+        const aligned_size = page_end - page_start;
+
         _ = krn.task.current.mm.?.mmap_area(
-            p_hdr.p_vaddr,
-            arch.pageAlign(p_hdr.p_memsz, false),
+            page_start,
+            aligned_size,
             prot,
             krn.mm.MAP.anonymous()
         ) catch {return ;};
