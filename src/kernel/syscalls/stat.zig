@@ -87,10 +87,21 @@ pub fn stat64(path: ?[*:0]u8, buf: ?*Stat) !u32 {
     return 0;
 }
 
-pub fn fstat64(fd: u32, buf: ?*Stat) !u32 {
+pub fn fstat(fd: u32, buf: ?*Stat) !u32 {
     if (buf == null) {
         return errors.EFAULT;
     } 
+    if (krn.task.current.files.fds.get(fd)) |file| {
+        try do_stat64(file.inode, buf.?);
+        return 0;
+    }
+    return errors.EBADF;
+}
+
+pub fn fstat64(fd: u32, buf: ?*Stat) !u32 {
+    if (buf == null) {
+        return errors.EFAULT;
+    }
     if (krn.task.current.files.fds.get(fd)) |file| {
         try do_stat64(file.inode, buf.?);
         return 0;
