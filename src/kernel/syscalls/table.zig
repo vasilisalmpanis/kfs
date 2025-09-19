@@ -18,7 +18,7 @@ fn notImpl(_: u32, _: u32, _: u32, _: u32, _: u32, _: u32) !u32 {
         state.eax,
         @tagName(@as(Syscall, @enumFromInt(state.eax)))
     });
-    return 0;
+    return errors.PosixError.EINVAL;
 }
 
 pub const SyscallTable = brk: {
@@ -37,7 +37,7 @@ pub const SyscallTable = brk: {
         .SYS_unlink                     = &notImpl,
         .SYS_execve                      = @ptrCast(&@import("exec.zig").execve),
         .SYS_chdir                      = @ptrCast(&@import("chdir.zig").chdir),
-        .SYS_time                       = &notImpl,
+        .SYS_time                       = @ptrCast(&@import("time.zig").time),
         .SYS_mknod                      = @ptrCast(&@import("mknod.zig").mknod),
         .SYS_chmod                      = &notImpl,
         .SYS_lchown                     = &notImpl,
@@ -69,7 +69,7 @@ pub const SyscallTable = brk: {
         .SYS_pipe                       = &notImpl,
         .SYS_times                      = &notImpl,
         .SYS_prof                       = &notImpl,
-        .SYS_brk                        = &notImpl,
+        .SYS_brk                        = @ptrCast(&@import("brk.zig").brk),
         .SYS_setgid                     = @ptrCast(&@import("../sched/process.zig").setGID),
         .SYS_getgid                     = @ptrCast(&@import("../sched/process.zig").getPID),
         .SYS_signal                     = &notImpl,
@@ -132,7 +132,7 @@ pub const SyscallTable = brk: {
         .SYS_getitimer                  = &notImpl,
         .SYS_stat                       = &notImpl,
         .SYS_lstat                      = &notImpl,
-        .SYS_fstat                      = &notImpl,
+        .SYS_fstat                      = @ptrCast(&@import("stat.zig").fstat64),
         .SYS_olduname                   = &notImpl,
         .SYS_iopl                       = &notImpl,
         .SYS_vhangup                    = &notImpl,
