@@ -4,6 +4,16 @@ const arch = @import("arch");
 const errors = @import("error-codes.zig").PosixError;
 const std = @import("std");
 
+pub fn freeSlices(
+    slice: []const []const u8,
+    len: u32
+) void {
+    for (0..len) |idx| {
+        krn.mm.kfree(slice[idx].ptr);
+    }
+    krn.mm.kfree(@ptrCast(slice.ptr));
+}
+
 pub fn doExecve(
     filename: []const u8,
     argv: []const []const u8,
@@ -23,23 +33,61 @@ pub fn doExecve(
     if (krn.task.current.mm) |_mm| {
         _mm.releaseMappings();
     }
-    krn.userspace.goUserspace(
+    try krn.userspace.prepareBinary(
         slice,
         argv,
         envp,
     );
+
+    freeSlices(argv, argv.len);
+    freeSlices(envp, envp.len);
+
+    krn.userspace.goUserspace();
     return 0;
+}
+
+pub fn dupStrings(array: [*:null]?[*:0]u8) ![][]u8 {
+    var len: u32 = 0;
+    while (array[len] != null) {
+        len += 1;
+    }
+    const slice = if (krn.mm.kmallocSlice([]u8, len)) |s| s else return errors.ENOMEM;
+    for (0..len) |idx| {
+        const s_span = std.mem.span(array[idx].?);
+        if (krn.mm.kmallocArray(u8, s_span.len)) |string| {
+            @memcpy(string[0..s_span.len], s_span);
+            slice[idx] = string[0..s_span.len];
+        } else {
+            if (idx - 1 >= 0)
+                freeSlices(slice, idx - 1);
+            return errors.ENOMEM;
+        }
+    }
+    return slice;
 }
 
 pub fn execve(
     filename: ?[*:0]const u8,
+    u_argv: ?[*:null]?[*:0]u8,
+    u_envp: ?[*:null]?[*:0]u8,
 ) !u32 {
-    if (filename == null)
+    if (filename == null or u_argv == null or u_envp == null)
         return errors.EINVAL;
+    const argv: [*:null]?[*:0]u8 = u_argv.?;
+    const envp: [*:null]?[*:0]u8 = u_envp.?;
     const span = std.mem.span(filename.?);
-    return doExecve(
+
+    // New argv
+    const argv_slice = try dupStrings(argv);
+    errdefer freeSlices(argv_slice, argv_slice.len);
+
+    // New envp
+    const envp_slice = try dupStrings(envp);
+    errdefer freeSlices(envp_slice, envp_slice.len);
+
+    return try doExecve(
         span,
-        krn.userspace.argv_init,
-        krn.userspace.envp_init,
+        argv_slice,
+        envp_slice,
     );
 }
