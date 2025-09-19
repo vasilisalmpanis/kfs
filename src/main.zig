@@ -85,11 +85,14 @@ fn user_thread(_: ?*const anyopaque) i32 {
     krn.task.current.mm = krn.task.initial_task.mm;
     krn.task.current.fs = krn.task.initial_task.fs;
     krn.task.current.files = krn.task.initial_task.files;
-    krn.userspace.goUserspace(
+    krn.userspace.prepareBinary(
         @embedFile("userspace"),
         krn.userspace.argv_init,
         krn.userspace.envp_init,
-    );
+    ) catch {
+        @panic("We cannot go to userspace");
+    };
+    krn.userspace.goUserspace();
     return 0;
 }
 

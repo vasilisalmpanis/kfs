@@ -118,7 +118,7 @@ fn checkStaticLinking32(userspace: []const u8, ehdr: *const std.elf.Elf32_Ehdr) 
     return !has_interp and !has_dynamic;
 }
 
-pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const u8, envp: []const []const u8) u32{
+pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const u8, envp: []const []const u8) void {
     // Auxiliary vector
     var argv_str_size: u32 = 0;
     for (argv) |arg| {
@@ -151,6 +151,8 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
     ptr_off += 1;
 
     // Set argv
+    krn.task.current.mm.?.arg_start = stack_ptr_addr;
+    krn.task.current.mm.?.arg_end = stack_ptr_addr + argv_ptr_size;
     for (argv) |arg| {
         @memcpy(strings[str_off..str_off + arg.len], arg);
         strings[str_off + arg.len] = 0;
@@ -162,6 +164,8 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
     ptr_off += 1;
 
     // Set envp
+    krn.task.current.mm.?.env_start = stack_ptr_addr + argv_ptr_size;
+    krn.task.current.mm.?.env_end = krn.task.current.mm.?.env_start + envp_ptr_size;
     for (envp) |env| {
         @memcpy(strings[str_off..str_off + env.len], env);
         strings[str_off + env.len] = 0;
@@ -181,10 +185,10 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
         aux_ptr[ptr_off] = aux;
         ptr_off += 1;
     }
-    return stack_ptr_addr;
+    krn.task.current.mm.?.arg_start = stack_ptr_addr;
 }
 
-pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) void {
+pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) !void {
     validateElfHeader(userspace) catch |err| {
         krn.logger.ERROR("ELF validation failed: {}\n", .{err});
         while (true) {}
@@ -249,7 +253,7 @@ pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []cons
     const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
     @memset(stack_ptr[0..stack_size], 0);
 
-    const stack_ptr_addr: u32 = setEnvironment(stack_bottom, stack_size, argv, envp);
+    setEnvironment(stack_bottom, stack_size, argv, envp);
 
     krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack_bottom, stack_bottom + stack_size});
     krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{ehdr.e_entry});
@@ -257,10 +261,14 @@ pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []cons
     arch.gdt.tss.esp0 = krn.task.current.regs.esp;
     heap_start = arch.pageAlign(heap_start, false);
     krn.logger.INFO("heap_start 0x{X:0>8}\n", .{heap_start});
-    krn.mm.proc_mm.init_mm.heap = heap_start;
-    krn.mm.proc_mm.init_mm.stack_bottom = stack_bottom;
-    krn.mm.proc_mm.init_mm.stack_top = stack_bottom + stack_size;
+    krn.task.current.mm.?.heap = heap_start;
+    krn.task.current.mm.?.stack_bottom = stack_bottom;
+    krn.task.current.mm.?.stack_top = stack_bottom + stack_size;
+    krn.task.current.mm.?.code = ehdr.e_entry;
     krn.task.current.tsktype = .PROCESS;
+}
+
+pub fn goUserspace() void {
 
     asm volatile(
         \\ cli
@@ -281,7 +289,7 @@ pub fn goUserspace(userspace: []const u8, argv: []const []const u8, envp: []cons
         \\ iret
         \\
         ::
-        [uc] "r" (ehdr.e_entry),
-        [us] "r" (stack_ptr_addr),
+        [uc] "r" (krn.task.current.mm.?.code),
+        [us] "r" (krn.task.current.mm.?.arg_start),
     );
 }
