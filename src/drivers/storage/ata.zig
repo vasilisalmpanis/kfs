@@ -10,6 +10,7 @@ const lst = kernel.list;
 const pci = @import("../pci/device.zig");
 const driver = @import("../main.zig");
 const ata = @import("device.zig");
+const part = @import("./partitions.zig");
 
 // BUS MASTER IDE
 const BMIDE_COMMAND             = 0x00;
@@ -184,7 +185,13 @@ const ChannelType = enum {
 
 var current_channel: ChannelType = .PRIMARY_MASTER;
 
-const ATADrive = struct {
+const Partition = struct {
+    start_sector: u32 = 0,
+    end_sector: u32 = 0,
+};
+
+
+pub const ATADrive = struct {
     name: [41]u8 = .{0} ** 41,
     channel: ChannelType = .PRIMARY_MASTER,
 
@@ -212,6 +219,8 @@ const ATADrive = struct {
     dma_buff_phys: u32 = 0,
     dma_buff_virt: u32 = 0,
     dma_initialized: bool = false,
+
+    partitions: []Partition = undefined,
 
     pub const SECTOR_SIZE = 512;
     pub const DMA_BUFFER_PAGES = 8;
@@ -410,7 +419,7 @@ const ATADrive = struct {
         return;
     }
 
-    fn readSectorsDMA(self: *const ATADrive, lba: u32, num_sectors: u8) !void {
+    pub fn readSectorsDMA(self: *const ATADrive, lba: u32, num_sectors: u8) !void {
         self.selectDeviceLBA(lba);
         if (!self.dma_initialized or !self.waitReady()) {
             kernel.logger.ERROR("Drive not ready", .{});
@@ -752,6 +761,7 @@ fn ata_probe(device: *driver.storage.StorageDevice) !void {
         .{drive.channel, drive.name}
     );
     drive.initDMA();
+    try part.parsePartitionTable(drive);
     try driver.bdev.addBdev(&device.dev, kernel.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0});
     // Create block device for drive
     // Maybe: think about creating bdevs for partitions

@@ -8,3 +8,4 @@ psf2arr*
 userspace_c
 *.img
 zls.json
+disk/*.img
