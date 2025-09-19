@@ -565,8 +565,8 @@ fn execve(self: *Shell, args: [][]const u8) void {
         var buffer: [64]u8 = .{0} ** 64;
         @memcpy(buffer[0..args[0].len], args[0]);
         buffer[args[0].len] = 0;
-        const argv: [*:null]const ?[*:0]const u8 = @ptrCast(&[_]?[*:0]const u8{ null });
-        const envp: [*:null]const ?[*:0]const u8 = @ptrCast(&[_]?[*:0]const u8{ null });
+        const argv: [*:null]const ?[*:0]const u8 = @ptrCast(&[_]?[*:0]const u8{ "ls", null });
+        const envp: [*:null]const ?[*:0]const u8 = @ptrCast(&[_]?[*:0]const u8{ "TERM=hello", "whatever=whatever", null });
         _ = self;
         std.posix.execveZ(@ptrCast(&buffer), argv, envp) catch  {return;};
             // self.print("exec failed: {}\n", .{err});
