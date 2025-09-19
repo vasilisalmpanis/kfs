@@ -52,7 +52,7 @@ pub fn mmap2(
         // look through mappings and just give back one.
         hint = krn.task.current.mm.?.heap;
     }
-    return try krn.task.current.mm.?.mmap_area(hint, len, prot, flags);
+    return try krn.task.current.mm.?.mmap_area(hint, len, prot | mm.PROT_WRITE, flags);
 }
 
 pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
