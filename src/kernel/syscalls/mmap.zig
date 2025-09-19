@@ -3,6 +3,22 @@ const arch = @import("arch");
 const krn = @import("../main.zig");
 const mm = @import("../mm/proc_mm.zig");
 
+const mmap_struct = extern struct {
+	addr: u32,
+	len: u32,
+	prot: u32,
+	flags: u32,
+	fd: u32,
+	offset: u32,
+};
+
+pub fn mmap(
+    arg: ?*mmap_struct
+) !u32 {
+    krn.logger.INFO("length {x}\n", .{arg.?.len});
+    return try mmap2(@ptrFromInt(arg.?.addr), arg.?.len, arg.?.prot, @bitCast(arg.?.flags), -1, 0);
+}
+
 pub fn mmap2(
     addr: ?*anyopaque,
     length: u32,
