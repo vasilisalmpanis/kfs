@@ -8,6 +8,8 @@ USERSPACE_DIR = userspace
 IMG 	= ext2.img
 IMG_DIR = ext2_dir
 
+GPT_DISK = disk/disk.img
+
 OS = linux
 ifeq ($(shell uname -s),Darwin)
 	OS = macos
@@ -47,7 +49,8 @@ qemu: $(NAME) $(IMG)
 	$(QEMU) $(KVM) \
 		-cdrom $(NAME) \
 		-serial stdio \
-		-drive file=${IMG},format=raw
+		-drive file=${IMG},format=raw \
+		-drive file=${GPT_DISK},format=raw
 
 debug: $(NAME)
 	$(QEMU) -cdrom $(NAME) -s -S &
