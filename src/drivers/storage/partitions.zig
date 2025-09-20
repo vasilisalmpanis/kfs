@@ -78,7 +78,7 @@ const GPTEntry = extern struct {
     attrib: u64,
     name: [72]u8,
 
-    pub fn eqlZero(self: *GPTEntry) bool {
+    pub fn isEmpty(self: *GPTEntry) bool {
         return std.mem.allEqual(u8, self.PGUID[0..16], 0);
     }
 };
@@ -121,41 +121,36 @@ pub fn parsePartitionTable(drive: *ata.ATADrive) !void {
                     offset = 0;
                 }
                 defer offset += entry_size;
-                const first_entry: *GPTEntry = @ptrFromInt(drive.dma_buff_virt + offset);
-
-                if (first_entry.eqlZero())
+                const part_entry: *GPTEntry = @ptrFromInt(drive.dma_buff_virt + offset);
+                if (part_entry.isEmpty())
                     continue;
                 part_num += 1;
                 if (krn.mm.kmalloc(Partition)) |part| {
-                    part.start_lba = @intCast(first_entry.slba);
-                    part.end_lba = @intCast(first_entry.elba);
-                    @memcpy(part.PGUID[0..16], first_entry.PGUID[0..16]);
-                    @memcpy(part.GUID[0..16], first_entry.GUID[0..16]);
+                    part.start_lba = @intCast(part_entry.slba);
+                    part.end_lba = @intCast(part_entry.elba);
+                    @memcpy(part.PGUID[0..16], part_entry.PGUID[0..16]);
+                    @memcpy(part.GUID[0..16], part_entry.GUID[0..16]);
                     var len: u32 = 0;
                     for (0..72) |idx| {
-                        if (first_entry.name[idx] != 0)
+                        if (part_entry.name[idx] != 0)
                             len += 1;
                     }
-                    // const span = std.mem.span(@as([*:0]u8, @ptrCast(&first_entry.name)));
                     if (krn.mm.kmallocSlice(u8, len)) |name| {
                         var curr: u32 = 0;
                         for (0..72) |idx| {
-                            if (first_entry.name[idx] != 0) {
-                                name[curr] = first_entry.name[idx];
+                            if (part_entry.name[idx] != 0) {
+                                name[curr] = part_entry.name[idx];
                                 curr += 1;
                             }
                         }
-                        krn.logger.INFO("partition name len {d} {s}\n", .{len, name});
                         part.name = name;
                         try drive.partitions.append(
                             krn.mm.kernel_allocator.allocator(),
                             part
                         );
-
                     }
                 }
             }
-
         } else {
             krn.logger.ERROR("Wrong GPT magic of {s}!", .{drive.name});
             return krn.errors.PosixError.ENODEV;
@@ -163,4 +158,32 @@ pub fn parsePartitionTable(drive: *ata.ATADrive) !void {
     }
 }
 
-fn parseGPT() void {}
+pub fn allocPartName(base: []const u8, idx: usize) ![]const u8 {
+    var buff: [10] u8 = undefined;
+    const idx_len = std.fmt.printInt(
+        buff[0..10],
+        idx,
+        10,
+        .lower,
+        .{}
+    );
+    if (krn.mm.kmallocSlice(u8, base.len + idx_len)) |name| {
+        @memcpy(name[0..base.len], base);
+        @memcpy(name[base.len..base.len + idx_len], buff[0..idx_len]);
+        return name;
+    }
+    return krn.errors.PosixError.ENOMEM;
+}
+
+pub fn getPartIdx(name: []const u8) !usize {
+    for (0..name.len) |idx| {
+        if (std.ascii.isDigit(name[idx])) {
+            return try std.fmt.parseInt(
+                usize,
+                name[idx..name.len],
+                10
+            );
+        }
+    }
+    return 0;
+}
