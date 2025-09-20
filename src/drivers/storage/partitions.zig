@@ -2,6 +2,15 @@ const std = @import("std");
 const ata = @import("ata.zig");
 const krn = @import("kernel");
 
+
+pub const Partition = struct {
+    name: []u8,
+    PGUID: [16]u8,
+    GUID: [16]u8,
+    start_lba: u32 = 0,
+    end_lba: u32 = 0,
+};
+
 const GPT_Prot = 0xee;
 
 const MasterBootRecord = extern struct {
@@ -17,32 +26,27 @@ const GUID = extern struct {
     a: u32,
     b: u16,
     c: u16,
-    d: u16,
-    e: u16,
-    f: u32,
+    d: [8]u8,
 
     pub fn init() GUID {
         return GUID{
             .a = 0,
             .b = 0,
             .c = 0,
-            .d = 0,
-            .e = 0,
-            .f = 0,
+            .d = .{0} ** 8,
         };
     }
 
     pub fn toSting(self: *GUID, buff: []u8) !void {
         _ = try std.fmt.bufPrint(
             buff,
-            "{X}-{X}-{X}-{X}-{X}-{X}",
+            "{X}-{X}-{X}-{X}-{X}",
             .{
                 self.a,
                 self.b,
                 self.c,
-                self.d,
-                self.e,
-                self.f,
+                self.d[0..2],
+                self.d[2..8],
             }
         );
     }
@@ -64,6 +68,21 @@ const GPTTableHeader = extern struct {
     part_entry_size: u32 = 0,
     part_entry_arr_CRC32: u32 = 0,
 };
+
+
+const GPTEntry = extern struct {
+    PGUID: [16]u8,
+    GUID: [16]u8,
+    slba: u64,
+    elba: u64,
+    attrib: u64,
+    name: [72]u8,
+
+    pub fn eqlZero(self: *GPTEntry) bool {
+        return std.mem.allEqual(u8, self.PGUID[0..16], 0);
+    }
+};
+
 
 pub fn parsePartitionTable(drive: *ata.ATADrive) !void {
     try drive.readSectorsDMA(0, 1);
@@ -88,6 +107,54 @@ pub fn parsePartitionTable(drive: *ata.ATADrive) !void {
                 guid_buf[0..36],
                 header.*
             });
+            // const part_num = header.part_entry_count;
+            var curr_lba: u32 = @intCast(header.part_entry_arr_LBA);
+            var offset: u32 = 0;
+            const entry_size: u32 = header.part_entry_size;
+            const part_count = header.part_entry_count;
+            try drive.readSectorsDMA(@intCast(curr_lba), 1);
+            var part_num: u32 = 0;
+            for (0..part_count) |_| {
+                if (offset >= ata.ATADrive.SECTOR_SIZE) {
+                    curr_lba += 1;
+                    try drive.readSectorsDMA(@intCast(curr_lba), 1);
+                    offset = 0;
+                }
+                defer offset += entry_size;
+                const first_entry: *GPTEntry = @ptrFromInt(drive.dma_buff_virt + offset);
+
+                if (first_entry.eqlZero())
+                    continue;
+                part_num += 1;
+                if (krn.mm.kmalloc(Partition)) |part| {
+                    part.start_lba = @intCast(first_entry.slba);
+                    part.end_lba = @intCast(first_entry.elba);
+                    @memcpy(part.PGUID[0..16], first_entry.PGUID[0..16]);
+                    @memcpy(part.GUID[0..16], first_entry.GUID[0..16]);
+                    var len: u32 = 0;
+                    for (0..72) |idx| {
+                        if (first_entry.name[idx] != 0)
+                            len += 1;
+                    }
+                    // const span = std.mem.span(@as([*:0]u8, @ptrCast(&first_entry.name)));
+                    if (krn.mm.kmallocSlice(u8, len)) |name| {
+                        var curr: u32 = 0;
+                        for (0..72) |idx| {
+                            if (first_entry.name[idx] != 0) {
+                                name[curr] = first_entry.name[idx];
+                                curr += 1;
+                            }
+                        }
+                        krn.logger.INFO("partition name len {d} {s}\n", .{len, name});
+                        part.name = name;
+                        try drive.partitions.append(
+                            krn.mm.kernel_allocator.allocator(),
+                            part
+                        );
+
+                    }
+                }
+            }
 
         } else {
             krn.logger.ERROR("Wrong GPT magic of {s}!", .{drive.name});
