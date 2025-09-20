@@ -14,6 +14,7 @@ const krn = @import("../main.zig");
 extern const stack_top: u32;
 
 fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
+    @setRuntimeSafety(false);
     from.regs = state.*;
     from.regs.esp = @intFromPtr(state);
     tsk.current = to;

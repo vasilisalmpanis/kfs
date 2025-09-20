@@ -32,6 +32,9 @@ pub export fn exceptionHandler(state: *Regs) callconv(.c) void {
 }
 
 pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
+    @setRuntimeSafety(false);
+    if (@intFromPtr(state) % 4 != 0)
+        krn.logger.WARN("IRQ: Unaligned stack address {x}\n", .{@intFromPtr(state)});
     var new_state: *Regs = state;
     if (krn.irq.handlers[state.int_no] != null) {
         if (state.int_no == SYSCALL_INTERRUPT) {
