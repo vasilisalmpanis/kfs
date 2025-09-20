@@ -825,6 +825,15 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
         }
         
         const lba: u32 = start_lba + file.pos / ATADrive.SECTOR_SIZE;
+        if (part_idx != 0) {
+            const partition = ata_dev.partitions.items[part_idx - 1];
+            if (lba > partition.end_lba) {
+                return 0;
+            }
+        } else {
+            if (lba > ata_dev.lba28)
+                return 0;
+        }
         // ata_dev.selectChannel();
         try ata_dev.readSectorsDMA(lba, 1);
         
@@ -844,7 +853,6 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
 fn ata_write(file: *kernel.fs.File, buff: [*]const u8, size: u32) !u32 {
     if( file.inode.data.dev) |d| {
         const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
-
         const part_idx = try part.getPartIdx(file.path.?.dentry.name);
         var start_lba: u32 = 0;
         if (part_idx != 0) {
@@ -853,6 +861,14 @@ fn ata_write(file: *kernel.fs.File, buff: [*]const u8, size: u32) !u32 {
         }
 
         const lba: u32 = start_lba + file.pos / ATADrive.SECTOR_SIZE;
+        if (part_idx != 0) {
+            const partition = ata_dev.partitions.items[part_idx - 1];
+            if (lba > partition.end_lba)
+                return kernel.errors.PosixError.ENOSPC;
+        } else {
+            if (lba > ata_dev.lba28)
+                return kernel.errors.PosixError.ENOSPC;
+        }
         const offset: u32 = file.pos % ATADrive.SECTOR_SIZE;
         var to_write = ATADrive.SECTOR_SIZE - offset;
 
