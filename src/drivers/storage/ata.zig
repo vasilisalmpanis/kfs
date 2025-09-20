@@ -185,12 +185,6 @@ const ChannelType = enum {
 
 var current_channel: ChannelType = .PRIMARY_MASTER;
 
-const Partition = struct {
-    start_sector: u32 = 0,
-    end_sector: u32 = 0,
-};
-
-
 pub const ATADrive = struct {
     name: [41]u8 = .{0} ** 41,
     channel: ChannelType = .PRIMARY_MASTER,
@@ -220,7 +214,7 @@ pub const ATADrive = struct {
     dma_buff_virt: u32 = 0,
     dma_initialized: bool = false,
 
-    partitions: []Partition = undefined,
+    partitions: std.ArrayList(*part.Partition) = std.ArrayList(*part.Partition){},
 
     pub const SECTOR_SIZE = 512;
     pub const DMA_BUFFER_PAGES = 8;
@@ -645,6 +639,7 @@ pub const ATAManager = struct {
         );
         if (kernel.mm.kmalloc(ATADrive)) |drive| {
             drive.* = device;
+            drive.partitions = std.ArrayList(*part.Partition){};
             errdefer kernel.mm.kfree(drive);
             try self.drives.append(
                 kernel.mm.kernel_allocator.allocator(),
@@ -763,6 +758,9 @@ fn ata_probe(device: *driver.storage.StorageDevice) !void {
     drive.initDMA();
     try part.parsePartitionTable(drive);
     try driver.bdev.addBdev(&device.dev, kernel.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0});
+    for (drive.partitions.items) |item| {
+        try driver.bdev.addDevFile(kernel.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0}, item.name, &device.dev);
+    }
     // Create block device for drive
     // Maybe: think about creating bdevs for partitions
 }

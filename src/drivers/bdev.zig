@@ -54,6 +54,28 @@ pub const bdev_default_ops: krn.fs.FileOps = .{
     .readdir = null,
 };
 
+pub fn addDevFile(mode: krn.fs.UMode, name: []const u8, device: *dev.Device) !void {
+    if (drivers.devfs_path.dentry.inode.ops.mknod) |_mknod| {
+        var new_mode  = mode;
+        new_mode.type = krn.fs.S_IFBLK;
+        _ = _mknod(drivers.devfs_path.dentry.inode,
+            name,
+            new_mode,
+            drivers.devfs_path.dentry,
+            device.id
+        ) catch |err| {
+            krn.logger.ERROR("mknod failed: {t}", .{err});
+            return err;
+        };
+    } else {
+        krn.logger.ERROR(
+            "No mknod operation in {s}\n", 
+            .{drivers.devfs_path.dentry.inode.sb.?.fs.name}
+        );
+        return krn.errors.PosixError.ENOSYS;
+    }
+}
+
 pub fn addBdev(device: *dev.Device, mode: krn.fs.UMode) !void {
     if (bdev_map.get((device.id))) |_d| {
         krn.logger.ERROR(
@@ -62,30 +84,11 @@ pub fn addBdev(device: *dev.Device, mode: krn.fs.UMode) !void {
         );
         return krn.errors.PosixError.EEXIST;
     }
+    bdev_map_mtx.lock();
+    defer bdev_map_mtx.unlock();
 
-    if (drivers.devfs_path.dentry.inode.ops.mknod) |_mknod| {
-        bdev_map_mtx.lock();
-        defer bdev_map_mtx.unlock();
-
-        var new_mode  = mode;
-        new_mode.type = krn.fs.S_IFBLK;
-        _ = _mknod(drivers.devfs_path.dentry.inode,
-            device.name,
-            new_mode,
-            drivers.devfs_path.dentry,
-            device.id
-        ) catch |err| {
-            krn.logger.ERROR("mknod failed: {t}", .{err});
-            return err;
-        };
-        try bdev_map.put(device.id, device);
-    } else {
-        krn.logger.ERROR(
-            "No mknod operation in {s}\n", 
-            .{drivers.devfs_path.dentry.inode.sb.?.fs.name}
-        );
-        return krn.errors.PosixError.ENOSYS;
-    }
+    try addDevFile(mode, device.name, device);
+    try bdev_map.put(device.id, device);
 }
 
 pub fn getBdev(devt: dev.dev_t) !*dev.Device {
