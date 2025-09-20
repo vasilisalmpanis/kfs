@@ -4,6 +4,7 @@ const lst = fs.list;
 const kernel = fs.kernel;
 const super = @import("super.zig");
 const device = @import("drivers").device;
+const std = @import("std");
 
 pub fn init() void {
     if (kernel.mm.kmalloc(Ext2FileSystem)) |_fs| {
@@ -23,7 +24,13 @@ pub const Ext2FileSystem = struct {
             if (!self.base.sbs.isEmpty()) {
                 kernel.logger.INFO("sb already exists\n", .{});
                 const sb = self.base.sbs.next.?.entry(fs.SuperBlock, "list");
-                if (sb.dev_file.?.inode.dev_id == dev_file.?.inode.dev_id) {
+                if (file.path == null)
+                    return kernel.errors.PosixError.ENOENT;
+
+                // Matching should not happen depending on just dentry names.
+                // disk abstraction is required which is missing for now.
+                if (std.mem.eql(u8, sb.dev_file.?.path.?.dentry.name, dev_file.?.path.?.dentry.name)
+                    and sb.dev_file.?.inode.dev_id.major == dev_file.?.inode.dev_id.major) {
                     sb.ref.ref();
                     return sb;
                 }
