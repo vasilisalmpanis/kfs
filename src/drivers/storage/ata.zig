@@ -757,9 +757,28 @@ fn ata_probe(device: *driver.storage.StorageDevice) !void {
     );
     drive.initDMA();
     try part.parsePartitionTable(drive);
-    try driver.bdev.addBdev(&device.dev, kernel.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0});
-    for (drive.partitions.items) |item| {
-        try driver.bdev.addDevFile(kernel.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0}, item.name, &device.dev);
+    try driver.bdev.addBdev(
+        &device.dev,
+        kernel.fs.UMode{
+            .usr = 0o6,
+            .grp = 0o6,
+            .other = 0
+        }
+    );
+    for (drive.partitions.items, 0..) |item, idx| {
+        try driver.bdev.addDevFile(
+            kernel.fs.UMode{
+                .usr = 0o6,
+                .grp = 0o6,
+                .other = 0
+            },
+            try part.allocPartName(device.dev.name, idx + 1),
+            &device.dev
+        );
+        kernel.logger.DEBUG(
+            "Added partition {s} as {s}{d}", 
+            .{item.name, device.dev.name, idx}
+        );
     }
     // Create block device for drive
     // Maybe: think about creating bdevs for partitions
@@ -796,6 +815,21 @@ fn ata_close(_: *kernel.fs.File) void {
 fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
     if( file.inode.data.dev) |d| {
         const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
+
+        // 0 - reading full drive, not partition
+        const part_idx = try part.getPartIdx(file.path.?.dentry.name);
+        kernel.logger.INFO(
+            "reading {s}, partition {d}",
+            .{ata_dev.name, part_idx}
+        );
+        if (part_idx != 0) {
+            const partition = ata_dev.partitions.items[part_idx - 1];
+            kernel.logger.INFO("Part: {s}, lba: {d} - {d}", .{
+                partition.name,
+                partition.start_lba,
+                partition.end_lba,
+            });
+        }
         
         const lba: u32 = file.pos / ATADrive.SECTOR_SIZE;
         // ata_dev.selectChannel();

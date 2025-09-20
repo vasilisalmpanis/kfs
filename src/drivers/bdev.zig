@@ -18,7 +18,6 @@ fn bdev_open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
         if (_dev.driver) |drv| {
             if (drv.fops) |ops| {
                 base.ops = ops;
-                krn.logger.INFO("replacing\n", .{});
                 return try base.ops.open(base, inode);
             }
             return krn.errors.PosixError.ENXIO;

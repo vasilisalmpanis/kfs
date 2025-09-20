@@ -102,7 +102,6 @@ pub const DevInode = struct {
             return error.Access;
 
         // Lookup if file already exists.
-        kernel.logger.INFO("EXISTS {s}\n", .{name});
         _ = base.ops.lookup(parent, name) catch {
             const new_inode = try DevInode.new(sb);
             // new_inode.dev_id = 0;
@@ -116,7 +115,6 @@ pub const DevInode = struct {
             dent.ref.ref();
             return dent;
         };
-        kernel.logger.INFO("EXISTS\n", .{});
         return error.Exists;
     }
 };
