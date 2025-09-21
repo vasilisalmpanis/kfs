@@ -1,6 +1,8 @@
 const fs = @import("../fs.zig");
 const kernel = fs.kernel;
 const Ext2Inode = @import("inode.zig").Ext2Inode;
+const Ext2InodeData = @import("inode.zig").Ext2InodeData;
+const Ext2DirEntry = @import("inode.zig").Ext2DirEntry;
 const std = @import("std");
 const device = @import("drivers").device;
 const ext2_inode = @import("./inode.zig");
@@ -130,7 +132,10 @@ pub const Ext2Super = struct {
                 .grp    = 0o5,
                 .other  = 0o5,
             };
-            sb.base.inode_map.put(root_inode.i_no, root_inode) catch |err| {
+            sb.base.inode_map.put(
+                root_inode.i_no,
+                root_inode
+            ) catch |err| {
                 kernel.mm.kfree(root_inode);
                 kernel.mm.kfree(sb);
                 return err;
@@ -152,6 +157,94 @@ pub const Ext2Super = struct {
         return error.OutOfMemory;
     }
 
+    pub fn writeSuper(self: *Ext2Super) !void {
+        self.data.s_wtime = kernel.cmos.toUnixSeconds();
+        var buff: [1024]u8 = undefined;
+        @memcpy(
+            buff[0..@sizeOf(Ext2SuperData)],
+            @as([*]const u8, @ptrCast(&self.data))[0..@sizeOf(Ext2SuperData)]
+        );
+        if (self.base.dev_file) |file| {
+            file.pos = 1024;
+            _ = try file.ops.write(file, &buff, 512);
+            _ = try file.ops.write(file, &buff[512], 512);
+        } else {
+            return kernel.errors.PosixError.ENODEV;
+        }
+    }
+
+    pub fn writeGDTEntry(self: *Ext2Super, entry_idx: u32) !void {
+        const gdt_start_block = if (self.base.block_size == 1024) 2 else 1;
+        const byte_off = entry_idx * @sizeOf(BGDT);
+        const block = gdt_start_block + (byte_off / self.base.block_size);
+        const offset: u32 = byte_off % self.base.block_size;
+
+        var block_buff = try self.readBlocks(block, 1);
+        defer kernel.mm.kfree(block_buff.ptr);
+
+        const src = &self.bgdt[entry_idx];
+        @memcpy(
+            block_buff[offset..offset + @sizeOf(BGDT)],
+            @as([*]const u8, @ptrCast(src))[0..@sizeOf(BGDT)]
+        );
+
+        _ = try self.writeBuff(
+            block,
+            block_buff.ptr,
+            self.base.block_size
+        );
+    }
+
+    pub fn writeBlockBitmap(self: *Ext2Super, gdt_idx: u32, buf: [*]const u8) !void {
+        const blk = self.bgdt[gdt_idx].bg_block_bitmap;
+        _ = try self.writeBuff(
+            blk,
+            buf,
+            self.base.block_size
+        );
+    }
+
+    pub fn writeInodeBitmap(self: *Ext2Super, gdt_idx: u32, buf: [*]const u8) !void {
+        const blk = self.bgdt[gdt_idx].bg_inode_bitmap;
+        _ = try self.writeBuff(
+            blk,
+            buf,
+            self.base.block_size
+        );
+    }
+
+    pub fn writeInode(
+        self: *Ext2Super,
+        ino_no: u32,
+        data: *const Ext2InodeData
+    ) !void {
+        const blk_size = self.base.block_size;
+        const per_group = self.data.s_inodes_per_group;
+        const inode_size = self.data.s_inode_size;
+        const gdt_idx = (ino_no - 1) / per_group;
+        const table = self.bgdt[gdt_idx].bg_inode_table;
+
+        const rel = ((ino_no - 1) % per_group) * inode_size;
+        const blk = table + (rel / blk_size);
+        const off = rel % blk_size;
+
+        const block_buff = try self.readBlocks(blk, 1);
+        defer kernel.mm.kfree(block_buff.ptr);
+
+        const dst: [*]u8 = @ptrFromInt(@intFromPtr(block_buff.ptr) + off);
+        const src: [*]const u8 = @ptrCast(data);
+        @memcpy(
+            dst[0..inode_size],
+            src[0..inode_size]
+        );
+
+        _ = try self.writeBuff(
+            blk,
+            block_buff.ptr,
+            blk_size
+        );
+    }
+
     pub fn readBlocks(sb: *Ext2Super, block: u32, count: u32) ![]u8 {
         const alloc_size: u32 = sb.base.block_size * count;
         if (kernel.mm.kmallocArray(u8, alloc_size)) |raw_buff| {
@@ -160,7 +253,11 @@ pub const Ext2Super = struct {
             sb.base.dev_file.?.pos = sb.base.block_size * block;
             var read: u32 = 0;
             while (read < alloc_size) {
-                const single_read: u32 = try sb.base.dev_file.?.ops.read(sb.base.dev_file.?, @ptrCast(&raw_buff[read]), sb.base.block_size);
+                const single_read: u32 = try sb.base.dev_file.?.ops.read(
+                    sb.base.dev_file.?,
+                    @ptrCast(&raw_buff[read]),
+                    sb.base.block_size
+                );
                 // FIXME:
                 if (single_read == 0) break;
                 read += single_read;
@@ -177,7 +274,11 @@ pub const Ext2Super = struct {
             sb.base.dev_file.?.pos = sb.base.block_size * block;
             var written: u32 = 0;
             while (written < size) {
-                const single_write: u32 = try sb.base.dev_file.?.ops.write(sb.base.dev_file.?, @ptrCast(&buff[written]), to_write);
+                const single_write: u32 = try sb.base.dev_file.?.ops.write(
+                    sb.base.dev_file.?,
+                    @ptrCast(&buff[written]),
+                    to_write
+                );
                 sb.base.dev_file.?.pos += single_write;
                 to_write -= single_write;
                 if (single_write == 0) break;
@@ -305,6 +406,54 @@ pub const Ext2Super = struct {
         }
         return kernel.errors.PosixError.EINVAL;
     }
+
+    pub fn insertDirent(
+        sb: *Ext2Super,
+        parent: *Ext2Inode,
+        child_ino: u32,
+        name: []const u8,
+        file_type: u8
+    ) !void {
+        const size = 8 + ((name.len + 3) & ~@as(u32, 3));
+
+        var blk_idx: u32 = 0;
+        while (blk_idx < parent.data.i_blocks) : (blk_idx += 1) {
+            const pbn = parent.data.i_block[blk_idx];
+            if (pbn == 0) break;
+
+            const blk = try sb.readBlocks(pbn, 1);
+            defer kernel.mm.kfree(blk.ptr);
+
+            var off: u32 = 0;
+            while (off < sb.base.block_size) {
+                var de: *Ext2DirEntry = @ptrFromInt(@intFromPtr(blk.ptr) + off);
+                if (de.rec_len == 0) break;
+
+                const used_size = 8 + ((de.name_len + 3) & ~@as(u32, 3));
+                const spare = @as(u32, de.rec_len) - used_size;
+                if (spare >= size) {
+                    // shrink current
+                    de.rec_len = @intCast(used_size);
+
+                    // new entry
+                    var nde: *Ext2DirEntry = @ptrFromInt(@intFromPtr(de) + used_size);
+                    nde.inode = child_ino;
+                    nde.name_len = @intCast(name.len);
+                    nde.file_type = file_type;
+                    nde.rec_len = @intCast(spare);
+                    const nstart: [*]u8 = @ptrFromInt(@intFromPtr(nde) + @sizeOf(Ext2DirEntry));
+                    @memcpy(nstart[0..name.len], name);
+
+                    // write back
+                    _ = try sb.writeBuff(pbn, blk.ptr, sb.base.block_size);
+                    return;
+                }
+                off += de.rec_len;
+            }
+        }
+        // TO DO: alloc new block
+    }
+
 };
 
 const ext2_super_ops = fs.SuperOps{
