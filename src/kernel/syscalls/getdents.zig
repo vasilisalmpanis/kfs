@@ -15,7 +15,7 @@ pub fn getdents64(fd: u32, dirents: [*]u8, size: u32) !u32 {
             }
             return errors.ENOENT;
         }
-        return errors.EBADF;
+        return errors.ENOTDIR;
     }
-    return errors.EFAULT;
+    return errors.EBADF;
 }

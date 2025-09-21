@@ -222,14 +222,32 @@ pub const Ext2Inode = struct {
     }
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
-        _ = base;
-        _ = parent;
-        _ = mode;
-        kernel.logger.ERROR("Ext2 mkdir: not implemented! Unable to create {s}!", .{name});
-        return kernel.errors.PosixError.ENONET;
+        if (base.sb == null)
+            return kernel.errors.PosixError.ENOENT;
+        const cash_key = fs.DentryHash{
+            .sb = @intFromPtr(parent.sb),
+            .ino = base.i_no,
+            .name = name,
+        };
+        if (fs.dcache.get(cash_key)) |_| {
+            return kernel.errors.PosixError.EEXIST;
+        }
+        const dentry: *fs.DEntry = try base.ops.create(base, name, mode, parent);
+        const sb: *ext2_sb.Ext2Super = base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
+        const new_inode: *Ext2Inode = dentry.inode.getImpl(Ext2Inode, "base");
+        new_inode.data.i_blocks += sb.base.block_size / 512;
+        try sb.insertDirent(new_inode, dentry.inode.i_no, ".", mode);
+        try sb.insertDirent(new_inode, base.i_no, "..", base.mode);
+        new_inode.data.i_size = sb.base.block_size;
+        new_inode.base.size = new_inode.data.i_size;
+        try new_inode.iput();
+
+        return dentry;
     }
 
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
+        if (base.sb == null)
+            return kernel.errors.PosixError.ENOENT;
         if (!base.mode.isDir())
             return kernel.errors.PosixError.ENOTDIR;
         if (!base.mode.canWrite(base.uid, base.gid))
@@ -316,7 +334,16 @@ pub const Ext2Inode = struct {
                     .i_blocks = 0,
                     .i_block = .{0} ** EXT2_N_BLOCKS,
                 };
-                try Ext2Inode.iput(&new_inode_data, sb, inode_no);
+                const new_inode = (try Ext2Inode.new(base.sb.?)).getImpl(Ext2Inode, "base");
+                errdefer kernel.mm.kfree(new_inode);
+                new_inode.base.setCreds(
+                    kernel.task.current.uid,
+                    kernel.task.current.gid,
+                    mode
+                );
+                new_inode.data = new_inode_data;
+                new_inode.base.i_no = inode_no;
+                try new_inode.iput();
 
                 try sb.insertDirent(
                     parent_inode,
@@ -326,20 +353,22 @@ pub const Ext2Inode = struct {
                 );
                 parent_inode.data.i_mtime = curr_seconds;
                 parent_inode.data.i_ctime = curr_seconds;
-                _ = try Ext2Inode.iput(
-                    &parent_inode.data,
-                    sb,
-                    parent_inode.base.i_no
-                );
+                _ = try parent_inode.iput();
                 try sb.writeGDTEntry(bgdt_idx);
                 try sb.writeSuper();
+
+                return try parent.new(name, &new_inode.base);
             }
             return err;
         };
         return kernel.errors.PosixError.EEXIST;
     }
 
-    pub fn iput(inode_data: *const Ext2InodeData, sb: *ext2_sb.Ext2Super, i_no: u32) !void {
+    pub fn iput(self: *const Ext2Inode) !void {
+        if (self.base.sb == null)
+            return kernel.errors.PosixError.ENOENT;
+        const sb: *ext2_sb.Ext2Super = self.base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
+        const i_no: u32 = self.base.i_no;
         if (
             (i_no != EXT2_ROOT_INO and i_no < sb.getFirstInodeIdx())
             or (i_no > sb.data.s_inodes_count)
@@ -354,7 +383,7 @@ pub const Ext2Inode = struct {
         const raw_buff: []u8 = try sb.readBlocks(block, 1);
         rel_offset &= (sb.base.block_size - 1);
         const size = @sizeOf(Ext2InodeData);
-        const src: [*]const u8 = @ptrCast(inode_data);
+        const src: [*]const u8 = @ptrCast(&self.data);
         @memcpy(
             raw_buff[rel_offset..rel_offset + size],
             src[0..size]

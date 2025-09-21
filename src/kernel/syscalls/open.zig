@@ -16,6 +16,8 @@ pub fn do_open(
     const fd = tsk.current.files.getNextFD() catch {
         return errors.EMFILE;
     };
+    var new_mode = mode;
+    new_mode.type = kernel.fs.S_IFREG;
     errdefer _ = tsk.current.files.releaseFD(fd);
     const parent_inode: *fs.Inode = parent_dir.dentry.inode;
     var target_path = parent_dir.clone();
@@ -24,7 +26,7 @@ pub fn do_open(
             const new_dentry = parent_inode.ops.create(
                 parent_inode,
                 name,
-                mode,
+                new_mode,
                 parent_dir.dentry
             ) catch |err| {
                 tsk.current.files.unsetFD(fd);
@@ -53,7 +55,7 @@ pub fn do_open(
         kernel.mm.kfree(target_path.dentry);
         return errors.ENOMEM;
     };
-    new_file.mode = mode;
+    new_file.mode = new_mode;
     new_file.flags = flags;
     new_file.ops.open(new_file, new_file.inode) catch {
         kernel.mm.kfree(new_file);

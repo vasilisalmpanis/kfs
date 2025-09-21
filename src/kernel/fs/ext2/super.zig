@@ -157,6 +157,37 @@ pub const Ext2Super = struct {
         return error.OutOfMemory;
     }
 
+    pub fn getFreeBlock(self: *Ext2Super, bgdt_index: u32) !u32 {
+        if (bgdt_index >= self.bgdt.len)
+            return kernel.errors.PosixError.EINVAL;
+        const bgdt_e: *BGDT = &self.bgdt[bgdt_index];
+
+        // Array as big as block_size
+
+        const map = try self.readBlocks(bgdt_e.bg_block_bitmap, 1);
+        defer kernel.mm.kfree(map.ptr);
+        for (0..self.base.block_size) |idx| {
+            var byte: u8 = map[idx];
+            if (byte == 0xFF)
+                continue;
+            for (0..8) |shift| {
+                if ((byte & (@as(u8,1) << @intCast(shift))) == 0) {
+                    const block_in_group: u32 = idx * 8 + shift;
+                    const absolute_block: u32 = bgdt_index * self.data.s_blocks_per_group + block_in_group;
+                    byte |= (@as(u8,1) << @intCast(shift));
+                    map[idx] = byte;
+                    _ = try self.writeBuff(bgdt_e.bg_block_bitmap, map.ptr, map.len);
+                    @memset(map[0..map.len], 0);
+                    _ = try self.writeBuff(absolute_block, map.ptr, map.len);
+                    self.data.s_free_blocks_count -= 1;
+                    bgdt_e.bg_free_blocks_count -= 1;
+                    return absolute_block;
+                }
+            }
+        }
+        return kernel.errors.PosixError.ENOSPC;
+    }
+
     pub fn writeSuper(self: *Ext2Super) !void {
         if (self.data.s_magic != EXT2_MAGIC) {
             kernel.logger.ERROR(
@@ -370,12 +401,22 @@ pub const Ext2Super = struct {
         mode: fs.UMode,
     ) !void {
         const size = @sizeOf(Ext2DirEntry) + ((name.len + 3) & ~@as(u32, 3));
+        if (name.len > 255)
+            return kernel.errors.PosixError.EINVAL;
 
-        var blk_idx: u32 = 0;
-        while (blk_idx < parent.maxBlockIdx()) : (blk_idx += 1) {
-            const pbn = parent.data.i_block[blk_idx];
-            if (pbn == 0)
-                break;
+        for (0..11) |blk_idx| {
+            var pbn = parent.data.i_block[blk_idx];
+            if (pbn == 0) {
+                const bgdt_idx = (parent.base.i_no - 1) / sb.data.s_inodes_per_group;
+                pbn = try sb.getFreeBlock(bgdt_idx);
+                try sb.writeGDTEntry(bgdt_idx);
+                try sb.writeSuper();
+                // Lets assume that we only have direct blocks
+                parent.data.i_block[blk_idx] = pbn;
+                if (pbn != 0) {
+                    parent.data.i_blocks += sb.base.block_size / 512;
+                }
+            }
 
             const blk = try sb.readBlocks(pbn, 1);
             defer kernel.mm.kfree(blk.ptr);
@@ -383,8 +424,17 @@ pub const Ext2Super = struct {
             var off: u32 = 0;
             while (off < sb.base.block_size) {
                 var de: *Ext2DirEntry = @ptrFromInt(@intFromPtr(blk.ptr) + off);
-                if (de.rec_len == 0)
-                    break;
+                if (de.rec_len == 0) {
+                    const entry: *Ext2DirEntry = @ptrCast(@alignCast(blk.ptr));
+                    entry.inode = child_ino;
+                    entry.rec_len = @intCast(sb.base.block_size);
+                    entry.name_len = @intCast(name.len);
+                    entry.setFileType(mode);
+                    const name_ptr: [*]u8 = @ptrFromInt(@intFromPtr(blk.ptr) + @sizeOf(Ext2DirEntry));
+                    @memcpy(name_ptr[0..name.len], name);
+                    _ = try sb.writeBuff(pbn, blk.ptr, blk.len);
+                    return ;
+                }
 
                 const used_size = @sizeOf(Ext2DirEntry) + ((de.name_len + 3) & ~@as(u32, 3));
                 const spare = @as(u32, de.rec_len) - used_size;
@@ -408,7 +458,6 @@ pub const Ext2Super = struct {
                 off += de.rec_len;
             }
         }
-        // TO DO: alloc new block
     }
 
 };
