@@ -125,7 +125,7 @@ pub const Ext2File = struct {
         const blk_index: u32 = @intCast(pos / block_size);
         var offset: u32 = @intCast(pos % block_size);
 
-        if (blk_index >= ext2_dir_inode.data.i_blocks) {
+        if (blk_index >= ext2_dir_inode.maxBlockIdx()) {
             return krn.errors.PosixError.ENOENT;
         }
 
