@@ -126,11 +126,13 @@ pub const Ext2File = struct {
         var offset: u32 = @intCast(pos % block_size);
 
         if (blk_index >= ext2_dir_inode.maxBlockIdx()) {
+            krn.logger.INFO("invalid blk index {d}\n", .{blk_index});
             return krn.errors.PosixError.ENOENT;
         }
 
         const block: u32 = ext2_dir_inode.data.i_block[blk_index];
         const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
+        krn.logger.INFO("Block {d}", .{block});
         defer krn.mm.kfree(block_slice.ptr);
         var bytes_written: u32 = 0;
 

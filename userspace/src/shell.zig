@@ -303,7 +303,7 @@ fn ls(self: *Shell, args: [][]const u8) void {
 
     var dirp: [1024]u8 = .{0} ** 1024;
     const len = std.os.linux.getdents64(fd, &dirp, 1024);
-    if (len < 0) {
+    if (len > 1024) {
         self.print("ls: getdents64 error on fd {d}\n", .{fd});
         return ;
     }
