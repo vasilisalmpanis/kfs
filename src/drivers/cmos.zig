@@ -59,6 +59,37 @@ pub const CMOS = struct {
         return self.curr_time;
     }
 
+    pub fn toUnixSeconds(self: *CMOS) u64 {
+        const sec  = @as(u64, self.curr_time[0]);
+        const min  = @as(u64, self.curr_time[1]);
+        const hour = @as(u64, self.curr_time[2]);
+        const day  = @as(u64, self.curr_time[3]);
+        const mon  = @as(u64, self.curr_time[4]);
+        const year   = @as(u64, self.curr_time[5]) + 2000;
+
+        var days: u64 = 0;
+        var y: u64 = 1970;
+        while (y < year) : (y += 1) {
+            days += if (isLeap(@intCast(y))) 366 else 365;
+        }
+        days += daysBeforeMonth(@intCast(year), @intCast(mon));
+        days += day - 1;
+
+        return (((days * 24 + hour) * 60 + min) * 60) + sec;
+    }
+
+    fn isLeap(y: u32) bool {
+        return (y % 4 == 0 and (y % 100 != 0 or y % 400 == 0));
+    }
+
+    fn daysBeforeMonth(y: u32, m: u32) u32 {
+        const days = [_]u32{ 0,31,59,90,120,151,181,212,243,273,304,334 };
+        var d = days[m - 1];
+        if (m > 2 and isLeap(y))
+            d += 1;
+        return d;
+    }
+
     pub fn incSec(self: *CMOS) void {
         self.curr_time[0] += 1;
         if (self.curr_time[0] >= 60) {
