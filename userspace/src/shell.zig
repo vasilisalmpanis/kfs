@@ -73,6 +73,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "whoami", .desc = "Who am I?", .hndl = &whoami });
         self.registerCommand(.{ .name = "users", .desc = "Print users", .hndl = &users });
         self.registerCommand(.{ .name = "env", .desc = "Print environment variables", .hndl = &env });
+        self.registerCommand(.{ .name = "touch", .desc = "Create new file", .hndl = &touch });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -494,4 +495,23 @@ fn env(self: *Shell, _: [][]const u8) void {
     for (std.os.environ) |entry| {
         self.print("{s}\n", .{entry});
     }
+}
+
+fn touch(self: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        self.print(
+            \\Usage: touch <name>
+            \\  Example: touch new_file 
+            \\
+            , .{}
+        );
+        return ;
+    }
+    _ = std.posix.open(
+        args[0],
+        std.os.linux.O{ .ACCMODE = .RDWR, .CREAT = true },
+        0o666
+    ) catch |err| {
+        self.print("Error: {t}\n", .{err});
+    };
 }

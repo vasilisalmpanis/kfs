@@ -80,7 +80,7 @@ pub fn get_ino() u32 {
     last_ino += 1;
     return tmp;
 }
-pub const DT_UNKNOWN	        = 0;
+pub const DT_UNKNOWN  = 0;
 pub const DT_FIFO		= 1;
 pub const DT_CHR		= 2;
 pub const DT_DIR		= 4;

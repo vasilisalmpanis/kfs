@@ -59,16 +59,16 @@ fn move_root() void {
     };
     var root_mountpoint: ?*krn.fs.Mount = null;
     if (krn.fs.FileSystem.find("ext2")) |fs| {
-        root_mountpoint = krn.fs.Mount.mount("/dev/sda", "/ext2", fs) catch {
-            dbg.printf("Failed to mount ext2 filesystem\n",.{});
+        root_mountpoint = krn.fs.Mount.mount("/dev/sda", "/ext2", fs) catch |err| {
+            krn.logger.ERROR("Failed to mount ext2 filesystem: {t}\n",.{err});
             @panic("Not able to mount\n");
         };
     } else {
             dbg.printf("Unknown filesystem type\n",.{});
     }
     if (krn.fs.FileSystem.find("devfs")) |fs| {
-        _ = krn.fs.Mount.mount("devfs", "/ext2/dev", fs) catch {
-            dbg.printf("Failed to mount devfs to rootfs\n",.{});
+        _ = krn.fs.Mount.mount("devfs", "/ext2/dev", fs) catch |err| {
+            dbg.printf("Failed to mount devfs to rootfs: {t}\n",.{err});
             @panic("Not able to mount\n");
         };
     } else {
@@ -145,8 +145,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     // FS
     krn.fs.init();
     if (krn.fs.FileSystem.find("examplefs")) |fs| {
-        const root_mount = krn.fs.Mount.mount("/dev/sda1", "/", fs) catch {
-            dbg.printf("Failed to mount root\n",.{});
+        const root_mount = krn.fs.Mount.mount("/dev/sda", "/", fs) catch |err| {
+            krn.logger.INFO("Failed to mount root: {t}\n",.{err});
             @panic("Not able to mount /\n");
         };
         krn.task.initial_task.fs = krn.fs.FSInfo.alloc() catch {

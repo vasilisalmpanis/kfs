@@ -12,6 +12,15 @@ pub const EXT2_BOOT_LOADER_INO      = 5; // Boot loader inode
 pub const EXT2_UNDEL_DIR_INO        = 6; // Undelete directory inode
 pub const EXT2_N_BLOCKS             = 15;
 
+pub const EXT2_FT_UNKNOWN       = 0;	// Unknown File Type
+pub const EXT2_FT_REG_FILE      = 1;	// Regular File
+pub const EXT2_FT_DIR           = 2;	// Directory File
+pub const EXT2_FT_CHRDEV        = 3;	// Character Device
+pub const EXT2_FT_BLKDEV        = 4;	// Block Device
+pub const EXT2_FT_FIFO          = 5;	// Buffer File
+pub const EXT2_FT_SOCK          = 6;	// Socket File
+pub const EXT2_FT_SYMLINK       = 7;	// Symbolic Link
+
 /// ext2 on-disk inode (little-endian fields). Classic 128-byte layout.
 /// Use `le16/le32` helpers below if you need host-endian values.
 ///
@@ -70,6 +79,19 @@ pub const Ext2DirEntry = extern struct {
             @panic("TODO: fix alignment with ext2\n");
         }
         return @ptrFromInt(addr);
+    }
+
+    pub fn setFileType(self: *Ext2DirEntry, mode: fs.UMode) void {
+        switch (mode.type & fs.S_IFMT) {
+            fs.S_IFREG => self.file_type = EXT2_FT_REG_FILE,
+            fs.S_IFDIR => self.file_type = EXT2_FT_DIR,
+            fs.S_IFLNK => self.file_type = EXT2_FT_SYMLINK,
+            fs.S_IFBLK => self.file_type = EXT2_FT_BLKDEV,
+            fs.S_IFCHR => self.file_type = EXT2_FT_CHRDEV,
+            fs.S_IFIFO => self.file_type = EXT2_FT_FIFO,
+            fs.S_IFSOCK => self.file_type = EXT2_FT_SOCK,
+            else => self.file_type = EXT2_FT_UNKNOWN,
+        }
     }
 };
 
@@ -144,6 +166,17 @@ pub const Ext2Inode = struct {
         return error.OutOfMemory;
     }
 
+    pub inline fn maxBlockIdx(self: *Ext2Inode) u32 {
+        const sb = self.base.sb.?.getImpl(
+            ext2_sb.Ext2Super,
+            "base"
+        );
+        return (
+            self.data.i_blocks 
+            / (@as(u32, 2) << @as(u5, @truncate(sb.data.s_log_block_size)))
+        );
+    }
+
     fn lookup(dir: *fs.DEntry, name: []const u8) !*fs.DEntry {
         if (!dir.inode.mode.isDir()) {
             return kernel.errors.PosixError.ENOTDIR;
@@ -165,7 +198,7 @@ pub const Ext2Inode = struct {
         // Get from disk
         const ext2_dir_inode = dir.inode.getImpl(Ext2Inode, "base");
         const ext2_super = dir.sb.getImpl(ext2_sb.Ext2Super, "base");
-        for (0..ext2_dir_inode.data.i_blocks) |idx| {
+        for (0..ext2_dir_inode.maxBlockIdx()) |idx| {
             const block: u32 = ext2_dir_inode.data.i_block[idx];
             // TODO: read dir entries of other blocks too.
             const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
@@ -185,7 +218,7 @@ pub const Ext2Inode = struct {
                 }
             }
         }
-        return error.InodeNotFound;
+        return kernel.errors.PosixError.ENOENT;
     }
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
@@ -196,17 +229,141 @@ pub const Ext2Inode = struct {
         return kernel.errors.PosixError.ENONET;
     }
 
-    pub fn create(base: *fs.Inode, name: []const u8, _: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
+    pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
         if (!base.mode.isDir())
-            return error.NotDirectory;
+            return kernel.errors.PosixError.ENOTDIR;
         if (!base.mode.canWrite(base.uid, base.gid))
-            return error.Access;
+            return kernel.errors.PosixError.EACCES;
 
         // Lookup if file already exists.
-        _ = base.ops.lookup(parent, name) catch {
-            return kernel.errors.PosixError.EINVAL;
+        _ = base.ops.lookup(parent, name) catch |err| {
+            if (err == kernel.errors.PosixError.ENOENT) {
+                const parent_inode = base.getImpl(Ext2Inode, "base");
+                const sb = base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
+
+                // Find block group
+                var bgdt_idx = (parent_inode.base.i_no - 1) / sb.data.s_inodes_per_group;
+                if (sb.bgdt[bgdt_idx].bg_free_inodes_count == 0) {
+                    bgdt_idx = 0;
+                    while (bgdt_idx < sb.bgdt.len) {
+                        if (sb.bgdt[bgdt_idx].bg_free_inodes_count != 0)
+                            break ;
+                        bgdt_idx += 1;
+                    }
+                }
+                if (bgdt_idx >= sb.bgdt.len)
+                    return kernel.errors.PosixError.ENOSPC;
+
+                const bgdt_entry = &sb.bgdt[bgdt_idx];
+
+                const inode_bitmap = try sb.readBlocks(bgdt_entry.bg_inode_bitmap, 1);
+
+                // Find and reserve free inode number in bgdt
+                var inode_no = bgdt_idx * sb.data.s_inodes_per_group + 1;
+                const max_ino_idx = inode_no + sb.data.s_inodes_per_group;
+                if (inode_no < sb.getFirstInodeIdx())
+                    inode_no = sb.getFirstInodeIdx() + 1;
+                while (inode_no < max_ino_idx) {
+                    const bit = (inode_no - 1) % sb.data.s_inodes_per_group;
+                    const byte = bit >> 3;
+                    const mask: u8 = @as(u8, 1) << @intCast(bit & 7);
+                    if (inode_bitmap[byte] & mask == 0) {
+                        inode_bitmap[byte] |= mask;
+                        _ = try sb.writeBuff(
+                            bgdt_entry.bg_inode_bitmap,
+                            inode_bitmap.ptr,
+                            sb.base.block_size
+                        );
+                        sb.data.s_free_inodes_count -|= 1;
+                        bgdt_entry.bg_free_inodes_count -|= 1;
+                        break ;
+                    }
+                    inode_no += 1;
+                }
+
+                // Construct ext2 inode data
+                const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds());
+                const new_inode_data: Ext2InodeData = Ext2InodeData{
+                    .i_atime = curr_seconds,
+                    .i_ctime = curr_seconds,
+                    .i_mtime = curr_seconds,
+                    .i_dtime = 0,
+                    .i_uid = kernel.task.current.uid,
+                    .i_gid = kernel.task.current.gid,
+                    .i_mode = @bitCast(mode),
+                    .i_size = 0,
+                    .i_links_count = 0,
+                    .i_generation = 0,
+                    .i_flags = parent_inode.data.i_flags,
+                    .i_faddr = 0,
+                    .i_dir_acl = 0,
+                    .i_file_acl = 0,
+                    .osd1 = .{
+                        .linux1 = .{
+                            .l_i_reserved1 = 0,
+                        }
+                    },
+                    .osd2 = .{
+                        .linux2 = .{
+                            .i_pad1 = 0,
+                            .l_i_frag = 0,
+                            .l_i_fsize = 0,
+                            .l_i_gid_high = 0,
+                            .l_i_reserved2 = 0,
+                            .l_i_uid_high = 0,
+                        }
+                    },
+                    .i_blocks = 0,
+                    .i_block = .{0} ** EXT2_N_BLOCKS,
+                };
+                try Ext2Inode.iput(&new_inode_data, sb, inode_no);
+
+                try sb.insertDirent(
+                    parent_inode,
+                    inode_no,
+                    name,
+                    mode
+                );
+                parent_inode.data.i_mtime = curr_seconds;
+                parent_inode.data.i_ctime = curr_seconds;
+                _ = try Ext2Inode.iput(
+                    &parent_inode.data,
+                    sb,
+                    parent_inode.base.i_no
+                );
+                try sb.writeGDTEntry(bgdt_idx);
+                try sb.writeSuper();
+            }
+            return err;
         };
-        return error.Exists;
+        return kernel.errors.PosixError.EEXIST;
+    }
+
+    pub fn iput(inode_data: *const Ext2InodeData, sb: *ext2_sb.Ext2Super, i_no: u32) !void {
+        if (
+            (i_no != EXT2_ROOT_INO and i_no < sb.getFirstInodeIdx())
+            or (i_no > sb.data.s_inodes_count)
+        ) {
+            return kernel.errors.PosixError.EINVAL;
+        }
+        const block_group = (i_no - 1) / sb.data.s_inodes_per_group;
+        const gd = sb.bgdt[block_group];
+        var rel_offset = ((i_no - 1) % sb.data.s_inodes_per_group) * sb.data.s_inode_size;
+        const block = gd.bg_inode_table + (rel_offset >> @as(u5, @truncate(sb.data.s_log_block_size + 10)));
+
+        const raw_buff: []u8 = try sb.readBlocks(block, 1);
+        rel_offset &= (sb.base.block_size - 1);
+        const size = @sizeOf(Ext2InodeData);
+        const src: [*]const u8 = @ptrCast(inode_data);
+        @memcpy(
+            raw_buff[rel_offset..rel_offset + size],
+            src[0..size]
+        );
+        _ = try sb.writeBuff(
+            block,
+            raw_buff.ptr,
+            sb.base.block_size
+        );
     }
 
     pub fn iget(inode: *Ext2Inode, sb: *ext2_sb.Ext2Super, i_no: u32) !void {
