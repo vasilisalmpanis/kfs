@@ -141,9 +141,9 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !Path {
         return krn.errors.PosixError.EINVAL;
     }
 
-    var cwd = krn.task.initial_task.fs.pwd;
+    var cwd = krn.task.current.fs.pwd;
     if (path[0] == '/') {
-        cwd = krn.task.initial_task.fs.root;
+        cwd = krn.task.current.fs.root;
     }
     var curr = Path.init(
         cwd.mnt,
@@ -172,7 +172,7 @@ pub fn dir_resolve_from(path: []const u8, from: Path, last: *[]const u8) !Path {
 
     var cwd = from;
     if (path[0] == '/') {
-        cwd = krn.task.initial_task.fs.root;
+        cwd = krn.task.current.fs.root;
     }
     var curr = Path.init(
         cwd.mnt,
