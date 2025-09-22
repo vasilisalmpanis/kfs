@@ -8,6 +8,9 @@ pub fn write(fd: u32, buf: u32, size: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
         if (!file.canWrite())
             return errors.PosixError.EACCES;
+        if (file.flags & krn.fs.file.O_APPEND != 0) {
+            file.pos = file.inode.size;
+        }
         return try file.ops.write(file, data, size);
     }
     krn.logger.INFO("Error {d}\n", .{krn.task.current.pid});
