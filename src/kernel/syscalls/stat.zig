@@ -60,9 +60,18 @@ pub fn do_stat64(inode: *fs.Inode, buf: *Stat) !void {
     buf.st_blksize = sb.block_size;
     buf.st_blocks = 0;
 
-    buf.st_atim = Timespec.init();
-    buf.st_mtim = Timespec.init();
-    buf.st_ctim = Timespec.init();
+    buf.st_atim = Timespec{
+        .tv_sec = inode.atime,
+        .tv_nsec = 0,
+    };
+    buf.st_mtim = Timespec{
+        .tv_sec = inode.mtime,
+        .tv_nsec = 0,
+    };
+    buf.st_ctim = Timespec{
+        .tv_sec = inode.ctime,
+        .tv_nsec = 0,
+    };
 }
 
 pub fn stat64(path: ?[*:0]u8, buf: ?*Stat) !u32 {

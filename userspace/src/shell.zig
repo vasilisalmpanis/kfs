@@ -322,15 +322,27 @@ fn ls(self: *Shell, args: [][]const u8) void {
             };
             var perms: [9]u8 = .{0} ** 9;
             verboseMode(&perms, curr_stat.mode);
+
+            const epoch_secs = std.time.epoch.EpochSeconds{
+                .secs = @intCast(curr_stat.mtim.sec)
+            };
+            const epoch_day = epoch_secs.getEpochDay();
+            const epoch_year = epoch_day.calculateYearDay();
+            const epoch_month_day = epoch_year.calculateMonthDay();
+            const epoch_day_sec = epoch_secs.getDaySeconds();
             self.print(
-                "{c}{s} {d:>6} {d:>6} {d:>4} {d:>8} {s}\n", 
+                "{c}{s} {d:>5} {d:>5} {B:>8.2} {d:>4}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}  {s}\n", 
                 .{
                     dirent.verboseType(),
                     perms[0..9],
                     curr_stat.uid,
                     curr_stat.gid,
-                    dirent.ino,
-                    curr_stat.size,
+                    @as(u64, @intCast(curr_stat.size)),
+                    epoch_year.year,
+                    epoch_month_day.month,
+                    epoch_month_day.day_index + 1,
+                    epoch_day_sec.getHoursIntoDay(),
+                    epoch_day_sec.getMinutesIntoHour(),
                     name
                 }
             );

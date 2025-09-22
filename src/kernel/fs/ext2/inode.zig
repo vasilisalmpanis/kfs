@@ -346,6 +346,9 @@ pub const Ext2Inode = struct {
                     mode
                 );
                 new_inode.data = new_inode_data;
+                new_inode.base.atime = new_inode.data.i_atime;
+                new_inode.base.ctime = new_inode.data.i_ctime;
+                new_inode.base.mtime = new_inode.data.i_mtime;
                 new_inode.base.i_no = inode_no;
                 try new_inode.iput();
 
@@ -356,7 +359,7 @@ pub const Ext2Inode = struct {
                 );
                 parent_inode.data.i_links_count += 1;
                 parent_inode.data.i_mtime = curr_seconds;
-                parent_inode.data.i_ctime = curr_seconds;
+                parent_inode.base.mtime = curr_seconds;
                 _ = try parent_inode.iput();
                 try sb.writeGDTEntry(bgdt_idx);
                 try sb.writeSuper();
@@ -417,6 +420,9 @@ pub const Ext2Inode = struct {
         const raw_inode: *Ext2InodeData = @ptrCast(@alignCast(&raw_buff[rel_offset]));
         inode.data = raw_inode.*;
         inode.base.size = inode.data.i_size;
+        inode.base.atime = inode.data.i_atime;
+        inode.base.ctime = inode.data.i_ctime;
+        inode.base.mtime = inode.data.i_mtime;
         inode.base.setCreds(
             raw_inode.i_uid | (@as(u32, raw_inode.osd2.linux2.l_i_uid_high) << 16),
             raw_inode.i_gid | (@as(u32, raw_inode.osd2.linux2.l_i_gid_high) << 16),
@@ -485,6 +491,7 @@ pub const Ext2Inode = struct {
         const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds());
         sb.data.s_wtime = curr_seconds;
         self.data.i_mtime = curr_seconds;
+        self.base.mtime = curr_seconds;
         try self.iput();
         try sb.writeGDTEntry(bgdt_idx);
         try sb.writeSuper();
