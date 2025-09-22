@@ -426,6 +426,25 @@ fn echo(self: *Shell, args: [][]const u8) void {
         );
         return ;
     }
+    if (args.len < 2) {
+        self.print("{s}\n", .{args[0]});
+        return ;
+    }
+    const fd = std.posix.open(
+        args[1],
+        std.os.linux.O{
+            .ACCMODE = .WRONLY,
+            .APPEND = true,
+            .CREAT = true
+        },
+        0x666
+    ) catch |err| {
+        self.print("Error: {t}\n", .{err});
+        return ;
+    };
+    _ = std.posix.write(fd, args[0]) catch |err| {
+        self.print("Error: {t}\n", .{err});
+    };
 }
 
 fn kshell(self: *Shell, args: [][]const u8) void {
