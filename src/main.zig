@@ -34,24 +34,6 @@ pub fn panic(
     while (true) {}
 }
 
-fn testp(_: ?*const anyopaque) i32 {
-    // go_userspace();
-    while (true) {
-        // dbg.ps();
-        // krn.sleep(2000);
-    }
-    return 0;
-}
-
-pub fn tty_thread(_: ?*const anyopaque) i32 {
-    while (krn.task.current.should_stop != true) {
-        if (keyboard.keyboard.getInput()) |input| {
-            screen.current_tty.?.input(input);
-        }
-    }
-    return 0;
-}
-
 fn move_root() void {
     _ = krn.mkdir("/ext2", 0) catch {
             dbg.printf("Failed to create ext2 directory\n",.{});
@@ -123,14 +105,13 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.logger = Logger.init(.DEBUG);
     var boot_info: multiboot.Multiboot = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
     dbg.initSymbolTable(&boot_info);
-    gdt.gdtInit();
 
+    gdt.gdtInit();
     mm.mmInit(&boot_info);
     krn.logger.INFO("GDT initialized", .{});
     krn.logger.INFO("Memory initialized", .{});
 
     screen.initScreen(&krn.scr, &boot_info);
-
     krn.pit = PIT.init(1000);
     krn.task.initMultitasking();
     idt.idtInit();
@@ -141,33 +122,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     syscalls.initSyscalls();
     drv.cmos.init();
 
-    
     // FS
     krn.fs.init();
-    if (krn.fs.FileSystem.find("examplefs")) |fs| {
-        const root_mount = krn.fs.Mount.mount("/dev/sda", "/", fs) catch |err| {
-            krn.logger.INFO("Failed to mount root: {t}\n",.{err});
-            @panic("Not able to mount /\n");
-        };
-        krn.task.initial_task.fs = krn.fs.FSInfo.alloc() catch {
-            @panic("Initial task must have a root,pwd\n");
-        };
-        krn.task.initial_task.fs.root = krn.fs.path.Path.init(
-            root_mount,
-            root_mount.sb.root
-        );
-        krn.task.initial_task.fs.pwd = krn.fs.path.Path.init(
-            root_mount,
-            root_mount.sb.root
-        );
-        if (krn.fs.TaskFiles.new()) |files| {
-            krn.task.initial_task.files = files;
-        } else {
-            @panic("PID 0 doesn't have TaskFiles struct, OOM\n");
-        }
-    } else {
-            dbg.printf("Unknown filesystem type\n",.{});
-    }
 
     // Get PID1
     _ = krn.kthreadCreate(&user_thread, null) catch null;
