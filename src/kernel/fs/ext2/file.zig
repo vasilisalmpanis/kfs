@@ -28,12 +28,15 @@ pub const Ext2File = struct {
             return krn.errors.PosixError.EISDIR;
         }
 
-        const to_write: u32 = size;
+        var to_write: u32 = size;
         // if (to_write > ino.base.size -| base.pos) {
         //     to_write = ino.base.size -| base.pos;
         // }
         if (to_write == 0)
             return 0;
+        if (to_write > ext2_sb.base.block_size) {
+            to_write = ext2_sb.base.block_size;
+        }
 
         const bs = ext2_sb.base.block_size;
         const lbn = base.pos / bs;
@@ -47,16 +50,23 @@ pub const Ext2File = struct {
             pbn = try ino.allocBlock();
         }
 
-        // read the actual data block
-        const written = try ext2_sb.writeBuff(pbn, buf, size);
+        const buff = try ext2_sb.readBlocks(pbn, 1);
+        defer krn.mm.kfree(buff.ptr);
 
-        base.pos += written;
+        const off: u32 = base.pos % bs;
+        if (off + to_write > bs) {
+            to_write = bs - off;
+        }
+        @memcpy(buff[off..off + to_write], buf[0..to_write]);
+        _ = try ext2_sb.writeBuff(pbn, buff.ptr, buff.len);
+
+        base.pos += to_write;
         if (base.pos > ino.base.size) {
             ino.base.size = base.pos;
             ino.data.i_size = ino.base.size;
             try ino.iput();
         }
-        return  written;
+        return to_write;
     }
 
     fn read(base: *fs.File, buf: [*]u8, size: u32) !u32 {

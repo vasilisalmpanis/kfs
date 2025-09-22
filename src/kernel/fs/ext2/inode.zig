@@ -294,6 +294,9 @@ pub const Ext2Inode = struct {
                         );
                         sb.data.s_free_inodes_count -|= 1;
                         bgdt_entry.bg_free_inodes_count -|= 1;
+                        if (mode.isDir()) {
+                            bgdt_entry.bg_used_dirs_count += 1;
+                        }
                         break ;
                     }
                     inode_no += 1;

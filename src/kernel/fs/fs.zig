@@ -165,72 +165,72 @@ pub const UMode = packed struct {
     pub fn fromInt(self: *UMode, other: u32) void {
         self.* = @bitCast(other);
     }
-    pub fn isDir(self: *UMode) bool {
+    pub fn isDir(self: *const UMode) bool {
         return self.type & S_IFMT == S_IFDIR;
     }
 
-    pub fn isLink(self: *UMode) bool {
+    pub fn isLink(self: *const UMode) bool {
         return self.type & S_IFMT == S_IFLNK;
     }
 
-    pub fn isReg(self: *UMode) bool {
+    pub fn isReg(self: *const UMode) bool {
         return self.type & S_IFMT == S_IFREG;
     }
 
-    pub fn isChr(self: *UMode) bool {
+    pub fn isChr(self: *const UMode) bool {
         return self.type & S_IFMT == S_IFCHR;
     }
 
-    pub fn isBlk(self: *UMode) bool {
+    pub fn isBlk(self: *const UMode) bool {
         return self.type & S_IFMT == S_IFBLK;
     }
 
-    pub fn isFifo(self: *UMode) bool {
+    pub fn isFifo(self: *const UMode) bool {
         return self.type & S_IFMT == S_IFIFO;
     }
 
-    pub fn isSock(self: *UMode) bool {
+    pub fn isSock(self: *const UMode) bool {
         return self.type & S_IFMT == S_IFSOCK;
     }
 
     // Modify to add ownership
-    pub fn isUReadable(self: *UMode) bool {
+    pub fn isUReadable(self: *const UMode) bool {
         return self.usr & 0o4 != 0;
     }
 
-    pub fn isUWriteable(self: *UMode) bool {
+    pub fn isUWriteable(self: *const UMode) bool {
         return self.usr & 0o2 != 0;
     }
 
-    pub fn isUExecutable(self: *UMode) bool {
+    pub fn isUExecutable(self: *const UMode) bool {
         return self.usr & 0o1 != 0;
     }
 
-    pub fn isGReadable(self: *UMode) bool {
+    pub fn isGReadable(self: *const UMode) bool {
         return self.grp & 0o4 != 0;
     }
 
-    pub fn isGWriteable(self: *UMode) bool {
+    pub fn isGWriteable(self: *const UMode) bool {
         return self.grp & 0o2 != 0;
     }
 
-    pub fn isGExecutable(self: *UMode) bool {
+    pub fn isGExecutable(self: *const UMode) bool {
         return self.grp & 0o1 != 0;
     }
 
-    pub fn isOReadable(self: *UMode) bool {
+    pub fn isOReadable(self: *const UMode) bool {
         return self.other & 0o4 != 0;
     }
 
-    pub fn isOWriteable(self: *UMode) bool {
+    pub fn isOWriteable(self: *const UMode) bool {
         return self.other & 0o2 != 0;
     }
 
-    pub fn isOExecutable(self: *UMode) bool {
+    pub fn isOExecutable(self: *const UMode) bool {
         return self.other & 0o1 != 0;
     }
 
-    pub fn canRead(self: *UMode, uid: u32, gid: u32) bool {
+    pub fn canRead(self: *const UMode, uid: u32, gid: u32) bool {
         if (kernel.task.current.uid == 0) 
             return true;
         if (kernel.task.current.uid == uid) {
@@ -251,7 +251,7 @@ pub const UMode = packed struct {
         return false;
     }
 
-    pub fn canWrite(self: *UMode, uid: u32, gid: u32) bool {
+    pub fn canWrite(self: *const UMode, uid: u32, gid: u32) bool {
         if (kernel.task.current.uid == 0) 
             return true;
         if (kernel.task.current.uid == uid) {
@@ -272,7 +272,7 @@ pub const UMode = packed struct {
         return false;
     }
 
-    pub fn canExecute(self: *UMode, uid: u32, gid: u32) bool {
+    pub fn canExecute(self: *const UMode, uid: u32, gid: u32) bool {
         if (kernel.task.current.uid == 0) 
             return true;
         if (kernel.task.current.uid == uid) {

@@ -267,7 +267,8 @@ pub const Ext2Super = struct {
                 );
                 sb.base.dev_file.?.pos += single_write;
                 to_write -= single_write;
-                if (single_write == 0) break;
+                if (single_write == 0)
+                    break;
                 written += single_write;
             }
             return written;
