@@ -15,6 +15,9 @@ pub const Inode = struct {
     mode: fs.UMode = fs.UMode{},
     uid: u32 = 0,
     gid: u32 = 0,
+    atime: u32 = 0,
+    ctime: u32 = 0,
+    mtime: u32 = 0,
     dev_id: drv.device.dev_t,
     data: extern union {
         dev: ?*drv.device.Device,
@@ -38,6 +41,9 @@ pub const Inode = struct {
         self.data.sock = null;
         self.uid = 0;
         self.gid = 0;
+        self.atime = 0;
+        self.ctime = 0;
+        self.mtime = 0;
         self.dev_id = drv.device.dev_t {
             .minor = 0,
             .major = 0,
