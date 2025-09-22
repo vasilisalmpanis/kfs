@@ -567,9 +567,10 @@ fn execve(self: *Shell, args: [][]const u8) void {
         buffer[args[0].len] = 0;
         const argv: [*:null]const ?[*:0]const u8 = @ptrCast(&[_]?[*:0]const u8{ "ash", null });
         const envp: [*:null]const ?[*:0]const u8 = @ptrCast(&[_]?[*:0]const u8{ "TERM=hello", "whatever=whatever", null });
-        _ = self;
-        std.posix.execveZ(@ptrCast(&buffer), argv, envp) catch  {return;};
-        std.posix.exit(0);
+        std.posix.execveZ(@ptrCast(&buffer), argv, envp) catch  {
+            self.print("EXEC failed\n", .{});
+            std.posix.exit(0);
+        };
     }
     _ = std.posix.waitpid(pid, 0);
 }

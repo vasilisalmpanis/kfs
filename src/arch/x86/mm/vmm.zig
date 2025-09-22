@@ -203,7 +203,7 @@ pub const VMM = struct {
         const pd_index = virt >> 22;
         const pt_index = (virt >> 12) & 0x3FF;
         const pt: [*]PageEntry = first_page_table + (0x400 * pd_index);
-        const pfn: u32 = pt[pt_index].address;
+        const pfn: u32 = pt[pt_index].address << 12;
         if (free_pfn)
             self.pmm.freePage(pfn);
         pt[pt_index].erase();
@@ -343,7 +343,7 @@ pub const VMM = struct {
                 temp_idx = try self.mapPageTable(new_pd,
                     pd_idx,
                     flags,
-                    new_pd[pd_idx] >> 12
+                    (new_pd[pd_idx] >> 12) << 12,
                 );
             }
 
@@ -411,17 +411,13 @@ pub const VMM = struct {
 
             for (pt_start_idx .. pt_end) |pt_idx| {
                 if (pt[pt_idx] != 0) {
-                    self.unmapPage(
-                        self.pageTableToAddr(
-                            pd_idx,
-                            pt_idx,
-                        ),
-                        true
-                    );
+                    const phys: u32 = (pt[pt_idx] >> 12) << 12;
+                    self.pmm.freePage(phys);
+                    pt[pt_idx] = 0; // Clear the PTE
                 }
             }
             if (std.mem.allEqual(u32, pt[0..1024], 0)) {
-                self.pmm.freePage(pd[pd_idx] >> 12);
+                self.pmm.freePage((pd[pd_idx] >> 12) << 12);
                 pd[pd_idx] = 0;
                 invalidatePage(
                     self.pageTableToAddr(pd_idx, 0)

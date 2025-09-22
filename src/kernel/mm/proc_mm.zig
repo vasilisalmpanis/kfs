@@ -325,12 +325,14 @@ pub const MM = struct {
             _mmap.code = self.code;
             _mmap.data = self.data;
             _mmap.heap = self.heap;
-            krn.logger.INFO("created vas {x}\n", .{_mmap.vas});
         }
         return mmap;
     }
 
     pub fn delete(self: *MM) void {
+        if (self != &init_mm and self.vas != 0) {
+            mm.virt_memory_manager.pmm.freePage(self.vas);
+        }
         krn.mm.kfree(self);
     }
 
@@ -345,6 +347,8 @@ pub const MM = struct {
             while (it.next()) |node| {
                 const vma: *VMA = node.curr.entry(VMA, "list");
                 mm.virt_memory_manager.releaseArea(vma.start, vma.end, vma.flags.TYPE);
+                // Free the VMA structure itself
+                krn.mm.kfree(vma);
             }
         }
         self.vmas = null;

@@ -12,9 +12,7 @@ pub fn getdents64(fd: u32, dirents: [*]u8, size: u32) !u32 {
             if (dir_file.ops.readdir) |readdir| {
                 if (krn.mm.kmallocSlice(u8, size)) |buf_slice| {
                     defer krn.mm.kfree(buf_slice.ptr);
-                    krn.logger.INFO("about to read dir\n",.{});
                     const ret =  try readdir(dir_file, buf_slice);
-                    krn.logger.INFO("Read from {x}-{x} \n{s}\n",.{@intFromPtr(dirents), @intFromPtr(dirents) + ret, buf_slice});
                     var offset: u32 = 0;
                     var u_off: u32 = 0;
                     var dirent: *krn.fs.LinuxDirent = @ptrCast(@alignCast(buf_slice.ptr));
@@ -30,7 +28,6 @@ pub fn getdents64(fd: u32, dirents: [*]u8, size: u32) !u32 {
                         @memcpy(dirents[u_off..name_start], @as([*]u8, @ptrCast(&temp))[0..ent_size]);
                         const entry_name: []u8 = dirent.getName();
                         @memcpy(dirents[name_start..name_start + entry_name.len], entry_name);
-                        krn.logger.INFO("entry name {s} {s}\n", .{entry_name, dirents[name_start..name_start + entry_name.len]});
                         dirents[name_start + entry_name.len] = 0;
                         u_off += temp.reclen;
                         if (u_off > size)
