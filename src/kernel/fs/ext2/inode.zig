@@ -10,8 +10,10 @@ pub const EXT2_BAD_INO	          = 1; // Bad blocks inode
 pub const EXT2_ROOT_INO	          = 2; // Root inode
 pub const EXT2_BOOT_LOADER_INO      = 5; // Boot loader inode
 pub const EXT2_UNDEL_DIR_INO        = 6; // Undelete directory inode
+
 pub const EXT2_N_BLOCKS             = 15;
 
+// File types
 pub const EXT2_FT_UNKNOWN       = 0;	// Unknown File Type
 pub const EXT2_FT_REG_FILE      = 1;	// Regular File
 pub const EXT2_FT_DIR           = 2;	// Directory File
@@ -59,18 +61,16 @@ pub const Ext2DirEntry = extern struct {
     rec_len: u16,     // total size of this entry
     name_len: u8,     // length of name
     file_type: u8,    // (ext2 rev>=1)
-                      //
-                      //
+
     pub fn iterator(self: *Ext2DirEntry, block_size: u32) Ext2DirIterator{
         return Ext2DirIterator.init(self, block_size);
     }
 
-    pub fn getName(self: *Ext2DirEntry) []u8 {
+    pub fn getName(self: *Ext2DirEntry) []const u8 {
         const addr: u32 = @intFromPtr(self) + @sizeOf(Ext2DirEntry);
-        const name: [*]u8 = @ptrFromInt(addr);
+        const name: [*]const u8 = @ptrFromInt(addr);
         return name[0..self.name_len];
     }
-
 
     // FIXME: incorrect alignment in some cases.
     pub fn getNext(self: *Ext2DirEntry) *Ext2DirEntry {
@@ -155,7 +155,7 @@ pub const Ext2Inode = struct {
         if (kernel.mm.kmalloc(Ext2Inode)) |inode| {
             inode.base.setup(sb);
             inode.base.ops = &ext2_inode_ops;
-            inode.base.size = 50;
+            inode.base.size = 0;
             inode.base.dev_id = drv.device.dev_t{
                 .major = 0,
                 .minor = 0,
@@ -233,12 +233,11 @@ pub const Ext2Inode = struct {
             return kernel.errors.PosixError.EEXIST;
         }
         const dentry: *fs.DEntry = try base.ops.create(base, name, mode, parent);
-        const sb: *ext2_sb.Ext2Super = base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
         const new_inode: *Ext2Inode = dentry.inode.getImpl(Ext2Inode, "base");
-        new_inode.data.i_blocks += sb.base.block_size / 512;
-        try sb.insertDirent(new_inode, dentry.inode.i_no, ".", mode);
-        try sb.insertDirent(new_inode, base.i_no, "..", base.mode);
-        new_inode.data.i_size = sb.base.block_size;
+        try new_inode.insertDirent(new_inode.base.i_no, ".", mode);
+        try new_inode.insertDirent(base.i_no, "..", base.mode);
+        new_inode.data.i_links_count = 2;
+        new_inode.data.i_size = base.sb.?.block_size;
         new_inode.base.size = new_inode.data.i_size;
         try new_inode.iput();
 
@@ -275,6 +274,7 @@ pub const Ext2Inode = struct {
                 const bgdt_entry = &sb.bgdt[bgdt_idx];
 
                 const inode_bitmap = try sb.readBlocks(bgdt_entry.bg_inode_bitmap, 1);
+                defer kernel.mm.kfree(inode_bitmap.ptr);
 
                 // Find and reserve free inode number in bgdt
                 var inode_no = bgdt_idx * sb.data.s_inodes_per_group + 1;
@@ -310,7 +310,7 @@ pub const Ext2Inode = struct {
                     .i_gid = kernel.task.current.gid,
                     .i_mode = @bitCast(mode),
                     .i_size = 0,
-                    .i_links_count = 0,
+                    .i_links_count = 1,
                     .i_generation = 0,
                     .i_flags = parent_inode.data.i_flags,
                     .i_faddr = 0,
@@ -334,7 +334,8 @@ pub const Ext2Inode = struct {
                     .i_blocks = 0,
                     .i_block = .{0} ** EXT2_N_BLOCKS,
                 };
-                const new_inode = (try Ext2Inode.new(base.sb.?)).getImpl(Ext2Inode, "base");
+
+                const new_inode = (try Ext2Inode.new(&sb.base)).getImpl(Ext2Inode, "base");
                 errdefer kernel.mm.kfree(new_inode);
                 new_inode.base.setCreds(
                     kernel.task.current.uid,
@@ -345,12 +346,12 @@ pub const Ext2Inode = struct {
                 new_inode.base.i_no = inode_no;
                 try new_inode.iput();
 
-                try sb.insertDirent(
-                    parent_inode,
+                try parent_inode.insertDirent(
                     inode_no,
                     name,
                     mode
                 );
+                parent_inode.data.i_links_count += 1;
                 parent_inode.data.i_mtime = curr_seconds;
                 parent_inode.data.i_ctime = curr_seconds;
                 _ = try parent_inode.iput();
@@ -413,7 +414,6 @@ pub const Ext2Inode = struct {
         const raw_inode: *Ext2InodeData = @ptrCast(@alignCast(&raw_buff[rel_offset]));
         inode.data = raw_inode.*;
         inode.base.size = inode.data.i_size;
-        inode.base.size = raw_inode.i_size;
         inode.base.setCreds(
             raw_inode.i_uid | (@as(u32, raw_inode.osd2.linux2.l_i_uid_high) << 16),
             raw_inode.i_gid | (@as(u32, raw_inode.osd2.linux2.l_i_gid_high) << 16),
@@ -443,6 +443,116 @@ pub const Ext2Inode = struct {
             @memcpy(resulting_link.*[0..span.len], span);
             resulting_link.len = span.len;
             return ;
+        }
+    }
+
+    pub fn allocBlock(self: *Ext2Inode) !u32 {
+        if (self.base.sb == null)
+            return kernel.errors.PosixError.ENOENT;
+        const sb = self.base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
+
+        // Find free block in i_block
+        var blk_idx: u32 = 0;
+        while (self.data.i_block[blk_idx] != 0) {
+            blk_idx += 1;
+            if (blk_idx > 11) {
+                kernel.logger.ERROR("TODO: allocBlock(): implement indirect blocks", .{});
+                return kernel.errors.PosixError.ENOSPC;
+            }
+            if (blk_idx >= EXT2_N_BLOCKS)
+                return kernel.errors.PosixError.ENOSPC;
+        }
+
+        // Find block group
+        var bgdt_idx = (self.base.i_no - 1) / sb.data.s_inodes_per_group;
+        if (sb.bgdt[bgdt_idx].bg_free_blocks_count == 0) {
+            bgdt_idx = 0;
+            while (bgdt_idx < sb.bgdt.len) {
+                if (sb.bgdt[bgdt_idx].bg_free_blocks_count != 0)
+                    break ;
+                bgdt_idx += 1;
+            }
+        }
+        if (bgdt_idx >= sb.bgdt.len)
+            return kernel.errors.PosixError.ENOSPC;
+
+        const block = try sb.getFreeBlock(bgdt_idx);
+        self.data.i_blocks += sb.base.block_size / 512;
+        self.data.i_block[blk_idx] = block;
+        const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds());
+        sb.data.s_wtime = curr_seconds;
+        self.data.i_mtime = curr_seconds;
+        try self.iput();
+        try sb.writeGDTEntry(bgdt_idx);
+        try sb.writeSuper();
+        return block;
+    }
+
+    pub fn insertDirent(
+        self: *Ext2Inode,
+        child_ino: u32,
+        name: []const u8,
+        mode: fs.UMode,
+    ) !void {
+        if (self.base.sb == null)
+            return kernel.errors.PosixError.ENOENT;
+        const sb = self.base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
+        if (name.len > 255)
+            return kernel.errors.PosixError.EINVAL;
+        var blk_idx: u32 = 0;
+        while (blk_idx <= 11) {
+            var pbn = self.data.i_block[blk_idx];
+            if (pbn == 0) {
+                pbn = try self.allocBlock();
+                blk_idx = 11; // to exit loop
+            }
+            const blk = try sb.readBlocks(pbn, 1);
+            defer kernel.mm.kfree(blk.ptr);
+
+            var off: u32 = 0;
+            var new_entry_size = @sizeOf(Ext2DirEntry) + name.len;
+            if (new_entry_size % 4 != 0) {
+                new_entry_size += 4 - (new_entry_size % 4);
+            }
+            while (off < sb.base.block_size) {
+                var old_de: *Ext2DirEntry = @ptrFromInt(@intFromPtr(blk.ptr) + off);
+                var spare: u32 = 0;
+                var used_size: u32 = 0;
+                if (old_de.rec_len == 0 and off != 0)
+                    return kernel.errors.PosixError.EINVAL;
+                if (old_de.rec_len == 0 and off == 0) {
+                    spare = sb.base.block_size;
+                    used_size = 0;
+                } else {
+                    if (old_de.inode == 0) {
+                        used_size = 0;
+                        spare = old_de.rec_len;
+                    } else {
+                        used_size = @sizeOf(Ext2DirEntry) + old_de.name_len;
+                        if (used_size % 4 != 0)
+                            used_size += 4 - (used_size % 4);
+                        spare = @as(u32, old_de.rec_len) - used_size;
+                    }
+                }
+
+                if (spare >= new_entry_size) {
+                    // shrink current
+                    if (used_size != 0)
+                        old_de.rec_len = @intCast(used_size);
+                    // new entry
+                    var new_entry: *Ext2DirEntry = @ptrFromInt(@intFromPtr(old_de) + used_size);
+                    new_entry.inode = child_ino;
+                    new_entry.rec_len = @intCast(spare);
+                    new_entry.name_len = @intCast(name.len);
+                    new_entry.setFileType(mode);
+                    const name_start: [*]u8 = @ptrFromInt(@intFromPtr(new_entry) + @sizeOf(Ext2DirEntry));
+                    @memcpy(name_start[0..name.len], name);
+                    _ = try sb.writeBuff(pbn, blk.ptr, sb.base.block_size);
+                    return;
+                }
+                off += old_de.rec_len;
+            }
+            blk_idx += 1;
         }
     }
 };
