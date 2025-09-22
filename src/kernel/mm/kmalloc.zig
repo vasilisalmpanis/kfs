@@ -27,7 +27,7 @@ pub fn kfree(addr: *const anyopaque) void {
 }
 
 pub fn kmallocSlice(comptime T: type, count: u32) ?[]T {
-    const addr = mm.kheap.alloc(count, true, false) catch return null;
+    const addr = mm.kheap.alloc(count * @sizeOf(T), true, false) catch return null;
     if (addr == 0) return null;
     const ptr: [*]T = @ptrFromInt(addr);
     return ptr[0..count];
