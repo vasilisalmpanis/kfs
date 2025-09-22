@@ -82,6 +82,7 @@ pub fn open(
 ) !u32 {
     if (filename) |f| {
         const path: []u8 = std.mem.span(f);
+        kernel.logger.INFO("opening {s}\n", .{path});
         var file_segment: []const u8 = "";
         const parent_dir = try fs.path.dir_resolve(
             path,

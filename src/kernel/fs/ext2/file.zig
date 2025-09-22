@@ -163,8 +163,8 @@ pub const Ext2File = struct {
             const dirent: *fs.LinuxDirent = @ptrFromInt(@intFromPtr(buf.ptr) + bytes_written);
 
             dirent.ino = ext_dir.inode;
-            dirent.off = base.pos;
             dirent.reclen = @intCast(entry_size);
+            dirent.off = base.pos + dirent.reclen;
             if (dirent.reclen % @sizeOf(usize) != 0) dirent.reclen += @sizeOf(usize) - (dirent.reclen % @sizeOf(usize));
             switch (ext_dir.file_type) {
                 0 => dirent.type = fs.DT_UNKNOWN,

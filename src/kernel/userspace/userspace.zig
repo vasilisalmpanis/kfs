@@ -200,7 +200,7 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
     const stack_pages: u32 = 10;
     var heap_start: u32 = 0;
 
-    const prot: u32 = krn.mm.PROC_RW;
+    const prot: u32 = krn.mm.PROT_RW;
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
 
     krn.logger.INFO("Goind to userspace {any}\n", .{ehdr});
