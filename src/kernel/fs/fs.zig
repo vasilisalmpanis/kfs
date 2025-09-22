@@ -102,7 +102,6 @@ pub const Dirent64 = extern struct {
     off: u64,
     reclen: u16,
     type: u8,
-    name: [256]u8,
 };
 
 pub const LinuxDirent = extern struct {
@@ -291,6 +290,10 @@ pub const UMode = packed struct {
             return true;
         }
         return false;
+    }
+
+    pub fn toU16(self: *const UMode) u16 {
+        return @bitCast(self.*);
     }
 };
 

@@ -132,7 +132,7 @@ pub const SyscallTable = brk: {
         .SYS_getitimer                  = &notImpl,
         .SYS_stat                       = &notImpl,
         .SYS_lstat                      = &notImpl,
-        .SYS_fstat                      = @ptrCast(&@import("stat.zig").fstat64),
+        .SYS_fstat                      = @ptrCast(&@import("stat.zig").fstat),
         .SYS_olduname                   = &notImpl,
         .SYS_iopl                       = &notImpl,
         .SYS_vhangup                    = &notImpl,
@@ -234,6 +234,7 @@ pub const SyscallTable = brk: {
         .SYS_openat                     = @ptrCast(&@import("open.zig").openat),
         .SYS_set_thread_area            = @ptrCast(&@import("thread.zig").set_thread_area),
         .SYS_set_tid_address            = @ptrCast(&@import("thread.zig").set_tid_address),
+        .SYS_statx                      = @ptrCast(&@import("statx.zig").statx),
     });
 };
 

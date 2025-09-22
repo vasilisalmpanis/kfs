@@ -34,6 +34,7 @@ pub fn syscallsManager(state: *arch.Regs) void {
             state.edi,
             state.ebp,
         ) catch |err| {
+            krn.logger.WARN("syscall failed with {any} call: {t}\n", .{err, sys});
             state.eax = errors.toErrno(err);
             return ;
         };
