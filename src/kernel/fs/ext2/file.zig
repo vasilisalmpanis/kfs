@@ -32,27 +32,30 @@ pub const Ext2File = struct {
         // if (to_write > ino.base.size -| base.pos) {
         //     to_write = ino.base.size -| base.pos;
         // }
-        if (to_write == 0) return 0;
+        if (to_write == 0)
+            return 0;
 
         const bs = ext2_sb.base.block_size;
         const lbn = base.pos / bs;
         // const write_offset: u32 = @intCast(base.pos % bs);
 
         // resolve lbn -> physical block number
-        const pbn = try ext2_sb.resolveLbn(ino, lbn);
+        var pbn = try ext2_sb.resolveLbn(ino, lbn);
 
         // if pbn == 0 => sparse hole: return zeroed bytes up to block boundary
         if (pbn == 0) {
-            // TODO
-            return 0;
+            pbn = try ino.allocBlock();
         }
 
         // read the actual data block
         const written = try ext2_sb.writeBuff(pbn, buf, size);
 
         base.pos += written;
-        if (base.pos > ino.base.size)
+        if (base.pos > ino.base.size) {
             ino.base.size = base.pos;
+            ino.data.i_size = ino.base.size;
+            try ino.iput();
+        }
         return  written;
     }
 

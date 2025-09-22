@@ -872,7 +872,8 @@ fn ata_write(file: *kernel.fs.File, buff: [*]const u8, size: u32) !u32 {
         const offset: u32 = file.pos % ATADrive.SECTOR_SIZE;
         var to_write = ATADrive.SECTOR_SIZE - offset;
 
-        if (size < to_write) to_write = size;
+        if (size < to_write)
+            to_write = size;
         try ata_dev.readSectorsDMA(lba, 1);
         const dma_buf: [*]u8 = @ptrFromInt(ata_dev.dma_buff_virt);
         @memcpy(dma_buf[offset..offset + to_write], buff[0..to_write]);
