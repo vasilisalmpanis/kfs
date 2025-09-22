@@ -17,12 +17,12 @@ pub fn do_open(
         return errors.EMFILE;
     };
     var new_mode = mode;
-    new_mode.type = kernel.fs.S_IFREG;
     errdefer _ = tsk.current.files.releaseFD(fd);
     const parent_inode: *fs.Inode = parent_dir.dentry.inode;
     var target_path = parent_dir.clone();
     target_path.stepInto(name) catch {
         if (flags & fs.file.O_CREAT != 0) {
+            new_mode.type = kernel.fs.S_IFREG;
             const new_dentry = parent_inode.ops.create(
                 parent_inode,
                 name,
