@@ -331,7 +331,7 @@ fn ls(self: *Shell, args: [][]const u8) void {
             const epoch_month_day = epoch_year.calculateMonthDay();
             const epoch_day_sec = epoch_secs.getDaySeconds();
             self.print(
-                "{c}{s} {d:>5} {d:>5} {B:>8.2} {d:>4}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}  {s}\n", 
+                "{c}{s} {d:>5} {d:>5} {Bi:>7.0} {d:>4}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}  {s}\n", 
                 .{
                     dirent.verboseType(),
                     perms[0..9],
