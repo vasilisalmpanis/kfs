@@ -323,4 +323,42 @@ pub fn init() void {
     sysfs.init();
     devfs.init();
     ext2.init();
+
+    if (FileSystem.find("examplefs")) |fs| {
+        const root_mount = Mount.mount(
+            "examplefs",
+            "/",
+            fs
+        ) catch |err| {
+            kernel.logger.ERROR("Failed to mount root: {t}\n",.{err});
+            @panic("Failed to mount root\n");
+        };
+        kernel.task.initial_task.fs = FSInfo.alloc() catch |err| {
+            kernel.logger.ERROR(
+                "Failed to alloc FSInfo for initial task: {t}\n",
+                .{err}
+            );
+            @panic("Initial task must have a root,pwd\n");
+        };
+        kernel.task.initial_task.fs.root = path.Path.init(
+            root_mount,
+            root_mount.sb.root
+        );
+        kernel.task.initial_task.fs.pwd = path.Path.init(
+            root_mount,
+            root_mount.sb.root
+        );
+        if (TaskFiles.new()) |files| {
+            kernel.task.initial_task.files = files;
+        } else {
+            kernel.logger.ERROR(
+                "Failed to alloc TaskFiles for initial task\n",
+                .{}
+            );
+            @panic("PID 0 doesn't have TaskFiles struct, OOM\n");
+        }
+    } else {
+        kernel.logger.ERROR("Filesystem examplefs not found!\n",.{});
+        @panic("Failed to mount root!\n");
+    }
 }
