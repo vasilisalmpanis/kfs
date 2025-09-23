@@ -158,6 +158,8 @@ pub const MM = struct {
     env_end: u32 = 0,
     bss: u32 = 0,
     heap: u32 = 0,
+    brk_start: u32 = 0,
+    brk: u32 = 0,
     vas: u32 = 0,
     vmas: ?*VMA = null,
 
@@ -325,6 +327,8 @@ pub const MM = struct {
             _mmap.code = self.code;
             _mmap.data = self.data;
             _mmap.heap = self.heap;
+            _mmap.brk_start = self.brk_start;
+            _mmap.brk = self.brk;
         }
         return mmap;
     }

@@ -72,6 +72,7 @@ pub fn do_open(
         kernel.mm.kfree(target_path.dentry);
         return errors.ENOENT;
     };
+    kernel.logger.DEBUG("opened {s} with fd {d}", .{name, fd});
     return fd;
 }
 
