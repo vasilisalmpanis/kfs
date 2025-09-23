@@ -261,7 +261,9 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
     arch.gdt.tss.esp0 = krn.task.current.regs.esp;
     heap_start = arch.pageAlign(heap_start, false);
     krn.logger.INFO("heap_start 0x{X:0>8}\n", .{heap_start});
-    krn.task.current.mm.?.heap = heap_start;
+    krn.task.current.mm.?.brk_start = heap_start;
+    krn.task.current.mm.?.brk = heap_start;
+    krn.task.current.mm.?.heap = heap_start + 32 * 1024 * 1024;
     krn.task.current.mm.?.stack_bottom = stack_bottom;
     krn.task.current.mm.?.stack_top = stack_bottom + stack_size;
     krn.task.current.mm.?.code = ehdr.e_entry;

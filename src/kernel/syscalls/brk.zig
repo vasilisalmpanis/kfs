@@ -4,17 +4,26 @@ const krn = @import("../main.zig");
 const arch = @import("arch");
 
 pub fn brk(addr: u32) !u32 {
-    const current_heap = krn.task.current.mm.?.heap;
+    const current_brk = krn.task.current.mm.?.brk;
 
+    var req = addr;
     // If addr is 0, return current break (heap end)
-    if (addr == 0) {
-        krn.logger.INFO("brk(0) returning current heap: 0x{x}\n", .{current_heap});
-        return current_heap;
+    if (req == 0) {
+        krn.logger.INFO("brk(0) returning current heap: 0x{x}\n", .{current_brk});
+        return current_brk;
     }
-    if (addr < current_heap)
-        return errors.EINVAL;
-    const len = arch.pageAlign(addr - current_heap, false);
-    const new_heap = try krn.task.current.mm.?.mmap_area(current_heap,
+    if (req < krn.task.current.mm.?.brk_start) {
+        req = krn.task.current.mm.?.brk_start;
+    }
+    if (req < current_brk) {
+        _ = try krn.do_munmap(krn.task.current.mm.?, req, current_brk);
+        krn.task.current.mm.?.brk = req;
+        return 0;
+    }
+    if (req == current_brk)
+        return 0;
+    const len = arch.pageAlign(req - current_brk, false);
+    const new_brk = try krn.task.current.mm.?.mmap_area(current_brk,
         len,
         krn.mm.PROT_RW, 
         krn.mm.MAP{
@@ -23,6 +32,6 @@ pub fn brk(addr: u32) !u32 {
         },
     );
     // TODO: fix brk cuz its broken
-    krn.task.current.mm.?.heap = new_heap + len;
+    krn.task.current.mm.?.brk = new_brk;
     return 0;
 }

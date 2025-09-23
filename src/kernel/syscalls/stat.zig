@@ -38,6 +38,8 @@ pub const Stat = extern struct {
     st_ino: u64,
 };
 
+// ==== OldStat ========================
+
 const OldStat = extern struct {
     st_dev: u16,
     st_ino: u16,
@@ -46,59 +48,13 @@ const OldStat = extern struct {
     st_uid: u16,
     st_gid: u16,
     st_rdev: u16,
-    _pad: u32,
     st_size: u32,
-    st_blocksize: u32,
-    _pad2: u32,
-    st_blocks: u32,
     st_atime: u32,
-    st_atime_nsec: u32,
     st_mtime: u32,
-    st_mtime_nsec: u32,
     st_ctime: u32,
-    st_ctime_nsec: u32,
-    _unused4: u32,
-    _unused5: u32,
 };
 
-pub fn do_stat64(inode: *fs.Inode, buf: *Stat) !void {
-    const sb = if (inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
-    buf.st_dev = 0;
-    if (sb.dev_file) |blkdev| {
-        const dev: u16 = @bitCast(blkdev.inode.dev_id);
-        buf.st_dev = @intCast(dev);
-    }
-    buf._st_ino = inode.i_no;
-    buf.st_ino = inode.i_no;
-    buf.st_nlink = 0; // No hard links yet.
-    const mode: u16 = @bitCast(inode.mode);
-    buf.__padding = 0;
-    buf.__pad0 = 0;
-    buf.st_mode = @intCast(mode);
-    krn.logger.INFO("mode {any}\n", .{mode});
-    buf.st_uid = @intCast(inode.uid);
-    buf.st_gid = @intCast(inode.gid);
-    const dev: u16 = @bitCast(inode.dev_id);
-    buf.st_rdev = @intCast(dev);
-    buf.st_size = inode.size;
-    buf.st_blksize = sb.block_size;
-    buf.st_blocks = 0;
-
-    buf.st_atim = Timespec{
-        .tv_sec = inode.atime,
-        .tv_nsec = 0,
-    };
-    buf.st_mtim = Timespec{
-        .tv_sec = inode.mtime,
-        .tv_nsec = 0,
-    };
-    buf.st_ctim = Timespec{
-        .tv_sec = inode.ctime,
-        .tv_nsec = 0,
-    };
-}
-
-pub fn do_oldstat64(inode: *fs.Inode, buf: *OldStat) !void {
+pub fn do_oldstat(inode: *fs.Inode, buf: *OldStat) !void {
     const sb = if (inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
     buf.st_dev = 0;
     if (sb.dev_file) |blkdev| {
@@ -108,33 +64,104 @@ pub fn do_oldstat64(inode: *fs.Inode, buf: *OldStat) !void {
     buf.st_ino = @intCast(inode.i_no);
     buf.st_nlink = 0; // No hard links yet.
     const mode: u16 = @bitCast(inode.mode);
-    buf._pad = 0;
-    buf._pad2 = 0;
     buf.st_mode = @intCast(mode);
-    krn.logger.INFO("mode {any}\n", .{mode});
     buf.st_uid = @intCast(inode.uid);
     buf.st_gid = @intCast(inode.gid);
     const dev: u16 = @bitCast(inode.dev_id);
     buf.st_rdev = @intCast(dev);
     buf.st_size = inode.size;
-    buf.st_blocksize = sb.block_size;
-    buf.st_blocks = 0;
 
     buf.st_atime = 0;
-    buf.st_atime_nsec = 0;
     buf.st_ctime = 0;
-    buf.st_ctime_nsec = 0;
     buf.st_mtime = 0;
-    buf.st_mtime_nsec = 0;
-    buf._unused4 = 0;
-    buf._unused5 = 0;
 }
 
-pub fn stat64(path: ?[*:0]u8, buf: ?*Stat) !u32 {
-    if (path == null or buf == null) return errors.EFAULT;
+pub fn fstat(fd: u32, buf: ?*OldStat) !u32 {
+    krn.logger.DEBUG("fstat fd: {d}", .{fd});
+    if (buf == null) {
+        return errors.EFAULT;
+    } 
+    if (krn.task.current.files.fds.get(fd)) |file| {
+        try do_oldstat(file.inode, buf.?);
+        return 0;
+    }
+    return errors.EBADF;
+}
 
-    const path_slice = std.mem.span(path.?);
-    const stat_buf: *Stat = buf.?;
+
+// ======== STAT64 =====================
+
+const Stat64 = extern struct{
+	st_dev: u64,	        // Device. 
+	st_ino: u64,	        // File serial number. 
+	st_mode: u32,	        // File mode. 
+	st_nlink: u32,	        // Link count. 
+	st_uid: u32,		    // User ID of the file's owner. 
+	st_gid: u32,		    // Group ID of the file's group.
+	st_rdev: u64,	        // Device number, if device. 
+	__pad1: u64,
+	st_size: i64,	        //Size of file, in bytes.
+	st_blksize: i32,	    //Optimal block size for I/O.
+	__pad2: i32,
+	st_blocks: i64,	        // Number 512-byte blocks allocated
+	st_atime: i32,	        // Time of last access.
+	st_atime_nsec: u32,
+	st_mtime: i32,	        // Time of last modification.
+	st_mtime_nsec: u32,
+	st_ctime: i32,	        // Time of last status change.
+	st_ctime_nsec: u32,
+	__unused4: u32,
+	__unused5: u32,
+};
+
+pub fn do_stat64(inode: *fs.Inode, buf: *Stat64) !void {
+    const sb = if (inode.sb) |_s| _s
+        else return krn.errors.PosixError.EINVAL;
+    buf.st_dev = 0;
+    if (sb.dev_file) |blkdev| {
+        const dev: u16 = @bitCast(blkdev.inode.dev_id);
+        buf.st_dev = @intCast(dev);
+    }
+    buf.st_ino = @intCast(inode.i_no);
+    const mode: u16 = @bitCast(inode.mode);
+    buf.st_mode = @intCast(mode);
+
+    buf.st_nlink = 0; // No hard links yet.
+    buf.st_uid = @intCast(inode.uid);
+    buf.st_gid = @intCast(inode.gid);
+    const dev: u16 = @bitCast(inode.dev_id);
+    buf.st_rdev = @intCast(dev);
+
+    buf.__pad1 = 0;
+
+    buf.st_size = @intCast(inode.size);
+    buf.st_blksize = @intCast(sb.block_size);
+
+    buf.__pad2 = 0;
+
+    buf.st_blocks = 0;
+
+    buf.st_atime = @intCast(inode.atime);
+    buf.st_atime_nsec = 0;
+    buf.st_mtime = @intCast(inode.mtime);
+    buf.st_mtime_nsec = 0;
+    buf.st_ctime = @intCast(inode.ctime);
+    buf.st_ctime_nsec = 0;
+
+    // buf.__unused4 = 0;
+    // buf.__unused5 = 0;
+}
+
+pub fn lstat64(path: ?[*:0]u8, buf: ?*Stat64) !u32 {
+    return stat64(path, buf);
+}
+
+pub fn stat64(path: ?[*:0]u8, buf: ?*Stat64) !u32 {
+    if (path == null or buf == null)
+        return errors.EFAULT;
+
+    const path_slice: []const u8 = std.mem.span(path.?);
+    const stat_buf: *Stat64 = buf.?;
     const inode_path: fs.path.Path = try fs.path.resolve(path_slice);
     const inode: *fs.Inode = inode_path.dentry.inode;
 
@@ -142,18 +169,7 @@ pub fn stat64(path: ?[*:0]u8, buf: ?*Stat) !u32 {
     return 0;
 }
 
-pub fn fstat(fd: u32, buf: ?*OldStat) !u32 {
-    if (buf == null) {
-        return errors.EFAULT;
-    } 
-    if (krn.task.current.files.fds.get(fd)) |file| {
-        try do_oldstat64(file.inode, buf.?);
-        return 0;
-    }
-    return errors.EBADF;
-}
-
-pub fn fstat64(fd: u32, buf: ?*Stat) !u32 {
+pub fn fstat64(fd: u32, buf: ?*Stat64) !u32 {
     if (buf == null) {
         return errors.EFAULT;
     }
@@ -167,7 +183,7 @@ pub fn fstat64(fd: u32, buf: ?*Stat) !u32 {
 pub fn fstatat64(
     dir_fd: u32,
     path: ?[*:0]u8,
-    buf: ?*Stat,
+    buf: ?*Stat64,
     flags: u32
 ) !u32 {
     _ = flags;
@@ -177,7 +193,7 @@ pub fn fstatat64(
     if (path == null) {
         return errors.ENOENT;
     }
-    const path_slice = std.mem.span(path.?);
+    const path_slice: []const u8 = std.mem.span(path.?);
     if (path_slice.len == 0) {
         return errors.ENOENT;
     }
