@@ -38,6 +38,29 @@ pub const Stat = extern struct {
     st_ino: u64,
 };
 
+const OldStat = extern struct {
+    st_dev: u16,
+    st_ino: u16,
+    st_mode: u16,
+    st_nlink: u16,
+    st_uid: u16,
+    st_gid: u16,
+    st_rdev: u16,
+    _pad: u32,
+    st_size: u32,
+    st_blocksize: u32,
+    _pad2: u32,
+    st_blocks: u32,
+    st_atime: u32,
+    st_atime_nsec: u32,
+    st_mtime: u32,
+    st_mtime_nsec: u32,
+    st_ctime: u32,
+    st_ctime_nsec: u32,
+    _unused4: u32,
+    _unused5: u32,
+};
+
 pub fn do_stat64(inode: *fs.Inode, buf: *Stat) !void {
     const sb = if (inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
     buf.st_dev = 0;
@@ -75,6 +98,38 @@ pub fn do_stat64(inode: *fs.Inode, buf: *Stat) !void {
     };
 }
 
+pub fn do_oldstat64(inode: *fs.Inode, buf: *OldStat) !void {
+    const sb = if (inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
+    buf.st_dev = 0;
+    if (sb.dev_file) |blkdev| {
+        const dev: u16 = @bitCast(blkdev.inode.dev_id);
+        buf.st_dev = @intCast(dev);
+    }
+    buf.st_ino = @intCast(inode.i_no);
+    buf.st_nlink = 0; // No hard links yet.
+    const mode: u16 = @bitCast(inode.mode);
+    buf._pad = 0;
+    buf._pad2 = 0;
+    buf.st_mode = @intCast(mode);
+    krn.logger.INFO("mode {any}\n", .{mode});
+    buf.st_uid = @intCast(inode.uid);
+    buf.st_gid = @intCast(inode.gid);
+    const dev: u16 = @bitCast(inode.dev_id);
+    buf.st_rdev = @intCast(dev);
+    buf.st_size = inode.size;
+    buf.st_blocksize = sb.block_size;
+    buf.st_blocks = 0;
+
+    buf.st_atime = 0;
+    buf.st_atime_nsec = 0;
+    buf.st_ctime = 0;
+    buf.st_ctime_nsec = 0;
+    buf.st_mtime = 0;
+    buf.st_mtime_nsec = 0;
+    buf._unused4 = 0;
+    buf._unused5 = 0;
+}
+
 pub fn stat64(path: ?[*:0]u8, buf: ?*Stat) !u32 {
     if (path == null or buf == null) return errors.EFAULT;
 
@@ -87,12 +142,12 @@ pub fn stat64(path: ?[*:0]u8, buf: ?*Stat) !u32 {
     return 0;
 }
 
-pub fn fstat(fd: u32, buf: ?*Stat) !u32 {
+pub fn fstat(fd: u32, buf: ?*OldStat) !u32 {
     if (buf == null) {
         return errors.EFAULT;
     } 
     if (krn.task.current.files.fds.get(fd)) |file| {
-        try do_stat64(file.inode, buf.?);
+        try do_oldstat64(file.inode, buf.?);
         return 0;
     }
     return errors.EBADF;
