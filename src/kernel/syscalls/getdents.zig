@@ -7,6 +7,7 @@ pub fn getdents(_: u32, _: [*]u8, _: u32) !u32 {
 }
 
 pub fn getdents64(fd: u32, dirents: [*]u8, size: u32) !u32 {
+    krn.logger.INFO("called with {d}\n", .{fd});
     if (krn.task.current.files.fds.get(fd)) |dir_file| {
         if (dir_file.inode.mode.isDir()) {
             if (dir_file.ops.readdir) |readdir| {
