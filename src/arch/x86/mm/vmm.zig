@@ -262,6 +262,7 @@ pub const VMM = struct {
         const new_pd_ph_addr = self.pmm.allocPage();
         const new_pair = self.mapVAS(new_pd_ph_addr);
         const new_pd: [*]u32 = @ptrFromInt(new_pair.virt);
+        @memset(new_pd[0..1024], 0);
         // recursive mapping
         new_pd[1023] = new_pd_ph_addr | PAGE_PRESENT | PAGE_WRITE;
 
