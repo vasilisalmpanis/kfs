@@ -10,6 +10,7 @@ const signals = @import("./signals.zig");
 const std = @import("std");
 const gdt = @import("arch").gdt;
 const krn = @import("../main.zig");
+const arch = @import("arch");
 
 extern const stack_top: u32;
 
@@ -24,6 +25,29 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
         gdt.tss.esp0 = to.stack_bottom + STACK_SIZE; // this needs fixing
     }
     asm volatile("mov %[pd], %cr3"::[pd] "r" (to.mm.?.vas));
+    var access: u8 = 0;
+    access |= 0x10; // S=1
+    access |= 0x60; // DPL=3
+    access |= 0x02; // data, writable
+    access |= 0x80; // P=1  (force present, don’t trust user)
+
+    var gran: u8 = 0;
+    gran |= 0x80; // G=1 (pages)
+    gran |= 0x40; // D=1 (32-bit)
+    gran |= 0x10; // AVL=1 (harmless)
+    arch.gdt.gdtSetEntry(
+        arch.gdt.GDT_TLS0_INDEX,
+        to.tls,
+        to.limit,
+        access,
+        gran,
+    );
+    const sel: u16 = @intCast((arch.gdt.GDT_TLS0_INDEX << 3) | 0x3);
+    asm volatile (
+        "mov %[_sel], %gs"
+        :: [_sel]"r"(sel)
+        : .{ .memory = true}
+    );
     return @ptrFromInt(to.regs.esp);
 }
 

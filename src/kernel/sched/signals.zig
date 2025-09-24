@@ -277,12 +277,12 @@ pub const SigHand = struct {
 
     pub fn isBlocked(self: *SigHand, signal: Signal) bool {
         if (tsk.current.sigmask.sigIsSet(signal))
-            return true;
+            return false;
         for(1..32) |idx| {
             const action = self.actions.get(@enumFromInt(idx));
             if (action.mask.sigIsSet(@enumFromInt(idx))) {
                 if (action.mask.sigIsSet(signal))
-                    return true;
+                    return false;
             }
         }
         return false;

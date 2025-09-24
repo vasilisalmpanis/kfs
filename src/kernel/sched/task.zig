@@ -89,6 +89,8 @@ pub const Task = struct {
     stack_bottom:   u32,
     state:          TaskState       = TaskState.RUNNING,
     regs:           Regs            = Regs.init(),
+    tls:            u32             = 0,
+    limit:          u32             = 0,
 
     tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
@@ -121,6 +123,8 @@ pub const Task = struct {
             .tsktype = tp,
             .fs = undefined,
             .files = undefined,
+            .tls = 0,
+            .limit = 0,
         };
     }
 
@@ -269,6 +273,7 @@ pub const Task = struct {
         self.state = .STOPPED;
         tasks_mutex.lock();
         self.list.del();
+        self.tree.del();
         if (stopped_tasks == null) {
             stopped_tasks = &self.list;
             stopped_tasks.?.setup();

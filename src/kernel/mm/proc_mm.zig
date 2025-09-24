@@ -343,8 +343,6 @@ pub const MM = struct {
     pub fn releaseMappings(self: *MM) void {
         if (self == &init_mm)
             return ;
-        // const pair: krn.mm.VASpair = mm.virt_memory_manager.mapVAS(self.vas);
-        // defer mm.virt_memory_manager.unmapVAS(pair);
 
         if (self.vmas) |head| {
             var it = head.list.iterator();
