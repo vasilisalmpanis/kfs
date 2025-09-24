@@ -53,6 +53,8 @@ pub fn doFork() !u32 {
     var child_regs: *arch.Regs = @ptrFromInt(stack_top);
     child_regs.* = parent_regs.*;
     child_regs.eax = 0;
+    child.?.tls = krn.task.current.tls;
+    child.?.limit = krn.task.current.limit;
     child.?.initSelf(
         stack_top,
         stack,

@@ -52,6 +52,8 @@ pub fn set_thread_area(ptr: *UserDesc) !u32 {
     gran |= 0x40; // D=1 (32-bit)
     gran |= 0x10; // AVL=1 (harmless)
 
+    krn.task.current.tls = ptr.base_addr;
+    krn.task.current.limit = limit;
     arch.gdt.gdtSetEntry(
         @intCast(ptr.entry_number),
         ptr.base_addr,

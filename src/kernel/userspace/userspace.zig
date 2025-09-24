@@ -221,6 +221,7 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
         const page_end = arch.pageAlign(p_hdr.p_vaddr + p_hdr.p_memsz, false);  // Round up to page boundary
         const aligned_size = page_end - page_start;
 
+        krn.logger.WARN("Creating Mapping {x}-{x}\n", .{page_start, page_start + aligned_size});
         _ = krn.task.current.mm.?.mmap_area(
             page_start,
             aligned_size,
