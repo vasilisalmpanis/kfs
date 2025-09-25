@@ -53,20 +53,6 @@ pub fn openStdFds() !void {
     _ = try krn.dup2(fd, 2);
 }
 
-pub fn openStdFds() !void {
-    const path = try krn.fs.path.resolve("/dev");
-    defer path.release();
-    const fd = try krn.do_open(
-        path,
-        "tty",
-        0o0000002,
-        .{ .grp = 0o6, .other = 0o6, .usr = 0o6 }
-    );
-    _ = try krn.dup2(fd, 0);
-    _ = try krn.dup2(fd, 1);
-    _ = try krn.dup2(fd, 2);
-}
-
 pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const u8, envp: []const []const u8) u32{
     // Auxiliary vector
     var argv_str_size: u32 = 0;

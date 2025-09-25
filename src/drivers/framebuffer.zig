@@ -34,6 +34,7 @@ pub const FrameBuffer = struct {
             const num_pages = (fb_size + 0xFFF) / mm.PAGE_SIZE;
             var i: u32 = 0;
             var addr: u32 = @truncate(tag.addr);
+            const page_off: u32 = @truncate(tag.addr & 0xFFF);
             addr &= 0xFFFFF000;
             var virt_addr: u32 = mm.virt_memory_manager.findFreeSpace(
                 num_pages,
@@ -47,11 +48,14 @@ pub const FrameBuffer = struct {
                 virt_addr += mm.PAGE_SIZE;
                 addr += mm.PAGE_SIZE;
             }
-            const buffer: ?[*]u32 = mm.kmallocArray(u32, tag.width * tag.height);
-            if (buffer) |_buffer| {
+            const bpp = tag.bpp;
+            const px_stride = tag.pitch / (bpp / 8);
+            const back_len  = px_stride * tag.height;
+
+            if (mm.kmallocArray(u32, back_len)) |_buffer| {
                 var fb = FrameBuffer{
                     .fb_info = tag,
-                    .fb_ptr = @ptrFromInt(first_addr),
+                    .fb_ptr = @ptrFromInt(first_addr + page_off),
                     .cwidth = (tag.pitch / 4) / font.width,
                     .cheight = tag.height / font.height,
                     .virtual_buffer = _buffer,
