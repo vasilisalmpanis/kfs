@@ -97,7 +97,17 @@ pub const Shell = struct {
         if (self.commands.get(cmd_name)) |cmd| {
             cmd.hndl(self, cmd_args);
         } else {
-            self.print("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{cmd_name});
+            if (cmd_name.len > 0 and cmd_name[0] == '/') {
+                execve(self, self.arg_buf[0..arg_count]);
+            } else if (cmd_name.len > 0) {
+                var full_cmd: [512]u8 = .{0} ** 512;
+                @memcpy(full_cmd[0..5], "/bin/");
+                @memcpy(full_cmd[5..], cmd_name);
+                self.arg_buf[0] = full_cmd[0..cmd_name.len + 5];
+                execve(self, self.arg_buf[0..arg_count]);
+            } else {
+                self.print("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{cmd_name});
+            }
         }
     }
 

@@ -105,7 +105,9 @@ pub fn hStackSegmentFault(regs: *Regs) void {
 }
 
 pub fn hGeneralProtectionFault(regs: *Regs) void {
-    _ = regs;
+    kernel.logger.ERROR("PID {d}\n", .{kernel.task.current.pid});
+    regs.dump();
+    dbg.traceStackTrace(20);
     @panic("hGeneralProtectionFault");
 }
 
