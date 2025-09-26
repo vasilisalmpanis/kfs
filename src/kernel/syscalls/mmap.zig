@@ -24,14 +24,27 @@ pub fn mmap2(
     length: u32,
     prot: u32,
     flags: mm.MAP,
-    _: i32, // fd
-    _: u32, // off
+    fd: i32,
+    off: u32,
 ) !u32 {
-    krn.logger.INFO("mmap2: {any} {any} {any} flags: {any}", .{
-        addr,
-        length,
-        prot,
-        flags,
+    krn.logger.DEBUG(\\mmap2
+        \\  addr:  0x{x:0>8}
+        \\  size:  {d:<10}
+        \\  prot:  0x{x:0>8}
+        \\  fd:    {d:<10}
+        \\  off:   {d:<10}
+        \\  flags: type:      {t}
+        \\         anon:      {}
+        \\         fixed:     {}
+        \\         stack:     {}
+        \\         growsdown: {}
+        \\         exec:      {}
+        \\
+        ,.{
+            @intFromPtr(addr),
+            length, prot, fd, off,
+            flags.TYPE, flags.ANONYMOUS, flags.FIXED,
+            flags.STACK, flags.GROWSDOWN, flags.EXECUTABLE
     });
     if (prot & ~(mm.PROT_EXEC | mm.PROT_READ | mm.PROT_WRITE | mm.PROT_NONE) > 0)
         return errors.EINVAL;
@@ -52,7 +65,8 @@ pub fn mmap2(
         // look through mappings and just give back one.
         hint = krn.task.current.mm.?.heap;
     }
-    return try krn.task.current.mm.?.mmap_area(hint, len, prot | mm.PROT_WRITE, flags);
+    // TODO: not adding READ and WRITE flags but implement mprotect
+    return try krn.task.current.mm.?.mmap_area(hint, len, prot | mm.PROT_WRITE | mm.PROT_READ, flags);
 }
 
 pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {

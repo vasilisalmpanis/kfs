@@ -31,7 +31,7 @@ pub const O_CLOEXEC	= 0o2000000;
 /// File: it represents any currently open inode in the current process.
 pub const File = struct {
     mode: fs.UMode,
-    flags: u16,
+    flags: u32,
     ops: * const FileOps,
     pos: u32,
     inode: *fs.Inode,

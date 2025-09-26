@@ -261,7 +261,11 @@ pub const MM = struct {
                         error.OutOfMemory => return errors.ENOMEM
                     };
                     if (hint < self.vmas.?.start)
-                        self.vmas = new_vma;
+                        self.vmas = new_vma;        
+                    krn.logger.DEBUG(
+                        "mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+                        .{hint, end}
+                    );
                     return @intCast(hint);
                 }
                 if (flags.FIXED == false) {
@@ -289,6 +293,10 @@ pub const MM = struct {
         if (self.vmas == null or hint < self.vmas.?.start) {
             self.vmas = new_vma;
         }
+        krn.logger.DEBUG(
+            "mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+            .{hint, end}
+        );
         return @intCast(hint);
     }
 

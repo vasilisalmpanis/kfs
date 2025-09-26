@@ -8,8 +8,9 @@ pub fn mprotect(
     len: u32,
     prot: u32
 ) !u32 {
-    _ = addr;
-    _ = len;
-    _ = prot;
+    krn.logger.DEBUG(
+        "mprotect addr {x}, len {d}, prot {x}",
+        .{@intFromPtr(addr), len, prot}
+    );
     return 0;
 }
