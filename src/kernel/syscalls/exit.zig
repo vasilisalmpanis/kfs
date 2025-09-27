@@ -33,6 +33,7 @@ pub fn exit(error_code: i32) !u32 {
             parent.state = .RUNNING;
         }
     }
+    tsk.current.refcount.unref();
     tsk.current.state = .ZOMBIE;
     sched.reschedule();
     return 0;

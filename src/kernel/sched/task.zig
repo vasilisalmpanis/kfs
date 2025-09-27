@@ -273,7 +273,6 @@ pub const Task = struct {
         self.state = .STOPPED;
         tasks_mutex.lock();
         self.list.del();
-        self.tree.del();
         if (stopped_tasks == null) {
             stopped_tasks = &self.list;
             stopped_tasks.?.setup();
