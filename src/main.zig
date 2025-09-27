@@ -131,6 +131,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.fs.init();
 
     // Get PID1
+    krn.kallsyms.dump();
     _ = krn.kthreadCreate(&user_thread, null) catch null;
 
     // Devices

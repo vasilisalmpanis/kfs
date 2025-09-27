@@ -1,7 +1,12 @@
 ENTRY (_start)
 
-SECTIONS
-{
+EXTERN(kallsyms_string_table)
+EXTERN(kallsyms_addresses)
+EXTERN(kallsyms_string_indices)
+EXTERN(kallsyms_count)
+EXTERN(kallsyms_count)
+
+SECTIONS {
     . = 0x00100000;
 	/* The kernel will live at 3GB + 1MB in the virtual address space, */
 	/* which will be mapped to 1MB in the physical address space. */
@@ -39,6 +44,11 @@ SECTIONS
 		*(.bss)
 		*(.bootstrap_stack)
 	}
+	.kallsyms ALIGN(4K) : AT (ADDR (.kallsyms) - 0xC0000000)
+	{
+		KEEP(*(.kallsyms))
+	}
+
 	/* Add a symbol that indicates the end address of the kernel. */
 	_kernel_end = .;
 }

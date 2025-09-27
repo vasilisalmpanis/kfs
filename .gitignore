@@ -9,3 +9,5 @@ userspace_c
 *.img
 zls.json
 disk/*.img
+*.o
+kallsyms.zig

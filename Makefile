@@ -3,6 +3,8 @@ KERNEL = zig-out/bin/kfs.bin
 
 ISO_DIR = iso
 SRC_DIR = src
+BUILD_DIR = build
+SCRIPTS = scripts
 USERSPACE_DIR = userspace
 
 IMG 	= ext2.img
@@ -17,6 +19,9 @@ endif
 
 SRC = $(shell find $(SRC_DIR) -name '*.zig')
 SRC += $(shell find $(USERSPACE_DIR) -name '*.zig')
+
+SYM = $(BUILD_DIR)/kallsyms_template.o
+
 ASM_SRC = $(shell find $(SRC_DIR) -name '*.s')
 GRUB_CFG = $(ISO_DIR)/boot/grub/grub.cfg
 QEMU = qemu-system-i386
@@ -34,11 +39,23 @@ $(NAME): $(KERNEL) $(GRUB_CFG)
 	cp $(KERNEL) $(ISO_DIR)/boot/
 	$(MKRESCUE) --compress=xz -o $(NAME) $(ISO_DIR)
 
-$(KERNEL): $(SRC) $(ASM_SRC)
+$(KERNEL): $(SRC) $(ASM_SRC) $(SYM)
+	rm -rf $(BUILD_DIR)/kallsyms.zig
+	rm -rf $(BUILD_DIR)/kallsyms.o
 	zig build -freference-trace=20 # -Doptimize=ReleaseSafe
+
+	# Second Pass
+	python3  $(SCRIPTS)/gen_kallsyms.py zig-out/bin/kfs.bin > $(BUILD_DIR)/kallsyms.zig
+	zig build-obj -target x86-freestanding-none -fstrip $(BUILD_DIR)/kallsyms.zig -femit-bin=$(BUILD_DIR)/kallsyms.o
+	zig build -freference-trace=20 # -Doptimize=ReleaseSafe
+
+$(SYM):
+	zig build-obj -target x86-freestanding-none -fstrip $(BUILD_DIR)/kallsyms_template.zig -femit-bin=$(BUILD_DIR)/kallsyms_template.o
 
 clean:
 	rm -f ${IMG}
+	rm -f $(BUILD_DIR)/*.o
+	rm -f $(BUILD_DIR)/kallsyms.zig
 	rm -rf zig-out $(ISO_DIR)/boot/kfs.bin
 
 fclean: clean
@@ -49,7 +66,7 @@ qemu: $(NAME) $(IMG)
 	$(QEMU) $(KVM) \
 		-cdrom $(NAME) \
 		-serial stdio \
-		-m 4G \
+		-m 1G \
 		-drive file=${IMG},format=raw \
 		-drive file=${GPT_DISK},format=raw
 

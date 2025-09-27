@@ -7,6 +7,9 @@ const kernel_src = "src/main.zig";
 
 const userspace_name = "userspace.bin";
 
+const kallsyms_path = "build/kallsyms.o";
+const kallsyms_first_path = "build/kallsyms_template.o";
+
 const archs = [_]std.Target.Cpu.Arch{
     std.Target.Cpu.Arch.x86,
     // std.Target.Cpu.Arch.x86_64,
@@ -77,6 +80,15 @@ pub fn build(b: *std.Build) !void {
 
         kernel.setLinkerScript(b.path(linker));
         kernel.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));
+        var case: bool = true;
+        _ = std.fs.cwd().access(kallsyms_path, std.fs.File.OpenFlags{.mode = .read_only}) catch {
+            case = false;
+        };
+        if (case) {
+            kernel.root_module.addObjectFile(b.path(kallsyms_path));
+        } else {
+            kernel.root_module.addObjectFile(b.path(kallsyms_first_path));
+        }
 
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
