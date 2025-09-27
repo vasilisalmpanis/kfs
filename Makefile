@@ -49,7 +49,7 @@ qemu: $(NAME) $(IMG)
 	$(QEMU) $(KVM) \
 		-cdrom $(NAME) \
 		-serial stdio \
-		-m 1G \
+		-m 4G \
 		-drive file=${IMG},format=raw \
 		-drive file=${GPT_DISK},format=raw
 
