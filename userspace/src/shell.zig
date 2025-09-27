@@ -75,6 +75,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "env", .desc = "Print environment variables", .hndl = &env });
         self.registerCommand(.{ .name = "touch", .desc = "Create new file", .hndl = &touch });
         self.registerCommand(.{ .name = "execve", .desc = "Execute a program", .hndl = &execve });
+        self.registerCommand(.{ .name = "kill", .desc = "Send signal", .hndl = &kill });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -178,12 +179,15 @@ fn kill(self: *Shell, args: [][]const u8) void {
         self.print("Invalid PID: {s}\n", .{args[1]});
         return;
     }
-    asm volatile(
-        \\ mov $37, %eax
-        \\ int $0x80
-        :
-        : [ebx] "{ebx}" (pid), [ecx] "{ecx}" (sig),
-    );
+    _ = std.posix.kill(@intCast(pid), @intCast(sig)) catch |err| {
+        self.print("Kill error {t}\n", .{err});
+    };
+    // asm volatile(
+    //     \\ mov $37, %eax
+    //     \\ int $0x80
+    //     :
+    //     : [ebx] "{ebx}" (pid), [ecx] "{ecx}" (sig),
+    // );
 }
 
 fn mount(self: *Shell, args: [][]const u8) void {
