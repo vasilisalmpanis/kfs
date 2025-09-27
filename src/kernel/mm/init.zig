@@ -108,11 +108,24 @@ pub fn mmInit(info: *multiboot.Multiboot) void {
                 base = @truncate(entries[idx].base_addr);
             }
         }
-        const kernel_end: u32 = @intFromPtr(&_kernel_end) - 0xC0000000;
+        const kernel_end: u32 = @intFromPtr(&_kernel_end) - PAGE_OFFSET;
         if (base < kernel_end) {
             mem_size -= kernel_end - base;
             base = kernel_end;
         }
+
+        // Copy Multiboot
+        if (base % 8 != 0) {
+            base += 8 - (base % 8);
+            mem_size -= 8 - (base % 8);
+        }
+        const new_info: [*]u8 = @ptrFromInt(base + PAGE_OFFSET);
+        @memcpy(new_info[0..info.header.total_size], @as([*]u8, @ptrFromInt(info.addr))[0..info.header.total_size]);
+
+        krn.boot_info = multiboot.Multiboot.init(base + PAGE_OFFSET);
+        base += info.header.total_size;
+        mem_size -= info.header.total_size;
+
         if ((base % PAGE_SIZE) > 0) {
             mem_size = mem_size - (base & 0xfff);
             base = (base & 0xfffff000) + PAGE_SIZE;
