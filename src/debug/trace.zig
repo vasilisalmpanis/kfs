@@ -2,6 +2,7 @@ const printf = @import("./printf.zig").printf;
 const lookupSymbol = @import("./symbols.zig").lookupSymbol;
 const krn = @import("kernel");
 const arch = @import("arch");
+const kernel = @import("kernel");
 
 const StackFrame = struct {
     ebp : ?*StackFrame = null,
@@ -36,7 +37,7 @@ pub inline fn traceStackTrace(maxFrames : u32 ) void {
         if (stk != null) {
             krn.logger.INFO("  0x{x}: {s}\n", .{
                 stk.?.eip,
-                if(lookupSymbol(stk.?.eip)) |sym| sym else "?"
+                if(kernel.kallsyms.lookup_symbol(stk.?.eip)) |sym| sym.name else "?"
             });
         }
         stk = stk.?.ebp;
