@@ -13,9 +13,9 @@ pub const proc_mm = @import("./proc_mm.zig");
 pub const MM = @import("./proc_mm.zig").MM;
 pub const MAP = @import("./proc_mm.zig").MAP;
 pub const VMA = @import("./proc_mm.zig").VMA;
-pub const PROC_READ = @import("./proc_mm.zig").PROT_READ;
-pub const PROC_WRITE = @import("./proc_mm.zig").PROT_WRITE;
-pub const PROC_RW: u32 = PROC_READ | PROC_WRITE;
+pub const PROT_READ = @import("./proc_mm.zig").PROT_READ;
+pub const PROT_WRITE = @import("./proc_mm.zig").PROT_WRITE;
+pub const PROT_RW: u32 = PROT_READ | PROT_WRITE;
 pub const VASpair = vmm.VASpair;
 pub const MAP_TYPE = @import("./proc_mm.zig").MAP_TYPE;
 
@@ -108,11 +108,17 @@ pub fn mmInit(info: *multiboot.Multiboot) void {
                 base = @truncate(entries[idx].base_addr);
             }
         }
-        const kernel_end: u32 = @intFromPtr(&_kernel_end) - 0xC0000000;
+        const kernel_end: u32 = @intFromPtr(&_kernel_end) - PAGE_OFFSET;
         if (base < kernel_end) {
             mem_size -= kernel_end - base;
             base = kernel_end;
         }
+
+        // Copy Multiboot
+        const offset = krn.boot_info.relocate(base + PAGE_OFFSET);
+        base += offset;
+        mem_size -= offset;
+
         if ((base % PAGE_SIZE) > 0) {
             mem_size = mem_size - (base & 0xfff);
             base = (base & 0xfffff000) + PAGE_SIZE;

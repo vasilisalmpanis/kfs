@@ -72,6 +72,7 @@ pub fn do_open(
         kernel.mm.kfree(target_path.dentry);
         return errors.ENOENT;
     };
+    kernel.logger.DEBUG("opened {s} with fd {d}", .{name, fd});
     return fd;
 }
 
@@ -82,6 +83,7 @@ pub fn open(
 ) !u32 {
     if (filename) |f| {
         const path: []u8 = std.mem.span(f);
+        kernel.logger.INFO("opening {s}\n", .{path});
         var file_segment: []const u8 = "";
         const parent_dir = try fs.path.dir_resolve(
             path,

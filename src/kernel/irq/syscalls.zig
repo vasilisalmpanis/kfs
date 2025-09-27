@@ -34,6 +34,11 @@ pub fn syscallsManager(state: *arch.Regs) void {
             state.edi,
             state.ebp,
         ) catch |err| {
+            krn.logger.ERROR("[PID {d:<2}]: {t}: {t}\n", .{
+                tsk.current.pid,
+                sys,
+                err
+            });
             state.eax = errors.toErrno(err);
             return ;
         };

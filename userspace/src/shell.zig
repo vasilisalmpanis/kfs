@@ -74,6 +74,8 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "users", .desc = "Print users", .hndl = &users });
         self.registerCommand(.{ .name = "env", .desc = "Print environment variables", .hndl = &env });
         self.registerCommand(.{ .name = "touch", .desc = "Create new file", .hndl = &touch });
+        self.registerCommand(.{ .name = "execve", .desc = "Execute a program", .hndl = &execve });
+        self.registerCommand(.{ .name = "kill", .desc = "Send signal", .hndl = &kill });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -96,7 +98,17 @@ pub const Shell = struct {
         if (self.commands.get(cmd_name)) |cmd| {
             cmd.hndl(self, cmd_args);
         } else {
-            self.print("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{cmd_name});
+            if (cmd_name.len > 0 and cmd_name[0] == '/') {
+                execve(self, self.arg_buf[0..arg_count]);
+            } else if (cmd_name.len > 0) {
+                var full_cmd: [512]u8 = .{0} ** 512;
+                @memcpy(full_cmd[0..5], "/bin/");
+                @memcpy(full_cmd[5..], cmd_name);
+                self.arg_buf[0] = full_cmd[0..cmd_name.len + 5];
+                execve(self, self.arg_buf[0..arg_count]);
+            } else {
+                self.print("Command not known: \"{s}\".\nInput \"help\" to get available commands.\n", .{cmd_name});
+            }
         }
     }
 
@@ -167,12 +179,15 @@ fn kill(self: *Shell, args: [][]const u8) void {
         self.print("Invalid PID: {s}\n", .{args[1]});
         return;
     }
-    asm volatile(
-        \\ mov $37, %eax
-        \\ int $0x80
-        :
-        : [ebx] "{ebx}" (pid), [ecx] "{ecx}" (sig),
-    );
+    _ = std.posix.kill(@intCast(pid), @intCast(sig)) catch |err| {
+        self.print("Kill error {t}\n", .{err});
+    };
+    // asm volatile(
+    //     \\ mov $37, %eax
+    //     \\ int $0x80
+    //     :
+    //     : [ebx] "{ebx}" (pid), [ecx] "{ecx}" (sig),
+    // );
 }
 
 fn mount(self: *Shell, args: [][]const u8) void {
@@ -228,13 +243,13 @@ fn umount(self: *Shell, args: [][]const u8) void {
 }
 
 const Dirent = extern struct{
-    ino: u32,
-    off: u32,
+    ino: u64,
+    off: i64,
     reclen: u16,
     type: u8,
     
     pub fn getName(self: *Dirent) []const u8 {
-        const name_offset: u32 = @intFromPtr(self) + @sizeOf(Dirent);
+        const name_offset: u32 = @intFromPtr(self) + @sizeOf(Dirent) - 1;
         return std.mem.span(@as([*:0]u8, @ptrFromInt(name_offset)))[0..self.reclen - @sizeOf(Dirent)];
     }
 
@@ -301,6 +316,15 @@ fn ls(self: *Shell, args: [][]const u8) void {
     };
     defer std.posix.close(fd);
 
+    var stat_buf: std.os.linux.Stat = undefined;
+    var buffer: [64]u8 = .{0} ** 64;
+    @memcpy(buffer[0..path.len], path);
+    buffer[path.len] = 0;
+    _ = std.os.linux.stat(@ptrCast(&buffer), &stat_buf);
+    if (stat_buf.mode & std.os.linux.S.IFMT != std.os.linux.S.IFDIR) {
+        self.print("{s}\n", .{path});
+        return ;
+    }
     var dirp: [1024]u8 = .{0} ** 1024;
     const len = std.os.linux.getdents64(fd, &dirp, 1024);
     if (len > 1024) {
@@ -331,7 +355,7 @@ fn ls(self: *Shell, args: [][]const u8) void {
             const epoch_month_day = epoch_year.calculateMonthDay();
             const epoch_day_sec = epoch_secs.getDaySeconds();
             self.print(
-                "{c}{s} {d:>5} {d:>5} {Bi:>7.0} {d:>4}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}  {s}\n", 
+                "{c}{s} {d:>6} {d:>6} {Bi:>7.0} {d:>4}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}  {s}\n", 
                 .{
                     dirent.verboseType(),
                     perms[0..9],
@@ -545,4 +569,30 @@ fn touch(self: *Shell, args: [][]const u8) void {
     ) catch |err| {
         self.print("Error: {t}\n", .{err});
     };
+}
+
+fn execve(self: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        self.print(
+            \\Usage: execve cmd <args>
+            \\  Example: execve /bin/ls -l /
+            \\
+            , .{}
+        );
+        return ;
+    }
+    const pid = std.posix.fork() catch |err | {
+        self.print("fork error {t}\n", .{err});
+        return ;
+    };
+    if (pid == 0) {
+        var buffer: [2048]u8 = .{0} ** 2048;
+        var alloc = std.heap.FixedBufferAllocator.init(&buffer);
+        std.process.execv(alloc.allocator(), args) catch {
+            self.print("execve error\n", .{});
+            std.posix.exit(0);
+            return ;
+        };
+    }
+    _ = std.posix.waitpid(pid, 0);
 }

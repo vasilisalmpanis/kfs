@@ -85,11 +85,14 @@ fn user_thread(_: ?*const anyopaque) i32 {
     krn.task.current.mm = krn.task.initial_task.mm;
     krn.task.current.fs = krn.task.initial_task.fs;
     krn.task.current.files = krn.task.initial_task.files;
-    krn.userspace.goUserspace(
+    krn.userspace.prepareBinary(
         @embedFile("userspace"),
         krn.userspace.argv_init,
         krn.userspace.envp_init,
-    );
+    ) catch {
+        @panic("We cannot go to userspace");
+    };
+    krn.userspace.goUserspace();
     return 0;
 }
 
@@ -103,15 +106,17 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial = Serial.init(0x3F8);
     krn.serial.setup();
     krn.logger = Logger.init(.DEBUG);
-    var boot_info: multiboot.Multiboot = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
-    dbg.initSymbolTable(&boot_info);
+    const boot_info = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
+    krn.boot_info = boot_info;
+
 
     gdt.gdtInit();
-    mm.mmInit(&boot_info);
+    mm.mmInit(&krn.boot_info);
+    dbg.initSymbolTable(&krn.boot_info);
     krn.logger.INFO("GDT initialized", .{});
     krn.logger.INFO("Memory initialized", .{});
 
-    screen.initScreen(&krn.scr, &boot_info);
+    screen.initScreen(&krn.scr, &krn.boot_info);
     krn.pit = PIT.init(1000);
     krn.task.initMultitasking();
     idt.idtInit();

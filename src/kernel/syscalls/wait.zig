@@ -36,8 +36,7 @@ const Rusage = packed struct {
 };
 
 pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
-    _ = rusage;
-    krn.logger.DEBUG("waiting pid {d} from pid {d}", .{pid, tsk.current.pid});
+    krn.logger.DEBUG("waiting pid {d} from pid {d} rusage {x}", .{pid, tsk.current.pid, @intFromPtr(rusage)});
     if (pid > 0) {
         if (tsk.current.findChildByPid(@intCast(pid))) |task| {
             defer task.refcount.unref();

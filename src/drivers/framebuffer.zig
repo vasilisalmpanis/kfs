@@ -29,12 +29,12 @@ pub const FrameBuffer = struct {
     ) FrameBuffer {
         if (boot_info.getTag(multiboot.TagFrameBufferInfo)) |tag| {
             // const fb_info: ?multiboot.FramebufferInfo = multiboot.getFBInfo(boot_info);
-            
             const fb_size: u32 = tag.height * tag.pitch;
             const num_pages = (fb_size + 0xFFF) / mm.PAGE_SIZE;
             var i: u32 = 0;
             var addr: u32 = @truncate(tag.addr);
             addr &= 0xFFFFF000;
+            const offset = addr & 0xFFF;
             var virt_addr: u32 = mm.virt_memory_manager.findFreeSpace(
                 num_pages,
                 mm.PAGE_OFFSET,
@@ -51,7 +51,7 @@ pub const FrameBuffer = struct {
             if (buffer) |_buffer| {
                 var fb = FrameBuffer{
                     .fb_info = tag,
-                    .fb_ptr = @ptrFromInt(first_addr),
+                    .fb_ptr = @ptrFromInt(first_addr + offset),
                     .cwidth = (tag.pitch / 4) / font.width,
                     .cheight = tag.height / font.height,
                     .virtual_buffer = _buffer,

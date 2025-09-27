@@ -18,7 +18,7 @@ fn notImpl(_: u32, _: u32, _: u32, _: u32, _: u32, _: u32) !u32 {
         state.eax,
         @tagName(@as(Syscall, @enumFromInt(state.eax)))
     });
-    return 0;
+    return errors.PosixError.EINVAL;
 }
 
 pub const SyscallTable = brk: {
@@ -35,9 +35,9 @@ pub const SyscallTable = brk: {
         .SYS_creat                      = &notImpl,
         .SYS_link                       = &notImpl,
         .SYS_unlink                     = &notImpl,
-        .SYS_execve                     = &notImpl,
+        .SYS_execve                      = @ptrCast(&@import("exec.zig").execve),
         .SYS_chdir                      = @ptrCast(&@import("chdir.zig").chdir),
-        .SYS_time                       = &notImpl,
+        .SYS_time                       = @ptrCast(&@import("time.zig").time),
         .SYS_mknod                      = @ptrCast(&@import("mknod.zig").mknod),
         .SYS_chmod                      = &notImpl,
         .SYS_lchown                     = &notImpl,
@@ -69,7 +69,7 @@ pub const SyscallTable = brk: {
         .SYS_pipe                       = &notImpl,
         .SYS_times                      = &notImpl,
         .SYS_prof                       = &notImpl,
-        .SYS_brk                        = &notImpl,
+        .SYS_brk                        = @ptrCast(&@import("brk.zig").brk),
         .SYS_setgid                     = @ptrCast(&@import("../sched/process.zig").setGID),
         .SYS_getgid                     = @ptrCast(&@import("../sched/process.zig").getPID),
         .SYS_signal                     = &notImpl,
@@ -79,7 +79,7 @@ pub const SyscallTable = brk: {
         .SYS_umount2                    = @ptrCast(&@import("./mount.zig").umount2),
         .SYS_lock                       = &notImpl,
         .SYS_ioctl                      = &notImpl,
-        .SYS_fcntl                      = &notImpl,
+        .SYS_fcntl                      = @ptrCast(&@import("./fcntl.zig").fcntl),
         .SYS_mpx                        = &notImpl,
         .SYS_setpgid                    = @ptrCast(&@import("../sched/process.zig").setPGID),
         .SYS_ulimit                     = &notImpl,
@@ -114,7 +114,7 @@ pub const SyscallTable = brk: {
         .SYS_swapon                     = &notImpl,
         .SYS_reboot                     = &notImpl,
         .SYS_readdir                    = &notImpl,
-        .SYS_mmap                       = &notImpl,
+        .SYS_mmap                      = @ptrCast(&@import("mmap.zig").mmap),
         .SYS_munmap                     = @ptrCast(&@import("mmap.zig").munmap),
         .SYS_truncate                   = &notImpl,
         .SYS_ftruncate                  = &notImpl,
@@ -132,7 +132,7 @@ pub const SyscallTable = brk: {
         .SYS_getitimer                  = &notImpl,
         .SYS_stat                       = &notImpl,
         .SYS_lstat                      = &notImpl,
-        .SYS_fstat                      = &notImpl,
+        .SYS_fstat                      = @ptrCast(&@import("stat.zig").fstat),
         .SYS_olduname                   = &notImpl,
         .SYS_iopl                       = &notImpl,
         .SYS_vhangup                    = &notImpl,
@@ -149,7 +149,7 @@ pub const SyscallTable = brk: {
         .SYS_uname                      = &notImpl,
         .SYS_modify_ldt                 = @ptrCast(&@import("thread.zig").modify_ldt),
         .SYS_adjtimex                   = &notImpl,
-        .SYS_mprotect                   = &notImpl,
+        .SYS_mprotect                   = @ptrCast(&@import("mprotect.zig").mprotect),
         .SYS_sigprocmask                = @ptrCast(&@import("./sigaction.zig").sigprocmask),
         .SYS_create_module              = &notImpl,
         .SYS_init_module                = &notImpl,
@@ -203,7 +203,7 @@ pub const SyscallTable = brk: {
         .SYS_rt_sigpending              = @ptrCast(&@import("./sigaction.zig").rt_sigpending),
         .SYS_rt_sigtimedwait            = &notImpl,
         .SYS_rt_sigqueueinfo            = &notImpl,
-        .SYS_rt_sigsuspend              = &notImpl,
+        .SYS_rt_sigsuspend              = @ptrCast(&@import("./sigaction.zig").rt_sigsuspend),
         .SYS_pread                      = @ptrCast(&@import("read.zig").pread),
         .SYS_pwrite                     = &notImpl,
         .SYS_chown                      = &notImpl,
@@ -229,11 +229,13 @@ pub const SyscallTable = brk: {
         .SYS_setgid32                   = @ptrCast(&@import("../sched/process.zig").setGID),
         .SYS_getgid32                   = @ptrCast(&@import("../sched/process.zig").getUID),
         .SYS_stat64                     = @ptrCast(&@import("stat.zig").stat64),
+        .SYS_lstat64                     = @ptrCast(&@import("stat.zig").lstat64),
         .SYS_fstat64                    = @ptrCast(&@import("stat.zig").fstat64),
         .SYS_fstatat64                  = @ptrCast(&@import("stat.zig").fstatat64),
         .SYS_openat                     = @ptrCast(&@import("open.zig").openat),
         .SYS_set_thread_area            = @ptrCast(&@import("thread.zig").set_thread_area),
         .SYS_set_tid_address            = @ptrCast(&@import("thread.zig").set_tid_address),
+        .SYS_statx                      = @ptrCast(&@import("statx.zig").statx),
     });
 };
 

@@ -1,4 +1,5 @@
 const std = @import("std");
+const krn = @import("kernel");
 
 pub const MultibootInfo1 = packed struct {
     flags: u32,
@@ -370,5 +371,47 @@ pub const Multiboot = struct {
         }
         return null;
 
+    }
+
+    pub fn relocate(self: *Multiboot, new_addr: u32) u32 {
+        var mem_taken: u32 = 0;
+        var _addr = new_addr;
+        if (new_addr % 8 != 0) {
+            _addr += 8 - (new_addr % 8);
+            mem_taken += 8 - (new_addr % 8);
+        }
+        const new_info: [*]u8 = @ptrFromInt(_addr);
+        @memcpy(
+            new_info[0..self.header.total_size],
+            @as([*]u8, @ptrFromInt(self.addr))[0..self.header.total_size]
+        );
+        mem_taken += self.header.total_size;
+
+        krn.boot_info = Multiboot.init(_addr);
+
+        // relocate some sections we need
+        var offset = new_addr + mem_taken;
+        if (krn.boot_info.getTag(TagELFSymbols)) |elf| {
+            const headers = elf.getSectionHeaders();
+            for (0..elf.num) |idx| {
+                const header = headers[idx];
+                if (
+                    header.sh_type == std.elf.SHT_SYMTAB or
+                    (header.sh_type == std.elf.SHT_STRTAB and idx != elf.shndx)
+                ) {
+                    @memcpy(
+                        @as([*]u8, @ptrFromInt(offset))[0..header.sh_size],
+                        @as(
+                            [*]u8,
+                            @ptrFromInt(header.sh_addr + krn.mm.PAGE_OFFSET)
+                        )[0..header.sh_size],
+                    );
+                    headers[idx].sh_addr = offset - krn.mm.PAGE_OFFSET;
+                    offset += header.sh_size;
+                    mem_taken += header.sh_size;
+                }
+            }
+        }
+        return mem_taken;
     }
 };

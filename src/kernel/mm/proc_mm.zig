@@ -152,8 +152,14 @@ pub const MM = struct {
     stack_bottom: u32 = 0,  // Lower
     code: u32 = 0,
     data: u32 = 0,
+    arg_start: u32 = 0,
+    arg_end: u32 = 0,
+    env_start: u32 = 0,
+    env_end: u32 = 0,
     bss: u32 = 0,
     heap: u32 = 0,
+    brk_start: u32 = 0,
+    brk: u32 = 0,
     vas: u32 = 0,
     vmas: ?*VMA = null,
 
@@ -255,7 +261,11 @@ pub const MM = struct {
                         error.OutOfMemory => return errors.ENOMEM
                     };
                     if (hint < self.vmas.?.start)
-                        self.vmas = new_vma;
+                        self.vmas = new_vma;        
+                    krn.logger.DEBUG(
+                        "mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+                        .{hint, end}
+                    );
                     return @intCast(hint);
                 }
                 if (flags.FIXED == false) {
@@ -283,6 +293,10 @@ pub const MM = struct {
         if (self.vmas == null or hint < self.vmas.?.start) {
             self.vmas = new_vma;
         }
+        krn.logger.DEBUG(
+            "mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+            .{hint, end}
+        );
         return @intCast(hint);
     }
 
@@ -321,28 +335,33 @@ pub const MM = struct {
             _mmap.code = self.code;
             _mmap.data = self.data;
             _mmap.heap = self.heap;
-            krn.logger.INFO("created vas {x}\n", .{_mmap.vas});
+            _mmap.brk_start = self.brk_start;
+            _mmap.brk = self.brk;
         }
         return mmap;
     }
 
     pub fn delete(self: *MM) void {
+        if (self != &init_mm and self.vas != 0) {
+            mm.virt_memory_manager.pmm.freePage(self.vas);
+        }
         krn.mm.kfree(self);
     }
 
     pub fn releaseMappings(self: *MM) void {
         if (self == &init_mm)
             return ;
-        // const pair: krn.mm.VASpair = mm.virt_memory_manager.mapVAS(self.vas);
-        // defer mm.virt_memory_manager.unmapVAS(pair);
 
         if (self.vmas) |head| {
             var it = head.list.iterator();
             while (it.next()) |node| {
                 const vma: *VMA = node.curr.entry(VMA, "list");
                 mm.virt_memory_manager.releaseArea(vma.start, vma.end, vma.flags.TYPE);
+                // Free the VMA structure itself
+                krn.mm.kfree(vma);
             }
         }
+        self.vmas = null;
     }
 };
 
