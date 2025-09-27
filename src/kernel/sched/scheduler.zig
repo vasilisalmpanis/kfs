@@ -73,7 +73,7 @@ fn processTasks() void {
                 tsk.stopped_tasks = curr.next;
         }
         curr.del();
-        task.delFromTree();
+        task.delFromTree(); // Already done in task finish but safe
         task.mm.?.delete();
         var file_it = task.files.map.iterator(.{});
         while (file_it.next()) |id| {

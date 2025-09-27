@@ -70,7 +70,7 @@ pub fn hBoundRangeExceeded(regs: *Regs) void {
 }
 
 pub fn hInvalidOpcode(regs: *Regs) void {
-    _ = regs;
+    regs.dump();
     @panic("hInvalidOpcode");
 }
 

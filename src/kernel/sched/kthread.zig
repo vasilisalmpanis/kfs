@@ -13,6 +13,7 @@ pub const STACK_SIZE: u32 = (STACK_PAGES - 1) * PAGE_SIZE;
 pub const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
 fn threadWrapper() callconv(.c) noreturn {
+    tsk.current.refcount.ref();
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
     tsk.current.finish();
     while (true) {}
