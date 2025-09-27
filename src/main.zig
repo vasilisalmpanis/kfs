@@ -109,10 +109,10 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     const boot_info = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
     krn.boot_info = boot_info;
 
-    dbg.initSymbolTable(&krn.boot_info);
 
     gdt.gdtInit();
     mm.mmInit(&krn.boot_info);
+    dbg.initSymbolTable(&krn.boot_info);
     krn.logger.INFO("GDT initialized", .{});
     krn.logger.INFO("Memory initialized", .{});
 

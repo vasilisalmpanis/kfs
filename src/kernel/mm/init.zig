@@ -115,16 +115,9 @@ pub fn mmInit(info: *multiboot.Multiboot) void {
         }
 
         // Copy Multiboot
-        if (base % 8 != 0) {
-            base += 8 - (base % 8);
-            mem_size -= 8 - (base % 8);
-        }
-        const new_info: [*]u8 = @ptrFromInt(base + PAGE_OFFSET);
-        @memcpy(new_info[0..info.header.total_size], @as([*]u8, @ptrFromInt(info.addr))[0..info.header.total_size]);
-
-        krn.boot_info = multiboot.Multiboot.init(base + PAGE_OFFSET);
-        base += info.header.total_size;
-        mem_size -= info.header.total_size;
+        const offset = krn.boot_info.relocate(base + PAGE_OFFSET);
+        base += offset;
+        mem_size -= offset;
 
         if ((base % PAGE_SIZE) > 0) {
             mem_size = mem_size - (base & 0xfff);
