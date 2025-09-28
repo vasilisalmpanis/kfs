@@ -194,15 +194,12 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
         return krn.errors.PosixError.ENOEXEC;
     };
 
-    krn.logger.INFO("Binary validation: 32-bit and statically_linked\n", .{});
-
     const stack_pages: u32 = 10;
     var heap_start: u32 = 0;
 
     const prot: u32 = krn.mm.PROT_RW;
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
 
-    krn.logger.INFO("Goind to userspace {any}\n", .{ehdr});
     for (0..ehdr.e_phnum) |i| {
         const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
             @constCast(@alignCast(&userspace[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
@@ -220,7 +217,6 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
         const page_end = arch.pageAlign(p_hdr.p_vaddr + p_hdr.p_memsz, false);  // Round up to page boundary
         const aligned_size = page_end - page_start;
 
-        krn.logger.WARN("Creating Mapping {x}-{x}\n", .{page_start, page_start + aligned_size});
         _ = krn.task.current.mm.?.mmap_area(
             page_start,
             aligned_size,
