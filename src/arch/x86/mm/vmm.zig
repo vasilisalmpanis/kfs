@@ -223,6 +223,8 @@ pub const VMM = struct {
 
         if (pd[pd_idx] == 0) {
             const pt_pfn = self.pmm.allocPage();
+            if (pt_pfn == 0)
+                @panic("No Memory\n");
             pd[pd_idx] = pt_pfn | @as(u12, @bitCast(flags)) | PAGE_WRITE;
             pt = @ptrCast(first_page_table);
             pt += (0x400 * pd_idx);
@@ -230,8 +232,10 @@ pub const VMM = struct {
         }
         pt = @ptrCast(first_page_table);
         pt += (0x400 * pd_idx);
-        if (pt[pt_idx] != 0)
-            return; // Do something
+        if (pt[pt_idx] != 0) {
+            krn.logger.ERROR("PD idx {d}\n", .{pd_idx});
+            @panic("PT is not 0\n");
+        }
         const new_flags = @as(u12, @bitCast(flags));
         pt[pt_idx] = physical_addr | new_flags;
         invalidatePage(virtual_addr);
@@ -340,6 +344,9 @@ pub const VMM = struct {
             const flags: PagingFlags = @bitCast(@as(u12, @truncate(pd[pd_idx] & 0xFFF)));
             if (new_pd[pd_idx] == 0) {
                 temp_idx = try self.allocatePageTable(new_pd, pd_idx, flags);
+                var new_pt: [*]u32 = @ptrCast(first_page_table);
+                new_pt += 0x400 * temp_idx;
+                @memset(new_pt[0..1024], 0);
             } else {
                 temp_idx = try self.mapPageTable(new_pd,
                     pd_idx,

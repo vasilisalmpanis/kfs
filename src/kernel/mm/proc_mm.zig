@@ -94,10 +94,13 @@ pub const VMA = struct {
                 .user = true,
                 .present = true,
             };
-            krn.mm.virt_memory_manager.mapPage(start + index * arch.PAGE_SIZE,
+            const virt_addr: u32 = start + index * arch.PAGE_SIZE;
+            krn.mm.virt_memory_manager.mapPage(virt_addr,
                 page,
                 flags
             );
+            const page_buf: [*]u32 = @ptrFromInt(virt_addr);
+            @memset(page_buf[0..1024], 0);
         }
     }
 
