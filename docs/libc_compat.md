@@ -9,12 +9,12 @@ the system calls that can be used.
 - [ ] SYS_acct
 - [ ] SYS_adjtimex
 - [ ] SYS_arch_prctl
-- [ ] SYS_brk
+- [x] SYS_brk
 - [ ] SYS_cachectl
 - [ ] SYS_cacheflush
 - [ ] SYS_capget
 - [ ] SYS_capset
-- [ ] SYS_chdir
+- [x] SYS_chdir
 - [ ] SYS_chmod
 - [ ] SYS_chown
 - [ ] SYS_chown32
@@ -34,11 +34,11 @@ the system calls that can be used.
 - [ ] SYS_clock_settime32
 - [ ] SYS_clock_settime64
 - [ ] SYS_clone
-- [ ] SYS_close
+- [x] SYS_close
 - [ ] SYS_copy_file_range
 - [ ] SYS_delete_module
-- [ ] SYS_dup
-- [ ] SYS_dup2
+- [x] SYS_dup
+- [x] SYS_dup2
 - [ ] SYS_dup3
 - [ ] SYS_epoll_create
 - [ ] SYS_epoll_create1
@@ -47,7 +47,7 @@ the system calls that can be used.
 - [ ] SYS_epoll_wait
 - [ ] SYS_eventfd
 - [ ] SYS_eventfd2
-- [ ] SYS_execve
+- [x] SYS_execve
 - [ ] SYS_execveat
 - [x] SYS_exit
 - [ ] SYS_exit_group
@@ -75,12 +75,12 @@ the system calls that can be used.
 - [x] SYS_fork
 - [ ] SYS_fremovexattr
 - [ ] SYS_fsetxattr
-- [ ] SYS_fstat
-- [ ] SYS_fstat64
-- [ ] SYS_fstatat
-- [ ] SYS_fstatat64
+- [x] SYS_fstat
+- [x] SYS_fstat64
+- [x] SYS_fstatat
+- [x] SYS_fstatat64
 - [ ] SYS_fstatfs
-- [ ] SYS_fstatfs64
+- [x] SYS_fstatfs64
 - [ ] SYS_fsync
 - [ ] SYS_ftruncate
 - [ ] SYS_ftruncate64
@@ -89,9 +89,9 @@ the system calls that can be used.
 - [ ] SYS_futimesat
 - [ ] SYS_get_robust_list
 - [ ] SYS_getcpu
-- [ ] SYS_getcwd
-- [ ] SYS_getdents
-- [ ] SYS_getdents64
+- [x] SYS_getcwd
+- [x] SYS_getdents
+- [x] SYS_getdents64
 - [ ] SYS_getegid
 - [ ] SYS_getegid32
 - [ ] SYS_geteuid
@@ -138,7 +138,7 @@ the system calls that can be used.
 - [ ] SYS_listxattr
 - [ ] SYS_llistxattr
 - [ ] SYS_lremovexattr
-- [ ] SYS_lseek
+- [x] SYS_lseek
 - [ ] SYS_lsetxattr
 - [ ] SYS_lstat
 - [ ] SYS_lstat64
@@ -146,16 +146,16 @@ the system calls that can be used.
 - [ ] SYS_membarrier
 - [ ] SYS_memfd_create
 - [ ] SYS_mincore
-- [ ] SYS_mkdir
-- [ ] SYS_mkdirat
-- [ ] SYS_mknod
+- [x] SYS_mkdir
+- [x] SYS_mkdirat
+- [x] SYS_mknod
 - [ ] SYS_mknodat
 - [ ] SYS_mlock
 - [ ] SYS_mlock2
 - [ ] SYS_mlockall
-- [ ] SYS_mmap
-- [ ] SYS_mmap2
-- [ ] SYS_mount
+- [x] SYS_mmap
+- [x] SYS_mmap2
+- [x] SYS_mount
 - [ ] SYS_mprotect
 - [ ] SYS_mq_getsetattr
 - [ ] SYS_mq_notify
@@ -177,9 +177,9 @@ the system calls that can be used.
 - [ ] SYS_name_to_handle_at
 - [ ] SYS_nanosleep
 - [ ] SYS_newfstatat
-- [ ] SYS_open
+- [x] SYS_open
 - [ ] SYS_open_by_handle_at
-- [ ] SYS_openat
+- [x] SYS_openat
 - [ ] SYS_pause
 - [ ] SYS_personality
 - [ ] SYS_pipe
@@ -189,7 +189,7 @@ the system calls that can be used.
 - [ ] SYS_ppoll
 - [ ] SYS_ppoll_time64
 - [ ] SYS_prctl
-- [ ] SYS_pread
+- [x] SYS_pread
 - [ ] SYS_pread64
 - [ ] SYS_preadv
 - [ ] SYS_preadv2
@@ -201,10 +201,10 @@ the system calls that can be used.
 - [ ] SYS_ptrace
 - [ ] SYS_pwrite
 - [ ] SYS_pwrite64
-- [ ] SYS_pwritev
+- [x] SYS_pwritev
 - [ ] SYS_pwritev2
 - [ ] SYS_quotactl
-- [ ] SYS_read
+- [x] SYS_read
 - [ ] SYS_readahead
 - [ ] SYS_readlink
 - [ ] SYS_readlinkat
@@ -248,7 +248,7 @@ the system calls that can be used.
 - [ ] SYS_sendfile64
 - [ ] SYS_sendmmsg
 - [ ] SYS_set_robust_list
-- [ ] SYS_set_thread_area
+- [x] SYS_set_thread_area
 - [ ] SYS_set_tid_address
 - [ ] SYS_setdomainname
 - [ ] SYS_setfsgid
@@ -288,11 +288,11 @@ the system calls that can be used.
 - [ ] SYS_signalfd4
 - [x] SYS_socketcall
 - [ ] SYS_splice
-- [ ] SYS_stat
-- [ ] SYS_stat64
+- [x] SYS_stat
+- [x] SYS_stat64
 - [ ] SYS_statfs
 - [ ] SYS_statfs64
-- [ ] SYS_statx
+- [x] SYS_statx
 - [ ] SYS_swapoff
 - [ ] SYS_swapon
 - [ ] SYS_symlink
@@ -326,7 +326,7 @@ the system calls that can be used.
 - [ ] SYS_truncate64
 - [ ] SYS_ugetrlimit
 - [ ] SYS_umask
-- [ ] SYS_umount2
+- [x] SYS_umount2
 - [ ] SYS_uname
 - [ ] SYS_unlink
 - [ ] SYS_unlinkat
@@ -341,4 +341,4 @@ the system calls that can be used.
 - [ ] SYS_wait4_time64
 - [ ] SYS_waitid
 - [x] SYS_write
-- [ ] SYS_writev
+- [x] SYS_writev
