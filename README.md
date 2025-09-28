@@ -6,9 +6,9 @@ A minimalistic kernel written in Zig.
 - [x] kfs-2
 - [x] kfs-3
 - [x] kfs-4
-- [ ] kfs-5
-- [ ] kfs-6
-- [ ] kfs-7
+- [x] kfs-5
+- [x] kfs-6
+- [x] kfs-7
 - [ ] kfs-8
 - [ ] kfs-9
 - [ ] kfs-x
