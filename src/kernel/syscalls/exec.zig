@@ -20,12 +20,13 @@ pub fn doExecve(
     envp: []const []const u8,
 ) !u32 {
     // TODO:
-    // - check if file is regular
-    // - check if executable
-    // - check permissions
     // - check suid / sgid and change euid / egid if needed
     const path = try krn.fs.path.resolve(filename);
     errdefer path.release();
+    const inode = path.dentry.inode;
+    if (!inode.mode.canExecute(inode.uid, inode.gid) or !inode.mode.isReg()) {
+        return errors.EACCES;
+    }
     const file = try krn.fs.File.new(path);
     errdefer file.ref.unref();
     const slice = if (krn.mm.kmallocSlice(u8, file.inode.size)) |_slice|

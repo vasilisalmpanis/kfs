@@ -191,8 +191,7 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
 pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) !void {
     validateElfHeader(userspace) catch |err| {
         krn.logger.ERROR("ELF validation failed: {}\n", .{err});
-        while (true) {}
-        return;
+        return krn.errors.PosixError.ENOEXEC;
     };
 
     krn.logger.INFO("Binary validation: 32-bit and statically_linked\n", .{});
