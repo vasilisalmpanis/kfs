@@ -1,0 +1,14 @@
+.{
+    .name = .kfs,
+    .version = "0.0.8",
+    .fingerprint = 0x4168117474585fbe, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.1",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "userspace",
+        "README.md",
+    },
+}
