@@ -17,7 +17,7 @@ pub fn build(b: *std.Build) void {
             .code_model = .kernel,
             .link_libc = false,
             .target = b.resolveTargetQuery(target),
-            // .strip = false,
+            .strip = true,
             .stack_protector = false,
             .stack_check = false,
             .red_zone = false,
