@@ -19,6 +19,7 @@ const syscalls = @import("kernel").syscalls;
 const std = @import("std");
 const cpu = @import("arch").cpu;
 const io = @import("arch").io;
+const modules = @import("modules");
 
 pub fn panic(
     msg: []const u8,
@@ -131,12 +132,19 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.fs.init();
 
     // Get PID1
-    _ = krn.kthreadCreate(&user_thread, null) catch null;
+    // _ = krn.kthreadCreate(&user_thread, null) catch null;
 
     // Devices
     drv.init();
     move_root();
     kernel_ready = true;
+    const path = krn.fs.path.resolve("/modules/example_mod.o") catch {
+        @panic("File doesn't exist");
+    };
+    _ = modules.load_module(path) catch {
+        @panic("Not loadable");
+    };
+    path.release();
 
     while (true) {
         asm volatile ("hlt");
