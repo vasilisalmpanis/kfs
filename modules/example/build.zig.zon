@@ -1,0 +1,17 @@
+.{
+    .name = .example_mod,
+    .version = "0.0.1",
+    .fingerprint = 0x163b1cee29628dbd, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.1",
+    .dependencies = .{
+        .kfs = .{
+           .path = "../../",
+           .lazy = false,
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
