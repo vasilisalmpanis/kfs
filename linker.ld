@@ -58,15 +58,15 @@ SECTIONS
     _kernel_end = .;
 
     /DISCARD/ : {
-        *(.debug_info)
+        /* *(.debug_info)
         *(.debug_abbrev)
         *(.debug_aranges)
         *(.debug_line)
         *(.debug_loc)
         *(.debug_ranges)
-        /* *(.debug_str) */
+        *(.debug_str)
         *(.debug_pubnames)
-        *(.debug_pubtypes)
+        *(.debug_pubtypes) */
         *(.comment)
     }
 }

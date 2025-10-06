@@ -2,15 +2,15 @@
 
 // pub extern fn kmalloc(size: u32) u32;
 
-// pub export fn add() u32 {
-//     _ = kmalloc(100);
-//     return 0;
-// }
-
-fn example_init() linksection(".init") callconv(.c) u32 {
-    // _ = kmalloc(43);
-    return 100;
+pub fn add(a: u32, b: u32) u32 {
+    return a + b;
 }
 
-fn example_exit() linksection(".exit") callconv(.c) void {
+export fn example_init() linksection(".init") callconv(.c) u32 {
+    // _ = kmalloc(43);
+    return add(55, 35);
+    // return 50;
+}
+
+export fn example_exit() linksection(".exit") callconv(.c) void {
 }
