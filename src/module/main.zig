@@ -106,17 +106,13 @@ pub fn do_relocations(
                 packU32(write_addr, S + A);
             },
             .R_386_PC32 => {
-                var diff: u32 = 0;
-                var sign: i32 = 1;
-                if (P > A + S) {
-                    diff = P - (A + S);
-                    sign = -1;
-                } else {
-                    diff = (A + S) - P;
-                }
+                const P64: i64 = @intCast(P);
+                const A64: i64 = @intCast(A);
+                const S64: i64 = @intCast(S);
+                const diff: i32 = @truncate(A64 + S64 - P64);
                 packU32(
                     write_addr,
-                    @bitCast(@as(i32, @intCast(diff)) * sign)
+                    @bitCast(diff)
                 );
             },
             // .R_386_GOTPC => {
