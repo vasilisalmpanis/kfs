@@ -132,12 +132,11 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.fs.init();
 
     // Get PID1
-    // _ = krn.kthreadCreate(&user_thread, null) catch null;
+    _ = krn.kthreadCreate(&user_thread, null) catch null;
 
     // Devices
     drv.init();
     move_root();
-    kernel_ready = true;
     const path = krn.fs.path.resolve("/modules/example.o") catch {
         @panic("File doesn't exist");
     };
@@ -145,6 +144,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
         @panic("Not loadable");
     };
     path.release();
+    kernel_ready = true;
 
     while (true) {
         asm volatile ("hlt");

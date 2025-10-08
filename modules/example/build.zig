@@ -24,7 +24,6 @@ pub fn build(b: *std.Build) void {
             .error_tracing = false,
             .fuzz = false,
             .optimize = optimize,
-            .pic = true,
         }),
     });
 
