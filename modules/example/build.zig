@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const example_mod = b.addObject(.{
-        .name = "example_mod",
+        .name = "example",
         .root_module = b.createModule(.{
             .root_source_file = b.path("./src/root.zig"),
             .code_model = .kernel,
