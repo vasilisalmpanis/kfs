@@ -29,6 +29,18 @@ pub fn initSymbolTable(boot_info: *multiboot.Multiboot) void {
         string_table = @ptrFromInt(strtab_hdr.sh_addr + mm.PAGE_OFFSET);
     }
 }
+pub fn lookupSymbolByName(name: []const u8) !std.elf.Elf32_Sym {
+    for (0..symbol_count) |idx| {
+        const current_symbol = symbol_table[idx];
+        const sym_name: []const u8 = std.mem.span(
+            @as([*:0]const u8, @ptrCast(&string_table[current_symbol.st_name]))
+        );
+        if (std.mem.eql(u8, sym_name, name)) {
+            return current_symbol;
+        }
+    }
+    return krn.errors.PosixError.ENOENT;
+}
 
 pub fn lookupSymbol(addr: usize) ?[]const u8 {
     
