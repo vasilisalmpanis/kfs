@@ -9,3 +9,5 @@ userspace_c
 *.img
 zls.json
 disk/*.img
+.DS_Store
+ext2_dir/modules/

@@ -138,7 +138,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     drv.init();
     move_root();
     kernel_ready = true;
-    const path = krn.fs.path.resolve("/modules/example_mod.o") catch {
+    const path = krn.fs.path.resolve("/modules/example.o") catch {
         @panic("File doesn't exist");
     };
     _ = modules.load_module(path) catch {
