@@ -71,6 +71,7 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
         task.threadfn = f;
         task.arg = arg;
         task.mm = &mm.proc_mm.init_mm;
+        task.fs = krn.task.initial_task.fs;
         task.initSelf(
             stack_top,
             stack,

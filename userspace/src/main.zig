@@ -257,22 +257,39 @@ pub fn run_test() void {
 }
 
 pub export fn main() noreturn {
-    const tty = std.posix.open(
-        "/dev/tty",
-        std.os.linux.O{ .ACCMODE = .RDWR },
-        0o666
-    ) catch 0;
-    std.posix.dup2(@intCast(tty), 0) catch |err| {
-        serial("dup2 error {d} -> 0 {t}\n", .{tty, err});
-    };
-    std.posix.dup2(@intCast(tty), 1) catch |err| {
-        serial("dup2 error {d} -> 1 {t}\n", .{tty, err});
-    };
-    std.posix.dup2(@intCast(tty), 2) catch |err| {
-        serial("dup2 error {d} -> 2 {t}\n", .{tty, err});
-    };
-    // run_test();
-    var sh = shell.Shell.init();
-    sh.start();
-    while (true) {}
+    for (1..5) |idx| {
+        var buff: [10]u8 = undefined;
+        const tty_path = std.fmt.bufPrint(
+            buff[0..10],
+            "/dev/tty{d}",
+            .{idx}
+        ) catch {
+            continue ;
+        };
+        const pid = std.posix.fork() catch {
+            continue ;
+        };
+        if (pid == 0) {
+            const tty = std.posix.open(
+                tty_path,
+                std.os.linux.O{ .ACCMODE = .RDWR },
+                0o666
+            ) catch 0;
+            std.posix.dup2(@intCast(tty), 0) catch |err| {
+                serial("dup2 error {d} -> 0 {t}\n", .{tty, err});
+            };
+            std.posix.dup2(@intCast(tty), 1) catch |err| {
+                serial("dup2 error {d} -> 1 {t}\n", .{tty, err});
+            };
+            std.posix.dup2(@intCast(tty), 2) catch |err| {
+                serial("dup2 error {d} -> 2 {t}\n", .{tty, err});
+            };
+            // run_test();
+            var sh = shell.Shell.init();
+            sh.start();
+        }
+    }
+    while (true) {
+        _ = std.posix.wait4(-1, 0, null);
+    }
 }

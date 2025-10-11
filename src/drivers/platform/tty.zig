@@ -1,3 +1,4 @@
+const std = @import("std");
 const krn = @import("kernel");
 const io = @import("arch").io;
 const printf = @import("debug").printf;
@@ -34,7 +35,7 @@ var tty_file_ops = krn.fs.FileOps{
 };
 
 fn tty_open(_: *krn.fs.File, _: *krn.fs.Inode) !void {
-    krn.logger.WARN("8250 file opened\n", .{});
+    krn.logger.WARN("tty file opened\n", .{});
 }
 
 fn tty_close(_: *krn.fs.File) void {
@@ -83,31 +84,81 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
     return 0;
 }
 
-pub fn init() void {
-    krn.logger.DEBUG("DRIVER INIT TTY", .{});
-    if (pdev.PlatformDevice.alloc("tty")) |platform_tty| {
+fn addTTYDev(name: []const u8) !void {
+    if (pdev.PlatformDevice.alloc(name)) |platform_tty| {
         if (krn.mm.kmalloc(TTY)) |tty| {
             tty.* = TTY.init(scr.framebuffer.cwidth, scr.framebuffer.cheight);
             scr.current_tty = tty;
             platform_tty.dev.data = @ptrCast(@alignCast(tty));
         } else {
-            return ;
+            return krn.errors.PosixError.ENOMEM;
         }
-        platform_tty.register() catch {
-            return ;
-        };
-        krn.logger.WARN("Device registered for tty", .{});
-        pdrv.platform_register_driver(&tty_driver.driver) catch |err| {
-            krn.logger.ERROR("Error registering platform driver: {any}", .{err});
-            return ;
-        };
-        krn.logger.WARN("Driver registered for tty", .{});
-        _ = krn.kthreadCreate(&tty_thread, null) catch null;
+        try platform_tty.register();
         return ;
+    } else {
+        return krn.errors.PosixError.ENOMEM;
     }
-    krn.logger.WARN("tty cannot be initialized", .{});
 }
 
+pub fn init() void {
+    krn.logger.DEBUG("DRIVER INIT TTY", .{});
+    addTTYDev("tty10") catch return;
+    addTTYDev("tty9") catch return;
+    addTTYDev("tty8") catch return;
+    addTTYDev("tty7") catch return;
+    addTTYDev("tty6") catch return;
+    addTTYDev("tty5") catch return;
+    addTTYDev("tty4") catch return;
+    addTTYDev("tty3") catch return;
+    addTTYDev("tty2") catch return;
+    addTTYDev("tty1") catch |err| { krn.logger.ERROR("tty not added: {t}", .{err}); return; };
+
+    pdrv.platform_register_driver(&tty_driver.driver) catch |err| {
+        krn.logger.ERROR("Error registering platform driver: {any}", .{err});
+        return ;
+    };
+    krn.logger.WARN("Driver registered for tty", .{});
+    _ = krn.kthreadCreate(&tty_thread, null) catch null;
+    return ;
+}
+
+fn switchTTY(ctrl: kbd.CtrlType) void {
+    krn.logger.INFO("Switch tty {t}", .{ctrl});
+    var buff: [10]u8 = undefined;
+    const name = std.fmt.bufPrint(
+        buff[0..10],
+        "/dev/tty{d}",
+        .{@intFromEnum(ctrl) - @intFromEnum(kbd.CtrlType.TTY1) + 1}
+    ) catch |err| {
+        krn.logger.ERROR("switchTTY: {t}", .{err});
+        return;
+    };
+    const path = krn.fs.path.resolve(name) catch |err| {
+        krn.logger.ERROR("switchTTY: {t}", .{err});
+        return;
+    };
+    if (!path.dentry.inode.mode.isChr()) {
+        krn.logger.ERROR("switchTTY: not char", .{});
+        return ;
+    }
+    const file = krn.fs.File.new(path) catch |err| {
+        krn.logger.ERROR("switchTTY: cannot create file: {t}", .{err});
+        return ;
+    };
+    defer file.ref.unref();
+    path.dentry.inode.fops.open(file, path.dentry.inode) catch |err| {
+        krn.logger.ERROR("switchTTY: cannot create file: {t}", .{err});
+        return ;
+    };
+    if (path.dentry.inode.data.dev) |_d| {
+        const tty: *TTY = @ptrCast(@alignCast(_d.data));
+        scr.current_tty = tty;
+        scr.current_tty.?.reRenderAll();
+    } else {
+        krn.logger.ERROR("switchTTY: no tty dev", .{});
+        return ;
+    }
+}
 
 pub const ConsoleColors = enum(u32) {
     Black = 0x000000,
@@ -274,6 +325,8 @@ pub const TTY = struct {
     }
 
     pub fn render(self: *TTY) void {
+        if (self != scr.current_tty)    
+            return ;
         if (!self._has_dirty_rect and !self.cursorUpdated())
             return ;
         if (self._has_dirty_rect) {
@@ -537,6 +590,8 @@ pub const TTY = struct {
                     .RIGHT => self.move(1),
                     .HOME => self.home(),
                     .END => self.endline(),
+                    .TTY1,.TTY2,.TTY3,.TTY4,.TTY5,
+                    .TTY6,.TTY7,.TTY8,.TTY9,.TTY10 => return switchTTY(ctl),
                     else => {},
                 }
             }

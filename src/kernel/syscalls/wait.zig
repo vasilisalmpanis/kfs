@@ -87,10 +87,10 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
                     if (res.state == .ZOMBIE) {
-                        res.finish();
                         if (stat_addr != null) {
                             stat_addr.?.* = res.result;
                         }
+                        res.finish();
                         return 0;
                     }
                 }

@@ -122,6 +122,7 @@ pub const Shell = struct {
                 self.handleInput(input[0..len]);
             }
         }
+        while (true) {}
     }
 };
 
