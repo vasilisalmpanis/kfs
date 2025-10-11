@@ -125,6 +125,7 @@ pub const Shell = struct {
                 self.handleInput(input[0..len]);
             }
         }
+        while (true) {}
     }
 };
 
@@ -598,7 +599,11 @@ fn execve(self: *Shell, args: [][]const u8) void {
             return ;
         };
     }
-    _ = std.posix.waitpid(pid, 0);
+    const res = std.posix.waitpid(pid, 0);
+    if (res.status != 0) {
+        if (std.os.linux.W.IFSIGNALED(res.status))
+            std.debug.print("Killed\n", .{});
+    }
 }
 
 fn insmod(self: *Shell, args: [][]const u8) void {

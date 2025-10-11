@@ -57,6 +57,16 @@ pub const CtrlType = enum(u8) {
     DOWN,
     HOME,
     END,
+    TTY1,
+    TTY2,
+    TTY3,
+    TTY4,
+    TTY5,
+    TTY6,
+    TTY7,
+    TTY8,
+    TTY9,
+    TTY10,
     _
 };
 
@@ -148,6 +158,16 @@ pub const Keyboard = struct {
             .K_DOWN                 => {if (!release) return .{ .ctl = true, .val = @intFromEnum(CtrlType.DOWN) }; },
             .K_HOME                 => {if (!release) return .{ .ctl = true, .val = @intFromEnum(CtrlType.HOME) }; },
             .K_END                  => {if (!release) return .{ .ctl = true, .val = @intFromEnum(CtrlType.END) }; },
+            .K_F1,.K_F2,.K_F3,
+            .K_F4,.K_F5,.K_F6,
+            .K_F7,.K_F8,.K_F9,.K_F10 => {
+                if (!release and self.cntl) {
+                    return .{
+                        .ctl = true,
+                        .val = @intFromEnum(enumcode) - @intFromEnum(ScanCode.K_F1) + @intFromEnum(CtrlType.TTY1)
+                    };
+                }
+            },
             else => {
                 if (release)
                     return null;
