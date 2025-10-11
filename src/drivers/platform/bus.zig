@@ -5,7 +5,7 @@ const std = @import("std");
 const kernel = @import("kernel");
 
 fn match(driver: *drv.Driver, device: *dev.Device) bool {
-    return std.mem.eql(u8, driver.name, device.name);
+    return std.mem.startsWith(u8, device.name, driver.name);
 }
 
 pub var platform_bus: Bus = Bus{

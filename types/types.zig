@@ -1134,6 +1134,16 @@ pub const drivers = struct {
             DOWN = 3,
             HOME = 4,
             END = 5,
+            TTY1 = 6,
+            TTY2 = 7,
+            TTY3 = 8,
+            TTY4 = 9,
+            TTY5 = 10,
+            TTY6 = 11,
+            TTY7 = 12,
+            TTY8 = 13,
+            TTY9 = 14,
+            TTY10 = 15,
             _,
         };
 
