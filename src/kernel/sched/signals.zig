@@ -153,7 +153,7 @@ pub const SA_SIGINFO  : u32  = 0x00000004; // Use sa_sigaction instead of sa_han
 
 pub const sigDFL: ?HandlerFn = @ptrFromInt(0);
 pub const sigIGN: ?HandlerFn = @ptrFromInt(1);
-pub const sigERR: ?HandlerFn = @ptrFromInt(-1);
+// pub const sigERR: ?HandlerFn = @ptrFromInt(-1);
 
 const default_sigaction: Sigaction = Sigaction{
     .handler = .{ .handler = sigDFL },

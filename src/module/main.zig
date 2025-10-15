@@ -20,3 +20,5 @@ pub export const kthreadStop = @import("kthread.zig").kthreadStop;
 
 //
 pub const load_module = @import("./loader.zig").load_module;
+
+pub const arch = @import("arch");
