@@ -24,7 +24,7 @@ pub const TaskState = enum(u8) {
     ZOMBIE,
 };
 
-const TaskType = enum(u8) {
+pub const TaskType = enum(u8) {
     KTHREAD,
     PROCESS,
 };

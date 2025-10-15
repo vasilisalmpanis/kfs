@@ -118,6 +118,24 @@ pub fn build(b: *std.Build) !void {
         kernel.step.dependOn(&userspace.step);
 
         const kernel_step = b.step(name, "Build the kernel");
+        const codegen_step = b.step("gen", "Build module types");
+
+
+
+        const codegen = b.addExecutable(.{
+            .name = "codegen",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("tools/codegen.zig"),
+                .target = b.resolveTargetQuery(target),
+            }),
+        });
+        codegen.root_module.addImport("modules", modules_mod);
+
+        const run_codegen = b.addRunArtifact(codegen);
+        _ = run_codegen.addOutputFileArg("types.zig");
+
+        // try writeStructs("types.zig");
+        codegen_step.dependOn(&run_codegen.step);
         kernel_step.dependOn(&kernel.step);
     }
 }
