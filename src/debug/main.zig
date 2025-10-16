@@ -11,7 +11,6 @@ pub const runTests = @import("./tests.zig").runTests;
 pub const Logger = @import("./logger.zig").Logger;
 pub const ps = @import("./tasks.zig").ps;
 pub const psTree = @import("./tasks.zig").psTree;
-pub const neofetch = @import("./neofetch.zig").neofetch;
 pub const printGDT = @import("./gdt.zig").printGDT;
 pub const printTSS = @import("./gdt.zig").printTSS;
 pub const dumpRegs = @import("./trace.zig").dumpRegs;
