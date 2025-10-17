@@ -27,7 +27,7 @@ pub const MAP = packed struct(u32) {
         TYPE: MAP_TYPE,
         FIXED: bool = false,
         ANONYMOUS: bool = false,
-        @"32BIT": bool = false,
+        _32BIT: bool = false,
         _7: u1 = 0,
         GROWSDOWN: bool = false,
         _9: u2 = 0,
