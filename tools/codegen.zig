@@ -11,37 +11,101 @@ fn printIdentation(identation: u32, writer: *std.io.Writer) !void {
 
 var visited_registry: std.StringHashMap([]const u8) = undefined;
 
-fn cleanType(typ: type) void {
+fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
     const typeinfo = @typeInfo(typ);
     switch (typeinfo) {
         .pointer => |ptr| {
-            cleanType(ptr.child);
-        },
-        .optional => |op| {
-            cleanType(op.child);
-        },
-        .array => |arr| {
-            cleanType(arr.child);
-        },
-        .error_union => |err| {
-            cleanType(err.payload);
-        },
-        .@"fn" => |_fn| {
-            if (_fn.return_type) |ret| {
-                cleanType(ret);
-            }
-            inline for (_fn.params) |param| {
-                if (param.type) |_t| {
-                    cleanType(_t);
+            switch (ptr.size) {
+                .one =>{
+                    try writer.print("* ", .{});
+                },
+                .many =>{
+                    try writer.print("[*{s}]", .{if (ptr.sentinel_ptr != null) ":0" else ""});
+                },
+                .slice => {
+                    try writer.print("[]", .{});
+                },
+                else => {
                 }
             }
+            if (ptr.is_const) {
+                try writer.print("const ", .{});
+            }
+            try cleanType(ptr.child, writer);
         },
-        .@"anyframe" => |_any| {
-            if (_any.child) |_t| {
-                cleanType(_t);            }
+        .vector => |vec| {
+                try writer.print("[{d}]", .{vec.len});
+                try cleanType(vec.child, writer);
+        },
+        .optional => |op| {
+            try writer.print("?", .{});
+            try cleanType(op.child, writer);
+        },
+        .array => |arr| {
+            try writer.print("[{d}]", .{arr.len});
+            try cleanType(arr.child, writer);
+        },
+        .error_union => |err| {
+            try writer.print("anyerror!", .{});
+            try cleanType(err.payload, writer);
+        },
+        .@"fn" => |_fn| {
+            try writer.print("fn(", .{});
+            inline for (_fn.params) |param| {
+                if (param.type) |_t| {
+                    try cleanType(_t, writer);
+                }
+                try writer.print(",", .{});
+            }
+            try writer.print(")", .{});
+            if (_fn.return_type) |ret| {
+                try cleanType(ret, writer);
+            } else {
+                try writer.print(" void", .{});
+            }
+        },
+        .@"anyframe" => {
+        },
+        .int => |num| {
+            const char: u8 = if (num.signedness == .signed) 'i' else 'u';
+            try writer.print("{c}{d}", .{char, num.bits});
+        },
+        .float => |num| {
+            try writer.print("f{d}", .{num.bits});
+        },
+        .bool => {
+            try writer.print("bool", .{});
+        },
+        .void => {
+            try writer.print("void", .{});
+        },
+        .null => {
+            try writer.print("null", .{});
+        },
+        .undefined => {
+            try writer.print("undefined", .{});
+        },
+        .@"opaque" => {
+            try writer.print("anyopaque", .{});
+        },
+        .comptime_float => {
+            try writer.print("comptime_float", .{});
+        },
+        .comptime_int => {
+            try writer.print("comptime_int", .{});
+        },
+        .noreturn => {
+            try writer.print("noreturn", .{});
         },
         else => {
-            std.debug.print("clean type: {s}\n", .{@typeName(typ)});
+            const replace_from = @typeName(typ);
+            if (std.mem.lastIndexOf(u8, replace_from, ".")) |idx| {
+                if (visited_registry.get(replace_from[idx + 1..])) |_to| {
+                    try writer.print("{s}.{s}", .{_to, replace_from[idx + 1..]});
+                } else {
+                    try writer.print("std.{s}", .{replace_from});
+                }
+            }
         }
     }
 }
@@ -50,7 +114,7 @@ fn printStruct(
     name_prefix: []const u8,
     identation: u32,
     struct_name: []const u8,
-    struct_type: std.builtin.Type.Struct,
+    curr_type: std.builtin.Type,
     writer: *std.io.Writer,
     struct_val: type,
     visited: *std.StringHashMap([]const u8),
@@ -69,107 +133,80 @@ fn printStruct(
         try visited.put(struct_name, "");
     }
 
-    if (first_run) {
-        try printIdentation(identation, writer);
-        try writer.print("pub const {s} = struct {{\n", .{struct_name});
-    }
-    inline for (struct_type.decls) |decl| {
-        const field_name = decl.name;
-        // std.debug.print("getting {s} in {s}", .{field_name, struct_name});
-        const field_val = @field(struct_val, field_name);
-        if (@TypeOf(field_val) != type)
-            continue;
-        const ti = @typeInfo(field_val);
+    switch (curr_type) {
+        .@"struct" => |struct_type| {
+            if (!first_run) {
+                try printIdentation(identation, writer);
+                try writer.print("pub const {s} = struct {{\n", .{struct_name});
+            }
+            inline for (struct_type.decls) |decl| {
+                const field_name = decl.name;
+                const field_val = @field(struct_val, field_name);
+                if (@TypeOf(field_val) != type)
+                    continue;
+                const ti = @typeInfo(field_val);
 
-        var prefix: []const u8 = struct_name;
-        if (name_prefix.len != 0) {
-            const _sl: []const []const u8 = &.{name_prefix, struct_name};
-            prefix = try std.mem.join(allocator, ".", _sl);
+                var prefix: []const u8 = struct_name;
+                if (name_prefix.len != 0) {
+                    const _sl: []const []const u8 = &.{name_prefix, struct_name};
+                    prefix = try std.mem.join(allocator, ".", _sl);
+                }
+
+                switch (ti) {
+                    .@"struct", .@"enum" => {
+                        try printStruct(
+                            prefix,
+                            identation + 4,
+                            field_name,
+                            ti,
+                            writer,
+                            field_val,
+                            visited,
+                            allocator,
+                            first_run
+                        );
+                        if (!first_run)
+                            try writer.writeAll("\n");
+                        },
+                        else => {}
+                }
+                if (name_prefix.len != 0)
+                    allocator.free(prefix);
+            }
+            inline for (struct_type.fields) |field| {
+                if (!first_run) {
+                    try printIdentation(identation + 4, writer);
+                    try writer.print("{s}: ", .{field.name});
+                    try cleanType(field.type, writer);
+                    try writer.print(",\n", .{});
+                }
+            }
+            if(!first_run) {
+                try printIdentation(identation, writer);
+                try writer.print("}};\n", .{});
+                try writer.flush();
+            }
+        },
+        .@"enum" => |en| {
+            if (!first_run) {
+                try printIdentation(identation, writer);
+                try writer.print("pub const {s} = enum({s}) {{\n", .{struct_name, @typeName(en.tag_type)});
+                inline for (en.fields) |field| {
+                    try printIdentation(identation + 4, writer);
+                    try writer.print("{s} = {d},\n", .{field.name, field.value});
+                }
+                if (!en.is_exhaustive) {
+                    try printIdentation(identation + 4, writer);
+                    try writer.print("_,\n", .{});
+                }
+                try printIdentation(identation, writer);
+                try writer.print("}};\n\n", .{});
+            }
+        },
+        else => {
         }
-
-        switch (ti) {
-            .@"struct" => |cap| {
-                try printStruct(
-                    prefix,
-                    identation + 4,
-                    field_name,
-                    cap,
-                    writer,
-                    field_val,
-                    visited,
-                    allocator,
-                    first_run
-                );
-                if (first_run)
-                    try writer.writeAll("\n");
-            },
-            else => {}
-        }
-        if (name_prefix.len != 0)
-            allocator.free(prefix);
-    }
-    std.debug.print("Struct {s}\n", .{struct_name});
-    inline for (struct_type.fields) |field| {
-        const field_type_name = @typeName(field.type);
-        if (first_run) {
-            try printIdentation(identation + 4, writer);
-            try writer.print("{s}: {s},\n", .{field.name, field_type_name});
-        } else {
-            cleanType(field.type);
-            // const ti = @typeInfo(field.type);
-            // switch (ti) {
-
-            //     else => {
-            //         if (std.mem.lastIndexOf(u8, field_type_name, ".")) |idx| {
-            //             var it = std.mem.splitBackwardsScalar(u8, field_type_name, ' ');
-            //             if (it.next()) |last_seg| {
-            //                 var to_replace = std.mem.replace(u8, last_seg, "anyerror!", "");
-            //                 to_replace = std.mem.trimStart(u8, to_replace, "!");
-            //                 to_replace = std.mem.trimStart(u8, to_replace, "?");
-            //                 to_replace = std.mem.trimStart(u8, to_replace, "*");
-
-            //                 const last_segment = field_type_name[idx + 1 ..];
-            //                 if (visited_registry.get(last_segment)) |val| {
-            //                     std.debug.print("Replace: {s} | {s} => {s}.{s}\n", .{field_type_name, to_replace, val, last_segment});
-            //                 } else {
-            //                     std.debug.print("Replace: {s} | {s} => std.{s}\n", .{field_type_name, to_replace, to_replace});
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
-        }
-    }
-    if(first_run) {
-        try printIdentation(identation, writer);
-        try writer.print("}};\n", .{});
-        try writer.flush();
     }
 }
-
-// try interface.print("pub const {s} = struct {{\n", .{field_name});
-// std.debug.print("\nStruct Name {s}\n", .{field_name});
-// inline for (cap.fields) |f| {
-//     const type_name = @typeName(f.type);
-//     std.debug.print("type name {s}\n", .{type_name});
-//     try writer.interface.print("    {s}:", .{f.name});
-//     var tokens = std.mem.splitScalar(u8, type_name, ' ');
-//     while (tokens.next()) |_token| {
-//         std.debug.print("Token {s}\n", .{_token});
-//         const token = std.mem.trim(u8, _token, " \t");
-//         if (std.mem.lastIndexOf(u8, token, ".")) |idx| {
-//             if (!std.mem.startsWith(u8, token, "std")) {
-//                 try writer.interface.print(" {s}", .{token[idx + 1..]});
-//             } else {
-//                 try writer.interface.print(" {s}", .{token});
-//             }
-//         } else {
-//             try writer.interface.print(" {s}", .{token});
-//         }
-//
-//     }
-//     try writer.interface.print(",\n", .{});
-// }
 
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -186,7 +223,9 @@ pub fn main() anyerror!void {
     
     const output_path = args[1];
     std.debug.print("{s}\n", .{output_path});
-    const file = try std.fs.cwd().createFile(output_path, .{});
+    const file = try std.fs.cwd().createFile(output_path, std.fs.File.CreateFlags{
+        .read = true,
+    });
     defer file.close();
    
     var buff: [4096]u8 = .{0} ** 4096;
@@ -195,7 +234,6 @@ pub fn main() anyerror!void {
     try writer.interface.writeAll("// Auto-generated kernel type interface\n\n");
     const interface = &writer.interface;
     
-    // Create the visited map
     visited_registry = std.StringHashMap([]const u8).init(allocator);
     
     switch (@typeInfo(modules)) {
@@ -208,23 +246,17 @@ pub fn main() anyerror!void {
                     continue;
 
                 const ti = @typeInfo(field_val);
-                switch (ti) {
-                    .@"struct" => |cap| {
-                        try printStruct(
-                            "",
-                            0,
-                            field_name, 
-                            cap,
-                            interface,
-                            field_val,
-                            &visited_registry,    // Pass visited map
-                            allocator,   // Pass allocator
-                            true
-                        );
-                        try interface.writeAll("\n");
-                    },
-                    else => {}
-                }
+                try printStruct(
+                    "",
+                    0,
+                    field_name,
+                    ti,
+                    interface,
+                    field_val,
+                    &visited_registry,
+                    allocator,
+                    true
+                );
             }
             var visited = std.StringHashMap([]const u8).init(allocator);
             defer visited.deinit();
@@ -236,23 +268,18 @@ pub fn main() anyerror!void {
                     continue;
 
                 const ti = @typeInfo(field_val);
-                switch (ti) {
-                    .@"struct" => |cap| {
-                        try printStruct(
-                            "",
-                            0,
-                            field_name, 
-                            cap,
-                            interface,
-                            field_val,
-                            &visited,    // Pass visited map
-                            allocator,   // Pass allocator
-                            false
-                        );
-                        try interface.writeAll("\n");
-                    },
-                    else => {}
-                }
+                try printStruct(
+                    "",
+                    0,
+                    field_name,
+                    ti,
+                    interface,
+                    field_val,
+                    &visited,
+                    allocator,
+                    false
+                );
+                try interface.writeAll("\n");
             }
         },
         else => {
