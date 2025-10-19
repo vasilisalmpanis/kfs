@@ -37,13 +37,37 @@ fn constructKey(typ: anytype) ![]const u8 {
     return res;
 }
 
+fn printType(visited_key: [] const u8, type_name: []const u8, writer: *std.Io.Writer) !void {
+    if (std.mem.lastIndexOf(u8, type_name, ".")) |idx| {
+        if (visited_registry.get(visited_key)) |_to| {
+            try writer.print("{s}.{s}", .{_to, type_name[idx + 1..]});
+        } else {
+            try writer.print("std.{s}", .{type_name});
+        }
+    } else {
+        try writer.print("{s}", .{type_name});
+    }
+}
+
+fn findTypeStart(str: []const u8) usize {
+    var idx = str.len - 1;
+    while (idx >= 0) {
+        if (std.mem.containsAtLeastScalar(u8, " *?!", 1, str[idx]))
+            return idx + 1;
+        if (idx == 0)
+            break ;
+        idx -= 1;
+    }
+    return 0;
+}
+
 fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
     const typeinfo = @typeInfo(typ);
     switch (typeinfo) {
         .pointer => |ptr| {
             switch (ptr.size) {
                 .one =>{
-                    try writer.print("* ", .{});
+                    try writer.print("*", .{});
                 },
                 .many =>{
                     try writer.print("[*{s}]", .{if (ptr.sentinel_ptr != null) ":0" else ""});
@@ -77,13 +101,14 @@ fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
         },
         .@"fn" => |_fn| {
             try writer.print("fn(", .{});
-            inline for (_fn.params) |param| {
+            inline for (_fn.params, 1..) |param, idx| {
                 if (param.type) |_t| {
                     try cleanType(_t, writer);
                 }
-                try writer.print(",", .{});
+                if (idx < _fn.params.len)
+                    try writer.print(", ", .{});
             }
-            try writer.print(")", .{});
+            try writer.print(") ", .{});
             if (_fn.return_type) |ret| {
                 try cleanType(ret, writer);
             } else {
@@ -125,14 +150,41 @@ fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
         },
         else => {
             const replace_from = @typeName(typ);
-            if (std.mem.lastIndexOf(u8, replace_from, ".")) |idx| {
+            if (std.mem.indexOf(u8, replace_from, "(")) |par_o| {
+                const fn_name = replace_from[0..par_o];
+                var vis_key = fn_name;
+                if (std.mem.lastIndexOf(u8, vis_key, ".")) |idx| {
+                    vis_key = vis_key[idx + 1 ..];
+                }
+                try printType(vis_key, fn_name, writer);
+                try writer.writeAll("(");
+
+                var args_str: []const u8 = replace_from[par_o + 1 ..];
+                if (std.mem.lastIndexOf(u8, args_str, ")")) |par_c| {
+                    args_str = args_str[0..par_c];
+                    var it = std.mem.splitScalar(u8, args_str, ',');
+                    while (it.next()) |arg| {
+                        const type_start = findTypeStart(arg);
+
+                        try writer.writeAll(arg[0..type_start]);
+                        try writer.flush();
+
+                        var _key = arg[type_start..];
+                        if (std.mem.lastIndexOf(u8, _key, ".")) |idx| {
+                            _key = _key[idx + 1 ..];
+                        }
+                        try printType(_key, arg[type_start..], writer);
+
+                        if (it.rest().len > 0)
+                            try writer.writeAll(", ");
+                    }
+                }
+
+                try writer.writeAll(")");
+            } else {
                 const visited_key = try constructKey(typ);
                 defer allocator.free(visited_key);
-                if (visited_registry.get(visited_key)) |_to| {
-                    try writer.print("{s}.{s}", .{_to, replace_from[idx + 1..]});
-                } else {
-                    try writer.print("std.{s}", .{replace_from});
-                }
+                try printType(visited_key, replace_from, writer);
             }
         }
     }
@@ -159,6 +211,11 @@ fn printStruct(
         const prefix_copy = try allocator.alloc(u8, name_prefix.len);
         @memcpy(prefix_copy[0..], name_prefix[0..]);
         try visited.put(visited_key, prefix_copy);
+        if (!visited.contains(struct_name)) {
+            const name_copy = try allocator.dupe(u8, struct_name);
+            const prefix_copy_copy = try allocator.dupe(u8, prefix_copy);
+            try visited.put(name_copy, prefix_copy_copy);
+        }
     } else {
         try visited.put(visited_key, "");
     }
@@ -253,7 +310,6 @@ pub fn main() anyerror!void {
     }
     
     const output_path = args[1];
-    std.debug.print("{s}\n", .{output_path});
     const file = try std.fs.cwd().createFile(output_path, std.fs.File.CreateFlags{
         .read = true,
     });
