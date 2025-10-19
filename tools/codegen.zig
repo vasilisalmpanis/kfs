@@ -2,6 +2,8 @@ const std = @import("std");
 const modules = @import("modules");
 
 pub export const stack_top: u32 = 0;
+var allocator: std.mem.Allocator = undefined;
+var visited_registry: std.StringHashMap([]const u8) = undefined;
 
 fn printIdentation(identation: u32, writer: *std.io.Writer) !void {
     for (0..identation) |_| {
@@ -9,7 +11,31 @@ fn printIdentation(identation: u32, writer: *std.io.Writer) !void {
     }
 }
 
-var visited_registry: std.StringHashMap([]const u8) = undefined;
+fn constructKey(typ: anytype) ![]const u8 {
+    var res: []const u8 = undefined;
+    var buf: []const u8 = undefined;
+
+    const key = @typeName(typ);
+
+    if (std.mem.lastIndexOf(u8, key, ".")) |idx| {
+        res = try std.fmt.allocPrint(allocator, "{s}", .{key[idx + 1..]});
+    } else {
+        res = try std.fmt.allocPrint(allocator, "{s}", .{key});
+    }
+
+    const ti = @typeInfo(typ);
+    switch (ti) {
+        .@"struct" => |_s| {
+            for (_s.decls) |decl| {
+                buf = res;
+                res = try std.fmt.allocPrint(allocator, "{s}.{s}", .{res, decl.name});
+                allocator.free(buf);
+            }
+        },
+        else => {}
+    }
+    return res;
+}
 
 fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
     const typeinfo = @typeInfo(typ);
@@ -100,7 +126,9 @@ fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
         else => {
             const replace_from = @typeName(typ);
             if (std.mem.lastIndexOf(u8, replace_from, ".")) |idx| {
-                if (visited_registry.get(replace_from[idx + 1..])) |_to| {
+                const visited_key = try constructKey(typ);
+                defer allocator.free(visited_key);
+                if (visited_registry.get(visited_key)) |_to| {
                     try writer.print("{s}.{s}", .{_to, replace_from[idx + 1..]});
                 } else {
                     try writer.print("std.{s}", .{replace_from});
@@ -118,33 +146,37 @@ fn printStruct(
     writer: *std.io.Writer,
     struct_val: type,
     visited: *std.StringHashMap([]const u8),
-    allocator: std.mem.Allocator,
     first_run: bool,
 ) anyerror!void {
 
-    if (visited.contains(struct_name))
+    const visited_key = try constructKey(struct_val);
+    if (visited.contains(visited_key)) {
+        allocator.free(visited_key);
         return;
+    }
 
     if (first_run) {
         const prefix_copy = try allocator.alloc(u8, name_prefix.len);
         @memcpy(prefix_copy[0..], name_prefix[0..]);
-        try visited.put(struct_name, prefix_copy);
+        try visited.put(visited_key, prefix_copy);
     } else {
-        try visited.put(struct_name, "");
+        try visited.put(visited_key, "");
     }
 
     switch (curr_type) {
         .@"struct" => |struct_type| {
+
+
             if (!first_run) {
                 try printIdentation(identation, writer);
                 try writer.print("pub const {s} = struct {{\n", .{struct_name});
             }
             inline for (struct_type.decls) |decl| {
-                const field_name = decl.name;
-                const field_val = @field(struct_val, field_name);
-                if (@TypeOf(field_val) != type)
+                const decl_name = decl.name;
+                const decl_val = @field(struct_val, decl_name);
+                if (@TypeOf(decl_val) != type)
                     continue;
-                const ti = @typeInfo(field_val);
+                const ti = @typeInfo(decl_val);
 
                 var prefix: []const u8 = struct_name;
                 if (name_prefix.len != 0) {
@@ -157,12 +189,11 @@ fn printStruct(
                         try printStruct(
                             prefix,
                             identation + 4,
-                            field_name,
+                            decl_name,
                             ti,
                             writer,
-                            field_val,
+                            decl_val,
                             visited,
-                            allocator,
                             first_run
                         );
                         if (!first_run)
@@ -211,7 +242,7 @@ fn printStruct(
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    allocator = gpa.allocator();
     
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -231,7 +262,12 @@ pub fn main() anyerror!void {
     var buff: [4096]u8 = .{0} ** 4096;
     var writer = file.writer(buff[0..4096]);
     
-    try writer.interface.writeAll("// Auto-generated kernel type interface\n\n");
+    try writer.interface.writeAll(
+        \\// Auto-generated kernel type interface
+        \\const std = @import("std");
+        \\
+        \\
+    );
     const interface = &writer.interface;
     
     visited_registry = std.StringHashMap([]const u8).init(allocator);
@@ -254,7 +290,6 @@ pub fn main() anyerror!void {
                     interface,
                     field_val,
                     &visited_registry,
-                    allocator,
                     true
                 );
             }
@@ -276,10 +311,14 @@ pub fn main() anyerror!void {
                     interface,
                     field_val,
                     &visited,
-                    allocator,
                     false
                 );
                 try interface.writeAll("\n");
+            }
+            var it = visited.iterator();
+            while (it.next()) |item| {
+                allocator.free(item.value_ptr.*);
+                allocator.free(item.key_ptr.*);
             }
         },
         else => {
@@ -290,6 +329,7 @@ pub fn main() anyerror!void {
     var it = visited_registry.iterator();
     while (it.next()) |item| {
         allocator.free(item.value_ptr.*);
+        allocator.free(item.key_ptr.*);
     }
     visited_registry.deinit();
 }

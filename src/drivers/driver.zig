@@ -8,7 +8,7 @@ const std = @import("std");
 pub const Driver = struct {
     name: []const u8,
     list: kern.list.ListHead,
-    minor_set: std.bit_set.ArrayBitSet(u8, 256) = std.bit_set.ArrayBitSet(u8, 256).initEmpty(),
+    minor_set: std.StaticBitSet(256) = std.StaticBitSet(256).initEmpty(),
     minor_mutex: kern.Mutex = kern.Mutex.init(),
     major: u8 = 0,
     fops: ?*kern.fs.FileOps = null,

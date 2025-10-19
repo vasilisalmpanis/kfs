@@ -26,7 +26,7 @@ pub const dev_t = packed struct {
         return kern.errors.PosixError.ENOENT;
     }
 
-    pub fn new(major: u8, bitset: *std.bit_set.ArrayBitSet) !dev_t {
+    pub fn new(major: u8, bitset: *std.StaticBitSet(256)) !dev_t {
         var res = dev_t{
             .major = major,
             .minor = 0,
