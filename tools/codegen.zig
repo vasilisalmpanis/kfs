@@ -76,6 +76,40 @@ fn findTypeStart(str: []const u8) usize {
     return 0;
 }
 
+fn printDefaultValue(value: anytype, writer: *std.Io.Writer) anyerror!void {
+    const T = @TypeOf(value);
+    const type_info = @typeInfo(T);
+
+    switch (type_info) {
+        .int => {
+            try writer.print("= {d}", .{value});
+        },
+        .float => {
+            try writer.print("= {d}", .{value});
+        },
+        .bool => {
+            try writer.print("= {s}", .{if (value) "true" else "false"});
+        },
+        .comptime_int => {
+            try writer.print("= {d}", .{value});
+        },
+        .comptime_float => {
+            try writer.print("= {d}", .{value});
+        },
+        .null => {
+            try writer.print("= null", .{});
+        },
+        .undefined => {
+            try writer.print("= undefined", .{});
+        },
+        .optional => {
+            try writer.print("= null", .{});
+        },
+        // TODO
+        else => {}
+    }
+}
+
 fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
     const typeinfo = @typeInfo(typ);
     switch (typeinfo) {
@@ -280,6 +314,9 @@ fn printStruct(
                     try printIdentation(identation + 4, writer);
                     try writer.print("{s}: ", .{field.name});
                     try cleanType(field.type, writer);
+                    if (field.defaultValue()) |value| {
+                        try printDefaultValue(value, writer);
+                    }
                     try writer.print(",\n", .{});
                 }
             }
