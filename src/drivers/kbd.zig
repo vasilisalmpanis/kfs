@@ -62,7 +62,7 @@ pub const CtrlType = enum(u8) {
 
 var input: [256]KeyEvent = undefined;
 
-pub const Keyboard = struct {
+pub const Keyboard = extern struct {
     write_pos: u8 = 0,
     read_pos: u8 = 0,
     buffer: [256]u8,
@@ -103,7 +103,7 @@ pub const Keyboard = struct {
         io.outb(0x64, cmd);
     }
 
-    fn saveScancode(self: *Keyboard, scancode: u8) void {
+    export fn saveScancode(self: *Keyboard, scancode: u8) void {
         self.buffer[self.write_pos] = scancode;
         if (self.write_pos == 255) {
             self.write_pos = 0;
@@ -197,12 +197,14 @@ pub const Keyboard = struct {
     }
 };
 
+pub export var global_keyboard = &keyboard;
+
 pub var keyboard = Keyboard.init(&keymap_us);
 
 pub fn keyboardInterrupt() void {
     var scancode: u8 = undefined;
-    keyboard.sendCommand(0xAD); // Disable keyboard
-    defer keyboard.sendCommand(0xAE); // Enable keyboard
+    global_keyboard.sendCommand(0xAD); // Disable keyboard
+    defer global_keyboard.sendCommand(0xAE); // Enable keyboard
     if (io.inb(0x64) & 0x01 != 0x01)
         return ;
     scancode = io.inb(0x60);
@@ -213,5 +215,5 @@ pub fn keyboardInterrupt() void {
         else        => {}
     }
     // handle e0 e1
-    keyboard.saveScancode(scancode);
+    global_keyboard.saveScancode(scancode);
 }
