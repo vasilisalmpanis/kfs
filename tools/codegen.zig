@@ -49,6 +49,21 @@ fn printType(visited_key: [] const u8, type_name: []const u8, writer: *std.Io.Wr
     }
 }
 
+fn printStructLayout(struct_type: std.builtin.Type.Struct, struct_name: []const u8, writer: *std.Io.Writer, identation: u32) !void {
+    try printIdentation(identation, writer);
+    try writer.print("pub const {s} = ", .{struct_name});
+    switch (struct_type.layout) {
+        .auto => {},
+        .@"extern" => {
+            try writer.print("extern ", .{});
+        },
+        .@"packed" => {
+            try writer.print("packed ", .{});
+        },
+    }
+    try writer.print("struct {{\n", .{});
+}
+
 fn findTypeStart(str: []const u8) usize {
     var idx = str.len - 1;
     while (idx >= 0) {
@@ -225,8 +240,7 @@ fn printStruct(
 
 
             if (!first_run) {
-                try printIdentation(identation, writer);
-                try writer.print("pub const {s} = struct {{\n", .{struct_name});
+                try printStructLayout(struct_type, struct_name, writer, identation);
             }
             inline for (struct_type.decls) |decl| {
                 const decl_name = decl.name;
