@@ -272,15 +272,42 @@ fn printStruct(
     switch (curr_type) {
         .@"struct" => |struct_type| {
 
-
             if (!first_run) {
                 try printStructLayout(struct_type, struct_name, writer, identation);
             }
             inline for (struct_type.decls) |decl| {
                 const decl_name = decl.name;
                 const decl_val = @field(struct_val, decl_name);
-                if (@TypeOf(decl_val) != type)
+                if (@TypeOf(decl_val) != type) {
+                    const temp_ti = @typeInfo(@TypeOf(decl_val));
+                    switch (temp_ti) {
+                        .@"fn" => |function| {
+                            if (!first_run) {
+                                if (function.calling_convention.eql(std.builtin.CallingConvention.c)) {
+                                    try printIdentation(identation + 4, writer);
+                                    try writer.print("pub extern fn {s}(", .{decl_name});
+                                    inline for (function.params, 1..) |param, idx| {
+                                        if (param.type) |_t| {
+                                            try cleanType(_t, writer);
+                                        }
+                                        if (idx < function.params.len)
+                                            try writer.print(", ", .{});
+                                    }
+                                    try writer.print(")", .{});
+                                    if (function.return_type) |ret| {
+                                        try cleanType(ret, writer);
+                                    } else {
+                                        try writer.print(" void", .{});
+                                    }
+                                    try writer.writeAll(";\n");
+                                }
+                            }
+                        },
+                        else => {
+                        }
+                    }
                     continue;
+                }
                 const ti = @typeInfo(decl_val);
 
                 var prefix: []const u8 = struct_name;
