@@ -131,7 +131,7 @@ pub fn build(b: *std.Build) !void {
         const output = run_codegen.addOutputFileArg("types.zig");
         const gen_output_file = b.addInstallFileWithDir(
             output,
-            .prefix,
+            .{ .custom = "../types/"},
             "types.zig"
         );
         gen_output_file.step.dependOn(&run_codegen.step);

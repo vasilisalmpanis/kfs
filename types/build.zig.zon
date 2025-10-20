@@ -1,0 +1,11 @@
+.{
+    .name = .kfs_types,
+    .version = "0.0.1",
+    .fingerprint = 0x91f1ac52788a526e, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.1",
+    .dependencies = .{},
+    .paths = .{
+        "types.zig",
+        "build.zig.zon",
+    },
+}

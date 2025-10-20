@@ -339,7 +339,7 @@ fn printStruct(
             inline for (struct_type.fields) |field| {
                 if (!first_run) {
                     try printIdentation(identation + 4, writer);
-                    try writer.print("{s}: ", .{field.name});
+                    try writer.print("{s} : ", .{field.name});
                     try cleanType(field.type, writer);
                     if (field.defaultValue()) |value| {
                         try printDefaultValue(value, writer);

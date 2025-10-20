@@ -27,6 +27,10 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    const types_mod = b.dependency("types", .{});
+    example_mod.root_module.addImport("types", types_mod.module("types"));
+
+
     const install = b.addInstallArtifact(
         example_mod,
         .{
