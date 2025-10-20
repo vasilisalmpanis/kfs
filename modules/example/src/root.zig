@@ -1,4 +1,5 @@
 // const std = @import("std");
+const types = @import("types");
 
 // pub extern fn kmalloc(size: u32) u32;
 //
@@ -24,6 +25,8 @@ pub fn add(a: u32, b: u32) u32 {
 
 export fn example_init() linksection(".init") callconv(.c) u32 {
     _ = add(55, 35);
+    const temp1: types.kernel.mm.proc_mm.MAP_TYPE = .SHARED;
+    _ = temp1;
     return 0;
 }
 
