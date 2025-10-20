@@ -11,14 +11,13 @@ pub export const vfree = @import("memory.zig").vfree;
 // Devices
 
 // IRQ
-pub export const registerHandler = @import("kernel").irq.registerHandler;
-pub export const unregisterHandler = @import("kernel").irq.unregisterHandler;
+// pub export const registerHandler = @import("kernel").irq.registerHandler;
+// pub export const unregisterHandler = @import("kernel").irq.unregisterHandler;
 
 // Kthread
 pub export const kthreadCreate = @import("kthread.zig").kthreadCreate;
 pub export const kthreadStop = @import("kthread.zig").kthreadStop;
 
-//
 pub const load_module = @import("./loader.zig").load_module;
 
 pub const arch = @import("arch");
