@@ -1,0 +1,17 @@
+.{
+    .name = .keyboard,
+    .version = "0.0.1",
+    .fingerprint = 0x83748095fc973a8f, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.1",
+    .dependencies = .{
+       .types = .{
+           .path = "../../types/",
+           .lazy = false,
+       },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

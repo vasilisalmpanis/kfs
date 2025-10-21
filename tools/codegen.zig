@@ -197,6 +197,28 @@ fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
         .noreturn => {
             try writer.print("noreturn", .{});
         },
+        .@"union" => |_u| {
+            const name = @typeName(typ);
+            if (std.mem.containsAtLeast(u8, name, 1, "__union_")) {
+                switch (_u.layout) {
+                    .@"extern" => try writer.print("extern ", .{}),
+                    .@"packed" => try writer.print("packed ", .{}),
+                    else => {},
+                }
+                try writer.print("union {{ ", .{});
+                inline for (_u.fields, 1..) |f, idx| {
+                    try writer.print("{s}: ", .{f.name});
+                    try cleanType(f.type, writer);
+                    if (idx < _u.fields.len)
+                        try writer.print(", ", .{});
+                }
+                try writer.print(" }}", .{});
+            } else {
+                const visited_key = try constructKey(typ);
+                defer allocator.free(visited_key);
+                try printType(visited_key, name, writer);
+            }
+        },
         else => {
             const replace_from = @typeName(typ);
             if (std.mem.indexOf(u8, replace_from, "(")) |par_o| {
@@ -317,7 +339,7 @@ fn printStruct(
                 }
 
                 switch (ti) {
-                    .@"struct", .@"enum" => {
+                    .@"struct", .@"enum" => { //, .@"union" => {
                         try printStruct(
                             prefix,
                             identation + 4,
@@ -364,6 +386,26 @@ fn printStruct(
                 if (!en.is_exhaustive) {
                     try printIdentation(identation + 4, writer);
                     try writer.print("_,\n", .{});
+                }
+                try printIdentation(identation, writer);
+                try writer.print("}};\n\n", .{});
+            }
+        },
+        .@"union" => |un| {
+            if (!first_run) {
+                var layout: []const u8 = "";
+                switch (un.layout) {
+                    .@"extern" => layout = "extern ",
+                    .@"packed" => layout = "packed ",
+                    else => {}
+                }
+                try printIdentation(identation, writer);
+                try writer.print("pub const {s} = {s}union {{\n", .{struct_name, layout});
+                inline for (un.fields) |field| {
+                    try printIdentation(identation + 4, writer);
+                    try writer.print("{s} = ", .{field.name});
+                    try cleanType(field.type, writer);
+                    try writer.print(",\n", .{});
                 }
                 try printIdentation(identation, writer);
                 try writer.print("}};\n\n", .{});

@@ -50,7 +50,7 @@ const Ucontext = struct {
     mask: sigset_t,
 };
 
-const SiginfoFieldsUnion = union {
+pub const SiginfoFieldsUnion = union {
     pad: [128 - 2 * @sizeOf(c_int) - @sizeOf(c_long)]u8,
     common: struct {
         first: union {

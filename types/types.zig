@@ -587,7 +587,7 @@ pub const kernel = struct {
         };
 
         pub const Sigaction = struct {
-            handler : std.sched.signals.Sigaction__union_23673,
+            handler : extern union { handler: ?*const fn(i32) void, sigaction: ?*const fn(i32, *const kernel.signals.Siginfo, ?*anyopaque) void },
             flags : u32,
             restorer : ?*const fn() void= null,
             mask : kernel.signals.sigset_t,
@@ -720,7 +720,7 @@ pub const kernel = struct {
             ctime : u32= 0,
             mtime : u32= 0,
             dev_id : drivers.device.dev_t,
-            data : std.fs.inode.Inode__union_23216,
+            data : extern union { dev: ?*drivers.device.Device, sock: ?*kernel.socket.Socket },
             size : u32= 0,
             ops : *const kernel.fs.InodeOps,
             fops : *const kernel.fs.file.FileOps,
@@ -1329,5 +1329,12 @@ pub const drivers = struct {
 
     };
 
+};
+
+pub const api = struct {
+    pub extern fn registerPlatformDevice(*drivers.platform.device.PlatformDevice)i32;
+    pub extern fn allocPlatformDevice([*]const u8, u32)?*drivers.platform.device.PlatformDevice;
+    pub extern fn registerPlatformDriver(*drivers.driver.Driver)i32;
+    pub extern fn addCharacterDevice(*drivers.device.Device, kernel.fs.UMode)i32;
 };
 

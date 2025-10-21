@@ -24,3 +24,5 @@ pub const arch = @import("arch");
 pub const kernel = @import("kernel");
 pub const debug = @import("debug");
 pub const drivers = @import("drivers");
+
+pub const api = @import("./api.zig");

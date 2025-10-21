@@ -137,7 +137,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     // Devices
     drv.init();
     move_root();
-    const path = krn.fs.path.resolve("/modules/example.o") catch {
+    const path = krn.fs.path.resolve("/modules/keyboard.o") catch {
         @panic("File doesn't exist");
     };
     _ = modules.load_module(path) catch {

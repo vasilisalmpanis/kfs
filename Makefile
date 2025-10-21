@@ -12,7 +12,7 @@ IMG_SIZE	= 32M
 MOD_SRC_DIR		= modules
 MOD_TARGET_DIR	= $(IMG_DIR)/modules
 
-MODULES = example
+MODULES = example keyboard
 
 GPT_DISK = disk/disk.img
 
