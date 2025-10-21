@@ -1,5 +1,7 @@
 // Auto-generated kernel type interface
 const std = @import("std");
+pub const dbg = @import("debug.zig");
+pub const mm = @import("mm.zig");
 
 pub const arch = struct {
     pub const io = struct {
@@ -1332,9 +1334,11 @@ pub const drivers = struct {
 };
 
 pub const api = struct {
+    pub extern fn kheap_alloc(u32, bool, bool)u32;
     pub extern fn registerPlatformDevice(*drivers.platform.device.PlatformDevice)i32;
     pub extern fn allocPlatformDevice([*]const u8, u32)?*drivers.platform.device.PlatformDevice;
     pub extern fn registerPlatformDriver(*drivers.driver.Driver)i32;
     pub extern fn addCharacterDevice(*drivers.device.Device, kernel.fs.UMode)i32;
+    pub extern fn printf([*]const u8, u32)void;
 };
 
