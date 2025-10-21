@@ -441,6 +441,8 @@ pub fn main() anyerror!void {
     try writer.interface.writeAll(
         \\// Auto-generated kernel type interface
         \\const std = @import("std");
+        \\pub const dbg = @import("debug.zig");
+        \\pub const mm = @import("mm.zig");
         \\
         \\
     );
