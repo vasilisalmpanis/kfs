@@ -1,6 +1,10 @@
 const drv = @import("drivers");
 const krn = @import("kernel");
 
+pub fn init() void {
+    krn.logger.INFO("Modules API initialized\n", .{});
+}
+
 pub export fn registerPlatformDevice(pdev: *drv.platform.PlatformDevice) callconv(.c) i32 {
     pdev.register() catch |err| {
         return krn.errors.toErrno(err);
