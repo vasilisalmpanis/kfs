@@ -16,9 +16,14 @@ pub const PlatformDriver = struct {
 
 // core probe wrapper
 fn platform_probe_device(driver: *drv.Driver, device: *dev.Device) anyerror!void {
+    kernel.logger.DEBUG(
+        "platform_probe_device(): probing drv {s} with dev {s}",
+        .{driver.name, device.name}
+    );
     const platform_dev: *PlatformDevice = @fieldParentPtr("dev", device);
     const platform_driver: *PlatformDriver = @fieldParentPtr("driver", driver);
 
+    kernel.logger.DEBUG("{s}", .{platform_dev.dev.name});
     try platform_driver.probe(platform_dev);
 }
 

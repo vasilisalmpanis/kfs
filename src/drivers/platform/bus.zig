@@ -5,6 +5,10 @@ const std = @import("std");
 const kernel = @import("kernel");
 
 fn match(driver: *drv.Driver, device: *dev.Device) bool {
+    kernel.logger.DEBUG(
+        "Matching drv {s} with dev {s}",
+        .{driver.name, device.name}
+    );
     return std.mem.eql(u8, driver.name, device.name);
 }
 
