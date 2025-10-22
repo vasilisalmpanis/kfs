@@ -1,8 +1,8 @@
 const io = @import("arch").io;
 const std = @import("std");
 const krn = @import("kernel");
-const keymap_us = @import("./keymaps.zig").keymap_us;
-const keymap_de = @import("./keymaps.zig").keymap_de;
+pub const keymap_us = @import("./keymaps.zig").keymap_us;
+pub const keymap_de = @import("./keymaps.zig").keymap_de;
 
 pub const ScanCode = enum(u8) {
     K_ESC = 0x1,
@@ -98,12 +98,12 @@ pub const Keyboard = struct {
         }
     }
 
-    fn sendCommand(_: *Keyboard, cmd: u8) void {
+    pub export fn sendCommand(_: *Keyboard, cmd: u8) void {
         kbWait();
         io.outb(0x64, cmd);
     }
 
-    fn saveScancode(self: *Keyboard, scancode: u8) void {
+    pub export fn saveScancode(self: *Keyboard, scancode: u8) void {
         self.buffer[self.write_pos] = scancode;
         if (self.write_pos == 255) {
             self.write_pos = 0;
@@ -198,6 +198,7 @@ pub const Keyboard = struct {
 };
 
 pub var keyboard = Keyboard.init(&keymap_us);
+pub var global_keyboard = &keyboard;
 
 pub fn keyboardInterrupt() void {
     var scancode: u8 = undefined;

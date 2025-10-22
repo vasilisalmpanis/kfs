@@ -5,6 +5,12 @@ pub const mm = @import("mm.zig");
 
 pub const arch = struct {
     pub const io = struct {
+        pub extern fn inb(u16)u8;
+        pub extern fn inw(u16)u16;
+        pub extern fn inl(u16)u32;
+        pub extern fn outb(u16, u8)void;
+        pub extern fn outw(u16, u16)void;
+        pub extern fn outl(u16, u32)void;
     };
 
     pub const system = struct {
@@ -868,6 +874,8 @@ pub const debug = struct {
 
 pub const drivers = struct {
     pub const Keyboard = struct {
+        pub extern fn sendCommand(*drivers.Keyboard, u8)void;
+        pub extern fn saveScancode(*drivers.Keyboard, u8)void;
         write_pos : u8= 0,
         read_pos : u8= 0,
         buffer : [256]u8,
@@ -1340,5 +1348,8 @@ pub const api = struct {
     pub extern fn registerPlatformDriver(*drivers.driver.Driver)i32;
     pub extern fn addCharacterDevice(*drivers.device.Device, kernel.fs.UMode)i32;
     pub extern fn printf([*]const u8, u32)void;
+    pub extern fn setKBD(*drivers.Keyboard)void;
+    pub extern fn registerHandler(u32, *const anyopaque)void;
+    pub extern fn unregisterHandler(u32)void;
 };
 
