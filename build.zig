@@ -67,10 +67,13 @@ pub fn build(b: *std.Build) !void {
             .name = name,
             .root_module = b.createModule(.{
                 .root_source_file = b.path(kernel_src),
-                .optimize = b.standardOptimizeOption(.{}),
+                .optimize = b.standardOptimizeOption(.{
+                    .preferred_optimize_mode = .ReleaseFast
+                }),
                 .target = b.resolveTargetQuery(target),
                 .code_model = .kernel,
                 .strip = false,
+                .error_tracing = true,
             }),
         });
         kernel.root_module.stack_protector = false;
