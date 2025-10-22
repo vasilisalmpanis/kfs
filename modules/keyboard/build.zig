@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
         .abi = .none,
     };
     const optimize = b.standardOptimizeOption(.{
-        .preferred_optimize_mode = .ReleaseSmall,
+        .preferred_optimize_mode = .ReleaseFast,
     });
 
     const example_mod = b.addObject(.{
@@ -21,7 +21,7 @@ pub fn build(b: *std.Build) void {
             .stack_protector = false,
             .stack_check = false,
             .red_zone = false,
-            .error_tracing = false,
+            .error_tracing = true,
             .fuzz = false,
             .optimize = optimize,
         }),
