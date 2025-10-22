@@ -1,6 +1,7 @@
 const drv = @import("drivers");
 const krn = @import("kernel");
 const dbg = @import("debug");
+const std = @import("std");
 
 pub fn init() void {
     krn.logger.INFO("Modules API initialized\n", .{});
@@ -11,6 +12,11 @@ pub export fn kheap_alloc(size: u32, contig: bool, user: bool) u32 {
     const addr = krn.mm.kheap.alloc(size, contig, user) catch return 0;
     return addr;
 }
+
+// Drivers
+
+pub export const keymap_us: *const std.EnumMap(drv.keyboard.ScanCode,drv.keyboard.KeymapEntry) = &drv.keyboard.keymap_us;
+pub export const keymap_de: *const std.EnumMap(drv.keyboard.ScanCode,drv.keyboard.KeymapEntry) = &drv.keyboard.keymap_de;
 
 // Device
 
@@ -48,6 +54,14 @@ pub export fn printf(buff: [*]const u8, size: u32) void {
     }
 }
 
+pub export fn setKBD(kbd: *drv.keyboard.Keyboard) void {
+    drv.keyboard.global_keyboard = kbd;
+}
+
 // pub export fn serial(buff: [*]const u8, size: u32) void {
 //     krn.logger.INFO(buff[0..size], .{});
 // }
+
+// IRQ
+pub export const registerHandler = @import("kernel").irq.registerHandler;
+pub export const unregisterHandler = @import("kernel").irq.unregisterHandler;

@@ -76,7 +76,7 @@ fn tty_remove(device: *pdev.PlatformDevice) !void {
 
 pub fn tty_thread(_: ?*const anyopaque) i32 {
     while (krn.task.current.should_stop != true) {
-        if (kbd.keyboard.getInput()) |input| {
+        if (kbd.global_keyboard.getInput()) |input| {
             scr.current_tty.?.input(input);
         }
     }

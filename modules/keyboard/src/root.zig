@@ -70,16 +70,52 @@ fn kbd_remove(device: *pdev.PlatformDevice) !void {
     _ = device;
 }
 
+var mod_kbd: *kfs.drivers.Keyboard = undefined;
+
+pub fn keyboardInterrupt() void {
+    var scancode: u8 = undefined;
+    mod_kbd.sendCommand(0xAD); // Disable keyboard
+    defer mod_kbd.sendCommand(0xAE); // Enable keyboard
+    if (kfs.arch.io.inb(0x64) & 0x01 != 0x01)
+        return ;
+    scancode = kfs.arch.io.inb(0x60);
+    switch (scancode) {
+        0xfa, 0xfe  => return,
+        0           => { return; },
+        0xff        => { return; },
+        else        => {}
+    }
+    // handle e0 e1
+    mod_kbd.saveScancode(scancode);
+}
+
 
 export fn _init() linksection(".init") callconv(.c) u32 {
     const dev_name: []const u8 = "kbd";
     if (api.allocPlatformDevice(dev_name.ptr, dev_name.len)) |kbd| {
-        var res = api.registerPlatformDevice(kbd);
-        if (res != 0)
-            return @intCast(res);
-        res = api.registerPlatformDriver(&kbd_driver.driver);
-        if (res != 0)
-            return @intCast(res);
+        if (kfs.mm.kmalloc(kfs.drivers.Keyboard)) |kbd_data| {
+            print_serial("alloc", 5);
+            kbd_data.* = kfs.drivers.Keyboard{
+                .buffer = .{0} ** 256,
+                .keymap = kfs.dbg.keymap_us,
+                .shift = false,
+                .cntl = false,
+                .alt = false,
+                .caps = false,
+                .write_pos = 0,
+                .read_pos = 0,
+            };
+            kbd.dev.data = kbd_data;
+            var res = api.registerPlatformDevice(kbd);
+            if (res != 0)
+                return @intCast(res);
+            res = api.registerPlatformDriver(&kbd_driver.driver);
+            if (res != 0)
+                return @intCast(res);
+            mod_kbd = kbd_data;
+            kfs.api.setKBD(mod_kbd);
+            kfs.api.registerHandler(1, keyboardInterrupt);
+        }
     }
     return 0;
 }

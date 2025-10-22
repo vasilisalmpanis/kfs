@@ -10,9 +10,6 @@ pub export const vfree = @import("memory.zig").vfree;
 
 // Devices
 
-// IRQ
-// pub export const registerHandler = @import("kernel").irq.registerHandler;
-// pub export const unregisterHandler = @import("kernel").irq.unregisterHandler;
 
 // Kthread
 pub export const kthreadCreate = @import("kthread.zig").kthreadCreate;
