@@ -89,10 +89,18 @@ pub fn keyboardInterrupt() void {
     mod_kbd.saveScancode(scancode);
 }
 
+pub fn panic(
+    msg: []const u8,
+    _: ?*std.builtin.StackTrace,
+    _: ?usize
+) noreturn {
+    api.module_panic(msg.ptr, msg.len);
+    while (true) {}
+}
 
 export fn _init() linksection(".init") callconv(.c) u32 {
     const dev_name: []const u8 = "kbd";
-    if (api.allocPlatformDevice(dev_name.ptr, dev_name.len)) |kbd| {
+    if (api.allocPlatformDevice(dev_name.ptr, dev_name.len)) |plt_dev| {
         if (kfs.mm.kmalloc(kfs.drivers.Keyboard)) |kbd_data| {
             print_serial("alloc", 5);
             kbd_data.* = kfs.drivers.Keyboard{
@@ -105,14 +113,14 @@ export fn _init() linksection(".init") callconv(.c) u32 {
                 .write_pos = 0,
                 .read_pos = 0,
             };
-            kbd.dev.data = kbd_data;
-            var res = api.registerPlatformDevice(kbd);
+            var res = api.registerPlatformDevice(plt_dev);
             if (res != 0)
                 return @intCast(res);
             res = api.registerPlatformDriver(&kbd_driver.driver);
             if (res != 0)
                 return @intCast(res);
             mod_kbd = kbd_data;
+            plt_dev.dev.data = kbd_data;
             kfs.api.setKBD(mod_kbd);
             kfs.api.registerHandler(1, keyboardInterrupt);
         }

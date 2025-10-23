@@ -1351,5 +1351,6 @@ pub const api = struct {
     pub extern fn setKBD(*drivers.Keyboard)void;
     pub extern fn registerHandler(u32, *const anyopaque)void;
     pub extern fn unregisterHandler(u32)void;
+    pub extern fn module_panic([*]const u8, u32)void;
 };
 
