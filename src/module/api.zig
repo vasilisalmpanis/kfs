@@ -65,3 +65,11 @@ pub export fn setKBD(kbd: *drv.keyboard.Keyboard) void {
 // IRQ
 pub export const registerHandler = @import("kernel").irq.registerHandler;
 pub export const unregisterHandler = @import("kernel").irq.unregisterHandler;
+
+// Panic
+pub export fn module_panic(
+    msg: [*]const u8,
+    msg_len: u32,
+) void {
+    @panic(msg[0..msg_len]);
+}

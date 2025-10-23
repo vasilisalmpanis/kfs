@@ -94,10 +94,10 @@ pub fn do_relocations(
         const P: u32 = @intFromPtr(write_addr);
         const A: u32 = unpackU32(write_addr);
         var S: u32 = load_base + sym_sh.sh_offset + sym.st_value;
-        const stype = sym.st_type();
-        if (stype == std.elf.SHN_ABS) {
+        
+        if (sym.st_shndx == std.elf.SHN_ABS) {
             S = sym.st_value;
-        } else if (stype == std.elf.SHN_UNDEF) {
+        } else if (sym.st_shndx == std.elf.SHN_UNDEF) {
             // We have no dynamic linking
             // we find the symbol value and use it as S
             // in the formula
@@ -109,6 +109,11 @@ pub fn do_relocations(
             S = symbol.st_value;
         }
         const rel_type: R_X86_Type = @enumFromInt(rel.r_type());
+        // kernel.logger.DEBUG("{t} [{s}]: A: {x} S: {x} P: {x}\n", .{
+        //     rel_type,
+        //     std.mem.span(@as([*:0]u8, @ptrCast(@alignCast(&strtab[sym.st_name])))),
+        //     A, S, P
+        // });
         switch (rel_type) {
             .R_386_32 => {
                 packU32(write_addr, S + A);
@@ -145,6 +150,14 @@ pub fn load_module(path: kernel.fs.path.Path) !*Module {
         _slice 
     else
         return kernel.errors.PosixError.ENOMEM;
+    kernel.logger.DEBUG(
+        "MOD {s} loaded at: 0x{x} - 0x{x}\n",
+        .{
+            path.dentry.name,
+            @intFromPtr(slice.ptr),
+            @intFromPtr(slice.ptr) + file.inode.size
+        }
+    );
     var read: u32 = 0;
     while (read < file.inode.size) {
         read += try file.ops.read(file, @ptrCast(&slice[read]), slice.len);
