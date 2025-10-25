@@ -7,9 +7,41 @@ const std = @import("std");
 const krn = @import("../main.zig");
 const mod = @import("modules");
 
-pub fn init_module(image: [*]u8, size: u32, name: [*]u8, name_len: u32) !u32 {
-    const name_span = name[0..name_len];
+pub fn init_module(image: [*]u8, size: u32, name: [*:0]u8) !u32 {
+    const name_span = std.mem.span(name);
     _ = try mod.load_module(image[0..size], name_span);
     return 0;
 }
 
+pub fn finit_module(fd: u32) !u32 {
+    if (krn.task.current.files.fds.get(fd)) |file| {
+        if (!file.mode.canRead(file.inode.uid, file.inode.gid)) {
+            return errors.EACCES;
+        }
+        if (file.mode.isDir())
+            return errors.EISDIR;
+        if (file.path) |_path| {
+            const size = file.inode.size;
+            const elf = krn.mm.kmallocSlice(u8, size);
+            if (elf) |_elf| {
+                defer krn.mm.kfree(_elf.ptr);
+                var offset: u32 = 0;
+                while (offset < file.inode.size) {
+                    const read = try file.ops.read(
+                        file,
+                        @ptrCast(@alignCast(&_elf[offset])),
+                        file.inode.sb.?.block_size,
+                    );
+                    if (read == 0)
+                        break;
+                    offset += read;
+                }
+                _ = try mod.load_module(_elf, _path.dentry.name);
+                return 0;
+            }
+            return errors.ENOMEM;
+        }
+        return errors.EBADF;
+    }
+    return errors.EBADF;
+}

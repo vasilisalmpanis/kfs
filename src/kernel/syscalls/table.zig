@@ -153,6 +153,7 @@ pub const SyscallTable = brk: {
         .SYS_sigprocmask                = @ptrCast(&@import("./sigaction.zig").sigprocmask),
         .SYS_create_module              = &notImpl,
         .SYS_init_module                = @ptrCast(&@import("./module.zig").init_module),
+        .SYS_finit_module               = @ptrCast(&@import("module.zig").finit_module),
         .SYS_delete_module              = &notImpl,
         .SYS_get_kernel_syms            = &notImpl,
         .SYS_quotactl                   = &notImpl,
