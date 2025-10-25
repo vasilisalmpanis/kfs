@@ -56,10 +56,6 @@ fn kbd_write(_: *krn.fs.file.File, _: [*]const u8, _: u32) !u32 {
 }
 
 fn kbd_probe(device: *pdev.PlatformDevice) !void {
-    const tst: [] const u8 = "test\n";
-    print_serial(tst.ptr, tst.len);
-    // print_serial(device.dev.name.ptr, device.dev.name.len);
-    print_serial(tst.ptr, tst.len);
     _ = api.addCharacterDevice(
         &device.dev,
         krn.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0o6}
@@ -102,7 +98,7 @@ export fn _init() linksection(".init") callconv(.c) u32 {
     const dev_name: []const u8 = "kbd";
     if (api.allocPlatformDevice(dev_name.ptr, dev_name.len)) |plt_dev| {
         if (kfs.mm.kmalloc(kfs.drivers.Keyboard)) |kbd_data| {
-            print_serial("alloc", 5);
+            kfs.dbg.printf("Loading keyboard module\n", .{});
             kbd_data.* = kfs.drivers.Keyboard{
                 .buffer = .{0} ** 256,
                 .keymap = kfs.dbg.keymap_us,
