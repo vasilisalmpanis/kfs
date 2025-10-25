@@ -91,6 +91,30 @@ pub fn fstat(fd: u32, buf: ?*OldStat) !u32 {
 
 // ======== STAT64 =====================
 
+pub const timespec = extern struct {
+    sec: isize,
+    nsec: isize,
+};
+
+pub const StatLinux = extern struct {
+    dev: u64,
+    __dev_padding: u32,
+    __ino_truncated: u32,
+    mode: u32,
+    nlink: u32,
+    uid: u32,
+    gid: u32,
+    rdev: u64,
+    __rdev_padding: u32,
+    size: i64,
+    blksize: i32,
+    blocks: i64,
+    atim: timespec,
+    mtim: timespec,
+    ctim: timespec,
+    ino: u64,
+};
+
 const Stat64 = extern struct{
 	st_dev: u64,	        // Device. 
 	st_ino: u64,	        // File serial number. 
@@ -113,6 +137,42 @@ const Stat64 = extern struct{
 	__unused4: u32,
 	__unused5: u32,
 };
+
+pub fn do_stat(inode: *fs.Inode, buf: *StatLinux) !void {
+    buf.* = std.mem.zeroes(StatLinux);
+    const sb = if (inode.sb) |_s| _s
+        else return krn.errors.PosixError.EINVAL;
+    buf.dev = 0;
+    if (sb.dev_file) |blkdev| {
+        const dev: u16 = @bitCast(blkdev.inode.dev_id);
+        buf.dev = @intCast(dev);
+    }
+    buf.ino = @intCast(inode.i_no);
+    const mode: u16 = @bitCast(inode.mode);
+    buf.mode = @intCast(mode);
+
+    buf.nlink = 0; // No hard links yet.
+    buf.uid = @intCast(inode.uid);
+    buf.gid = @intCast(inode.gid);
+    const dev: u16 = @bitCast(inode.dev_id);
+    buf.rdev = @intCast(dev);
+
+    buf.size = @intCast(inode.size);
+    buf.blksize = @intCast(sb.block_size);
+
+    buf.atim = timespec{
+        .nsec = 0,
+        .sec = @intCast(inode.atime),
+    };
+    buf.mtim = timespec{
+        .nsec = 0,
+        .sec = @intCast(inode.mtime),
+    };
+    buf.ctim = timespec{
+        .nsec = 0,
+        .sec = @intCast(inode.ctime),
+    };
+}
 
 pub fn do_stat64(inode: *fs.Inode, buf: *Stat64) !void {
     const sb = if (inode.sb) |_s| _s
@@ -152,29 +212,30 @@ pub fn do_stat64(inode: *fs.Inode, buf: *Stat64) !void {
     // buf.__unused5 = 0;
 }
 
-pub fn lstat64(path: ?[*:0]u8, buf: ?*Stat64) !u32 {
+pub fn lstat64(path: ?[*:0]u8, buf: ?*StatLinux) !u32 {
     return stat64(path, buf);
 }
 
-pub fn stat64(path: ?[*:0]u8, buf: ?*Stat64) !u32 {
+pub fn stat64(path: ?[*:0]u8, buf: ?*StatLinux) !u32 {
     if (path == null or buf == null)
         return errors.EFAULT;
 
     const path_slice: []const u8 = std.mem.span(path.?);
-    const stat_buf: *Stat64 = buf.?;
+    const stat_buf: *StatLinux = buf.?;
     const inode_path: fs.path.Path = try fs.path.resolve(path_slice);
+    defer inode_path.release();
     const inode: *fs.Inode = inode_path.dentry.inode;
 
-    try do_stat64(inode, stat_buf);
+    try do_stat(inode, stat_buf);
     return 0;
 }
 
-pub fn fstat64(fd: u32, buf: ?*Stat64) !u32 {
+pub fn fstat64(fd: u32, buf: ?*StatLinux) !u32 {
     if (buf == null) {
         return errors.EFAULT;
     }
     if (krn.task.current.files.fds.get(fd)) |file| {
-        try do_stat64(file.inode, buf.?);
+        try do_stat(file.inode, buf.?);
         return 0;
     }
     return errors.EBADF;
@@ -183,7 +244,7 @@ pub fn fstat64(fd: u32, buf: ?*Stat64) !u32 {
 pub fn fstatat64(
     dir_fd: u32,
     path: ?[*:0]u8,
-    buf: ?*Stat64,
+    buf: ?*StatLinux,
     flags: u32
 ) !u32 {
     _ = flags;
@@ -210,7 +271,7 @@ pub fn fstatat64(
         const target = try fs.path.resolveFrom(path_slice, from_path);
         defer target.release();
         krn.logger.INFO(" target {s} {any}\n", .{target.dentry.name, target.dentry.inode.mode.isDir()});
-        try do_stat64(target.dentry.inode, buf.?);
+        try do_stat(target.dentry.inode, buf.?);
         return 0;
     } 
     return errors.EBADF;
