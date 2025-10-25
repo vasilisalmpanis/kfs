@@ -6,6 +6,8 @@ const fs = @import("../fs/fs.zig");
 const std = @import("std");
 const kernel = @import("../main.zig");
 
+const AT_FDCWD = -100;
+
 pub fn do_open(
     parent_dir: fs.path.Path,
     name: []const u8,
@@ -101,7 +103,7 @@ pub fn open(
 }
 
 pub fn openat(
-    dirfd: u32,
+    dirfd: i32,
     path: ?[*:0]const u8,
     flags: u16,
     mode: fs.UMode,
@@ -109,10 +111,28 @@ pub fn openat(
     if (path == null) {
         return errors.EFAULT;
     }
-    if (kernel.task.current.files.fds.get(dirfd)) |dir| {
+    // TODO: Handle absolute paths
+    const path_sl: []const u8 = std.mem.span(path.?);
+    kernel.logger.INFO("path {s} fd {d}\n", .{path_sl, dirfd});
+    if (dirfd == AT_FDCWD and kernel.fs.path.isRelative(path_sl)) {
+        const cwd = kernel.task.current.fs.pwd.clone();
+        defer cwd.release();
+        var file_segment: []const u8 = "";
+        const parent_dir = try fs.path.dir_resolve_from(
+            path_sl,
+            cwd,
+            &file_segment
+        );
+        defer parent_dir.release();
+        return try do_open(
+            parent_dir,
+            file_segment,
+            flags,
+            mode
+        );
+    } else if (kernel.task.current.files.fds.get(@intCast(dirfd))) |dir| {
         if (dir.path == null)
             return errors.EBADF;
-        const path_sl: []const u8 = std.mem.span(path.?);
         var file_segment: []const u8 = "";
         const parent_dir = try fs.path.dir_resolve_from(
             path_sl,

@@ -194,6 +194,12 @@ pub fn dir_resolve_from(path: []const u8, from: Path, last: *[]const u8) !Path {
     return curr;
 }
 
+pub fn isRelative(path: []const u8) bool {
+    if (path.len != 0 and path[0] != '/')
+        return true;
+    return false;
+}
+
 pub fn resolveFrom(path: []const u8, from: Path) !Path {
     var last: [] const u8 = "";
     var res = try dir_resolve_from(path, from, &last);
