@@ -76,6 +76,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "touch", .desc = "Create new file", .hndl = &touch });
         self.registerCommand(.{ .name = "execve", .desc = "Execute a program", .hndl = &execve });
         self.registerCommand(.{ .name = "kill", .desc = "Send signal", .hndl = &kill });
+        self.registerCommand(.{ .name = "insmod", .desc = "load module", .hndl = &insmod });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -595,4 +596,58 @@ fn execve(self: *Shell, args: [][]const u8) void {
         };
     }
     _ = std.posix.waitpid(pid, 0);
+}
+
+fn insmod(self: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        self.print(
+            \\Usage: insmod module
+            \\  Example: ismod /modules/keyboard.o
+            \\
+            , .{}
+        );
+        return ;
+    }
+    const fd = std.posix.open(
+        args[0],
+        std.os.linux.O{.ACCMODE = .RDONLY},
+        0o444
+    ) catch |err| {
+        self.print("ls: cannot access '{s}': {t}\n", .{args[0], err});
+        return ;
+    };
+    defer std.posix.close(fd);
+    var temp: std.os.linux.Stat = undefined;
+    var buffer: [100]u8 = .{0} ** 100;
+    @memcpy(buffer[0..args[0].len], args[0]);
+    buffer[args[0].len] = 0;
+    if (std.os.linux.stat(@ptrCast(&buffer), &temp) != 0) {
+        self.print("Stat failed\n", .{});
+        return ;
+    }
+    const allocator = std.heap.page_allocator;
+    const buf = allocator.allocWithOptions(u8, @intCast(temp.size), std.mem.Alignment.@"4", null) catch {
+        std.debug.print("Out of Memory\n", .{});
+        return;
+    };
+    var offset: u32 = 0;
+    while (true) {
+        const res = std.posix.read(fd, buf[offset..]) catch |err| {
+            self.print("ismod: read error on '{s}': {t}\n", .{args[0], err});
+            return ;
+        };
+        if (res == 0) {
+            break;
+        } else {
+            offset += res;
+        }
+    }
+    _ = std.os.linux.syscall4(
+        std.os.linux.syscalls.X86.init_module,
+        @intFromPtr(buf.ptr),
+        buf.len,
+        @intFromPtr(args[0].ptr),
+        args[0].len,
+    );
+    allocator.free(buf);
 }

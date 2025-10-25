@@ -183,22 +183,8 @@ fn place_sections(module: []u8, binary: []u8, section_hdrs: []std.elf.Elf32_Shdr
     }
 }
 
-pub fn load_module(path: kernel.fs.path.Path) !*Module {
-    const inode = path.dentry.inode;
-    if (!inode.mode.canExecute(inode.uid, inode.gid) or !inode.mode.isReg()) {
-        return kernel.errors.PosixError.EACCES;
-    }
-    const file = try kernel.fs.File.new(path);
-    errdefer file.ref.unref();
-    const slice = if (kernel.mm.kmallocSlice(u8, file.inode.size)) |_slice|
-        _slice 
-    else
-        return kernel.errors.PosixError.ENOMEM;
+pub fn load_module(slice: []u8, name: []const u8) !*Module {
     defer kernel.mm.kfree(slice.ptr);
-    var read: u32 = 0;
-    while (read < file.inode.size) {
-        read += try file.ops.read(file, @ptrCast(&slice[read]), slice.len);
-    }
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(slice.ptr));
     const sh_hdr: *std.elf.Elf32_Shdr = @ptrCast(
         @constCast(@alignCast(&slice[ehdr.e_shoff + (ehdr.e_shentsize * ehdr.e_shstrndx)]))
@@ -218,7 +204,7 @@ pub fn load_module(path: kernel.fs.path.Path) !*Module {
     kernel.logger.DEBUG(
         "MOD {s} loaded at: 0x{x} - 0x{x}\n",
         .{
-            path.dentry.name,
+            name,
             @intFromPtr(module.ptr),
             @intFromPtr(module.ptr) + module.len
         }
@@ -233,17 +219,14 @@ pub fn load_module(path: kernel.fs.path.Path) !*Module {
         const section_hdr: *std.elf.Elf32_Shdr = @ptrCast(
             @constCast(@alignCast(&slice[ehdr.e_shoff + (ehdr.e_shentsize * i)]))
         );
-        const section_name: [*:0]u8 = @ptrCast(&section_strings[section_hdr.sh_name]);
-        kernel.logger.INFO("Section name {s} {x} {d}\n", .{section_name, section_hdr.sh_offset, section_hdr.sh_size});
         if (section_hdr.sh_type == std.elf.SHT_SYMTAB) {
             sh_symtab = section_hdr;
         } else if (section_hdr.sh_type == std.elf.SHT_STRTAB and i != ehdr.e_shstrndx) {
             sh_strtab = section_hdr;
         }
-        const name: [*:0]u8 = @ptrCast(&section_strings[section_hdr.sh_name]);
-        const span = std.mem.span(name);
+        const section_name: [*:0]u8 = @ptrCast(&section_strings[section_hdr.sh_name]);
+        const span = std.mem.span(section_name);
         if (std.mem.eql(u8, span, ".init")) {
-            kernel.logger.INFO("init addr {x}\n", .{section_hdr.sh_addr});
             init = @ptrFromInt(section_hdr.sh_addr);
 
         } else if (std.mem.eql(u8, span, ".exit")) {
@@ -267,10 +250,9 @@ pub fn load_module(path: kernel.fs.path.Path) !*Module {
         errdefer kernel.mm.kfree(mod);
         mod.exit = exit;       
         mod.list.setup();
-        if (kernel.mm.kmallocSlice(u8, path.dentry.name.len)) |name| {
-            const mod_name: []u8 = path.dentry.name;
-            @memcpy(name[0..mod_name.len], mod_name);
-            mod.name = name;
+        if (kernel.mm.kmallocSlice(u8, name.len)) |_name| {
+            @memcpy(_name[0..name.len], name);
+            mod.name = _name;
         } else {
             return kernel.errors.PosixError.ENOMEM;
         }

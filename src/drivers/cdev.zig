@@ -52,7 +52,6 @@ pub const cdev_default_ops: krn.fs.FileOps = .{
 };
 
 pub fn addCdev(device: *dev.Device, mode: krn.fs.UMode) !void {
-    krn.logger.DEBUG("addCdev() {s}", .{device.name});
     if (cdev_map.get(device.id)) |_d| {
         krn.logger.ERROR(
             "Cdev with id {d}:{d} already exists: {s}\n",
@@ -60,7 +59,6 @@ pub fn addCdev(device: *dev.Device, mode: krn.fs.UMode) !void {
         );
         return krn.errors.PosixError.EEXIST;
     }
-    krn.logger.DEBUG("addCdev() 2 {s}", .{device.name});
 
     if (drivers.devfs_path.dentry.inode.ops.mknod) |_mknod| {
         cdev_map_mtx.lock();

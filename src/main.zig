@@ -138,13 +138,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     drv.init();
     modules.api.init();
     move_root();
-    const path = krn.fs.path.resolve("/modules/keyboard.o") catch {
-        @panic("File doesn't exist");
-    };
-    _ = modules.load_module(path) catch {
-        @panic("Not loadable");
-    };
-    path.release();
     kernel_ready = true;
 
     while (true) {

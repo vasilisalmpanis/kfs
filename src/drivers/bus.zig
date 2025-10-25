@@ -78,7 +78,6 @@ pub const Bus = struct {
     }
 
     pub fn add_dev(bus: *Bus, device: *dev.Device) !void {
-        kern.logger.DEBUG("ADDING DEVICE {s} to BUS {s}", .{device.name, bus.name});
         bus.device_mutex.lock();
         defer bus.device_mutex.unlock();
 
