@@ -617,37 +617,5 @@ fn insmod(self: *Shell, args: [][]const u8) void {
         return ;
     };
     defer std.posix.close(fd);
-    var temp: std.os.linux.Stat = undefined;
-    var buffer: [100]u8 = .{0} ** 100;
-    @memcpy(buffer[0..args[0].len], args[0]);
-    buffer[args[0].len] = 0;
-    if (std.os.linux.stat(@ptrCast(&buffer), &temp) != 0) {
-        self.print("Stat failed\n", .{});
-        return ;
-    }
-    const allocator = std.heap.page_allocator;
-    const buf = allocator.allocWithOptions(u8, @intCast(temp.size), std.mem.Alignment.@"4", null) catch {
-        std.debug.print("Out of Memory\n", .{});
-        return;
-    };
-    var offset: u32 = 0;
-    while (true) {
-        const res = std.posix.read(fd, buf[offset..]) catch |err| {
-            self.print("ismod: read error on '{s}': {t}\n", .{args[0], err});
-            return ;
-        };
-        if (res == 0) {
-            break;
-        } else {
-            offset += res;
-        }
-    }
-    _ = std.os.linux.syscall4(
-        std.os.linux.syscalls.X86.init_module,
-        @intFromPtr(buf.ptr),
-        buf.len,
-        @intFromPtr(args[0].ptr),
-        args[0].len,
-    );
-    allocator.free(buf);
+    _ = std.os.linux.syscall1(std.os.linux.syscalls.X86.finit_module, @intCast(fd));
 }
