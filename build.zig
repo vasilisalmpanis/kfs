@@ -49,6 +49,7 @@ pub fn build(b: *std.Build) !void {
         kernel_mod.addImport("arch", arch_mod);
         kernel_mod.addImport("debug", debug_mod);
         kernel_mod.addImport("drivers", drivers_mod);
+        kernel_mod.addImport("modules", modules_mod);
 
         modules_mod.addImport("kernel", kernel_mod);
         modules_mod.addImport("arch", arch_mod);

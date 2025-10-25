@@ -1,3 +1,3 @@
 name: kernel
 main: main.zig
-dependencies: arch, debug, drivers
+dependencies: arch, debug, drivers, modules
