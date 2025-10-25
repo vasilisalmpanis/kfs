@@ -113,20 +113,21 @@ export fn _init() linksection(".init") callconv(.c) u32 {
                 .write_pos = 0,
                 .read_pos = 0,
             };
+            mod_kbd = kbd_data;
+            plt_dev.dev.data = kbd_data;
             var res = api.registerPlatformDevice(plt_dev);
             if (res != 0)
                 return @intCast(res);
             res = api.registerPlatformDriver(&kbd_driver.driver);
             if (res != 0)
                 return @intCast(res);
-            mod_kbd = kbd_data;
-            plt_dev.dev.data = kbd_data;
             kfs.api.setKBD(mod_kbd);
             kfs.api.registerHandler(1, keyboardInterrupt);
         }
     }
     return 0;
 }
+
 
 export fn _exit() linksection(".exit") callconv(.c) void {
 }

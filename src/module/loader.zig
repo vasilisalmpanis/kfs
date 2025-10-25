@@ -9,7 +9,8 @@ var modules_mutex = kernel.Mutex.init();
 pub const Module = struct {
     name: []const u8,
     exit: ?*const fn() callconv(.c) void,
-    list: kernel.list.ListHead
+    list: kernel.list.ListHead,
+    code: []u8 = undefined,
     // deps
     // version
     // Lock
@@ -77,23 +78,17 @@ pub fn do_relocations(
     const rel_entries: [*]std.elf.Elf32_Rel = @ptrCast(@alignCast(
         &elf[sh.sh_offset]
     ));
-    kernel.logger.INFO(
-        "Target: {any}",
-        .{sh_target}
-    );
     const rel_count = sh.sh_size / sh.sh_entsize;
     for (0..rel_count) |idx| {
         const rel = rel_entries[idx];
         const sym = symtab[rel.r_sym()];
-        const write_addr: [*]u8 = @ptrCast(@alignCast(
-            &elf[sh_target.sh_offset + rel.r_offset]
-        ));
+        const write_addr: [*]u8 = @ptrFromInt(
+            sh_target.sh_addr + rel.r_offset
+        );
         const sym_sh = sh_arr[sym.st_shndx];
-        const load_base = @intFromPtr(elf.ptr); 
-        // const GOT: u32 = load_base;
         const P: u32 = @intFromPtr(write_addr);
         const A: u32 = unpackU32(write_addr);
-        var S: u32 = load_base + sym_sh.sh_offset + sym.st_value;
+        var S: u32 = sym_sh.sh_addr + sym.st_value;
         
         if (sym.st_shndx == std.elf.SHN_ABS) {
             S = sym.st_value;
@@ -139,6 +134,55 @@ pub fn do_relocations(
     }
 }
 
+fn alignSize(size: u32, alignment: u32) u32 {
+    if (size % alignment != 0) {
+        return size + (alignment - size % alignment);
+    }
+    return size;
+}
+
+fn get_module_total_size(elf_headers: [*]std.elf.Elf32_Shdr, count: u32) u32 {
+    var offset: u32 = 0;
+    var max_alignment: u32 = 0;
+    for (0..count) |idx| {
+        const header: std.elf.Elf32_Shdr = elf_headers[idx];
+        if (header.sh_size == 0)
+            continue;
+        offset = alignSize(offset, header.sh_addralign);
+        offset += header.sh_size;
+        if (header.sh_addralign > max_alignment)
+            max_alignment = header.sh_addralign;
+    }
+    return offset + max_alignment;
+}
+
+fn place_sections(module: []u8, binary: []u8, section_hdrs: []std.elf.Elf32_Shdr) !void {
+    var offset: u32 = 0;
+    const load_address: u32 = @intFromPtr(module.ptr);
+    for (section_hdrs, 0..) |header, idx| {
+        // Maybe incorrect
+        if (header.sh_size == 0)
+            continue;
+        if (offset == 0) {
+            if (load_address % header.sh_addralign != 0) {
+                offset += header.sh_addralign - load_address % header.sh_addralign;
+            }
+        }
+        const temp: *std.elf.Elf32_Shdr = &section_hdrs[idx];
+        if (load_address + offset % header.sh_addralign != 0) {
+            const aligned: u32 = alignSize(load_address + offset, header.sh_addralign);
+            offset += aligned - (load_address + offset);
+        }
+        temp.sh_addr = load_address + offset;
+        if (header.sh_type == std.elf.SHT_NOBITS) {
+            offset += header.sh_size;
+            continue;
+        }
+        @memcpy(module[offset..offset + header.sh_size], binary[header.sh_offset..header.sh_offset + header.sh_size]);
+        offset += header.sh_size;
+    }
+}
+
 pub fn load_module(path: kernel.fs.path.Path) !*Module {
     const inode = path.dentry.inode;
     if (!inode.mode.canExecute(inode.uid, inode.gid) or !inode.mode.isReg()) {
@@ -150,14 +194,7 @@ pub fn load_module(path: kernel.fs.path.Path) !*Module {
         _slice 
     else
         return kernel.errors.PosixError.ENOMEM;
-    kernel.logger.DEBUG(
-        "MOD {s} loaded at: 0x{x} - 0x{x}\n",
-        .{
-            path.dentry.name,
-            @intFromPtr(slice.ptr),
-            @intFromPtr(slice.ptr) + file.inode.size
-        }
-    );
+    defer kernel.mm.kfree(slice.ptr);
     var read: u32 = 0;
     while (read < file.inode.size) {
         read += try file.ops.read(file, @ptrCast(&slice[read]), slice.len);
@@ -170,6 +207,24 @@ pub fn load_module(path: kernel.fs.path.Path) !*Module {
     const sh_arr: [*]std.elf.Elf32_Shdr = @ptrCast(@alignCast(
         &slice[ehdr.e_shoff]
     ));
+
+    // Find size, allocate and set to 0 and place sections
+    const total_size = get_module_total_size(sh_arr, ehdr.e_shnum);
+    const module = if (kernel.mm.kmallocSlice(u8, total_size)) |_module|
+        _module
+    else
+        return kernel.errors.PosixError.ENOMEM;
+    @memset(module[0..], 0);
+    kernel.logger.DEBUG(
+        "MOD {s} loaded at: 0x{x} - 0x{x}\n",
+        .{
+            path.dentry.name,
+            @intFromPtr(module.ptr),
+            @intFromPtr(module.ptr) + module.len
+        }
+    );
+    try place_sections(module, slice, sh_arr[0..ehdr.e_shnum]);
+
     var sh_symtab: *std.elf.Elf32_Shdr = undefined;
     var sh_strtab: *std.elf.Elf32_Shdr = undefined;
     var init: ?*const fn() callconv(.c) u32 = null;
@@ -178,6 +233,8 @@ pub fn load_module(path: kernel.fs.path.Path) !*Module {
         const section_hdr: *std.elf.Elf32_Shdr = @ptrCast(
             @constCast(@alignCast(&slice[ehdr.e_shoff + (ehdr.e_shentsize * i)]))
         );
+        const section_name: [*:0]u8 = @ptrCast(&section_strings[section_hdr.sh_name]);
+        kernel.logger.INFO("Section name {s} {x} {d}\n", .{section_name, section_hdr.sh_offset, section_hdr.sh_size});
         if (section_hdr.sh_type == std.elf.SHT_SYMTAB) {
             sh_symtab = section_hdr;
         } else if (section_hdr.sh_type == std.elf.SHT_STRTAB and i != ehdr.e_shstrndx) {
@@ -186,15 +243,12 @@ pub fn load_module(path: kernel.fs.path.Path) !*Module {
         const name: [*:0]u8 = @ptrCast(&section_strings[section_hdr.sh_name]);
         const span = std.mem.span(name);
         if (std.mem.eql(u8, span, ".init")) {
-            init = @ptrCast(&slice[section_hdr.sh_offset]);
+            kernel.logger.INFO("init addr {x}\n", .{section_hdr.sh_addr});
+            init = @ptrFromInt(section_hdr.sh_addr);
+
         } else if (std.mem.eql(u8, span, ".exit")) {
-            exit = @ptrCast(&slice[section_hdr.sh_offset]);
+            exit = @ptrFromInt(section_hdr.sh_addr);
         }
-    }
-    if (init == null) {
-        // Error
-        kernel.logger.INFO("Module doesn't have init", .{});
-        return kernel.errors.PosixError.EINVAL;
     }
     for (0..ehdr.e_shnum) |i| {
         const section_hdr: *std.elf.Elf32_Shdr = @ptrCast(
@@ -220,7 +274,7 @@ pub fn load_module(path: kernel.fs.path.Path) !*Module {
         } else {
             return kernel.errors.PosixError.ENOMEM;
         }
-
+        mod.code = module;
         addModule(mod);
         return mod;
     }
