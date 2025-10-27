@@ -1,4 +1,4 @@
-const errors = @import("./error-codes.zig");
+const errors = @import("./error-codes.zig").PosixError;
 const arch = @import("arch");
 const dbg = @import("debug");
 const krn = @import("../main.zig");
@@ -7,22 +7,22 @@ pub fn read(fd: u32, buf: u32, size: u32) !u32 {
     const data: [*]u8 = @ptrFromInt(buf);
     if (krn.task.current.files.fds.get(fd)) |file| {
         if (file.inode.mode.isDir()) {
-            return errors.PosixError.EISDIR;
+            return errors.EISDIR;
         }
         if (!file.canRead())
-            return errors.PosixError.EACCES;
+            return errors.EACCES;
         return try file.ops.read(file, data, size);
     }
-    return errors.PosixError.EBADF;
+    return errors.EBADF;
 }
 
 pub fn pread(fd: u32, buf: [*]u8, size: u32, offset: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
         if (file.inode.mode.isDir()) {
-            return errors.PosixError.EISDIR;
+            return errors.EISDIR;
         }
         if (!file.canRead())
-            return errors.PosixError.EACCES;
+            return errors.EACCES;
         if (offset > file.inode.size)
             return 0;
 
@@ -32,7 +32,7 @@ pub fn pread(fd: u32, buf: [*]u8, size: u32, offset: u32) !u32 {
         file.pos = offset;
         return try file.ops.read(file, buf, size);
     }
-    return errors.PosixError.EBADF;
+    return errors.EBADF;
 }
 
 pub const IoVec = extern struct {
