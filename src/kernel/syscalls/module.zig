@@ -45,3 +45,15 @@ pub fn finit_module(fd: u32) !u32 {
     }
     return errors.EBADF;
 }
+
+pub fn delete_module(name: ?[*:0]const u8) !u32 {
+    if (name == null) {
+        return errors.ENOENT;
+    }
+    const _name: []const u8 = std.mem.span(name.?);
+    if (_name.len == 0) {
+        return errors.ENOENT;
+    }
+    try mod.removeModule(_name);
+    return 0;
+}

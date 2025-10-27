@@ -184,12 +184,10 @@ fn place_sections(module: []u8, binary: []u8, section_hdrs: []std.elf.Elf32_Shdr
 }
 
 pub fn load_module(slice: []u8, name: []const u8) !*Module {
-    defer kernel.mm.kfree(slice.ptr);
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(slice.ptr));
     const sh_hdr: *std.elf.Elf32_Shdr = @ptrCast(
         @constCast(@alignCast(&slice[ehdr.e_shoff + (ehdr.e_shentsize * ehdr.e_shstrndx)]))
     );
-    const section_strings: [*]u8 = @ptrCast(&slice[sh_hdr.sh_offset]);
     const sh_arr: [*]std.elf.Elf32_Shdr = @ptrCast(@alignCast(
         &slice[ehdr.e_shoff]
     ));
@@ -210,7 +208,8 @@ pub fn load_module(slice: []u8, name: []const u8) !*Module {
         }
     );
     try place_sections(module, slice, sh_arr[0..ehdr.e_shnum]);
-
+    
+    const section_strings: [*]u8 = @ptrCast(&slice[sh_hdr.sh_offset]);
     var sh_symtab: *std.elf.Elf32_Shdr = undefined;
     var sh_strtab: *std.elf.Elf32_Shdr = undefined;
     var init: ?*const fn() callconv(.c) u32 = null;
@@ -274,4 +273,36 @@ fn addModule(mod: *Module) void {
     } else {
         modules_list = mod;
     }
+}
+
+pub fn removeModule(name: []const u8) !void {
+    modules_mutex.lock();
+    defer modules_mutex.unlock();
+
+    if (modules_list) |head| {
+        var it = head.list.iterator();
+        while (it.next()) |i| {
+            const _mod = i.curr.entry(Module, "list");
+            if (std.mem.eql(u8, name, _mod.name)) {
+                if (_mod.exit) |_exit| {
+                    _exit();
+                }
+                if (_mod == modules_list) {
+                    if (_mod.list.isEmpty()) {
+                        modules_list = null;
+                    } else {
+                        modules_list = _mod.list.next.?.entry(Module, "list");
+                    }
+                }
+                _mod.list.del();
+                kernel.mm.kfree(_mod.name.ptr);
+                kernel.mm.kfree(_mod.code.ptr);
+                kernel.mm.kfree(_mod);
+                kernel.logger.DEBUG("module removed: {s}", .{name});
+                return ;
+            }
+        }
+    }
+    kernel.logger.DEBUG("No module found with name {s}", .{name});
+    return kernel.errors.PosixError.ENOENT;
 }

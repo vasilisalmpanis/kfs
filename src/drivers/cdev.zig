@@ -94,3 +94,20 @@ pub fn getCdev(devt: dev.dev_t) !*dev.Device {
     }
     return krn.errors.PosixError.ENOENT;
 }
+
+pub fn rmCdev(devt: dev.dev_t) !void {
+    cdev_map_mtx.lock();
+    defer cdev_map_mtx.unlock();
+
+    if (cdev_map.get(devt)) |_dev| {
+        const _d = try drivers.devfs_path.dentry.inode.ops.lookup(
+            drivers.devfs_path.dentry,
+            _dev.name
+        );
+        if (_d.inode.ops.unlink) |_unlink| {
+            try _unlink(_d);
+        }
+        _ = cdev_map.remove(devt);
+    }
+    return krn.errors.PosixError.ENOENT;
+}

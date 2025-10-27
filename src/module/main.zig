@@ -16,6 +16,7 @@ pub export const kthreadCreate = @import("kthread.zig").kthreadCreate;
 pub export const kthreadStop = @import("kthread.zig").kthreadStop;
 
 pub const load_module = @import("./loader.zig").load_module;
+pub const removeModule = @import("./loader.zig").removeModule;
 
 pub const arch = @import("arch");
 pub const kernel = @import("kernel");

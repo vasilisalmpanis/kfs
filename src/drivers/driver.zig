@@ -81,17 +81,17 @@ pub const Driver = struct {
         return ;
     }
 
-    pub fn unregister(self: *Driver, bus: *Bus) void {
+    pub fn unregister(self: *Driver, bus: *Bus) !void {
         if (bus.devices) |head| {
             var it = head.list.iterator();
             while (it.next()) |node| {
                 const bus_dev: *dev.Device = node.curr.entry(dev.Device, "list");
                 bus_dev.lock.lock();
                 if (bus_dev.driver == self) {
-                    self.remove(bus_dev);
+                    try self.remove(self, bus_dev);
                 }
                 // TODO: remove the device from the driver
-                bus_dev.unlock.lock();
+                bus_dev.lock.unlock();
             }
         }
         if (bus.drivers == self) {
