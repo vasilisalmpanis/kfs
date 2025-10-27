@@ -737,6 +737,7 @@ pub const kernel = struct {
         pub const InodeOps = struct {
             create : *const fn(*kernel.fs.Inode, []const u8, kernel.fs.UMode, *kernel.fs.DEntry) anyerror!*kernel.fs.DEntry,
             mknod : ?*const fn(*kernel.fs.Inode, []const u8, kernel.fs.UMode, *kernel.fs.DEntry, drivers.device.dev_t) anyerror!*kernel.fs.DEntry,
+            unlink : ?*const fn(*kernel.fs.DEntry) anyerror!void= null,
             lookup : *const fn(*kernel.fs.DEntry, []const u8) anyerror!*kernel.fs.DEntry,
             mkdir : *const fn(*kernel.fs.Inode, *kernel.fs.DEntry, []const u8, kernel.fs.UMode) anyerror!*kernel.fs.DEntry,
             get_link : ?*const fn(*kernel.fs.Inode, *[]u8) anyerror!void,
@@ -1346,9 +1347,12 @@ pub const api = struct {
     pub extern fn registerPlatformDevice(*drivers.platform.device.PlatformDevice)i32;
     pub extern fn allocPlatformDevice([*]const u8, u32)?*drivers.platform.device.PlatformDevice;
     pub extern fn registerPlatformDriver(*drivers.driver.Driver)i32;
+    pub extern fn unregisterPlatformDriver(*drivers.driver.Driver)i32;
     pub extern fn addCharacterDevice(*drivers.device.Device, kernel.fs.UMode)i32;
+    pub extern fn rmCharacterDevice(drivers.device.dev_t)i32;
     pub extern fn printf([*]const u8, u32)void;
     pub extern fn setKBD(*drivers.Keyboard)void;
+    pub extern fn restoreKBD()void;
     pub extern fn registerHandler(u32, *const anyopaque)void;
     pub extern fn unregisterHandler(u32)void;
     pub extern fn module_panic([*]const u8, u32)void;

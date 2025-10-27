@@ -216,3 +216,8 @@ pub fn keyboardInterrupt() void {
     // handle e0 e1
     keyboard.saveScancode(scancode);
 }
+
+pub fn init() void {
+    global_keyboard = &keyboard;
+    krn.irq.registerHandler(1, &keyboardInterrupt);
+}

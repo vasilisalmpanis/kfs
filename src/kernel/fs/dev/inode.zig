@@ -117,11 +117,39 @@ pub const DevInode = struct {
         };
         return error.Exists;
     }
+
+    fn unlink(_dentry: *fs.DEntry) !void {
+        const sb = if (_dentry.inode.sb) |_s| _s else
+            return kernel.errors.PosixError.EINVAL;
+        const sys_inode = _dentry.inode.getImpl(DevInode, "base");
+
+        kernel.logger.DEBUG("unlink {d}", .{_dentry.ref.getValue()});
+        if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 1)
+            return kernel.errors.PosixError.EBUSY;
+        if (_dentry.tree.parent) |_p| {
+            const _parent = _p.entry(fs.DEntry, "tree");
+            _parent.ref.unref();
+        }
+        const key = fs.DentryHash{
+            .sb = @intFromPtr(sb),
+            .ino = _dentry.inode.i_no,
+            .name = _dentry.name
+        };
+        _ = fs.dcache.remove(key);
+        _ = sb.inode_map.remove(_dentry.inode.i_no);
+        sys_inode.deinit();
+        _dentry.release();
+    }
+
+    fn deinit(self: *DevInode) void {
+        kernel.mm.kfree(self);
+    }
 };
 
 var dev_inode_ops = fs.InodeOps {
     .create = DevInode.create,
     .mknod = DevInode.mknod,
+    .unlink = DevInode.unlink,
     .lookup = DevInode.lookup,
     .mkdir = DevInode.mkdir,
     .get_link = null,

@@ -77,6 +77,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "execve", .desc = "Execute a program", .hndl = &execve });
         self.registerCommand(.{ .name = "kill", .desc = "Send signal", .hndl = &kill });
         self.registerCommand(.{ .name = "insmod", .desc = "load module", .hndl = &insmod });
+        self.registerCommand(.{ .name = "rmmod", .desc = "unload module", .hndl = &rmmod });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -618,4 +619,28 @@ fn insmod(self: *Shell, args: [][]const u8) void {
     };
     defer std.posix.close(fd);
     _ = std.os.linux.syscall1(std.os.linux.syscalls.X86.finit_module, @intCast(fd));
+}
+
+fn rmmod(self: *Shell, args: [][]const u8) void {
+    if (args.len < 1) {
+        self.print(
+            \\Usage: rmmod <module name>
+            \\  Example: rmmod keyboard.o
+            \\
+            , .{}
+        );
+        return ;
+    }
+    var name_buf: [256] u8 = .{0} ** 256;
+    @memcpy(name_buf[0..args[0].len], args[0][0..]);
+    name_buf[args[0].len] = 0;
+    const res = std.os.linux.syscall1(
+        std.os.linux.syscalls.X86.delete_module,
+        @intFromPtr(&name_buf)
+    );
+    if (res == 0) {
+        self.print("module unloaded\n", .{});
+    } else {
+        self.print("error unloading: {t}\n", .{std.posix.errno(res)});
+    }
 }

@@ -123,7 +123,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     idt.idtInit();
     krn.logger.INFO("IDT initialized", .{});
 
-    irq.registerHandler(1, &keyboard.keyboardInterrupt);
+    keyboard.init();
+
     krn.logger.INFO("Keyboard handler added", .{});
     syscalls.initSyscalls();
     drv.cmos.init();

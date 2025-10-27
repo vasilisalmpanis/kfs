@@ -60,10 +60,11 @@ fn kbd_probe(device: *pdev.PlatformDevice) !void {
         &device.dev,
         krn.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0o6}
     );
+
 }
 
 fn kbd_remove(device: *pdev.PlatformDevice) !void {
-    _ = device;
+    _ = api.rmCharacterDevice(device.dev.id);
 }
 
 var mod_kbd: *kfs.drivers.Keyboard = undefined;
@@ -126,4 +127,6 @@ export fn _init() linksection(".init") callconv(.c) u32 {
 
 
 export fn _exit() linksection(".exit") callconv(.c) void {
+    _ = kfs.api.unregisterPlatformDriver(&kbd_driver.driver);
+    kfs.api.restoreKBD();
 }

@@ -35,6 +35,6 @@ pub fn platform_register_driver(driver: *drv.Driver) !void {
     try driver.register(&bus.platform_bus);
 }
 
-pub fn platform_unregister_driver(driver: *drv.Driver) void {
-    driver.unregister(&bus.platform_bus);
+pub fn platform_unregister_driver(driver: *drv.Driver) !void {
+    try driver.unregister(&bus.platform_bus);
 }

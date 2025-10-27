@@ -39,8 +39,22 @@ pub export fn registerPlatformDriver(driver: *drv.driver.Driver) i32 {
     return 0;
 }
 
+pub export fn unregisterPlatformDriver(driver: *drv.driver.Driver) i32 {
+    drv.platform.driver.platform_unregister_driver(driver) catch |err| {
+        return @intFromError(err);
+    };
+    return 0;
+}
+
 pub export fn addCharacterDevice(device: *drv.device.Device, mode: krn.fs.UMode) i32 {
     drv.cdev.addCdev(device, mode) catch |err| {
+        return @intFromError(err);
+    };
+    return 0;
+}
+
+pub export fn rmCharacterDevice(dev: drv.device.dev_t) i32 {
+    drv.cdev.rmCdev(dev) catch |err| {
         return @intFromError(err);
     };
     return 0;
@@ -56,6 +70,10 @@ pub export fn printf(buff: [*]const u8, size: u32) void {
 
 pub export fn setKBD(kbd: *drv.keyboard.Keyboard) void {
     drv.keyboard.global_keyboard = kbd;
+}
+
+pub export fn restoreKBD() void {
+    drv.keyboard.init();
 }
 
 // pub export fn serial(buff: [*]const u8, size: u32) void {
