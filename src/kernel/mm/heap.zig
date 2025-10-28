@@ -3,11 +3,8 @@ const vmm = @import("arch").vmm.VMM;
 const Mutex = @import("../sched/mutex.zig").Mutex;
 const printf = @import("debug").printf;
 const dbg = @import("debug");
+const krn = @import("../main.zig");
 const PAGE_SIZE = @import("./init.zig").PAGE_SIZE;
-
-const AllocationError = error{
-    OutOfMemory,
-};
 
 pub const FreeListNode = packed struct {
     block_size: u32,
@@ -300,7 +297,7 @@ pub const FreeList = struct {
             user
         );
         if (begin == 0xFFFFFFFF)
-            return AllocationError.OutOfMemory;
+            return krn.errors.PosixError.ENOMEM;
         const free_size = try if (contig)
             self.expandMemoryContig(num_pages, begin, user)
         else
@@ -324,7 +321,7 @@ pub const FreeList = struct {
     fn expandMemoryContig(self: *FreeList, num_pages: u32, virtual: u32, user: bool) !u32 {
         var physical = self.pmm.allocPages(num_pages);
         if (physical == 0) {
-            return AllocationError.OutOfMemory;
+            return krn.errors.PosixError.ENOMEM;
         }
         var idx: u32 = 0;
         var virt_addr = virtual;
@@ -347,7 +344,7 @@ pub const FreeList = struct {
                     virt_addr -= PAGE_SIZE;
                     self.vmm.unmapPage(virt_addr, true);
                 }
-                return AllocationError.OutOfMemory;
+                return krn.errors.PosixError.ENOMEM;
             }
             self.vmm.mapPage(virt_addr, physical, .{.user = user});
             virt_addr += PAGE_SIZE;

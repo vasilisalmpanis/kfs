@@ -2,6 +2,7 @@
 const std = @import("std");
 pub const dbg = @import("debug.zig");
 pub const mm = @import("mm.zig");
+pub const errors = @import("errors.zig");
 
 pub const arch = struct {
     pub const io = struct {
@@ -1156,7 +1157,7 @@ pub const drivers = struct {
             lock : kernel.Mutex,
             list : kernel.list.ListHead,
             tree : kernel.tree.TreeNode,
-            data : *anyopaque,
+            data : ?*anyopaque,
         };
 
     };
