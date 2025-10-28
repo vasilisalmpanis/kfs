@@ -443,6 +443,7 @@ pub fn main() anyerror!void {
         \\const std = @import("std");
         \\pub const dbg = @import("debug.zig");
         \\pub const mm = @import("mm.zig");
+        \\pub const errors = @import("errors.zig");
         \\
         \\
     );

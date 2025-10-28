@@ -750,6 +750,8 @@ var ata_driver = driver.storage.StorageDriver{
 
 
 fn ata_probe(device: *driver.storage.StorageDevice) !void {
+    if (device.dev.data == null)
+        return kernel.errors.PosixError.EIO;
     const drive: *ATADrive = @ptrCast(@alignCast(device.dev.data));
     kernel.logger.INFO(
         "Probing drive: {any} {s}",

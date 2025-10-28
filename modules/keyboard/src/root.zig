@@ -56,6 +56,8 @@ fn kbd_write(_: *krn.fs.file.File, _: [*]const u8, _: u32) !u32 {
 }
 
 fn kbd_probe(device: *pdev.PlatformDevice) !void {
+    if (device.dev.data == null)
+        return kfs.errors.PosixError.EIO;
     _ = api.addCharacterDevice(
         &device.dev,
         krn.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0o6}
