@@ -95,6 +95,8 @@ pub fn panic(
     while (true) {}
 }
 
+var global_platform_dev: ?*kfs.drivers.platform.device.PlatformDevice = null;
+
 export fn _init() linksection(".init") callconv(.c) u32 {
     const dev_name: []const u8 = "kbd";
     if (api.allocPlatformDevice(dev_name.ptr, dev_name.len)) |plt_dev| {
@@ -115,6 +117,7 @@ export fn _init() linksection(".init") callconv(.c) u32 {
             var res = api.registerPlatformDevice(plt_dev);
             if (res != 0)
                 return @intCast(res);
+            global_platform_dev = plt_dev;
             res = api.registerPlatformDriver(&kbd_driver.driver);
             if (res != 0)
                 return @intCast(res);
@@ -127,6 +130,9 @@ export fn _init() linksection(".init") callconv(.c) u32 {
 
 
 export fn _exit() linksection(".exit") callconv(.c) void {
-    _ = kfs.api.unregisterPlatformDriver(&kbd_driver.driver);
     kfs.api.restoreKBD();
+    _ = kfs.api.unregisterPlatformDriver(&kbd_driver.driver);
+    if (global_platform_dev) |plt_dev| {
+        _ = kfs.api.unregisterPlatformDevice(plt_dev);
+    }
 }

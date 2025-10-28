@@ -13,6 +13,10 @@ pub export fn kheap_alloc(size: u32, contig: bool, user: bool) u32 {
     return addr;
 }
 
+pub export fn kheap_free(addr: u32) void {
+    krn.mm.kheap.free(addr);
+}
+
 // Drivers
 
 pub export const keymap_us: *const std.EnumMap(drv.keyboard.ScanCode,drv.keyboard.KeymapEntry) = &drv.keyboard.keymap_us;
@@ -23,6 +27,12 @@ pub export const keymap_de: *const std.EnumMap(drv.keyboard.ScanCode,drv.keyboar
 pub export fn registerPlatformDevice(pdev: *drv.platform.PlatformDevice) callconv(.c) i32 {
     pdev.register() catch |err| {
         return krn.errors.toErrno(err);
+    };
+    return 0;
+}
+pub export fn unregisterPlatformDevice(pdev: *drv.platform.PlatformDevice) i32 {
+    pdev.unregister() catch {
+        return 1;
     };
     return 0;
 }
