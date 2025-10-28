@@ -82,6 +82,13 @@ pub const Driver = struct {
     }
 
     pub fn unregister(self: *Driver, bus: *Bus) !void {
+        // Remove file from sysfs
+        if (bus.sysfs_drivers) |_drivers| {
+            const driver_file = try _drivers.inode.ops.lookup(_drivers, self.name);
+            if (driver_file.inode.ops.unlink) |unlink| {
+                try unlink(driver_file);
+            }
+        }
         if (bus.devices) |head| {
             var it = head.list.iterator();
             while (it.next()) |node| {
@@ -90,7 +97,7 @@ pub const Driver = struct {
                 if (bus_dev.driver == self) {
                     try self.remove(self, bus_dev);
                 }
-                // TODO: remove the device from the driver
+                bus_dev.driver = null;
                 bus_dev.lock.unlock();
             }
         }
@@ -98,8 +105,8 @@ pub const Driver = struct {
            if (self.list.isEmpty()) {
                bus.drivers = null;
            }
-           self.list.del();
         }
+        self.list.del();
     }
 
     pub fn getFreeMinor(self: *Driver) !u8 {

@@ -67,7 +67,7 @@ pub const Device = struct {
     lock: kern.Mutex,
     list: kern.list.ListHead, // Bus list (not global)
     tree: kern.tree.TreeNode, // Global
-    data: *anyopaque,
+    data: *anyopaque, // TODO: make optional and init to zero
 
     pub fn new(name: []u8, _bus: *bus.Bus) !*Device {
         // Think about parent child relationship.
@@ -107,8 +107,10 @@ pub const Device = struct {
     pub fn delete(self: *Device) void {
         // Probably mark dev_t as free for other devices.
         device_mutex.lock();
+        self.list.del();
         self.tree.del(); // Needs rethinking.
         device_mutex.unlock();
+        // TODO: free data if not null
         kern.mm.kfree(self.name.ptr);
         kern.mm.kfree(self);
     }

@@ -28,3 +28,7 @@ pub fn dupSlice(comptime T: type, slice: []const T) ?[]T {
     }
     return null;
 }
+
+pub fn kfree(addr: *anyopaque) void {
+    types.api.kheap_free(@intFromPtr(addr));
+}

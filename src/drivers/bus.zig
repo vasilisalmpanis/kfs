@@ -101,4 +101,26 @@ pub const Bus = struct {
         // WARN: Maybe we need to run probe for all drivers
         // present on the bus.
     }
+
+    pub fn remove_dev(bus: *Bus, device: *dev.Device) !void {
+        bus.device_mutex.lock();
+        defer bus.device_mutex.unlock();
+        if (bus.sysfs_devices) |d| {
+            const device_file = try d.inode.ops.lookup(d, device.name);
+            if (d.inode.ops.unlink) |unlink| {
+                try unlink(device_file);
+            }
+        }
+        if (bus.devices) |head| {
+            if (head == device) {
+                if (device.list.isEmpty()) {
+                    bus.devices = null;
+                } else {
+                    const next: *dev.Device = head.list.next.?.entry(dev.Device, "list");
+                    bus.devices = next;
+                }
+            }
+            device.delete();
+        }
+    }
 };

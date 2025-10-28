@@ -28,7 +28,6 @@ pub const PlatformDevice = struct {
     }
 
     pub fn unregister(self: *PlatformDevice) !void {
-        _ = self;
-        // TODO:
+        try self.dev.bus.remove_dev(&self.dev);
     }
 };

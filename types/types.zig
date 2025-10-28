@@ -1344,7 +1344,9 @@ pub const drivers = struct {
 
 pub const api = struct {
     pub extern fn kheap_alloc(u32, bool, bool)u32;
+    pub extern fn kheap_free(u32)void;
     pub extern fn registerPlatformDevice(*drivers.platform.device.PlatformDevice)i32;
+    pub extern fn unregisterPlatformDevice(*drivers.platform.device.PlatformDevice)i32;
     pub extern fn allocPlatformDevice([*]const u8, u32)?*drivers.platform.device.PlatformDevice;
     pub extern fn registerPlatformDriver(*drivers.driver.Driver)i32;
     pub extern fn unregisterPlatformDriver(*drivers.driver.Driver)i32;

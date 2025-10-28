@@ -124,8 +124,9 @@ pub const DevInode = struct {
         const sys_inode = _dentry.inode.getImpl(DevInode, "base");
 
         kernel.logger.DEBUG("unlink {d}", .{_dentry.ref.getValue()});
-        if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 1)
+        if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
+        _dentry.ref.unref();
         if (_dentry.tree.parent) |_p| {
             const _parent = _p.entry(fs.DEntry, "tree");
             _parent.ref.unref();

@@ -103,8 +103,9 @@ pub const SysInode = struct {
             return kernel.errors.PosixError.EINVAL;
         const sys_inode = _dentry.inode.getImpl(SysInode, "base");
 
-        if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 1)
+        if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
+        _dentry.ref.unref();
         if (_dentry.tree.parent) |_p| {
             const _parent = _p.entry(fs.DEntry, "tree");
             _parent.ref.unref();
