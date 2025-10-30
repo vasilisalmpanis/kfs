@@ -7,6 +7,8 @@ pub fn init() void {
     krn.logger.INFO("Modules API initialized\n", .{});
 }
 
+pub export const error_offset: u16 = @intFromError(krn.errors.PosixError.EPERM);
+
 // Memory
 pub export fn kheap_alloc(size: u32, contig: bool, user: bool) u32 {
     const addr = krn.mm.kheap.alloc(size, contig, user) catch return 0;

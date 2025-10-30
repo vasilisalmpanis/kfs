@@ -137,6 +137,10 @@ pub const PosixError = error{
     ERFKILL,         // 132 - Operation not possible due to RF-kill
     EHWPOISON,       // 133 - Memory page has hardware error
 };
-pub inline fn toErrno(err: PosixError) i32 {
-    return -@as(i32, @intCast((@intFromError(err) - @intFromError(PosixError.EPERM) + 1)));
+
+pub extern const error_offset: u16;
+
+pub inline fn convert(err: PosixError) anyerror {
+    return @errorFromInt(@intFromError(err) + error_offset - @intFromError(PosixError.EPERM));
 }
+
