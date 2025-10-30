@@ -108,15 +108,15 @@ pub const SysInode = struct {
         _dentry.ref.unref();
         if (_dentry.tree.parent) |_p| {
             const _parent = _p.entry(fs.DEntry, "tree");
+            const key = fs.DentryHash{
+                .sb = @intFromPtr(sb),
+                .ino = _parent.inode.i_no,
+                .name = _dentry.name
+            };
+            _ = fs.dcache.remove(key);
+            _ = sb.inode_map.remove(_dentry.inode.i_no);
             _parent.ref.unref();
         }
-        const key = fs.DentryHash{
-            .sb = @intFromPtr(sb),
-            .ino = _dentry.inode.i_no,
-            .name = _dentry.name
-        };
-        _ = fs.dcache.remove(key);
-        _ = sb.inode_map.remove(_dentry.inode.i_no);
         sys_inode.deinit();
         _dentry.release();
     }
