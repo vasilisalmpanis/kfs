@@ -41,18 +41,20 @@ fn kbd_open(_: *krn.fs.file.File, _: *krn.fs.Inode) !void {
 fn kbd_close(_: *krn.fs.file.File) void {
 }
 
-const test_s: []const u8 = "Test keyboard";
-
-fn kbd_read(_: *krn.fs.file.File, buf: [*]u8, size: u32) !u32 {
-    var len = test_s.len;
-    if (size < len)
-        len = size;
-    @memcpy(buf[0..len], test_s[0..len]);
-    return len;
+fn kbd_read(file: *krn.fs.file.File, buf: [*]u8, size: u32) !u32 {
+    var to_read: u32 = size;
+    if (file.pos >= 256)
+        return 0;
+    if (to_read > 256 - file.pos) {
+        to_read = 256 - file.pos;
+    }
+    @memcpy(buf[0..to_read], mod_kbd.buffer[file.pos..file.pos + to_read]);
+    file.pos += to_read;
+    return to_read;
 }
 
 fn kbd_write(_: *krn.fs.file.File, _: [*]const u8, _: u32) !u32 {
-    return 0;
+    return kfs.errors.convert(kfs.errors.PosixError.ENOSYS);
 }
 
 fn kbd_probe(device: *pdev.PlatformDevice) !void {
