@@ -2,25 +2,32 @@ const io = @import("arch").io;
 const dbg = @import("debug");
 const krn = @import("kernel");
 
+
 pub const CMOS = struct {
     curr_time: [7]u8 = .{0} ** 7,
+    updateTime: *const fn (self: *CMOS) void,
+    incSec: *const fn (self: *CMOS) void,
+    toUnixSeconds: *const fn (self: *CMOS) u64,
     pub const CMOS_ADDRESS = 0x70;
     pub const CMOS_DATA = 0x71;
 
     pub fn init() CMOS {
         var _cmos= CMOS{
             .curr_time = .{0} ** 7,
+            .updateTime = CMOS._updateTime,
+            .incSec = CMOS._incSec,
+            .toUnixSeconds = CMOS._toUnixSeconds,
         };
-        _cmos.updateTime();
+        _cmos.updateTime(&_cmos);
         return _cmos;
     }
 
-    pub fn readByte(reg: u8) u8 {
+    fn readByte(reg: u8) u8 {
         io.outb(CMOS_ADDRESS, reg);
         return io.inb(CMOS_DATA);
     }
 
-    pub fn writeByte(reg: u8, value: u8) void {
+    fn writeByte(reg: u8, value: u8) void {
         io.outb(CMOS_ADDRESS, reg);
         io.outb(CMOS_DATA, value);
     }
@@ -30,7 +37,7 @@ pub const CMOS = struct {
         return (readByte(0x0B) & 0x80) != 0;
     }
 
-    pub fn updateTime(self: *CMOS) void {
+    fn _updateTime(self: *CMOS) void {
         while (updateInProgress()) {}
         self.curr_time[0] = readByte(0x00); // seconds
         self.curr_time[1] = readByte(0x02); // minutes
@@ -59,7 +66,7 @@ pub const CMOS = struct {
         return self.curr_time;
     }
 
-    pub fn toUnixSeconds(self: *CMOS) u64 {
+    fn _toUnixSeconds(self: *CMOS) u64 {
         const sec  = @as(u64, self.curr_time[0]);
         const min  = @as(u64, self.curr_time[1]);
         const hour = @as(u64, self.curr_time[2]);
@@ -90,7 +97,7 @@ pub const CMOS = struct {
         return d;
     }
 
-    pub fn incSec(self: *CMOS) void {
+    fn _incSec(self: *CMOS) void {
         self.curr_time[0] += 1;
         if (self.curr_time[0] >= 60) {
             self.curr_time[0] = 0;
@@ -100,14 +107,14 @@ pub const CMOS = struct {
                 self.curr_time[2] += 1;
                 if (self.curr_time[2] >= 24) {
                     self.curr_time[2] = 0;
-                    self.updateTime();
+                    self.updateTime(self);
                 }
             }
         }
     }
 
     pub fn printTime(self: *CMOS) void {
-        self.updateTime();
+        self.updateTime(self);
         const time = self.curr_time;
         var year: u16 = (time[5] & 0x7F);
         year += 2000;
@@ -127,6 +134,9 @@ pub const CMOS = struct {
     }
 };
 
+var cmos: CMOS = undefined;
+
 pub fn init() void {
-    krn.cmos = CMOS.init();
+    cmos = CMOS.init();
+    krn.cmos = &cmos;
 }

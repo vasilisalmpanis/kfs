@@ -7,7 +7,7 @@ pub fn timerHandler() void {
 
     if (jiffies % drivers.pit.HZ == 0) {
         // Every second
-        krn.cmos.incSec();
+        krn.cmos.incSec(krn.cmos);
     }
 }
 

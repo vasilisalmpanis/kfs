@@ -80,12 +80,24 @@ pub export fn printf(buff: [*]const u8, size: u32) void {
     }
 }
 
+// Keyboard
+
 pub export fn setKBD(kbd: *drv.keyboard.Keyboard) void {
     drv.keyboard.global_keyboard = kbd;
 }
 
 pub export fn restoreKBD() void {
     drv.keyboard.init();
+}
+
+// CMOS
+
+pub export fn setCMOS(cmos: *drv.cmos.CMOS) void {
+    krn.cmos = cmos;
+}
+
+pub export fn restoreCMOS() void {
+    drv.cmos.init();
 }
 
 // pub export fn serial(buff: [*]const u8, size: u32) void {
