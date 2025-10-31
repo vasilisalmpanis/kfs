@@ -32,7 +32,6 @@ pub const DEntry = struct {
 
     pub fn drop(self: *Refcount) void {
         const dentry: *DEntry = list.containerOf(DEntry, @intFromPtr(self), "ref");
-        kernel.logger.ERROR("removing dentry {s}\n", .{dentry.name});
         dentry.tree.del();
         kernel.mm.kfree(dentry);
     }
