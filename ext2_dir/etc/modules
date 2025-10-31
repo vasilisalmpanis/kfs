@@ -1,0 +1,3 @@
+# Relative paths are resolved from /modules
+/modules/keyboard.o
+time.o

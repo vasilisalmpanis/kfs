@@ -4,8 +4,10 @@ const arch = @import("arch");
 const sockets = @import("../net/socket.zig");
 const kernel = @import("../main.zig");
 
-pub fn close(fd: u32) !u32 {
-    if (tsk.current.files.releaseFD(fd)) {
+pub fn close(fd: i32) !u32 {
+    if (fd < 0)
+        return errors.EBADF;
+    if (tsk.current.files.releaseFD(@intCast(fd))) {
         kernel.logger.INFO("finished closing {d}\n", .{fd});
         return 0;
     }

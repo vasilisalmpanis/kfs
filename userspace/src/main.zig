@@ -256,7 +256,56 @@ pub fn run_test() void {
     _ = std.posix.wait4(pid, 0, null);
 }
 
+pub fn load_modules() !void {
+    const fd = try std.posix.open(
+        "/etc/modules",
+        std.os.linux.O{.ACCMODE = .RDONLY},
+        0o444
+    );
+    var file = std.fs.File{
+        .handle = fd
+    };
+    var reader_buff: [256]u8 = undefined;
+    var reader = file.reader(&reader_buff);
+    var r = &reader.interface;
+    while (true) {
+        const line = r.takeDelimiterExclusive('\n') catch |err| {
+            switch (err) {
+                error.EndOfStream => return,
+                else => return err,
+            }
+            return err;
+        };
+        if (line.len == 0) {
+            return;
+        }
+        if (line[0] == '#') {
+            continue ;
+        }
+        var dir_fd: i32 = undefined;
+        if (line[0] == '/') {
+            dir_fd = -100;
+        } else {
+            dir_fd = try std.posix.open(
+                "/modules",
+                std.os.linux.O{.DIRECTORY = true},
+                0o444
+            );
+        }
+        defer std.posix.close(dir_fd);
+        const mod_fd = try std.posix.openat(
+            dir_fd,
+            line,
+            std.os.linux.O{.ACCMODE = .RDONLY},
+            0o444
+        );
+        defer std.posix.close(mod_fd);
+        _ = std.os.linux.syscall1(std.os.linux.syscalls.X86.finit_module, @intCast(mod_fd));
+    }
+}
+
 pub export fn main() noreturn {
+    load_modules() catch {};
     const tty = std.posix.open(
         "/dev/tty",
         std.os.linux.O{ .ACCMODE = .RDWR },

@@ -79,12 +79,12 @@ pub fn do_open(
 }
 
 pub fn open(
-    filename: ?[*:0]u8,
+    filename: ?[*:0]const u8,
     flags: u16,
     mode: fs.UMode,
 ) !u32 {
     if (filename) |f| {
-        const path: []u8 = std.mem.span(f);
+        const path: []const u8 = std.mem.span(f);
         kernel.logger.INFO("opening {s}\n", .{path});
         var file_segment: []const u8 = "";
         const parent_dir = try fs.path.dir_resolve(
@@ -114,6 +114,9 @@ pub fn openat(
     // TODO: Handle absolute paths
     const path_sl: []const u8 = std.mem.span(path.?);
     kernel.logger.INFO("path {s} fd {d}\n", .{path_sl, dirfd});
+    if (!kernel.fs.path.isRelative(path_sl)) {
+        return try open(path, flags, mode);
+    }
     if (dirfd == AT_FDCWD and kernel.fs.path.isRelative(path_sl)) {
         const cwd = kernel.task.current.fs.pwd.clone();
         defer cwd.release();
