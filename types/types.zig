@@ -1122,6 +1122,9 @@ pub const drivers = struct {
     pub const cmos = struct {
         pub const CMOS = struct {
             curr_time : [7]u8,
+            updateTime : *const fn(*drivers.cmos.CMOS) void,
+            incSec : *const fn(*drivers.cmos.CMOS) void,
+            toUnixSeconds : *const fn(*drivers.cmos.CMOS) u64,
         };
 
     };
@@ -1356,6 +1359,8 @@ pub const api = struct {
     pub extern fn printf([*]const u8, u32)void;
     pub extern fn setKBD(*drivers.Keyboard)void;
     pub extern fn restoreKBD()void;
+    pub extern fn setCMOS(*drivers.cmos.CMOS)void;
+    pub extern fn restoreCMOS()void;
     pub extern fn registerHandler(u32, *const anyopaque)void;
     pub extern fn unregisterHandler(u32)void;
     pub extern fn module_panic([*]const u8, u32)void;

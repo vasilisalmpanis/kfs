@@ -41,7 +41,7 @@ pub var serial: Serial = undefined;
 pub var logger: Logger = undefined;
 pub var boot_info: multiboot.Multiboot = undefined;
 pub var scr: screen.Screen = undefined;
-pub var cmos: drv.cmos.CMOS = undefined;
+pub var cmos: *drv.cmos.CMOS = undefined;
 
 pub const proc_mm = @import("./mm/proc_mm.zig");
 pub const fs = @import("fs/fs.zig");

@@ -196,7 +196,7 @@ pub const Ext2Super = struct {
             );
             return kernel.errors.PosixError.EINVAL;
         }
-        self.data.s_wtime = @intCast(kernel.cmos.toUnixSeconds());
+        self.data.s_wtime = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
         var buff: [1024]u8 = .{0} ** 1024;
         const src: [*]const u8 = @ptrCast(&self.data);
         const size = @sizeOf(Ext2SuperData);

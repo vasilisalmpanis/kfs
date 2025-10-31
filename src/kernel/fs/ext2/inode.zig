@@ -303,7 +303,7 @@ pub const Ext2Inode = struct {
                 }
 
                 // Construct ext2 inode data
-                const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds());
+                const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
                 const new_inode_data: Ext2InodeData = Ext2InodeData{
                     .i_atime = curr_seconds,
                     .i_ctime = curr_seconds,
@@ -488,7 +488,7 @@ pub const Ext2Inode = struct {
         const block = try sb.getFreeBlock(bgdt_idx);
         self.data.i_blocks += sb.base.block_size / 512;
         self.data.i_block[blk_idx] = block;
-        const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds());
+        const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
         sb.data.s_wtime = curr_seconds;
         self.data.i_mtime = curr_seconds;
         self.base.mtime = curr_seconds;
