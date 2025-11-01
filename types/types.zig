@@ -813,6 +813,13 @@ pub const kernel = struct {
 
         };
 
+        pub const procfs = struct {
+            pub const ProcFileSystem = struct {
+                base : kernel.fs.filesystem.FileSystem,
+            };
+
+        };
+
         pub const DentryHash = struct {
             sb : u32,
             ino : u32,

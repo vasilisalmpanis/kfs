@@ -37,6 +37,7 @@ pub const examplefs = @import("example/filesystem.zig");
 pub const sysfs = @import("sys/filesystem.zig");
 pub const devfs = @import("dev/filesystem.zig");
 pub const ext2 = @import("ext2/filesystem.zig");
+pub const procfs = @import("proc/filesystem.zig");
 
 const std = @import("std");
 pub const DentryHash = struct {
@@ -325,6 +326,7 @@ pub fn init() void {
     examplefs.init();
     sysfs.init();
     devfs.init();
+    procfs.init();
     ext2.init();
 
     if (FileSystem.find("examplefs")) |fs| {
