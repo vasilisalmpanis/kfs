@@ -24,7 +24,6 @@ pub fn init() void {
 pub const ProcFileSystem = struct {
     base: fs.FileSystem,
 
-
     fn getSB(base: *fs.FileSystem, dev_file: ?*fs.File) !*fs.SuperBlock {
         const self: *ProcFileSystem = base.getImpl(ProcFileSystem, "base");
         if (!self.base.sbs.isEmpty()) {

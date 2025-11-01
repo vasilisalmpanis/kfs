@@ -1,7 +1,3 @@
-// Debug
-pub export const print_screen = @import("debug.zig").print_screen;
-pub export const print_serial = @import("debug.zig").print_serial;
-
 // Memory
 pub export const kmalloc = @import("memory.zig").kmalloc;
 pub export const kfree = @import("memory.zig").kfree;

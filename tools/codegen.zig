@@ -5,6 +5,8 @@ pub export const stack_top: u32 = 0;
 var allocator: std.mem.Allocator = undefined;
 var visited_registry: std.StringHashMap([]const u8) = undefined;
 
+const LEVEL_0: u32 = 0;
+
 fn printIdentation(identation: u32, writer: *std.io.Writer) !void {
     for (0..identation) |_| {
         try writer.print(" ", .{});
@@ -261,18 +263,85 @@ fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
     }
 }
 
-fn printStruct(
+fn printExternFunction(function: std.builtin.Type.Fn, identation: u32, writer: *std.Io.Writer, decl_name: []const u8) anyerror!void {
+    if (function.calling_convention.eql(std.builtin.CallingConvention.c)) {
+        try printIdentation(identation + 4, writer);
+        try writer.print("pub extern fn {s}(", .{decl_name});
+        inline for (function.params, 1..) |param, idx| {
+            if (param.type) |_t| {
+                try cleanType(_t, writer);
+            }
+            if (idx < function.params.len)
+                try writer.print(", ", .{});
+        }
+        try writer.print(")", .{});
+        if (function.return_type) |ret| {
+            try cleanType(ret, writer);
+        } else {
+            try writer.print(" void", .{});
+        }
+        try writer.writeAll(";\n");
+    }
+}
+
+fn printStructFields(identation: u32, writer: *std.Io.Writer, struct_type: std.builtin.Type.Struct) anyerror!void {
+    inline for (struct_type.fields) |field| {
+        try printIdentation(identation + 4, writer);
+        try writer.print("{s} : ", .{field.name});
+        try cleanType(field.type, writer);
+        if (field.defaultValue()) |value| {
+            try printDefaultValue(value, writer);
+        }
+        try writer.print(",\n", .{});
+    }
+}
+
+fn printEnum(identation: u32, writer: *std.Io.Writer, enum_name: []const u8, en: std.builtin.Type.Enum) anyerror!void {
+    try printIdentation(identation, writer);
+    try writer.print("pub const {s} = enum({s}) {{\n", .{enum_name, @typeName(en.tag_type)});
+    inline for (en.fields) |field| {
+        try printIdentation(identation + 4, writer);
+        try writer.print("{s} = {d},\n", .{field.name, field.value});
+    }
+    if (!en.is_exhaustive) {
+        try printIdentation(identation + 4, writer);
+        try writer.print("_,\n", .{});
+    }
+    try printIdentation(identation, writer);
+    try writer.print("}};\n\n", .{});
+}
+
+fn printUnion(identation: u32, writer: *std.Io.Writer, un: std.builtin.Type.Union, type_name: []const u8) anyerror!void {
+    var layout: []const u8 = "";
+    switch (un.layout) {
+        .@"extern" => layout = "extern ",
+        .@"packed" => layout = "packed ",
+        else => {}
+    }
+    try printIdentation(identation, writer);
+    try writer.print("pub const {s} = {s}union {{\n", .{type_name, layout});
+    inline for (un.fields) |field| {
+        try printIdentation(identation + 4, writer);
+        try writer.print("{s} = ", .{field.name});
+        try cleanType(field.type, writer);
+        try writer.print(",\n", .{});
+    }
+    try printIdentation(identation, writer);
+    try writer.print("}};\n\n", .{});
+}
+
+fn handleComplexType(
     name_prefix: []const u8,
     identation: u32,
-    struct_name: []const u8,
+    type_name: []const u8,
     curr_type: std.builtin.Type,
     writer: *std.io.Writer,
-    struct_val: type,
+    type_val: type,
     visited: *std.StringHashMap([]const u8),
     first_run: bool,
 ) anyerror!void {
 
-    const visited_key = try constructKey(struct_val);
+    const visited_key = try constructKey(type_val);
     if (visited.contains(visited_key)) {
         allocator.free(visited_key);
         return;
@@ -282,8 +351,8 @@ fn printStruct(
         const prefix_copy = try allocator.alloc(u8, name_prefix.len);
         @memcpy(prefix_copy[0..], name_prefix[0..]);
         try visited.put(visited_key, prefix_copy);
-        if (!visited.contains(struct_name)) {
-            const name_copy = try allocator.dupe(u8, struct_name);
+        if (!visited.contains(type_name)) {
+            const name_copy = try allocator.dupe(u8, type_name);
             const prefix_copy_copy = try allocator.dupe(u8, prefix_copy);
             try visited.put(name_copy, prefix_copy_copy);
         }
@@ -295,34 +364,21 @@ fn printStruct(
         .@"struct" => |struct_type| {
 
             if (!first_run) {
-                try printStructLayout(struct_type, struct_name, writer, identation);
+                try printStructLayout(struct_type, type_name, writer, identation);
             }
             inline for (struct_type.decls) |decl| {
                 const decl_name = decl.name;
-                const decl_val = @field(struct_val, decl_name);
+                const decl_val = @field(type_val, decl_name);
                 if (@TypeOf(decl_val) != type) {
                     const temp_ti = @typeInfo(@TypeOf(decl_val));
                     switch (temp_ti) {
                         .@"fn" => |function| {
                             if (!first_run) {
-                                if (function.calling_convention.eql(std.builtin.CallingConvention.c)) {
-                                    try printIdentation(identation + 4, writer);
-                                    try writer.print("pub extern fn {s}(", .{decl_name});
-                                    inline for (function.params, 1..) |param, idx| {
-                                        if (param.type) |_t| {
-                                            try cleanType(_t, writer);
-                                        }
-                                        if (idx < function.params.len)
-                                            try writer.print(", ", .{});
-                                    }
-                                    try writer.print(")", .{});
-                                    if (function.return_type) |ret| {
-                                        try cleanType(ret, writer);
-                                    } else {
-                                        try writer.print(" void", .{});
-                                    }
-                                    try writer.writeAll(";\n");
-                                }
+                                try printExternFunction(
+                                    function,
+                                    identation,
+                                    writer,decl_name
+                                );
                             }
                         },
                         else => {
@@ -332,15 +388,15 @@ fn printStruct(
                 }
                 const ti = @typeInfo(decl_val);
 
-                var prefix: []const u8 = struct_name;
+                var prefix: []const u8 = type_name;
                 if (name_prefix.len != 0) {
-                    const _sl: []const []const u8 = &.{name_prefix, struct_name};
+                    const _sl: []const []const u8 = &.{name_prefix, type_name};
                     prefix = try std.mem.join(allocator, ".", _sl);
                 }
 
                 switch (ti) {
-                    .@"struct", .@"enum" => { //, .@"union" => {
-                        try printStruct(
+                    .@"struct", .@"enum" => {
+                        try handleComplexType(
                             prefix,
                             identation + 4,
                             decl_name,
@@ -358,18 +414,12 @@ fn printStruct(
                 if (name_prefix.len != 0)
                     allocator.free(prefix);
             }
-            inline for (struct_type.fields) |field| {
-                if (!first_run) {
-                    try printIdentation(identation + 4, writer);
-                    try writer.print("{s} : ", .{field.name});
-                    try cleanType(field.type, writer);
-                    if (field.defaultValue()) |value| {
-                        try printDefaultValue(value, writer);
-                    }
-                    try writer.print(",\n", .{});
-                }
-            }
-            if(!first_run) {
+            if (!first_run) {
+                try printStructFields(
+                    identation,
+                    writer,
+                    struct_type
+                );
                 try printIdentation(identation, writer);
                 try writer.print("}};\n", .{});
                 try writer.flush();
@@ -377,38 +427,22 @@ fn printStruct(
         },
         .@"enum" => |en| {
             if (!first_run) {
-                try printIdentation(identation, writer);
-                try writer.print("pub const {s} = enum({s}) {{\n", .{struct_name, @typeName(en.tag_type)});
-                inline for (en.fields) |field| {
-                    try printIdentation(identation + 4, writer);
-                    try writer.print("{s} = {d},\n", .{field.name, field.value});
-                }
-                if (!en.is_exhaustive) {
-                    try printIdentation(identation + 4, writer);
-                    try writer.print("_,\n", .{});
-                }
-                try printIdentation(identation, writer);
-                try writer.print("}};\n\n", .{});
+                try printEnum(
+                    identation,
+                    writer,
+                    type_name,
+                    en
+                );
             }
         },
         .@"union" => |un| {
             if (!first_run) {
-                var layout: []const u8 = "";
-                switch (un.layout) {
-                    .@"extern" => layout = "extern ",
-                    .@"packed" => layout = "packed ",
-                    else => {}
-                }
-                try printIdentation(identation, writer);
-                try writer.print("pub const {s} = {s}union {{\n", .{struct_name, layout});
-                inline for (un.fields) |field| {
-                    try printIdentation(identation + 4, writer);
-                    try writer.print("{s} = ", .{field.name});
-                    try cleanType(field.type, writer);
-                    try writer.print(",\n", .{});
-                }
-                try printIdentation(identation, writer);
-                try writer.print("}};\n\n", .{});
+                try printUnion(
+                    identation,
+                    writer,
+                    un,
+                    type_name
+                );
             }
         },
         else => {
@@ -461,9 +495,9 @@ pub fn main() anyerror!void {
                     continue;
 
                 const ti = @typeInfo(field_val);
-                try printStruct(
+                try handleComplexType(
                     "",
-                    0,
+                    LEVEL_0,
                     field_name,
                     ti,
                     interface,
@@ -482,9 +516,9 @@ pub fn main() anyerror!void {
                     continue;
 
                 const ti = @typeInfo(field_val);
-                try printStruct(
+                try handleComplexType(
                     "",
-                    0,
+                    LEVEL_0,
                     field_name,
                     ti,
                     interface,

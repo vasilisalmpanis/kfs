@@ -29,7 +29,7 @@ pub fn build(b: *std.Build) void {
         .stack_protector = false,
         .stack_check = false,
         .red_zone = false,
-        .error_tracing = false,
+        .error_tracing = true,
         .fuzz = false,
         .optimize = optimize,
     });
