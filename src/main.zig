@@ -137,7 +137,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     // Devices
     drv.init();
-    modules.api.init();
+    modules.init() catch {
+        @panic("Modules file cannot be created\n");
+    };
     move_root();
     kernel_ready = true;
 
