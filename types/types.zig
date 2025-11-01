@@ -4,6 +4,38 @@ pub const dbg = @import("debug.zig");
 pub const mm = @import("mm.zig");
 pub const errors = @import("errors.zig");
 
+pub const loader = struct {
+    pub const Module = struct {
+        name : []const u8,
+        exit : ?*const fn() void,
+        list : kernel.list.ListHead,
+        code : []u8,
+    };
+
+    pub const R_X86_Type = enum(u8) {
+        R_386_NONE = 0,
+        R_386_32 = 1,
+        R_386_PC32 = 2,
+        R_386_GOT32 = 3,
+        R_386_PLT32 = 4,
+        R_386_COPY = 5,
+        R_386_GLOB_DAT = 6,
+        R_386_JMP_SLOT = 7,
+        R_386_RELATIVE = 8,
+        R_386_GOTOFF = 9,
+        R_386_GOTPC = 10,
+        R_386_32PLT = 11,
+        R_386_16 = 20,
+        R_386_PC16 = 21,
+        R_386_8 = 22,
+        R_386_PC8 = 23,
+        R_386_SIZE32 = 28,
+        _,
+    };
+
+
+};
+
 pub const arch = struct {
     pub const io = struct {
         pub extern fn inb(u16)u8;
@@ -764,6 +796,7 @@ pub const kernel = struct {
                 inode : *kernel.fs.Inode,
                 ref : kernel.task.RefCount,
                 path : ?kernel.fs.path.Path,
+                data : ?*anyopaque,
             };
 
             pub const FileOps = struct {

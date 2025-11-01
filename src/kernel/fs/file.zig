@@ -37,6 +37,7 @@ pub const File = struct {
     inode: *fs.Inode,
     ref: Refcount,
     path: ?fs.path.Path,
+    data: ?*anyopaque,
 
     pub fn init(
         self: *File,
@@ -49,6 +50,7 @@ pub const File = struct {
         self.ref.dropFn = File.release;
         self.ref.ref();
         self.inode = inode;
+        self.data = null;
     }
 
     pub fn release(ref: *kernel.task.RefCount) void {

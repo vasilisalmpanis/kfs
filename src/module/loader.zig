@@ -3,8 +3,8 @@ const arch = @import("arch");
 const debug = @import("debug");
 const std = @import("std");
 
-var modules_list: ?*Module = null;
-var modules_mutex = kernel.Mutex.init();
+pub var modules_list: ?*Module = null;
+pub var modules_mutex = kernel.Mutex.init();
 
 pub const Module = struct {
     name: []const u8,
