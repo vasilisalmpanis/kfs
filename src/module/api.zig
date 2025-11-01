@@ -80,6 +80,10 @@ pub export fn printf(buff: [*]const u8, size: u32) void {
     }
 }
 
+pub fn print_serial(arr: [*]const u8, size: u32) callconv(.c) void {
+    krn.serial.print(arr[0..size]);
+}
+
 // Keyboard
 
 pub export fn setKBD(kbd: *drv.keyboard.Keyboard) void {
@@ -99,10 +103,6 @@ pub export fn setCMOS(cmos: *drv.cmos.CMOS) void {
 pub export fn restoreCMOS() void {
     drv.cmos.init();
 }
-
-// pub export fn serial(buff: [*]const u8, size: u32) void {
-//     krn.logger.INFO(buff[0..size], .{});
-// }
 
 // IRQ
 pub export const registerHandler = @import("kernel").irq.registerHandler;

@@ -52,11 +52,3 @@ pub const do_open = @import("./syscalls/open.zig").do_open;
 pub const do_mount = @import("./syscalls/mount.zig").do_mount;
 pub const do_umount = @import("./syscalls/mount.zig").do_umount;
 pub const do_munmap = @import("./syscalls/mmap.zig").do_munmap;
-
-pub const TestStruct = struct {
-    array: [50]u8,
-    optional: ?*u32,
-    slice: []const u8,
-    opq: *anyopaque,
-    sent: [*:0]u8,
-};

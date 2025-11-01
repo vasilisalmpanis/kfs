@@ -897,14 +897,6 @@ pub const kernel = struct {
 
     };
 
-    pub const TestStruct = struct {
-        array : [50]u8,
-        optional : ?*u32,
-        slice : []const u8,
-        opq : *anyopaque,
-        sent : [*:0]u8,
-    };
-
 };
 
 pub const debug = struct {
@@ -1397,6 +1389,7 @@ pub const api = struct {
     pub extern fn addCharacterDevice(*drivers.device.Device, kernel.fs.UMode)i32;
     pub extern fn rmCharacterDevice(drivers.device.dev_t)i32;
     pub extern fn printf([*]const u8, u32)void;
+    pub extern fn print_serial([*]const u8, u32)void;
     pub extern fn setKBD(*drivers.Keyboard)void;
     pub extern fn restoreKBD()void;
     pub extern fn setCMOS(*drivers.cmos.CMOS)void;

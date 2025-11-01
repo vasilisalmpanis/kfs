@@ -108,6 +108,7 @@ pub fn rmCdev(devt: dev.dev_t) !void {
             try _unlink(_d);
         }
         _ = cdev_map.remove(devt);
+        return ;
     }
     return krn.errors.PosixError.ENOENT;
 }

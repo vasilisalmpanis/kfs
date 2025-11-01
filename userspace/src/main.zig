@@ -306,6 +306,7 @@ pub fn load_modules() !void {
 
 pub export fn main() noreturn {
     load_modules() catch {};
+    _ = std.os.linux.mount("asdf", "/proc", "procfs", 0, 0);
     const tty = std.posix.open(
         "/dev/tty",
         std.os.linux.O{ .ACCMODE = .RDWR },
