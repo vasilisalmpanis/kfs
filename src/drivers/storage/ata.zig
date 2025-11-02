@@ -389,7 +389,7 @@ pub const ATADrive = struct {
         }
 
         const prdt: *PRDEntry = @ptrFromInt(self.prdt_virt);
-        const transfer_size = @as(u16, if (num_sectors == 0) 256 else num_sectors) * 512;
+        const transfer_size = @as(u16, if (num_sectors == 0) 64 else num_sectors) * 512;
         prdt.size = transfer_size;
 
         const status = arch.io.inb(self.bmide_base + BMIDE_STATUS);
@@ -837,17 +837,23 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
                 return 0;
         }
         // ata_dev.selectChannel();
-        try ata_dev.readSectorsDMA(lba, 1);
         
+        var _size: u32 = size;
+        if (_size > 64 * ATADrive.SECTOR_SIZE)
+            _size = ATADrive.SECTOR_SIZE * 64;
+        var to_read: u32 = _size;
+
+        if ((file.pos + to_read) % ATADrive.SECTOR_SIZE != 0) {
+            to_read += (ATADrive.SECTOR_SIZE - (file.pos + to_read) % ATADrive.SECTOR_SIZE);
+        }
         const offset: u32 = file.pos % ATADrive.SECTOR_SIZE;
-        var to_read: u32 = ATADrive.SECTOR_SIZE - offset;
-        if (size < to_read)
-            to_read = size;
+        const sectors_to_read: u8 = @intCast((to_read + offset) / ATADrive.SECTOR_SIZE);
+        try ata_dev.readSectorsDMA(lba, sectors_to_read);
 
         const dma_buf: [*]u8 = @ptrFromInt(ata_dev.dma_buff_virt);
-        @memcpy(buff[0..to_read], dma_buf[offset..offset + to_read]);
-        file.pos += to_read;
-        return to_read;
+        @memcpy(buff[0.._size], dma_buf[offset..offset + _size]);
+        file.pos += _size;
+        return _size;
     }
     return 0;
 }
