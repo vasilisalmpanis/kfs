@@ -243,10 +243,11 @@ pub const Ext2Super = struct {
                 const single_read: u32 = try sb.base.dev_file.?.ops.read(
                     sb.base.dev_file.?,
                     @ptrCast(&raw_buff[read]),
-                    sb.base.block_size
+                    alloc_size - read
                 );
                 // FIXME:
-                if (single_read == 0) break;
+                if (single_read == 0)
+                    break;
                 read += single_read;
             }
             return raw_buff[0..alloc_size];

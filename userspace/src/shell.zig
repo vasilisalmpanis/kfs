@@ -429,8 +429,8 @@ fn cat(self: *Shell, args: [][]const u8) void {
         return ;
     };
     defer std.posix.close(fd);
-    var buff: [1024]u8 = .{0} ** 1024;
-    var buff_slice = buff[0..1024];
+    var buff: [4096]u8 = .{0} ** 4096;
+    var buff_slice = buff[0..4096];
     while (true) {
         const res = std.posix.read(fd, buff_slice) catch |err| {
             self.print("cat: read error on '{s}': {t}\n", .{args[0], err});

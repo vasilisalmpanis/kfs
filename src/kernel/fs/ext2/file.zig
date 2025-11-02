@@ -71,7 +71,8 @@ pub const Ext2File = struct {
     }
 
     fn read(base: *fs.File, buf: [*]u8, size: u32) !u32 {
-        const sb: *fs.SuperBlock = if (base.inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
+        const sb: *fs.SuperBlock = if (base.inode.sb) |_s| _s else
+            return krn.errors.PosixError.EINVAL;
         const ino = base.inode.getImpl(Ext2Inode, "base");
         const ext2_sb = sb.getImpl(Ext2Super, "base");
 
@@ -83,37 +84,60 @@ pub const Ext2File = struct {
         if (to_read > ino.base.size -| base.pos) {
             to_read = ino.base.size -| base.pos;
         }
-        if (to_read == 0) return 0;
+        if (to_read == 0)
+            return 0;
 
         const bs = ext2_sb.base.block_size;
-        const lbn = base.pos / bs;
-        const read_offset: u32 = @intCast(base.pos % bs);
+        const read_offset: u32 = base.pos % bs;
 
-        // resolve lbn -> physical block number
-        const pbn = try ext2_sb.resolveLbn(ino, lbn);
+        const fisrt_lbn = base.pos / bs;
+        var last_lbn = (base.pos + to_read) / bs;
+        if ((base.pos + to_read) % bs != 0)
+            last_lbn += 1;
+        var last_contig_lbn: u32 = fisrt_lbn;
 
-        // if pbn == 0 => sparse hole: return zeroed bytes up to block boundary
-        if (pbn == 0) {
-            var zeros_to_copy: u32 = @intCast(to_read);
-            if (read_offset + zeros_to_copy > bs) {
-                zeros_to_copy = bs - read_offset;
+        var first_pbn: u32 = 0;
+        var contig_pbn_count: u32 = 0;
+        var prev_pbn: u32 = 0;
+
+        for (fisrt_lbn..last_lbn) |_lbn| {
+            const pbn = try ext2_sb.resolveLbn(ino, _lbn);
+            if (first_pbn == 0) {
+                first_pbn = pbn;
             }
-            // fill user buffer with zeros
-            @memset(buf[0..zeros_to_copy], 0); // if you don't have std in kernel, use explicit loop
-            base.pos += zeros_to_copy;
-            return zeros_to_copy;
+            // if pbn == 0 => sparse hole: return zeroed bytes up to block boundary
+            if (pbn == 0 and _lbn == fisrt_lbn) {
+                var zeros_to_copy: u32 = @intCast(to_read);
+                if (read_offset + zeros_to_copy > bs) {
+                    zeros_to_copy = bs - read_offset;
+                }
+                // fill user buffer with zeros
+                @memset(buf[0..zeros_to_copy], 0); // if you don't have std in kernel, use explicit loop
+                base.pos += zeros_to_copy;
+                return zeros_to_copy;
+            } else if (pbn == 0) {
+                break;
+            }
+            if (prev_pbn != 0 and prev_pbn + 1 != pbn) {
+                break ;
+            }
+            prev_pbn = pbn;
+            contig_pbn_count += 1;
+            last_contig_lbn = _lbn;
         }
 
         // read the actual data block
-        const file_buf = try ext2_sb.readBlocks(pbn, 1);
+        const file_buf = try ext2_sb.readBlocks(first_pbn, contig_pbn_count);
         defer krn.mm.kfree(file_buf.ptr);
 
-        var n: u32 = to_read;
-        if (read_offset + n > bs) n = bs - read_offset;
+        var bytes_read: u32 = file_buf.len - read_offset;
+        if (bytes_read > to_read) {
+            bytes_read = to_read;
+        }
 
-        @memcpy(buf[0..n], file_buf[read_offset..read_offset + n]);
-        base.pos += n;
-        return  n;
+        @memcpy(buf[0..bytes_read], file_buf[read_offset..read_offset + bytes_read]);
+        base.pos += bytes_read;
+        return bytes_read;
     }
 
     fn close(_: *fs.File) void {

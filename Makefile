@@ -99,6 +99,7 @@ $(IMG_DIR):
 	mkdir -p $(IMG_DIR)/sys
 	mkdir -p $(IMG_DIR)/tmp
 	mkdir -p $(IMG_DIR)/var
+	mkdir -p $(IMG_DIR)/proc
 
 modules: $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:=.o))
 
