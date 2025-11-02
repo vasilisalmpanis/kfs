@@ -78,6 +78,7 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "kill", .desc = "Send signal", .hndl = &kill });
         self.registerCommand(.{ .name = "insmod", .desc = "load module", .hndl = &insmod });
         self.registerCommand(.{ .name = "rmmod", .desc = "unload module", .hndl = &rmmod });
+        self.registerCommand(.{ .name = "access", .desc = "access syscall", .hndl = &access });
     }
 
     pub fn handleInput(self: *Shell, input: []const u8) void {
@@ -643,4 +644,35 @@ fn rmmod(self: *Shell, args: [][]const u8) void {
     } else {
         self.print("error unloading: {t}\n", .{std.posix.errno(res)});
     }
+}
+
+fn access(self: *Shell, args: [][]const u8) void {
+    if (args.len < 2) {
+        self.print(
+            \\Usage: access <path> <mode>
+            \\  Example: access . F_OK
+            \\
+            , .{}
+        );
+        return;
+    }
+    var mode: u32 = std.posix.F_OK;
+    if (std.mem.eql(u8,args[1],"F_OK")) {
+        mode = std.posix.F_OK;
+    } else if (std.mem.eql(u8,args[1],"W_OK")) {
+        mode = std.posix.W_OK;
+    } else if (std.mem.eql(u8,args[1],"X_OK")) {
+        mode = std.posix.X_OK;
+    }else if (std.mem.eql(u8,args[1],"R_OK")) {
+        mode = std.posix.R_OK;
+    } else {
+        self.print("Wrong mode {s}\n", .{args[1]});
+        return ;
+    }
+    _ = std.posix.access(args[0], mode) catch |err| {
+        self.print("Access {s} {s}: {any}\n", .{args[0], args[1], err});
+        return ;
+    };
+    self.print("Access result for {s} {s}: {d}\n", .{args[0], args[1], 0});
+    return ;
 }

@@ -55,6 +55,11 @@ pub fn readv(fd: u32, iov: [*]IoVec, iovcnt: u32) !u32 {
 }
 
 pub fn preadv(fd: u32, iov: [*]IoVec, iovcnt: u32, offset: u32) !u32 {
-    _ = offset;
-    return try readv(fd, iov, iovcnt);
+    if (krn.task.current.files.fds.get(fd)) |file| {
+        const old_pos = file.pos;
+        file.pos = offset;
+        defer file.pos = old_pos;
+        return try readv(fd, iov, iovcnt);
+    }
+    return errors.PosixError.EBADF;
 }
