@@ -8,54 +8,49 @@ const fs = @import("../fs/fs.zig");
 const krn = @import("../main.zig");
 
 pub fn doFork() !u32 {
-    var child: ?*tsk.Task = km.kmalloc(tsk.Task);
-    if (child == null) {
+    var child: *tsk.Task = km.kmalloc(tsk.Task) orelse {
         krn.logger.ERROR("fork: failed to alloc child task", .{});
         return errors.ENOMEM;
-    }
+    };
+    errdefer km.kfree(child);
     const stack: u32 = kthread.kthreadStackAlloc(kthread.STACK_PAGES);
     if (stack == 0) {
         krn.logger.ERROR("fork: failed to alloc kthread stack", .{});
-        km.kfree(child.?);
         return errors.ENOMEM;
     }
-    child.?.mm = tsk.current.mm.?.dup();
-    if (child.?.mm == null) {
+    errdefer kthread.kthreadStackFree(stack);
+    child.mm = tsk.current.mm.?.dup() orelse {
         krn.logger.ERROR("fork: failed to dup mm", .{});
-        kthread.kthreadStackFree(stack);
-        mm.kfree(child.?);
-        return errors.ENOMEM;
-    }
-    child.?.fs = tsk.current.fs.clone() catch {
-        krn.logger.ERROR("fork: failed to clone fs", .{});
-        kthread.kthreadStackFree(stack);
-        mm.kfree(child.?);
         return errors.ENOMEM;
     };
+    errdefer km.kfree(child.mm.?); // BUG: free mappings and then mm
+    child.fs = tsk.current.fs.clone() catch {
+        krn.logger.ERROR("fork: failed to clone fs", .{});
+        return errors.ENOMEM;
+    };
+    errdefer child.fs.deinit();
     if (fs.TaskFiles.new()) |files| {
-        child.?.files = files;
-        child.?.files.dup(tsk.current.files) catch {
+        errdefer km.kfree(files);
+        child.files = files;
+        child.files.dup(tsk.current.files) catch {
             // TODO: free mm and free fs.
             krn.logger.ERROR("fork: failed to clone files", .{});
-            kthread.kthreadStackFree(stack);
-            mm.kfree(child.?);
             return errors.ENOMEM;
         };
     } else {
             krn.logger.ERROR("fork: failed to clone files", .{});
-            kthread.kthreadStackFree(stack);
-            mm.kfree(child.?);
             return errors.ENOMEM;
     }
+    errdefer km.kfree(child.files);
 
     const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
     const parent_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
     var child_regs: *arch.Regs = @ptrFromInt(stack_top);
     child_regs.* = parent_regs.*;
     child_regs.eax = 0;
-    child.?.tls = krn.task.current.tls;
-    child.?.limit = krn.task.current.limit;
-    child.?.initSelf(
+    child.tls = krn.task.current.tls;
+    child.limit = krn.task.current.limit;
+    child.initSelf(
         stack_top,
         stack,
         tsk.current.uid,
@@ -66,13 +61,9 @@ pub fn doFork() !u32 {
         // TODO: understand when error comes from kmalloc allocation of files
         // or from resizing of fds/map inside files to do deinit
         krn.logger.ERROR("fork: failed to init child task: {any}", .{err});
-        km.kfree(child.?.fs);
-        km.kfree(child.?.mm.?);
-        km.kfree(child.?);
-        kthread.kthreadStackFree(stack);
         return errors.ENOMEM;
     };
-    return @intCast(child.?.pid);
+    return @intCast(child.pid);
 }
 
 pub fn getPID() !u32 {
