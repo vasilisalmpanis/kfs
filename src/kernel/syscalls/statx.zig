@@ -155,5 +155,6 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
     const clone_path = from_path.clone();
     defer clone_path.release();
     const target_path = try fs.path.resolveFrom(path_s, clone_path);
+    defer target_path.release();
     return try do_statx(target_path.dentry.inode, statxbuf.?);
 }
