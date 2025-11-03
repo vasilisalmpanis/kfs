@@ -319,6 +319,12 @@ pub const FSInfo = struct {
         _fs.root.mnt.count.ref();
         return _fs;
     }
+
+    pub fn deinit(self: *FSInfo) void {
+        self.root.release();
+        self.pwd.release();
+        kernel.mm.kfree(self);
+    }
 };
 
 pub fn init() void {
