@@ -67,6 +67,7 @@ pub const DevInode = struct {
             var new_dentry = try fs.DEntry.alloc(_name, sb, new_inode);
             errdefer kernel.mm.kfree(new_dentry);
             parent.tree.addChild(&new_dentry.tree);
+            parent.ref.ref();
             cash_key.name = new_dentry.name;
             try fs.dcache.put(cash_key, new_dentry);
             return new_dentry;
@@ -121,7 +122,9 @@ pub const DevInode = struct {
     fn unlink(_dentry: *fs.DEntry) !void {
         const sb = if (_dentry.inode.sb) |_s| _s else
             return kernel.errors.PosixError.EINVAL;
-        const sys_inode = _dentry.inode.getImpl(DevInode, "base");
+        if (_dentry.inode.mode.isDir())
+            return kernel.errors.PosixError.EISDIR;
+        const dev_inode = _dentry.inode.getImpl(DevInode, "base");
 
         kernel.logger.DEBUG("unlink {d}", .{_dentry.ref.getValue()});
         if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
@@ -138,7 +141,7 @@ pub const DevInode = struct {
             _ = sb.inode_map.remove(_dentry.inode.i_no);
             _parent.ref.unref();
         }
-        sys_inode.deinit();
+        dev_inode.deinit();
         _dentry.release();
     }
 
