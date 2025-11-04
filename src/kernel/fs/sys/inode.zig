@@ -67,6 +67,7 @@ pub const SysInode = struct {
             var new_dentry = try fs.DEntry.alloc(_name, sb, new_inode);
             errdefer kernel.mm.kfree(new_dentry);
             parent.tree.addChild(&new_dentry.tree);
+            parent.ref.ref();
             cash_key.name = new_dentry.name;
             try fs.dcache.put(cash_key, new_dentry);
             return new_dentry;
@@ -102,6 +103,9 @@ pub const SysInode = struct {
         const sb = if (_dentry.inode.sb) |_s| _s else
             return kernel.errors.PosixError.EINVAL;
         const sys_inode = _dentry.inode.getImpl(SysInode, "base");
+
+        if (_dentry.inode.mode.isDir())
+            return kernel.errors.PosixError.EISDIR;
 
         if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
