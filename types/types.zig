@@ -579,6 +579,7 @@ pub const kernel = struct {
         pub const Task = struct {
             pid : u32,
             tsktype : kernel.task.TaskType,
+            name : [16]u8,
             uid : u16,
             gid : u16,
             pgid : u16= 1,
@@ -773,6 +774,7 @@ pub const kernel = struct {
             unlink : ?*const fn(*kernel.fs.DEntry) anyerror!void= null,
             lookup : *const fn(*kernel.fs.DEntry, []const u8) anyerror!*kernel.fs.DEntry,
             mkdir : *const fn(*kernel.fs.Inode, *kernel.fs.DEntry, []const u8, kernel.fs.UMode) anyerror!*kernel.fs.DEntry,
+            rmdir : ?*const fn(*kernel.fs.DEntry, *kernel.fs.DEntry) anyerror!void= null,
             get_link : ?*const fn(*kernel.fs.Inode, *[]u8) anyerror!void,
         };
 

@@ -83,6 +83,7 @@ pub const RefCount = struct {
 pub const Task = struct {
     pid:            u32,
     tsktype:        TaskType,
+    name:           [16] u8,
     uid:            u16,
     gid:            u16,
     pgid:           u16             = 1,
@@ -125,10 +126,11 @@ pub const Task = struct {
             .files = undefined,
             .tls = 0,
             .limit = 0,
+            .name = .{0} ** 16,
         };
     }
 
-    pub fn setup(self: *Task, virt: u32, task_stack_top: u32, task_stack_bottom: u32) void {
+    pub fn setup(self: *Task, virt: u32, task_stack_top: u32, task_stack_bottom: u32, name: []const u8) void {
         self.pid = pid;
         self.uid = 0;
         pid += 1;
@@ -138,7 +140,14 @@ pub const Task = struct {
         self.tree.setup();
         self.refcount = RefCount.init();
         self.mm = &mm.proc_mm.init_mm;
+        self.setName(name);
         mm.proc_mm.init_mm.vas = virt;
+    }
+
+    pub fn setName(self: *Task, name: []const u8) void {
+        const len = if (name.len >= 15) 15 else name.len;
+        self.name = .{0} ** 16;
+        @memcpy(self.name[0..len], name[0..len]);
     }
 
     pub fn new(
@@ -147,11 +156,12 @@ pub const Task = struct {
         uid: u16,
         gid: u16,
         pgid: u16,
-        tp: TaskType
+        tp: TaskType,
+        name: []const u8,
     ) anyerror!*Task {
         if (krn.mm.kmalloc(Task)) |task| {
             errdefer krn.mm.kfree(task);
-            try task.initSelf(task_stack_top, stack_btm, uid, gid, pgid, tp);
+            try task.initSelf(task_stack_top, stack_btm, uid, gid, pgid, tp, name);
             return task;
         }
         return error.OutOfMemory;
@@ -164,7 +174,8 @@ pub const Task = struct {
         uid: u16,
         gid: u16,
         pgid: u16,
-        tp: TaskType
+        tp: TaskType,
+        name: []const u8,
     ) !void {
         const tmp = Task.init(uid, gid, pgid, tp);
         self.uid = tmp.uid;
@@ -186,6 +197,7 @@ pub const Task = struct {
         self.list.setup();
         self.tree.setup();
 
+        self.setName(name);
         self.sighand = current.sighand;
         self.sighand.pending = std.StaticBitSet(32).initEmpty();
 
@@ -308,6 +320,7 @@ pub fn initMultitasking() void {
         @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET,
         @intFromPtr(&stack_top),
         @intFromPtr(&stack_bottom),
+        "swapper"
     );
     krn.irq.registerHandler(0, &krn.timerHandler);
     arch.system.enableWriteProtect();

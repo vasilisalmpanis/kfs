@@ -4,6 +4,7 @@ const printf = @import("debug").printf;
 const mm = @import("../mm/init.zig");
 const arch = @import("arch");
 const krn = @import("../main.zig");
+const std = @import("std");
 
 
 const PAGE_SIZE = @import("arch").PAGE_SIZE;
@@ -52,7 +53,7 @@ pub fn kthreadStackFree(addr: u32) void {
     page += PAGE_SIZE;
 }
 
-pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
+pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const u8) !*tsk.Task {
     var stack: u32 = undefined;
     const new_task: ?*tsk.Task = km.kmalloc(tsk.Task);
     if (new_task) |task| {
@@ -77,7 +78,8 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) !*tsk.Task {
             0,
             0,
             1,
-            .KTHREAD
+            .KTHREAD,
+            std.mem.span(name)
         ) catch |err| {
             krn.mm.kfree(task);
             return err;
