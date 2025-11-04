@@ -12,12 +12,12 @@ pub fn wrapper(arg: ?*const anyopaque) i32 {
     return info.callback(info.arg);
 }
 
-pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque) callconv(.c) ?*tsk.Task {
+pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const u8) callconv(.c) ?*tsk.Task {
     const info = WrapperInfo{
         .callback = f,
         .arg = arg,
     };
-    const task = kernel.kthreadCreate(wrapper, &info) catch {
+    const task = kernel.kthreadCreate(wrapper, &info, name) catch {
         return null;
     };
     return task;

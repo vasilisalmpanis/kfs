@@ -6,6 +6,7 @@ const kthread = @import("./kthread.zig");
 const arch = @import("arch");
 const fs = @import("../fs/fs.zig");
 const krn = @import("../main.zig");
+const procfs =krn.fs.procfs;
 
 pub fn doFork() !u32 {
     var child: *tsk.Task = km.kmalloc(tsk.Task) orelse {
@@ -57,12 +58,14 @@ pub fn doFork() !u32 {
         tsk.current.gid,
         tsk.current.pgid,
         .PROCESS,
+        tsk.current.name[0..16]
     ) catch |err| {
         // TODO: understand when error comes from kmalloc allocation of files
         // or from resizing of fds/map inside files to do deinit
         krn.logger.ERROR("fork: failed to init child task: {any}", .{err});
         return errors.ENOMEM;
     };
+    try procfs.newProcess(child);
     return @intCast(child.pid);
 }
 

@@ -133,7 +133,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.fs.init();
 
     // Get PID1
-    _ = krn.kthreadCreate(&user_thread, null) catch null;
+    _ = krn.kthreadCreate(&user_thread, null, "init") catch null;
 
     // Devices
     drv.init();

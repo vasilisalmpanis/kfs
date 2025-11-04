@@ -104,7 +104,7 @@ pub fn init() void {
             return ;
         };
         krn.logger.WARN("Driver registered for tty", .{});
-        _ = krn.kthreadCreate(&tty_thread, null) catch null;
+        _ = krn.kthreadCreate(&tty_thread, null, "tty_thread") catch null;
         return ;
     }
     krn.logger.WARN("tty cannot be initialized", .{});
