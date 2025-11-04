@@ -39,7 +39,7 @@ pub fn doExecve(
         read += try file.ops.read(file, @ptrCast(&slice[read]), slice.len);
     }
 
-    krn.task.current.setName(filename); // TODO: make copy of filename and set name only if we will execute
+    krn.task.current.setName(path.dentry.name); // TODO: make copy of filename and set name only if we will execute
 
     if (krn.task.current.mm) |_mm| {
         _mm.releaseMappings();

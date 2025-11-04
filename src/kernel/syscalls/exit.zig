@@ -24,6 +24,7 @@ pub fn exit(error_code: i32) !u32 {
         _mm.releaseMappings();
     }
 
+    kernel.fs.procfs.deleteProcess(tsk.current);
     tsk.current.result = error_code;
     if (tsk.current.tree.parent) |p| {
         const parent = p.entry(tsk.Task, "tree");

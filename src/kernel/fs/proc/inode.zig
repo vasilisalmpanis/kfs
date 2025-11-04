@@ -7,6 +7,7 @@ const drv = @import("drivers");
 pub const ProcInode = struct {
     base: fs.Inode,
     buff: [50]u8,
+    task: ?*kernel.task.Task,
 
     pub fn new(sb: *fs.SuperBlock) !*fs.Inode {
         if (kernel.mm.kmalloc(ProcInode)) |inode| {
@@ -14,6 +15,7 @@ pub const ProcInode = struct {
                 .major = 0,
                 .minor = 0,
             };
+            inode.task = null;
             inode.base.setup(sb);
             inode.base.ops = &proc_inode_ops;
             inode.base.size = 50;
@@ -65,9 +67,58 @@ pub const ProcInode = struct {
         var new_dentry = try fs.DEntry.alloc(name, sb, new_inode);
         errdefer kernel.mm.kfree(new_dentry);
         parent.tree.addChild(&new_dentry.tree);
+        parent.ref.ref();
         cash_key.name = new_dentry.name;
         try fs.dcache.put(cash_key, new_dentry);
         return new_dentry;
+    }
+
+    fn rmdir(current: *fs.DEntry, parent: *fs.DEntry) !void {
+        const sb: *fs.SuperBlock = if (current.inode.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
+        if (current.tree.hasChildren())
+            return kernel.errors.PosixError.ENOTEMPTY;
+        if (current.ref.getValue() > 2)
+            return kernel.errors.PosixError.EBUSY;
+        const proc_inode = current.inode.getImpl(ProcInode, "base");
+
+        current.ref.unref();
+        const key = fs.DentryHash{
+            .sb = @intFromPtr(sb),
+            .ino = parent.inode.i_no,
+            .name = current.name
+        };
+        _ = fs.dcache.remove(key);
+        _ = sb.inode_map.remove(current.inode.i_no);
+
+        parent.ref.unref();
+        proc_inode.deinit();
+        current.release();
+        return ;
+    }
+
+    fn unlink(_dentry: *fs.DEntry) !void {
+        const sb = if (_dentry.inode.sb) |_s| _s else
+            return kernel.errors.PosixError.EINVAL;
+        if (_dentry.inode.mode.isDir())
+            return kernel.errors.PosixError.EISDIR;
+        const proc_inode = _dentry.inode.getImpl(ProcInode, "base");
+
+        if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
+            return kernel.errors.PosixError.EBUSY;
+        _dentry.ref.unref();
+        if (_dentry.tree.parent) |_p| {
+            const _parent = _p.entry(fs.DEntry, "tree");
+            const key = fs.DentryHash{
+                .sb = @intFromPtr(sb),
+                .ino = _parent.inode.i_no,
+                .name = _dentry.name
+            };
+            _ = fs.dcache.remove(key);
+            _ = sb.inode_map.remove(_dentry.inode.i_no);
+            _parent.ref.unref();
+        }
+        proc_inode.deinit();
+        _dentry.release();
     }
 
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
@@ -102,6 +153,10 @@ pub const ProcInode = struct {
         @memcpy(resulting_link.*[0..span.len], span);
         return ;
     }
+
+    fn deinit(self: *ProcInode) void {
+        kernel.mm.kfree(self);
+    }
 };
 
 const proc_inode_ops = fs.InodeOps {
@@ -109,5 +164,7 @@ const proc_inode_ops = fs.InodeOps {
     .mknod = null,
     .lookup = ProcInode.lookup,
     .mkdir = ProcInode.mkdir,
+    .rmdir = ProcInode.rmdir,
+    .unlink = ProcInode.unlink,
     .get_link = ProcInode.getLink,
 };
