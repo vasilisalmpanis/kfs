@@ -111,5 +111,6 @@ pub const InodeOps = struct {
     unlink: ?*const fn(dentry: *fs.DEntry) anyerror!void = null,
     lookup: *const fn (parent: *fs.DEntry, name: []const u8) anyerror!*fs.DEntry,
     mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
+    rmdir: ?*const fn (current: *fs.DEntry, parent: *fs.DEntry) anyerror!void = null,
     get_link: ?*const fn(base: *Inode, resulting_link: *[]u8) anyerror!void,
 };

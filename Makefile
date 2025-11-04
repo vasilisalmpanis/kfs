@@ -85,7 +85,7 @@ $(IMG): $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:=.o)) \
 		-d $(IMG_DIR) \
 		-m 5 -r 1 \
 		-t ext2 \
-		-b 1024 \
+		-b 8196 \
 		$(IMG) \
 		$(IMG_SIZE)
 
