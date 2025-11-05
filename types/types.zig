@@ -445,6 +445,7 @@ pub const kernel = struct {
                 data : u32= 0,
                 arg_start : u32= 0,
                 arg_end : u32= 0,
+                argc : u32= 0,
                 env_start : u32= 0,
                 env_end : u32= 0,
                 bss : u32= 0,
@@ -538,7 +539,7 @@ pub const kernel = struct {
 
         pub const Iterator = struct {
             curr : *kernel.tree.TreeNode,
-            head : *kernel.tree.TreeNode,
+            head : ?*kernel.tree.TreeNode,
             used : bool= false,
         };
 

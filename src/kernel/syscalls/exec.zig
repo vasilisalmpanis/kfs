@@ -44,6 +44,7 @@ pub fn doExecve(
     if (krn.task.current.mm) |_mm| {
         _mm.releaseMappings();
     }
+    krn.logger.INFO("doExecve: argv: {s}", .{argv[0]});
     try krn.userspace.prepareBinary(
         slice,
         argv,

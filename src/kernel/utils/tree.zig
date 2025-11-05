@@ -92,7 +92,7 @@ pub const TreeNode = struct {
 
 pub const Iterator = struct {
     curr: *TreeNode,
-    head: *TreeNode,
+    head: ?*TreeNode,
     used: bool = false,
 
     pub fn init(head: *TreeNode) Iterator {
@@ -103,19 +103,37 @@ pub const Iterator = struct {
     }
 
     pub fn next(self: *Iterator) ?*Iterator {
-        if (self.curr == self.head and !self.used) {
-            self.used = true;
+        if (self.head) |head| {
+            if (self.curr == head and !self.used) {
+                self.used = true;
+                return self;
+            }
+            if (self.curr.next == null)
+                return null;
+            self.curr = self.curr.next.?;
+            if (self.curr == head)
+                return null;
             return self;
         }
-        if (self.curr.next == null)
-            return null;
-        self.curr = self.curr.next.?;
-        if (self.curr == self.head)
-            return null;
-        return self;
+        return null;
     }
 
     pub fn isLast(self: *Iterator) bool {
-        return self.curr.next == self.head;
+        return self.head == null or self.curr.next == self.head.?;
+    }
+
+    pub fn reset(self: *Iterator, removed: *TreeNode) void {
+        if (self.head == null)
+            return;
+        if (self.head.? == removed) {
+            if (self.head.?.hasSiblings()) {
+                const new_head = self.head.?.next.?;
+                self.head = new_head;
+                self.curr = new_head;
+                self.used = false;
+            } else {
+                self.head = null;
+            }
+        }
     }
 };

@@ -147,11 +147,12 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
     var ptr_off: u32 = 0;
     
     // Set argc
+    krn.task.current.mm.?.argc = stack_ptr_addr;
     pointers[ptr_off] = argv.len;
     ptr_off += 1;
 
     // Set argv
-    krn.task.current.mm.?.arg_start = stack_ptr_addr;
+    krn.task.current.mm.?.arg_start = stack_ptr_addr + @sizeOf(usize);
     krn.task.current.mm.?.arg_end = stack_ptr_addr + argv_ptr_size;
     for (argv) |arg| {
         @memcpy(strings[str_off..str_off + arg.len], arg);
@@ -185,7 +186,6 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
         aux_ptr[ptr_off] = aux;
         ptr_off += 1;
     }
-    krn.task.current.mm.?.arg_start = stack_ptr_addr;
 }
 
 pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) !void {
@@ -288,6 +288,6 @@ pub fn goUserspace() void {
         \\
         ::
         [uc] "r" (krn.task.current.mm.?.code),
-        [us] "r" (krn.task.current.mm.?.arg_start),
+        [us] "r" (krn.task.current.mm.?.argc),
     );
 }

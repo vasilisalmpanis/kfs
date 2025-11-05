@@ -13,7 +13,12 @@ pub fn mkdir(parent: *fs.DEntry, name: []const u8) !*fs.DEntry {
     return try parent.inode.ops.mkdir(parent.inode, parent, name, mode);
 }
 
-pub fn createFile(parent: *fs.DEntry, name: []const u8, fops: *const fs.FileOps, mode: fs.UMode) !*fs.DEntry {
+pub fn createFile(
+    parent: *fs.DEntry,
+    name: []const u8,
+    fops: *const fs.FileOps,
+    mode: fs.UMode
+) !*fs.DEntry {
     _ = parent.inode.ops.lookup(parent, name) catch {
         const new_file = try parent.inode.ops.create(parent.inode, name, mode, parent);
         new_file.inode.fops = fops;
@@ -30,10 +35,12 @@ pub fn deleteRecursive(dentry: *fs.DEntry) !void {
             if (child.inode.mode.isDir()) {
                 try deleteRecursive(child);
                 if (child.inode.ops.rmdir) |callback| {
+                    it.reset(node.curr);
                     try callback(child, dentry);
                 }
             } else {
                 if (child.inode.ops.unlink) |callback| {
+                    it.reset(node.curr);
                     try callback(child);
                 }
             }
@@ -47,17 +54,51 @@ pub fn deleteRecursive(dentry: *fs.DEntry) !void {
     }
 }
 
+// Create file for new task (used in doFork())
+
+pub fn newProcess(task: *kernel.task.Task) !void {
+    var buff: [5]u8 = .{0} ** 5;
+    const slice = try std.fmt.bufPrint(buff[0..5], "{d}", .{task.pid});
+    const parent = try kernel.fs.procfs.mkdir(kernel.fs.procfs.root, slice);
+    const mode = kernel.fs.UMode{
+        .usr = 4,
+        .grp = 4,
+        .other = 4,
+        .type = fs.S_IFREG,
+    };
+
+    const stat_dentry = try createFile(parent,
+        "stat",
+        &stat_file_ops,
+        mode
+    );
+    const stat_inode: *inode.ProcInode = stat_dentry.inode.getImpl(inode.ProcInode, "base");
+    stat_inode.task = task;
+
+    const cmdline_dentry = try createFile(parent,
+        "cmdline",
+        &cmdline_file_ops,
+        mode
+    );
+    const cmdline_inode = cmdline_dentry.inode.getImpl(inode.ProcInode, "base");
+    cmdline_inode.task = task;
+}
+
+
 pub fn deleteProcess(task: *kernel.task.Task) void {
     var buff: [5]u8 = .{0} ** 5;
     const slice = std.fmt.bufPrint(buff[0..5], "{d}", .{task.pid}) catch { return; };
     const dentry = fs.procfs.root.inode.ops.lookup(fs.procfs.root, slice) catch {
         @panic("Not found? This shouldn't happen\n");
     };
+    kernel.logger.INFO("Removing /proc/{s}", .{dentry.name});
     _ = deleteRecursive(dentry) catch {};
 
 }
 
-fn stat_open(_: *kernel.fs.File, base: *kernel.fs.Inode) !void {
+// PROCFS FILE OPS
+
+fn open(_: *kernel.fs.File, base: *kernel.fs.Inode) !void {
     const proc_inode = base.getImpl(inode.ProcInode, "base");
     const task = proc_inode.task orelse {
         return kernel.errors.PosixError.EINVAL;
@@ -65,13 +106,19 @@ fn stat_open(_: *kernel.fs.File, base: *kernel.fs.Inode) !void {
     task.refcount.ref();
 }
 
-fn stat_close(file: *kernel.fs.File) void {
+fn close(file: *kernel.fs.File) void {
     const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
     const task = proc_inode.task orelse {
         @panic("Should not happen");
     };
     task.refcount.unref();
 }
+
+fn write(_: *kernel.fs.File, _: [*]const u8, _: u32) !u32 {
+    return kernel.errors.PosixError.ENOSYS;
+}
+
+// /proc/stat file
 
 fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
     const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
@@ -97,33 +144,56 @@ fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
     return to_read;
 }
 
-fn stat_write(_: *kernel.fs.File, _: [*]const u8, _: u32) !u32 {
-    return kernel.errors.PosixError.ENOSYS;
-}
 
-const file_ops = fs.FileOps{
-    .open = stat_open,
+const stat_file_ops = fs.FileOps{
+    .open = open,
     .read = stat_read,
-    .write = stat_write,
-    .close = stat_close,
+    .write = write,
+    .close = close,
 };
 
+// /proc/cmdline file
 
-pub fn newProcess(task: *kernel.task.Task) !void {
-    var buff: [5]u8 = .{0} ** 5;
-    const slice = try std.fmt.bufPrint(buff[0..5], "{d}", .{task.pid});
-    const parent = try kernel.fs.procfs.mkdir(kernel.fs.procfs.root, slice);
-    const mode = kernel.fs.UMode{
-        .usr = 4,
-        .grp = 4,
-        .other = 4,
-        .type = fs.S_IFREG,
+fn cmdline_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
+    const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
+    const task = proc_inode.task orelse {
+        @panic("Should not happen");
     };
-    const child = try createFile(parent,
-        "stat",
-        &file_ops,
-        mode
-    );
-    const proc_inode: *inode.ProcInode = child.inode.getImpl(inode.ProcInode, "base");
-    proc_inode.task = task;
+    const mm = task.mm orelse
+        return 0;
+    var args_pos: usize = 0;
+    var written: usize = 0;
+    const _args: ?[*:null]const ?[*:0]const u8 = @ptrFromInt(mm.arg_start);
+    if (_args) |args|  {
+        var idx: usize = 0;
+        while (args[idx]) |arg| {
+            const _arg: []const u8 = std.mem.span(arg);
+            kernel.logger.INFO("arg: {s}", .{_arg});
+            if (args_pos + _arg.len > file.pos) {
+                const arf_off: usize = file.pos - args_pos;
+                var to_write = args_pos + _arg.len - file.pos;
+                if (written + to_write > size)
+                    to_write = size - written;
+                @memcpy(buff[written..written + to_write], _arg[arf_off..arf_off + to_write]);
+                // args_pos += to_write;
+                written += to_write;
+                file.pos += to_write;
+                if (written >= size)
+                    return written;
+            }
+            args_pos += _arg.len;
+            idx += 1;
+        }
+        return written;
+    } else {
+        kernel.logger.INFO("args is null: addr {d}", .{mm.arg_start});
+        return 0;
+    }
 }
+
+const cmdline_file_ops = fs.FileOps{
+    .open = open,
+    .read = cmdline_read,
+    .write = write,
+    .close = close,
+};
