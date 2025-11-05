@@ -57,7 +57,8 @@ pub const DEntry = struct {
     pub fn new(parent: *DEntry, name: []const u8, ino: *fs.Inode) !*DEntry {
         parent.ref.ref();
         errdefer parent.ref.unref();
-        if (ino.sb == null) return kernel.errors.PosixError.EINVAL;
+        if (ino.sb == null)
+            return kernel.errors.PosixError.EINVAL;
         const new_dentry: *fs.DEntry = fs.DEntry.alloc(name, ino.sb.?, ino) catch {
             return kernel.errors.PosixError.ENOMEM;
         };

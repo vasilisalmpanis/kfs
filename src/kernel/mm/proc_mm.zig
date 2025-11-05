@@ -157,6 +157,7 @@ pub const MM = struct {
     data: u32 = 0,
     arg_start: u32 = 0,
     arg_end: u32 = 0,
+    argc: u32 = 0, // address
     env_start: u32 = 0,
     env_end: u32 = 0,
     bss: u32 = 0,
@@ -340,6 +341,11 @@ pub const MM = struct {
             _mmap.heap = self.heap;
             _mmap.brk_start = self.brk_start;
             _mmap.brk = self.brk;
+            _mmap.argc = self.argc;
+            _mmap.arg_start = self.arg_start;
+            _mmap.arg_end = self.arg_end;
+            _mmap.env_start = self.env_start;
+            _mmap.env_end = self.env_end;
         }
         return mmap;
     }
