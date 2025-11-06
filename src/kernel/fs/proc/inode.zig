@@ -125,8 +125,9 @@ pub const ProcInode = struct {
         const sb: *fs.SuperBlock = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         if (!base.mode.isDir())
             return error.NotDirectory;
-        if (!base.mode.canWrite(base.uid, base.gid))
-            return error.Access;
+
+        // We are the kernel we can have access to this directory
+        // we don't need to check. This should happen only for userspace
 
         // Lookup if file already exists.
         _ = base.ops.lookup(parent, name) catch {
