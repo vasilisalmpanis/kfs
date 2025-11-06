@@ -155,7 +155,7 @@ pub const MM = struct {
     stack_bottom: u32 = 0,  // Lower
     code: u32 = 0,
     data: u32 = 0,
-    arg_start: u32 = 0,
+    arg_start: u32 = 0, // Addres to begin of args strings
     arg_end: u32 = 0,
     argc: u32 = 0, // address
     env_start: u32 = 0,
@@ -371,6 +371,24 @@ pub const MM = struct {
             }
         }
         self.vmas = null;
+    }
+
+    pub inline fn isCurrentMM(self: *MM) bool {
+        return krn.task.current.mm.? == self;
+    }
+
+    pub fn accessTaskVM(self: *MM, addr: u32, len: u32) ![]u8 {
+        if (krn.mm.kmallocSlice(u8, len)) |res| {
+            const curr_vas = krn.task.current.mm.?.vas;
+            if (!self.isCurrentMM())
+                arch.vmm.switchToVAS(self.vas);
+            const src: [*]u8 = @ptrFromInt(addr);
+            @memcpy(res[0..len], src[0..len]);
+            if (!self.isCurrentMM())
+                arch.vmm.switchToVAS(curr_vas);
+            return res;
+        }
+        return krn.errors.PosixError.ENOMEM;
     }
 };
 

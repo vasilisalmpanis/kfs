@@ -32,6 +32,10 @@ pub extern var initial_page_dir: [1024]u32;
 pub const current_page_dir: [*]PageEntry = @ptrFromInt(0xFFFFF000);
 pub const first_page_table: [*]PageEntry = @ptrFromInt(0xFFC00000);
 
+pub inline fn switchToVAS(vas: u32) void {
+    asm volatile("mov %[pd], %cr3"::[pd] "r" (vas));
+}
+
 pub inline fn invalidatePage(page: usize) void {
     asm volatile ("invlpg (%eax)"
         :

@@ -24,7 +24,7 @@ fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     } else {
         gdt.tss.esp0 = to.stack_bottom + STACK_SIZE; // this needs fixing
     }
-    asm volatile("mov %[pd], %cr3"::[pd] "r" (to.mm.?.vas));
+    arch.vmm.switchToVAS(to.mm.?.vas);
     var access: u8 = 0;
     access |= 0x10; // S=1
     access |= 0x60; // DPL=3
