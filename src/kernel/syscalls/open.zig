@@ -25,6 +25,18 @@ pub fn do_open(
     target_path.stepInto(name) catch {
         if (flags & fs.file.O_CREAT != 0) {
             new_mode.type = kernel.fs.S_IFREG;
+            if (
+                !target_path.dentry.inode.mode.canExecute(
+                    target_path.dentry.inode.uid,
+                    target_path.dentry.inode.gid
+                )
+                or !target_path.dentry.inode.mode.canWrite(
+                    target_path.dentry.inode.uid,
+                    target_path.dentry.inode.gid
+                )
+            ) {
+                return errors.EACCES;
+            }
             const new_dentry = parent_inode.ops.create(
                 parent_inode,
                 name,
