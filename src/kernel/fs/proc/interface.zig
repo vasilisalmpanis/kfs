@@ -91,7 +91,6 @@ pub fn deleteProcess(task: *kernel.task.Task) void {
     const dentry = fs.procfs.root.inode.ops.lookup(fs.procfs.root, slice) catch {
         @panic("Not found? This shouldn't happen\n");
     };
-    kernel.logger.INFO("Removing /proc/{s}", .{dentry.name});
     _ = deleteRecursive(dentry) catch {};
 
 }
@@ -161,34 +160,32 @@ fn cmdline_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
     };
     const mm = task.mm orelse
         return 0;
-    var args_pos: usize = 0;
+    const args = try mm.accessTaskVM(mm.arg_start, mm.arg_end - mm.arg_start);
+    defer kernel.mm.kfree(args.ptr);
+
     var written: usize = 0;
-    const _args: ?[*:null]const ?[*:0]const u8 = @ptrFromInt(mm.arg_start);
-    if (_args) |args|  {
-        var idx: usize = 0;
-        while (args[idx]) |arg| {
-            const _arg: []const u8 = std.mem.span(arg);
-            kernel.logger.INFO("arg: {s}", .{_arg});
-            if (args_pos + _arg.len > file.pos) {
-                const arf_off: usize = file.pos - args_pos;
-                var to_write = args_pos + _arg.len - file.pos;
-                if (written + to_write > size)
-                    to_write = size - written;
-                @memcpy(buff[written..written + to_write], _arg[arf_off..arf_off + to_write]);
-                // args_pos += to_write;
-                written += to_write;
-                file.pos += to_write;
-                if (written >= size)
-                    return written;
-            }
-            args_pos += _arg.len;
-            idx += 1;
+    var args_off: usize = 0;
+    while (args_off < args.len) {
+        const arg_ptr: [*:0]const u8 = @ptrCast(&args.ptr[args_off]);
+        const arg: []const u8 = std.mem.span(arg_ptr);
+        if (args_off + arg.len > file.pos) {
+            const arg_pos = file.pos - args_off;
+            var to_write = args_off + arg.len - file.pos;
+            if (written + to_write > size)
+                to_write = size - written;
+            @memcpy(
+                buff[written..written + to_write],
+                arg[arg_pos..arg_pos + to_write]
+            );
+            written += to_write;
+            file.pos += to_write;
+            if (written >= size)
+                return written;
         }
-        return written;
-    } else {
-        kernel.logger.INFO("args is null: addr {d}", .{mm.arg_start});
-        return 0;
+        file.pos += 1;
+        args_off += arg.len + 1;
     }
+    return written;
 }
 
 const cmdline_file_ops = fs.FileOps{

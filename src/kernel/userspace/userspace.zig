@@ -152,8 +152,7 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
     ptr_off += 1;
 
     // Set argv
-    krn.task.current.mm.?.arg_start = stack_ptr_addr + @sizeOf(usize);
-    krn.task.current.mm.?.arg_end = stack_ptr_addr + argv_ptr_size;
+    krn.task.current.mm.?.arg_start = @intFromPtr(strings) + str_off;
     for (argv) |arg| {
         @memcpy(strings[str_off..str_off + arg.len], arg);
         strings[str_off + arg.len] = 0;
@@ -161,6 +160,7 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
         str_off += arg.len + 1;
         ptr_off += 1;
     }
+    krn.task.current.mm.?.arg_end = @intFromPtr(strings) + str_off;
     pointers[ptr_off] = 0;
     ptr_off += 1;
 
