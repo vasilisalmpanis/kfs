@@ -9,8 +9,8 @@ const inode = @import("inode.zig");
 
 pub const createFile = @import("interface.zig").createFile;
 pub const mkdir = @import("interface.zig").mkdir;
-pub const newProcess = @import("interface.zig").newProcess;
-pub const deleteProcess = @import("interface.zig").deleteProcess;
+pub const newProcess = @import("task_info.zig").newProcess;
+pub const deleteProcess = @import("task_info.zig").deleteProcess;
 pub var root: *fs.DEntry = undefined;
 
 pub fn init() void {
