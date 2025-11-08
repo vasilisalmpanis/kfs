@@ -60,6 +60,8 @@ pub fn do_umount(
         const mountpoint: *fs.Mount = path.mnt;
         mountpoint.remove(); // Removed from tree. Now we can free all the children.
         mountpoint.sb.ref.unref();
+        krn.mm.kfree(mountpoint.source.ptr);
+        krn.mm.kfree(mountpoint);
         return 0;
     } else  {
         krn.logger.INFO("{s}: not a mountpoint!", .{name});

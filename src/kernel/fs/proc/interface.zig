@@ -2,7 +2,6 @@ const inode = @import("inode.zig");
 const fs = @import("../fs.zig");
 const kernel = @import("../../main.zig");
 const std = @import("std");
-const process = @import("process.zig");
 
 pub fn mkdir(parent: *fs.DEntry, name: []const u8) !*fs.DEntry {
     const mode = kernel.fs.UMode{

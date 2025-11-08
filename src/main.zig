@@ -66,6 +66,12 @@ fn move_root() void {
             dbg.printf("Unknown filesystem type\n",.{});
     }
     if (root_mountpoint) |point| {
+        const devfs = krn.fs.path.resolve("/dev") catch {
+            @panic("Failed moving dev\n");
+        };
+        const sysfs = krn.fs.path.resolve("/sys") catch {
+            @panic("Failed moving dev\n");
+        };
         krn.task.initial_task.fs.root = krn.fs.path.Path.init(
             point,
             point.sb.root,
@@ -74,8 +80,13 @@ fn move_root() void {
             point,
             point.sb.root,
         );
+        defer sysfs.dentry.ref.unref();
+        defer devfs.dentry.ref.unref();
+        devfs.mnt.remove();
+        sysfs.mnt.remove();
         krn.fs.mount.mountpoints.?.remove();
         krn.fs.mount.mountpoints = point;
+        point.tree.parent = null;
     }
 }
 

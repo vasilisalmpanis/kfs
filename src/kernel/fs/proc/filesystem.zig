@@ -12,6 +12,7 @@ pub const mkdir = @import("interface.zig").mkdir;
 pub const newProcess = @import("task_info.zig").newProcess;
 pub const deleteProcess = @import("task_info.zig").deleteProcess;
 pub var root: *fs.DEntry = undefined;
+const fs_info = @import("fs_info.zig");
 
 pub fn init() void {
     if (kernel.mm.kmalloc(ProcFileSystem)) |_fs| {
@@ -20,6 +21,9 @@ pub fn init() void {
             kernel.logger.ERROR("Procfs super block creation failed\n", .{});
         };
     }
+    fs_info.init() catch {
+        @panic("fs_info init is broken\n");
+    };
     kernel.logger.INFO("proc fs initialized\n", .{});
 }
 
