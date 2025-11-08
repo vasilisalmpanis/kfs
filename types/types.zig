@@ -720,7 +720,9 @@ pub const kernel = struct {
             sb : *kernel.fs.SuperBlock,
             root : *kernel.fs.DEntry,
             tree : kernel.tree.TreeNode,
+            list : kernel.list.ListHead,
             count : kernel.task.RefCount,
+            source : []const u8,
         };
 
         pub const mount = struct {

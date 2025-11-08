@@ -19,7 +19,9 @@ pub const Mount = struct {
     sb: *fs.SuperBlock,
     root: *fs.DEntry,
     tree: tree.TreeNode,
+    list: krn.list.ListHead,
     count: krn.task.RefCount,
+    source: []const u8,
 
     pub fn mount(
         source: []const u8, // device
@@ -77,9 +79,14 @@ pub const Mount = struct {
             errdefer curr.release();
         }
         if (krn.mm.kmalloc(Mount)) |mnt| {
+            errdefer krn.mm.kfree(mnt);
+            mnt.source = krn.mm.dupSlice(u8, source) orelse {
+                return krn.errors.PosixError.ENOMEM;
+            };
             mnt.root = curr.dentry;
             mnt.sb = sb;
             mnt.tree.setup();
+            mnt.list.setup();
             mnt_lock.lock();
             mnt.count = krn.task.RefCount.init();
             mnt.count.ref();
@@ -89,11 +96,21 @@ pub const Mount = struct {
             } else {
                 curr.mnt.count.ref();
                 curr.mnt.tree.addChild(&mnt.tree);
+                curr.mnt.list.add(&mnt.list);
             }
             return mnt;
         } else {
             sb.ref.unref(); // later maybe something else
             return error.OutOfMemory;
+        }
+    }
+
+    pub fn getPath(self: *Mount) fs.path.Path {
+        if (self.tree.parent) |node| {
+            const parent_mnt = node.entry(Mount, "tree");
+            return fs.path.Path.init(parent_mnt, self.root);
+        } else {
+            return fs.path.Path.init(self, self.sb.root);
         }
     }
 
@@ -105,6 +122,7 @@ pub const Mount = struct {
         }
         const parent = self.tree.parent;
         self.tree.del();
+        self.list.del();
         if (parent) |_parent| {
             const parent_mount = _parent.entry(Mount, "tree");
             parent_mount.count.unref();
