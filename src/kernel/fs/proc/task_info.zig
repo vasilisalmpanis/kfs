@@ -79,7 +79,6 @@ fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
             std.mem.span(@as([*:0]u8, @ptrCast(&task.name))),
         }
     );
-    kernel.logger.INFO("slice {s} len {d}\n", .{string, string.len});
     var to_read: u32 = size;
     if (file.pos >= string.len)
         return 0;
