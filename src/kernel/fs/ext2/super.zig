@@ -87,6 +87,7 @@ pub const Ext2Super = struct {
         if (kernel.mm.kmalloc(Ext2Super)) |sb| {
             errdefer kernel.mm.kfree(sb);
             sb.base.dev_file = file;
+            sb.base.magic = EXT2_MAGIC;
             sb.bgdt.len = 0;
             sb.base.inode_map = std.AutoHashMap(u32, *fs.Inode).init(kernel.mm.kernel_allocator.allocator());
             errdefer sb.base.inode_map.deinit();
@@ -96,7 +97,7 @@ pub const Ext2Super = struct {
             _ = try file.ops.read(file, &super_buffer, 512);
             _ = try file.ops.read(file, @ptrCast(&super_buffer[512]), 512);
             const ext2_super_data: *Ext2SuperData = @ptrCast(&super_buffer);
-            if (ext2_super_data.s_magic != EXT2_MAGIC) {
+            if (ext2_super_data.s_magic != sb.base.magic) {
                 return kernel.errors.PosixError.EINVAL;
             }
             sb.data = ext2_super_data.*;
@@ -393,8 +394,44 @@ pub const Ext2Super = struct {
         }
         return kernel.errors.PosixError.EINVAL;
     }
+
+    pub inline fn freeBlocksCount(self: *Ext2Super) u32 {
+        var count: u32 = 0;
+        for (self.bgdt) |bgd| {
+            count += bgd.bg_free_blocks_count;
+        }
+        return count;
+    }
+
+    pub inline fn freeInodesCount(self: *Ext2Super) u32 {
+        var count: u32 = 0;
+        for (self.bgdt) |bgd| {
+            count += bgd.bg_free_inodes_count;
+        }
+        return count;
+    }
+
+    pub fn statfs(base: *fs.SuperBlock) !fs.Statfs {
+        const ext2_sb = base.getImpl(Ext2Super, "base");
+        const bfree: u32 = ext2_sb.freeBlocksCount();
+        const ffree: u32 = ext2_sb.freeInodesCount();
+        return fs.Statfs{
+            .type = base.magic,
+            .bsize = base.block_size,
+            .blocks = ext2_sb.data.s_blocks_count,
+            .bfree = bfree,
+            .bavail = bfree - ext2_sb.data.s_r_blocks_count,
+            .files = ext2_sb.data.s_inodes_count,
+            .ffree = ffree,
+            .namelen = 255,
+            .flags = 0,
+            .frsize = 0,
+            .fsid = 0,
+        };
+    }
 };
 
 const ext2_super_ops = fs.SuperOps{
     .alloc_inode = Ext2Super.allocInode,
+    .statfs = Ext2Super.statfs,
 };

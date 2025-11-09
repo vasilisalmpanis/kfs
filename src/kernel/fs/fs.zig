@@ -1,6 +1,7 @@
 pub const kernel = @import("../main.zig");
 // SuperBlock
 pub const SuperBlock = @import("./super.zig").SuperBlock;
+pub const Statfs = @import("./super.zig").Statfs;
 pub const SuperOps = @import("super.zig").SuperOps;
 // Mount
 pub const Mount = @import("mount.zig").Mount;

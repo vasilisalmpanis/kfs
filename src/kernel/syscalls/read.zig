@@ -34,3 +34,27 @@ pub fn pread(fd: u32, buf: [*]u8, size: u32, offset: u32) !u32 {
     }
     return errors.PosixError.EBADF;
 }
+
+pub const IoVec = extern struct {
+    base: [*]u8,
+    len: usize,
+};
+
+pub fn readv(fd: u32, iov: [*]IoVec, iovcnt: u32) !u32 {
+    var ret: u32 = 0;
+    for (0..iovcnt) |idx| {
+        const curr = iov[idx];
+        if (curr.len > 0)
+            ret += try read(
+                fd,
+                @intFromPtr(curr.base),
+                curr.len
+            );
+    }
+    return ret;
+}
+
+pub fn preadv(fd: u32, iov: [*]IoVec, iovcnt: u32, offset: u32) !u32 {
+    _ = offset;
+    return try readv(fd, iov, iovcnt);
+}

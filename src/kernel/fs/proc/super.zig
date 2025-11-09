@@ -5,6 +5,8 @@ const std = @import("std");
 const device = @import("drivers").device;
 const filesystem = @import("filesystem.zig");
 
+const PROCFS_MAGIC = 0x9fa0;
+
 pub const ProcSuper = struct {
     base: fs.SuperBlock,
 
@@ -35,6 +37,7 @@ pub const ProcSuper = struct {
         dntry.inode = root_inode;
         filesystem.root = dntry;
         proc_super.base.root = dntry;
+        proc_super.base.magic = PROCFS_MAGIC;
         proc_super.base.list.setup();
         proc_super.base.ref = kernel.task.RefCount.init();
         proc_super.base.fs = _fs;
@@ -58,5 +61,6 @@ pub var proc_super = ProcSuper{
         .ops = &proc_super_ops,
         .ref = kernel.task.RefCount.init(),
         .root = undefined,
+        .magic = PROCFS_MAGIC,
     },
 };

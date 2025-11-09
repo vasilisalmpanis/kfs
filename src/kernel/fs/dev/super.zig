@@ -4,7 +4,7 @@ const ExampleInode = @import("inode.zig").DevInode;
 const std = @import("std");
 const device = @import("drivers").device;
 
-
+const DEVFS_MAGIC = 0x1373;
 
 pub const DevSuper = struct {
     base: fs.SuperBlock,
@@ -17,6 +17,7 @@ pub const DevSuper = struct {
         if (kernel.mm.kmalloc(DevSuper)) |sb| {
             sb.base.inode_map = std.AutoHashMap(u32, *fs.Inode).init(kernel.mm.kernel_allocator.allocator());
             sb.base.block_size = 0;
+            sb.base.magic = DEVFS_MAGIC;
             sb.base.dev_file = null;
             const root_inode = ExampleInode.new(&sb.base) catch |err| {
                 kernel.mm.kfree(sb);
