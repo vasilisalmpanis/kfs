@@ -110,11 +110,4 @@ const modules_ops = kernel.fs.FileOps{
 
 pub fn init() !void {
     api.init();
-    const mode = kernel.fs.UMode{
-        .usr = 4,
-        .grp = 4,
-        .other = 4,
-        .type = kernel.fs.S_IFREG,
-    };
-    _ = try kernel.fs.procfs.createFile(kernel.fs.procfs.root, "modules", &modules_ops, mode);
 }

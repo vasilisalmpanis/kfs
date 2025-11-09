@@ -2,18 +2,23 @@ const fs = @import("../fs.zig");
 const kernel = @import("../../main.zig");
 const interface = @import("interface.zig");
 const std = @import("std");
+const generic_ops = @import("generic_ops.zig");
 
 const mounts_ops = kernel.fs.FileOps{
     .open = mounts_open,
-    .read = mounts_read,
-    .write = mounts_write,
-    .close = mounts_close,
+    .read = generic_ops.generic_read,
+    .write = generic_ops.generic_write,
+    .close = generic_ops.generic_close,
 };
 
-const Slice = struct {
-    ptr: *anyopaque,
-    len: u32,
+const filesystems_ops = kernel.fs.FileOps{
+    .open = filesystems_open,
+    .read = generic_ops.generic_read,
+    .write = generic_ops.generic_write,
+    .close = generic_ops.generic_close,
 };
+
+// Mounts
 
 //proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
 fn mounts_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
@@ -57,41 +62,49 @@ fn mounts_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
             const entry_slice = try std.fmt.bufPrint(content[offset..], "{s} on {s} type {s} (rw)\n", .{mnt.source, abs_path, mnt.sb.fs.name});
             offset += entry_slice.len;
         }
-        const slice = kernel.mm.kmalloc(Slice) orelse {
-            return kernel.errors.PosixError.ENOMEM;
-        };
-        slice.ptr = content.ptr;
-        slice.len = content.len;
-        base.data = slice;
+        try generic_ops.assignSlice(base, content);
     }
 }
 
-fn mounts_close(base: *kernel.fs.File) void {
-    if (base.data == null)
+// filesystems
+
+fn filesystems_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
+    fs.filesystem.filesystem_mutex.lock();
+    defer fs.filesystem.filesystem_mutex.unlock();
+
+    const fs_head = fs.filesystem.fs_list orelse {
         return ;
-    const slice: *Slice = @ptrCast(@alignCast(base.data));
-    kernel.mm.kfree(slice.ptr);
-    kernel.mm.kfree(base.data.?);
-}
+    };
 
-fn mounts_write(_: *kernel.fs.File, _: [*]const u8, _: u32) anyerror!u32 {
-    return kernel.errors.PosixError.ENOSYS;
-}
-
-fn mounts_read(base: *kernel.fs.File, buf: [*]u8, size: u32) anyerror!u32 {
-    if (base.data == null)
-        return 0;
-
-    const content: *[]const u8 = @ptrCast(@alignCast(base.data));
-    var to_read: u32 = size;
-    if (base.pos >= content.len)
-        return 0;
-    if (base.pos + to_read > content.len) {
-        to_read = content.len - base.pos;
+    var it = fs_head.list.iterator();
+    var size: u32 = 0;
+    while (it.next()) |node| {
+        const filesystem = node.curr.entry(fs.FileSystem, "list");
+        size += std.fmt.count("{s}  {s}\n",
+            .{
+                if (filesystem.virtual) "nodev" else "     ",
+                    filesystem.name,
+            }
+        );
     }
-    @memcpy(buf[0..to_read], content.*[base.pos..base.pos + to_read]);
-    base.pos += to_read;
-    return to_read;
+    const content = kernel.mm.kmallocSlice(u8, size) orelse {
+        return kernel.errors.PosixError.ENOMEM;
+    };
+    errdefer kernel.mm.kfree(content.ptr);
+    it = fs_head.list.iterator();
+    var offset: u32 = 0;
+    while (it.next()) |node| {
+        const filesystem = node.curr.entry(fs.FileSystem, "list");
+
+        const entry_slice = try std.fmt.bufPrint(content[offset..], "{s}  {s}\n",
+            .{
+                if (filesystem.virtual) "nodev" else "     ",
+                    filesystem.name,
+            }
+        );
+        offset += entry_slice.len;
+    }
+    try generic_ops.assignSlice(base, content);
 }
 
 pub fn init() !void {
@@ -105,6 +118,12 @@ pub fn init() !void {
         fs.procfs.root,
         "mounts",
         &mounts_ops,
+        mode
+    );
+    _ = try interface.createFile(
+        fs.procfs.root,
+        "filesystems",
+        &filesystems_ops,
         mode
     );
 }
