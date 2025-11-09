@@ -41,7 +41,7 @@ fn mounts_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
             if (abs_path.len == 0) {
                 abs_path = "/";
             }
-            const entry_size = std.fmt.count("{s} on {s} type {s} (rw)\n", .{mnt.source, abs_path, mnt.sb.fs.name});
+            const entry_size = std.fmt.count("{s} {s} {s} rw 0 0\n", .{mnt.source, abs_path, mnt.sb.fs.name});
             size += entry_size;
         }
         const content = kernel.mm.kmallocSlice(u8, size) orelse {
@@ -59,7 +59,7 @@ fn mounts_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
             if (abs_path.len == 0) {
                 abs_path = "/";
             }
-            const entry_slice = try std.fmt.bufPrint(content[offset..], "{s} on {s} type {s} (rw)\n", .{mnt.source, abs_path, mnt.sb.fs.name});
+            const entry_slice = try std.fmt.bufPrint(content[offset..], "{s} {s} {s} rw 0 0\n", .{mnt.source, abs_path, mnt.sb.fs.name});
             offset += entry_slice.len;
         }
         try generic_ops.assignSlice(base, content);

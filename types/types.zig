@@ -710,10 +710,26 @@ pub const kernel = struct {
             block_size : u32,
             inode_map : std.hash_map.HashMap(u32, *kernel.fs.Inode, std.hash_map.AutoContext(u32), 80),
             dev_file : ?*kernel.fs.file.File= null,
+            magic : u32,
+        };
+
+        pub const Statfs = extern struct {
+            type : u32,
+            bsize : u32,
+            blocks : u32= 0,
+            bfree : u32= 0,
+            bavail : u32= 0,
+            files : u32= 0,
+            ffree : u32= 0,
+            fsid : u32,
+            namelen : u64,
+            frsize : u32= 0,
+            flags : u32= 0,
         };
 
         pub const SuperOps = struct {
             alloc_inode : *const fn(*kernel.fs.SuperBlock) anyerror!*kernel.fs.Inode,
+            statfs : ?*const fn(*kernel.fs.SuperBlock) anyerror!kernel.fs.Statfs= null,
         };
 
         pub const Mount = struct {
