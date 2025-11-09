@@ -12,7 +12,10 @@ pub const mkdir = @import("interface.zig").mkdir;
 pub const newProcess = @import("task_info.zig").newProcess;
 pub const deleteProcess = @import("task_info.zig").deleteProcess;
 pub var root: *fs.DEntry = undefined;
+
+// files
 const fs_info = @import("fs_info.zig");
+const modules_info = @import("modules_info.zig");
 
 pub fn init() void {
     if (kernel.mm.kmalloc(ProcFileSystem)) |_fs| {
@@ -23,6 +26,9 @@ pub fn init() void {
     }
     fs_info.init() catch {
         @panic("fs_info init is broken\n");
+    };
+    modules_info.init() catch {
+        @panic("modules_info init is broken\n");
     };
     kernel.logger.INFO("proc fs initialized\n", .{});
 }
