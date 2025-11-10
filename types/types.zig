@@ -795,6 +795,7 @@ pub const kernel = struct {
             mkdir : *const fn(*kernel.fs.Inode, *kernel.fs.DEntry, []const u8, kernel.fs.UMode) anyerror!*kernel.fs.DEntry,
             rmdir : ?*const fn(*kernel.fs.DEntry, *kernel.fs.DEntry) anyerror!void= null,
             get_link : ?*const fn(*kernel.fs.Inode, *[]u8) anyerror!void,
+            chmod : ?*const fn(*kernel.fs.Inode, kernel.fs.UMode) anyerror!void= null,
         };
 
 
@@ -914,6 +915,7 @@ pub const kernel = struct {
         pub const FSInfo = struct {
             root : kernel.fs.path.Path,
             pwd : kernel.fs.path.Path,
+            umask : u32= 18,
         };
 
     };

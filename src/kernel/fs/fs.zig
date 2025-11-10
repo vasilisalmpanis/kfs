@@ -297,15 +297,58 @@ pub const UMode = packed struct {
     pub fn toU16(self: *const UMode) u16 {
         return @bitCast(self.*);
     }
-};
 
+    pub fn setSUID(self: *UMode) void {
+        self.type |= S_ISUID;
+    }
+
+    pub fn unSetSUID(self: *UMode) void {
+        const mask: u7 = S_ISUID;
+        self.type |= ~mask;
+    }
+
+    pub fn setSGID(self: *UMode) void {
+        self.type |= S_ISGID;
+    }
+
+    pub fn unSetSGID(self: *UMode) void {
+        const mask: u7 = S_ISGID;
+        self.type |= ~mask;
+    }
+
+    pub fn isSUID(self: *const UMode) bool {
+        return (self.type & S_ISUID) != 0;
+    }
+
+    pub fn isGUID(self: *const UMode) bool {
+        return (self.type & S_ISGID) != 0;
+    }
+
+    pub fn copyPerms(self: *UMode, other: UMode) void {
+        self.grp = other.grp;
+        self.usr = other.usr;
+        self.other = other.other;
+        if (other.isSUID() and !self.isSUID()) {
+            self.setSUID();
+        } else if (!other.isSUID() and self.isSUID()) {
+            self.unSetSUID();
+        }
+        if (other.isGUID() and !self.isGUID()) {
+            self.setSGID();
+        } else if (!other.isGUID() and self.isGUID()) {
+            self.unSetSGID();
+        }
+    }
+};
 
 pub const FSInfo = struct {
     root: path.Path,
     pwd: path.Path,
+    umask: u32 = 0o22,
 
     pub fn alloc() !*FSInfo {
         if (kernel.mm.kmalloc(FSInfo)) |_fs| {
+            _fs.umask = 0o22;
             return _fs;
         }
         return error.OutOfMemory;
