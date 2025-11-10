@@ -102,6 +102,12 @@ pub const Inode = struct {
             return true;
         return false;
     }
+
+    pub fn chmod(base: *Inode, mode: fs.UMode) !void {
+        const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
+        base.mode.copyPerms(mode);
+        base.mtime = curr_seconds;
+    }
 };
 
 // TODO: define the Inode Ops struct with documentation.
@@ -113,4 +119,5 @@ pub const InodeOps = struct {
     mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
     rmdir: ?*const fn (current: *fs.DEntry, parent: *fs.DEntry) anyerror!void = null,
     get_link: ?*const fn(base: *Inode, resulting_link: *[]u8) anyerror!void,
+    chmod: ?*const fn(base: *Inode, mode: fs.UMode) anyerror!void = Inode.chmod,
 };

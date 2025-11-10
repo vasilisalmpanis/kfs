@@ -565,6 +565,15 @@ pub const Ext2Inode = struct {
             blk_idx += 1;
         }
     }
+
+    pub fn chmod(base: *fs.Inode, mode: fs.UMode) !void {
+        const ext2_inode = base.getImpl(Ext2Inode, "base");
+        kernel.logger.DEBUG("chmod {any} => {any}", .{base.mode, mode});
+        try base.chmod(mode);
+        ext2_inode.data.i_mtime = base.mtime;
+        ext2_inode.data.i_mode.copyPerms(base.mode);
+        try ext2_inode.iput();
+    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -573,4 +582,5 @@ const ext2_inode_ops = fs.InodeOps {
     .lookup = Ext2Inode.lookup,
     .mkdir = Ext2Inode.mkdir,
     .get_link = Ext2Inode.getLink,
+    .chmod = Ext2Inode.chmod,
 };
