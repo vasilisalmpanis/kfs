@@ -61,5 +61,5 @@ pub fn preadv(fd: u32, iov: [*]IoVec, iovcnt: u32, offset: u32) !u32 {
         defer file.pos = old_pos;
         return try readv(fd, iov, iovcnt);
     }
-    return errors.PosixError.EBADF;
+    return errors.EBADF;
 }
