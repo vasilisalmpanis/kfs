@@ -221,7 +221,9 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
             page_start,
             aligned_size,
             prot,
-            krn.mm.MAP.anonymous()
+            krn.mm.MAP.anonymous(),
+            null,
+            0
         ) catch {return ;};
         const section_ptr: [*]u8 = @ptrFromInt(p_hdr.p_vaddr);
         if (p_hdr.p_filesz > 0) {
@@ -242,7 +244,9 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
         stack_bottom,
         stack_size,
         prot,
-        krn.mm.MAP.anonymous()
+        krn.mm.MAP.anonymous(),
+        null,
+        0
     ) catch {
         @panic("Unable to go to userspace\n");
     };
