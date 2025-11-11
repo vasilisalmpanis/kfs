@@ -59,6 +59,8 @@ pub const VMA = struct {
     mm: ?*MM,
     flags: MAP,
     prot: u32,
+    file: ?*krn.fs.File,
+    offset: u32,
     list: lst.ListHead,
 
     pub fn setup(self: *VMA, start: u32, end: u32, owner: ?*MM, flags: MAP, prot: u32) !void {
@@ -68,6 +70,8 @@ pub const VMA = struct {
         self.flags = flags;
         self.prot = prot;
         self.list.setup();
+        self.file = null;
+        self.offset = 0;
         try self.allocFullVMA();
     }
 
@@ -108,13 +112,43 @@ pub const VMA = struct {
         return try allocatePages(self, self.start, self.end);
     }
 
-    pub fn new(addr: u32, end: u32, owner: *MM, flags: MAP, prot: u32) ?*VMA {
+    pub fn new(
+        addr: u32,
+        end: u32,
+        owner: *MM,
+        flags: MAP,
+        prot: u32,
+        file: ?*krn.fs.File,
+        offset: u32,
+    ) ?*VMA {
         const vma: ?*VMA = mm.kmalloc(VMA);
         if (vma) |_vma| {
             _vma.setup(addr, end, owner, flags, prot) catch {
                 krn.mm.kfree(_vma);
                 return null;
             };
+            _vma.file = file;
+            _vma.offset = offset;
+            if (file) |_file| {
+                _file.ref.ref();
+                defer _file.ref.unref();
+                const old_pos = _file.pos;
+                _file.pos = offset;
+                const buffer: [*]u8 = @ptrFromInt(_vma.start);
+
+                var read: u32 = 0;
+                while (read < _vma.end - _vma.start) {
+                    const ret = _file.ops.read(_file, @ptrCast(&buffer[read]), _vma.end - _vma.start - read) catch {
+                        mm.virt_memory_manager.releaseArea(_vma.start, _vma.end, _vma.flags.TYPE);
+                        krn.mm.kfree(_vma);
+                        return null;
+                    };
+                    if (ret == 0)
+                        break;
+                    read += ret;
+                }
+                _file.pos = old_pos;
+            }
         }
         return vma;
     }
@@ -139,6 +173,8 @@ pub const VMA = struct {
         if (self.flags.ANONYMOUS != flags.ANONYMOUS)
             return false;
         if (self.flags.TYPE != flags.TYPE)
+            return false;
+        if (self.file != null)
             return false;
         if (addr + length == self.start)
             return true;
@@ -191,55 +227,74 @@ pub const MM = struct {
         addr: u32,
         length: u32,
         prot: u32,
-        flags: MAP
+        flags: MAP,
+        file: ?*krn.fs.File,
+        offset: u32,
     ) !?*VMA {
         var new_vma: ?*VMA = null;
-        if (curr) |c| {
-            const vma: *VMA = c.entry(VMA, "list");
-            const prev = c.prev.?.entry(VMA, "list");
-            const next = c.next.?.entry(VMA, "list");
-            if (
-                prev.start < vma.start
-                and prev.mergable(addr, length, prot, flags)
-            ) {
-                try prev.allocatePages(prev.end, prev.end + length);
-                prev.end += length;
-                new_vma = prev;
+        if (file == null) {
+            if (curr) |c| {
+                const vma: *VMA = c.entry(VMA, "list");
+                const prev = c.prev.?.entry(VMA, "list");
+                const next = c.next.?.entry(VMA, "list");
                 if (
+                    prev.start < vma.start
+                    and prev.mergable(addr, length, prot, flags)
+                ) {
+                    try prev.allocatePages(prev.end, prev.end + length);
+                    prev.end += length;
+                    new_vma = prev;
+                    if (
+                        next.start > vma.start
+                        and next.mergable(addr, length, prot, flags)
+                    ) {
+                        new_vma.?.end = next.end;
+                        next.list.del();
+                        krn.mm.kfree(next);
+                    }
+                    return new_vma;
+                } else if (
                     next.start > vma.start
                     and next.mergable(addr, length, prot, flags)
                 ) {
-                    new_vma.?.end = next.end;
-                    next.list.del();
-                    krn.mm.kfree(next);
+                    try next.allocatePages(addr, next.start);
+                    next.start = addr;
+                    return next;
+                } else if (vma.mergable(addr, length, prot, flags)) {
+                    if (vma.end == addr) {
+                        try vma.allocatePages(vma.end, vma.end + length);
+                        vma.end += length;
+                    } else {
+                        try vma.allocatePages(addr, vma.start);
+                        vma.start = addr;
+                    }
+                    return vma;
                 }
-                return new_vma;
-            } else if (
-                next.start > vma.start
-                and next.mergable(addr, length, prot, flags)
-            ) {
-                try next.allocatePages(addr, next.start);
-                next.start = addr;
-                return next;
-            } else if (vma.mergable(addr, length, prot, flags)) {
-                if (vma.end == addr) {
-                    try vma.allocatePages(vma.end, vma.end + length);
-                    vma.end += length;
-                } else {
-                    try vma.allocatePages(addr, vma.start);
-                    vma.start = addr;
-                }
-                return vma;
             }
         }
-        new_vma = VMA.new(addr, addr + length, self, flags, prot);
+        new_vma = VMA.new(
+            addr,
+            addr + length,
+            self, flags,
+            prot,
+            file,
+            offset
+        );
         if (new_vma == null)
             return error.OutOfMemory;
         if (curr) |c| c.addTail(&new_vma.?.list);
         return new_vma;
     }
 
-    pub fn mmap_area(self: *MM, addr: u32, length: u32, prot: u32, flags: MAP) !u32
+    pub fn mmap_area(
+        self: *MM,
+        addr: u32,
+        length: u32,
+        prot: u32,
+        flags: MAP,
+        file: ?*krn.fs.File,
+        offset: u32,
+    ) !u32
     {
         // 1. check if this addr is taken.
         //  - if free or map fixed, create mappings or replace mappings
@@ -260,7 +315,9 @@ pub const MM = struct {
                         hint,
                         length,
                         prot,
-                        flags
+                        flags,
+                        file,
+                        offset
                     ) catch |err| switch (err) {
                         error.OutOfMemory => return errors.ENOMEM
                     };
@@ -290,7 +347,9 @@ pub const MM = struct {
             hint,
             length,
             prot,
-            flags
+            flags,
+            file,
+            offset
         ) catch |err| switch (err) {
             error.OutOfMemory => return errors.ENOMEM
         };

@@ -435,6 +435,8 @@ pub const kernel = struct {
                 mm : ?*kernel.mm.proc_mm.MM,
                 flags : kernel.mm.proc_mm.MAP,
                 prot : u32,
+                file : ?*kernel.fs.file.File,
+                offset : u32,
                 list : kernel.list.ListHead,
             };
 
