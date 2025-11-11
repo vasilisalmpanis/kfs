@@ -240,6 +240,7 @@ pub const SyscallTable = brk: {
         .SYS_set_thread_area            = @ptrCast(&@import("thread.zig").set_thread_area),
         .SYS_set_tid_address            = @ptrCast(&@import("thread.zig").set_tid_address),
         .SYS_statx                      = @ptrCast(&@import("statx.zig").statx),
+        .SYS_clock_gettime64            = @ptrCast(&@import("clock.zig").clock_gettime64),
     });
 };
 
