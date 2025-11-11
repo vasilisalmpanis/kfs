@@ -568,7 +568,6 @@ pub const Ext2Inode = struct {
 
     pub fn chmod(base: *fs.Inode, mode: fs.UMode) !void {
         const ext2_inode = base.getImpl(Ext2Inode, "base");
-        kernel.logger.DEBUG("chmod {any} => {any}", .{base.mode, mode});
         try base.chmod(mode);
         ext2_inode.data.i_mtime = base.mtime;
         ext2_inode.data.i_mode.copyPerms(base.mode);
