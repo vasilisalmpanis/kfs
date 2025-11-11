@@ -383,6 +383,7 @@ pub const VMM = struct {
 
     pub fn releaseArea(self: *VMM, start: u32, end: u32, area_type: krn.mm.MAP_TYPE) void {
         if (area_type == .SHARED) {
+            // FIXME: accounting for shared mappings
             krn.logger.INFO("We should somehow refcount pages and only free when the last user frees\n", .{});
             return;
         }
