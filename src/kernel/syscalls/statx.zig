@@ -55,8 +55,10 @@ const Statx = extern struct{
 	stx_atomic_write_unit_min: u32,	    // Min atomic write unit in bytes
 	stx_atomic_write_unit_max: u32,	    // Max atomic write unit in bytes
 	stx_atomic_write_segments_max: u32, // Max atomic write segment count
-	__spare1: u32,
-	__spare3: [9]u64,   	            // Spare space for future expansion
+        stx_dio_read_offset_align: u32,
+        stx_atomic_write_unix_max_opt: u32,
+	__spare1: [1]u32,
+	__spare3: [8]u64,   	            // Spare space for future expansion
 };
 
 pub fn do_statx(inode: *fs.Inode, buf: *Statx) !u32 {
@@ -112,8 +114,10 @@ pub fn do_statx(inode: *fs.Inode, buf: *Statx) !u32 {
     buf.stx_atomic_write_unit_max = 0;
     buf.stx_atomic_write_segments_max = 0;
 
-    buf.__spare1 = 0;
-    buf.__spare3 = [_]u64{0} ** 9;
+    buf.stx_dio_read_offset_align = 0;
+    buf.stx_atomic_write_unix_max_opt = 0;
+    buf.__spare1[0] = 0;
+    buf.__spare3 = [_]u64{0} ** 8;
     return 0;
 }
 
@@ -139,9 +143,7 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
     var from_path = krn.task.current.fs.pwd;
     if (path_s[0] != '/') {
         if (dirfd == AT_FDCWD) {
-            const cwd = krn.task.current.fs.pwd.clone();
-            defer cwd.release();
-            return try do_statx(cwd.dentry.inode, statxbuf.?);
+
         } else if (krn.task.current.files.fds.get(@intCast(dirfd))) |file| {
             if (!file.inode.mode.isDir())
                 return errors.ENOTDIR;
