@@ -1182,6 +1182,7 @@ pub const drivers = struct {
             updateTime : *const fn(*drivers.cmos.CMOS) void,
             incSec : *const fn(*drivers.cmos.CMOS) void,
             toUnixSeconds : *const fn(*drivers.cmos.CMOS) u64,
+            setTime : *const fn(*drivers.cmos.CMOS, u64) void,
         };
 
     };
