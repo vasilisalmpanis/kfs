@@ -100,7 +100,7 @@ pub const SysInode = struct {
     }
 
     fn unlink(_dentry: *fs.DEntry) !void {
-        const sb = if (_dentry.inode.sb) |_s| _s else
+        _ = if (_dentry.inode.sb) |_s| _s else
             return kernel.errors.PosixError.EINVAL;
         const sys_inode = _dentry.inode.getImpl(SysInode, "base");
 
@@ -110,17 +110,6 @@ pub const SysInode = struct {
         if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
         _dentry.ref.unref();
-        if (_dentry.tree.parent) |_p| {
-            const _parent = _p.entry(fs.DEntry, "tree");
-            const key = fs.DentryHash{
-                .sb = @intFromPtr(sb),
-                .ino = _parent.inode.i_no,
-                .name = _dentry.name
-            };
-            _ = fs.dcache.remove(key);
-            _ = sb.inode_map.remove(_dentry.inode.i_no);
-            _parent.ref.unref();
-        }
         sys_inode.deinit();
         _dentry.release();
     }
