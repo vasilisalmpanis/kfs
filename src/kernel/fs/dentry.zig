@@ -32,6 +32,7 @@ pub const DEntry = struct {
 
     pub fn drop(self: *Refcount) void {
         const dentry: *DEntry = list.containerOf(DEntry, @intFromPtr(self), "ref");
+        kernel.logger.WARN("Dropping {s}\n", .{dentry.name});
         if (dentry.tree.parent) |_p| {
             const _parent = _p.entry(fs.DEntry, "tree");
             const key = fs.DentryHash{

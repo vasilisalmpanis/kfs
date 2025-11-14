@@ -10,8 +10,9 @@ pub fn dup2(old_fd: u32, new_fd: u32) !u32 {
         if (old_fd == new_fd) {
             return new_fd;
         }
-        if (krn.task.current.files.fds.get(new_fd)) |old_file| {
-            old_file.ops.close(old_file);
+        if (krn.task.current.files.fds.get(new_fd) != null) {
+            file.ref.ref();
+            _ = krn.task.current.files.releaseFD(new_fd);
         }
         try krn.task.current.files.setFD(new_fd, file);
         return new_fd;
