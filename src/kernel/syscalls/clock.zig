@@ -22,11 +22,22 @@ pub fn clock_gettime64(clock_id: u32, _tp: ?*kernel_timespec) !u32 {
     const  tp = _tp orelse {
         return errors.EFAULT;
     };
-    if (clock_id == CLOCK_REALTIME) {
-        const curr_seconds: u64 = krn.cmos.toUnixSeconds(krn.cmos);
-        tp.tv_sec = @intCast(curr_seconds);
-        tp.tv_nsec = 0;
-        return 0;
+    switch (clock_id) {
+        CLOCK_REALTIME => {
+            const curr_seconds: u64 = krn.cmos.toUnixSeconds(krn.cmos);
+            tp.tv_sec = @intCast(curr_seconds);
+            tp.tv_nsec = 0;
+            return 0;
+        },
+        CLOCK_MONOTONIC => {
+            const secs = krn.getSecondsFromStart();
+            tp.tv_sec = @intCast(secs);
+            tp.tv_nsec = 0;
+            return 0;
+        },
+        else => {
+            @panic("TODO\n");
+        },
     }
     return errors.EINVAL;
 }
