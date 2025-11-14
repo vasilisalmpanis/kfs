@@ -484,6 +484,7 @@ fn echo(self: *Shell, args: [][]const u8) void {
     _ = std.posix.write(fd, args[0]) catch |err| {
         self.print("Error: {t}\n", .{err});
     };
+    std.posix.close(fd);
 }
 
 fn kshell(self: *Shell, args: [][]const u8) void {
