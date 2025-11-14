@@ -74,7 +74,7 @@ pub const ProcInode = struct {
     }
 
     fn rmdir(current: *fs.DEntry, parent: *fs.DEntry) !void {
-        const sb: *fs.SuperBlock = if (current.inode.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
+        _ = if (current.inode.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         if (current.tree.hasChildren())
             return kernel.errors.PosixError.ENOTEMPTY;
         if (current.ref.getValue() > 2)
@@ -82,13 +82,6 @@ pub const ProcInode = struct {
         const proc_inode = current.inode.getImpl(ProcInode, "base");
 
         current.ref.unref();
-        const key = fs.DentryHash{
-            .sb = @intFromPtr(sb),
-            .ino = parent.inode.i_no,
-            .name = current.name
-        };
-        _ = fs.dcache.remove(key);
-        _ = sb.inode_map.remove(current.inode.i_no);
 
         parent.ref.unref();
         proc_inode.deinit();
@@ -97,7 +90,7 @@ pub const ProcInode = struct {
     }
 
     fn unlink(_dentry: *fs.DEntry) !void {
-        const sb = if (_dentry.inode.sb) |_s| _s else
+        _ = if (_dentry.inode.sb) |_s| _s else
             return kernel.errors.PosixError.EINVAL;
         if (_dentry.inode.mode.isDir())
             return kernel.errors.PosixError.EISDIR;
@@ -106,17 +99,6 @@ pub const ProcInode = struct {
         if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
         _dentry.ref.unref();
-        if (_dentry.tree.parent) |_p| {
-            const _parent = _p.entry(fs.DEntry, "tree");
-            const key = fs.DentryHash{
-                .sb = @intFromPtr(sb),
-                .ino = _parent.inode.i_no,
-                .name = _dentry.name
-            };
-            _ = fs.dcache.remove(key);
-            _ = sb.inode_map.remove(_dentry.inode.i_no);
-            _parent.ref.unref();
-        }
         proc_inode.deinit();
         _dentry.release();
     }

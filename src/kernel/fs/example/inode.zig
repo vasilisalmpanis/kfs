@@ -43,7 +43,7 @@ pub const ExampleInode = struct {
         if (fs.dcache.get(key)) |entry| {
             return entry;
         }
-        return error.InodeNotFound;
+        return kernel.errors.PosixError.ENOENT;
     }
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
@@ -75,9 +75,10 @@ pub const ExampleInode = struct {
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
         const sb: *fs.SuperBlock = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         if (!base.mode.isDir())
-            return error.NotDirectory;
+            return kernel.errors.PosixError.ENOTDIR;
         if (!base.mode.canWrite(base.uid, base.gid))
-            return error.Access;
+            return kernel.errors.PosixError.EACCES;
+
 
         // Lookup if file already exists.
         _ = base.ops.lookup(parent, name) catch {
@@ -92,7 +93,7 @@ pub const ExampleInode = struct {
             dent.ref.ref();
             return dent;
         };
-        return error.Exists;
+        return kernel.errors.PosixError.EEXIST;
     }
 
     pub fn getLink(base: *fs.Inode, resulting_link: *[]u8) !void {
