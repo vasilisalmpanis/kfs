@@ -133,9 +133,9 @@ pub fn hPageFault(regs: *Regs) void {
             regs.err_code & 0x8,
             regs.err_code & 0x10,
         });
+    dbg.traceStackTrace(20);
     while (true) {}
     regs.dump();
-    dbg.traceStackTrace(20);
     @panic("hPageFault");
 }
 

@@ -13,11 +13,14 @@ pub fn mkdir(
         return errors.ENOENT;
     }
     const user_path = std.mem.span(path_name.?);
+    krn.logger.INFO("mkdir {s}\n", .{user_path});
     const stripped_path = fs.path.remove_trailing_slashes(user_path);
-    var dir_name: []const u8 = undefined;
-    const parent = fs.path.dir_resolve(stripped_path, &dir_name) catch {
-        return errors.ENOTDIR;
+    var dir_name: []const u8 = "";
+    const parent = fs.path.dir_resolve(stripped_path, &dir_name) catch |err| {
+        return err;
     };
+    if (dir_name.len == 0)
+        return errors.EEXIST;
     if (
         !parent.dentry.inode.mode.canExecute(
             parent.dentry.inode.uid,
@@ -37,8 +40,8 @@ pub fn mkdir(
         parent.dentry,
         dir_name,
         dir_mode
-    ) catch {
-        return errors.ENOENT;
+    ) catch |err| {
+        return err;
     };
     return 0;
 }

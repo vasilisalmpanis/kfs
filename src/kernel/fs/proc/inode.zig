@@ -73,7 +73,7 @@ pub const ProcInode = struct {
         return new_dentry;
     }
 
-    fn rmdir(current: *fs.DEntry, parent: *fs.DEntry) !void {
+    fn rmdir(current: *fs.DEntry, _: *fs.DEntry) !void {
         _ = if (current.inode.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         if (current.tree.hasChildren())
             return kernel.errors.PosixError.ENOTEMPTY;
@@ -83,7 +83,6 @@ pub const ProcInode = struct {
 
         current.ref.unref();
 
-        parent.ref.unref();
         proc_inode.deinit();
         current.release();
         return ;
