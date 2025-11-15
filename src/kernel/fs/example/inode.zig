@@ -98,14 +98,14 @@ pub const ExampleInode = struct {
 
     pub fn getLink(base: *fs.Inode, resulting_link: *[]u8) !void {
         const example_inode = base.getImpl(ExampleInode, "base");
-        const span = std.mem.span(@as([*:0]u8, @ptrCast(&example_inode.buff)));
+        const span: []const u8 = std.mem.span(@as([*:0]u8, @ptrCast(&example_inode.buff)));
         if (span.len > resulting_link.len) {
             return kernel.errors.PosixError.EINVAL;
         }
         @memcpy(resulting_link.*[0..span.len], span);
+        resulting_link.len = span.len;
         return ;
     }
-
 
     fn symlink(parent: *fs.DEntry, name: []const u8, target: []const u8) !void {
         const new_inode = try ExampleInode.new(parent.sb);
@@ -116,8 +116,9 @@ pub const ExampleInode = struct {
             fs.UMode.link()
         );
         const example_inode = new_inode.getImpl(ExampleInode, "base");
-        if (target.len > example_inode.buff.len)
+        if (target.len + 1 > example_inode.buff.len)
             return kernel.errors.PosixError.ENAMETOOLONG;
+        @memset(example_inode.buff[0..example_inode.buff.len], 0);
         @memcpy(example_inode.buff[0..target.len], target);
         var dent = try parent.new(name, new_inode);
         dent.ref.ref();
