@@ -38,9 +38,7 @@ pub const Driver = struct {
             _ = try d.inode.ops.create(
                 d.inode,
                 self.name,
-                kern.fs.UMode{
-                    .usr = 0o6,
-                },
+                kern.fs.UMode.regular(),
                 d
             );
         }

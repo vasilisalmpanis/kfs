@@ -30,6 +30,8 @@ pub fn brk(addr: u32) !u32 {
             .TYPE = .PRIVATE,
             .ANONYMOUS = true,
         },
+        null,
+        0
     );
     // TODO: fix brk cuz its broken
     krn.task.current.mm.?.brk = new_brk;

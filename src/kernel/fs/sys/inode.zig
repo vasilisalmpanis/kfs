@@ -63,6 +63,7 @@ pub const SysInode = struct {
                 mode
             );
             new_inode.mode.type |= kernel.fs.S_IFDIR;
+            new_inode.links = 2;
             errdefer kernel.mm.kfree(new_inode);
             var new_dentry = try fs.DEntry.alloc(_name, sb, new_inode);
             errdefer kernel.mm.kfree(new_dentry);
@@ -94,13 +95,15 @@ pub const SysInode = struct {
             );
             var dent = try parent.new(name, new_inode);
             dent.ref.ref();
+            if (mode.isDir())
+                base.links += 1;
             return dent;
         };
         return error.Exists;
     }
 
     fn unlink(_dentry: *fs.DEntry) !void {
-        const sb = if (_dentry.inode.sb) |_s| _s else
+        _ = if (_dentry.inode.sb) |_s| _s else
             return kernel.errors.PosixError.EINVAL;
         const sys_inode = _dentry.inode.getImpl(SysInode, "base");
 
@@ -110,23 +113,16 @@ pub const SysInode = struct {
         if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
         _dentry.ref.unref();
-        if (_dentry.tree.parent) |_p| {
-            const _parent = _p.entry(fs.DEntry, "tree");
-            const key = fs.DentryHash{
-                .sb = @intFromPtr(sb),
-                .ino = _parent.inode.i_no,
-                .name = _dentry.name
-            };
-            _ = fs.dcache.remove(key);
-            _ = sb.inode_map.remove(_dentry.inode.i_no);
-            _parent.ref.unref();
-        }
         sys_inode.deinit();
         _dentry.release();
     }
 
     fn deinit(self: *SysInode) void {
-        kernel.mm.kfree(self);
+        if (self.base.links == 1) {
+            kernel.mm.kfree(self);
+        } else {
+            self.base.links -= 1;
+        }
     }
 };
 

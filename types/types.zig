@@ -435,6 +435,8 @@ pub const kernel = struct {
                 mm : ?*kernel.mm.proc_mm.MM,
                 flags : kernel.mm.proc_mm.MAP,
                 prot : u32,
+                file : ?*kernel.fs.file.File,
+                offset : u32,
                 list : kernel.list.ListHead,
             };
 
@@ -783,6 +785,7 @@ pub const kernel = struct {
             dev_id : drivers.device.dev_t,
             data : extern union { dev: ?*drivers.device.Device, sock: ?*kernel.socket.Socket },
             size : u32= 0,
+            links : u32= 1,
             ops : *const kernel.fs.InodeOps,
             fops : *const kernel.fs.file.FileOps,
         };
@@ -795,6 +798,9 @@ pub const kernel = struct {
             mkdir : *const fn(*kernel.fs.Inode, *kernel.fs.DEntry, []const u8, kernel.fs.UMode) anyerror!*kernel.fs.DEntry,
             rmdir : ?*const fn(*kernel.fs.DEntry, *kernel.fs.DEntry) anyerror!void= null,
             get_link : ?*const fn(*kernel.fs.Inode, *[]u8) anyerror!void,
+            chmod : ?*const fn(*kernel.fs.Inode, kernel.fs.UMode) anyerror!void= null,
+            symlink : ?*const fn(*kernel.fs.DEntry, []const u8, []const u8) anyerror!void= null,
+            link : ?*const fn(*kernel.fs.DEntry, []const u8, kernel.fs.path.Path) anyerror!void= null,
         };
 
 
@@ -914,6 +920,7 @@ pub const kernel = struct {
         pub const FSInfo = struct {
             root : kernel.fs.path.Path,
             pwd : kernel.fs.path.Path,
+            umask : u32= 18,
         };
 
     };
@@ -1178,6 +1185,7 @@ pub const drivers = struct {
             updateTime : *const fn(*drivers.cmos.CMOS) void,
             incSec : *const fn(*drivers.cmos.CMOS) void,
             toUnixSeconds : *const fn(*drivers.cmos.CMOS) u64,
+            setTime : *const fn(*drivers.cmos.CMOS, u64) void,
         };
 
     };

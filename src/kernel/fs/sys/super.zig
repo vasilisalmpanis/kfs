@@ -23,13 +23,7 @@ pub const SysSuper = struct {
                 kernel.mm.kfree(sb);
                 return err;
             };
-            root_inode.mode = fs.UMode{
-                // This should come from mount.
-                .type   = fs.S_IFDIR,
-                .usr    = 0o7,
-                .grp    = 0o5,
-                .other  = 0o5,
-            };
+            root_inode.mode = fs.UMode.directory();
             sb.base.inode_map.put(root_inode.i_no, root_inode) catch |err| {
                 kernel.mm.kfree(root_inode);
                 kernel.mm.kfree(sb);

@@ -8,12 +8,7 @@ pub fn newProcess(task: *kernel.task.Task) !void {
     var buff: [5]u8 = .{0} ** 5;
     const slice = try std.fmt.bufPrint(buff[0..5], "{d}", .{task.pid});
     const parent = try kernel.fs.procfs.mkdir(kernel.fs.procfs.root, slice);
-    const mode = kernel.fs.UMode{
-        .usr = 4,
-        .grp = 4,
-        .other = 4,
-        .type = kernel.fs.S_IFREG,
-    };
+    const mode = kernel.fs.UMode.regular();
 
     const stat_dentry = try interface.createFile(parent,
         "stat",

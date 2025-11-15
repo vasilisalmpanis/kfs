@@ -27,6 +27,7 @@ pub fn mmap2(
     fd: i32,
     off: u32,
 ) !u32 {
+    var file: ?*krn.fs.File = null;
     krn.logger.DEBUG(\\mmap2
         \\  addr:  0x{x:0>8}
         \\  size:  {d:<10}
@@ -46,8 +47,33 @@ pub fn mmap2(
             flags.TYPE, flags.ANONYMOUS, flags.FIXED,
             flags.STACK, flags.GROWSDOWN, flags.EXECUTABLE
     });
+
     if (prot & ~(mm.PROT_EXEC | mm.PROT_READ | mm.PROT_WRITE | mm.PROT_NONE) > 0)
         return errors.EINVAL;
+    if (off % krn.mm.PAGE_SIZE != 0)
+        return errors.EINVAL;
+
+    if (!flags.ANONYMOUS and fd >= 0) {
+        if (krn.task.current.files.fds.get(@intCast(fd))) |_file| {
+            if (!_file.inode.mode.isReg())
+                return errors.EACCES;
+            if (!_file.mode.canRead(_file.inode.uid, _file.inode.gid))
+                return errors.EACCES;
+            if (
+                flags.TYPE == .SHARED and
+                prot & mm.PROT_WRITE != 0 and
+                _file.mode.canWrite(_file.inode.uid, _file.inode.gid)
+            )
+                return errors.EACCES;
+            if (off > _file.inode.size)
+                return errors.EACCES;
+
+            file = _file;
+        } else {
+            return errors.EBADF;
+        }
+    }
+
     // addr specifies the wanted virtual address (suggestion)
     // length is the size of the mapping
     const len: u32 = arch.pageAlign(length, false);
@@ -66,7 +92,14 @@ pub fn mmap2(
         hint = krn.task.current.mm.?.heap;
     }
     // TODO: not adding READ and WRITE flags but implement mprotect
-    return try krn.task.current.mm.?.mmap_area(hint, len, prot | mm.PROT_WRITE | mm.PROT_READ, flags);
+    return try krn.task.current.mm.?.mmap_area(
+        hint,
+        len,
+        prot | mm.PROT_WRITE | mm.PROT_READ,
+        flags,
+        file,
+        off
+    );
 }
 
 pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
