@@ -4,12 +4,7 @@ const kernel = @import("../../main.zig");
 const std = @import("std");
 
 pub fn mkdir(parent: *fs.DEntry, name: []const u8) !*fs.DEntry {
-    const mode = kernel.fs.UMode{
-        .usr = 5,
-        .grp = 5,
-        .other = 5,
-        .type = fs.S_IFDIR,
-    };
+    const mode = kernel.fs.UMode.directory();
     return try parent.inode.ops.mkdir(parent.inode, parent, name, mode);
 }
 

@@ -108,12 +108,7 @@ fn filesystems_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
 }
 
 pub fn init() !void {
-    const mode = kernel.fs.UMode{
-        .usr = 4,
-        .grp = 4,
-        .other = 4,
-        .type = kernel.fs.S_IFREG,
-    };
+    const mode = kernel.fs.UMode.regular();
     _ = try interface.createFile(
         fs.procfs.root,
         "mounts",
