@@ -105,6 +105,23 @@ pub const ExampleInode = struct {
         @memcpy(resulting_link.*[0..span.len], span);
         return ;
     }
+
+
+    fn symlink(parent: *fs.DEntry, name: []const u8, target: []const u8) !void {
+        const new_inode = try ExampleInode.new(parent.sb);
+        errdefer kernel.mm.kfree(new_inode);
+        new_inode.setCreds(
+            kernel.task.current.uid,
+            kernel.task.current.gid,
+            fs.UMode.link()
+        );
+        const example_inode = new_inode.getImpl(ExampleInode, "base");
+        if (target.len > example_inode.buff.len)
+            return kernel.errors.PosixError.ENAMETOOLONG;
+        @memcpy(example_inode.buff[0..target.len], target);
+        var dent = try parent.new(name, new_inode);
+        dent.ref.ref();
+    }
 };
 
 const example_inode_ops = fs.InodeOps {
@@ -113,4 +130,5 @@ const example_inode_ops = fs.InodeOps {
     .lookup = ExampleInode.lookup,
     .mkdir = ExampleInode.mkdir,
     .get_link = ExampleInode.getLink,
+    .symlink = ExampleInode.symlink,
 };
