@@ -13,13 +13,12 @@ pub fn lseek(fd: u32, offset: u32, whence: u32) !u32 {
             return try _lseek(file, offset, whence);
         }
         var new_pos = offset;
-        krn.logger.INFO("file descriptor {d}\n", .{fd});
         switch (whence) {
             SEEK_CUR => new_pos = file.pos +| offset,
             SEEK_END => new_pos = file.inode.size +| offset,
             else => {}
         }
-        if (new_pos >= file.inode.size) {
+        if (new_pos > file.inode.size) {
             return errors.PosixError.EINVAL;
         }
         file.pos = new_pos;
@@ -32,5 +31,5 @@ pub fn llseek(fd: u32, offset_high: u32, offset_low: u32, result: *u64, whence: 
     _ = offset_high;
     const res = try lseek(fd, offset_low, whence);
     result.* = @intCast(res);
-    return res;
+    return 0;
 }
