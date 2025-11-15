@@ -63,6 +63,7 @@ pub const DevInode = struct {
                 mode
             );
             new_inode.mode.type |= kernel.fs.S_IFDIR;
+            new_inode.links = 2;
             errdefer kernel.mm.kfree(new_inode);
             var new_dentry = try fs.DEntry.alloc(_name, sb, new_inode);
             errdefer kernel.mm.kfree(new_dentry);
@@ -114,6 +115,8 @@ pub const DevInode = struct {
             );
             var dent = try parent.new(name, new_inode);
             dent.ref.ref();
+            if (mode.isDir())
+                base.links += 1;
             return dent;
         };
         return error.Exists;
@@ -135,7 +138,11 @@ pub const DevInode = struct {
     }
 
     fn deinit(self: *DevInode) void {
-        kernel.mm.kfree(self);
+        if (self.base.links == 1) {
+            kernel.mm.kfree(self);
+        } else {
+            self.base.links -= 1;
+        }
     }
 };
 

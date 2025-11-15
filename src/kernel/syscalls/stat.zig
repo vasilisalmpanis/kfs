@@ -62,7 +62,7 @@ pub fn do_oldstat(inode: *fs.Inode, buf: *OldStat) !void {
         buf.st_dev = @intCast(dev);
     }
     buf.st_ino = @intCast(inode.i_no);
-    buf.st_nlink = 0; // No hard links yet.
+    buf.st_nlink = @intCast(inode.links);
     const mode: u16 = @bitCast(inode.mode);
     buf.st_mode = @intCast(mode);
     buf.st_uid = @intCast(inode.uid);
@@ -151,7 +151,7 @@ pub fn do_stat(inode: *fs.Inode, buf: *StatLinux) !void {
     const mode: u16 = @bitCast(inode.mode);
     buf.mode = @intCast(mode);
 
-    buf.nlink = 0; // No hard links yet.
+    buf.nlink = @intCast(inode.links);
     buf.uid = @intCast(inode.uid);
     buf.gid = @intCast(inode.gid);
     const dev: u16 = @bitCast(inode.dev_id);
@@ -186,7 +186,7 @@ pub fn do_stat64(inode: *fs.Inode, buf: *Stat64) !void {
     const mode: u16 = @bitCast(inode.mode);
     buf.st_mode = @intCast(mode);
 
-    buf.st_nlink = 0; // No hard links yet.
+    buf.st_nlink = @intCast(inode.links);
     buf.st_uid = @intCast(inode.uid);
     buf.st_gid = @intCast(inode.gid);
     const dev: u16 = @bitCast(inode.dev_id);

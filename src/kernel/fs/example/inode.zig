@@ -62,6 +62,7 @@ pub const ExampleInode = struct {
             kernel.task.current.gid,
             mode
         );
+        new_inode.links = 2;
         errdefer kernel.mm.kfree(new_inode);
         var new_dentry = try fs.DEntry.alloc(name, sb, new_inode);
         errdefer kernel.mm.kfree(new_dentry);
@@ -91,6 +92,8 @@ pub const ExampleInode = struct {
             );
             var dent = try parent.new(name, new_inode);
             dent.ref.ref();
+            if (mode.isDir())
+                base.links += 1;
             return dent;
         };
         return kernel.errors.PosixError.EEXIST;
@@ -123,6 +126,20 @@ pub const ExampleInode = struct {
         var dent = try parent.new(name, new_inode);
         dent.ref.ref();
     }
+
+    fn link(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) !void {
+        target.dentry.inode.links += 1;
+        var dent = try parent.new(name, target.dentry.inode);
+        dent.ref.ref();
+    }
+
+    fn deinit(self: *ExampleInode) void {
+        if (self.base.links == 1) {
+            kernel.mm.kfree(self);
+        } else {
+            self.base.links -= 1;
+        }
+    }
 };
 
 const example_inode_ops = fs.InodeOps {
@@ -132,4 +149,5 @@ const example_inode_ops = fs.InodeOps {
     .mkdir = ExampleInode.mkdir,
     .get_link = ExampleInode.getLink,
     .symlink = ExampleInode.symlink,
+    .link = ExampleInode.link,
 };

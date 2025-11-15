@@ -785,6 +785,7 @@ pub const kernel = struct {
             dev_id : drivers.device.dev_t,
             data : extern union { dev: ?*drivers.device.Device, sock: ?*kernel.socket.Socket },
             size : u32= 0,
+            links : u32= 1,
             ops : *const kernel.fs.InodeOps,
             fops : *const kernel.fs.file.FileOps,
         };
@@ -799,6 +800,7 @@ pub const kernel = struct {
             get_link : ?*const fn(*kernel.fs.Inode, *[]u8) anyerror!void,
             chmod : ?*const fn(*kernel.fs.Inode, kernel.fs.UMode) anyerror!void= null,
             symlink : ?*const fn(*kernel.fs.DEntry, []const u8, []const u8) anyerror!void= null,
+            link : ?*const fn(*kernel.fs.DEntry, []const u8, kernel.fs.path.Path) anyerror!void= null,
         };
 
 

@@ -24,6 +24,7 @@ pub const Inode = struct {
         sock: ?*Socket,
     },
     size: u32 = 0,
+    links: u32 = 1,
     ops: *const InodeOps,
     fops: *const fs.FileOps,
 
@@ -44,6 +45,7 @@ pub const Inode = struct {
         self.atime = 0;
         self.ctime = 0;
         self.mtime = 0;
+        self.links = 1;
         self.dev_id = drv.device.dev_t {
             .minor = 0,
             .major = 0,
@@ -121,4 +123,5 @@ pub const InodeOps = struct {
     get_link: ?*const fn(base: *Inode, resulting_link: *[]u8) anyerror!void,
     chmod: ?*const fn(base: *Inode, mode: fs.UMode) anyerror!void = Inode.chmod,
     symlink: ?*const fn(parent: *fs.DEntry, name: []const u8, target: []const u8) anyerror!void = null,
+    link: ?*const fn(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) anyerror!void = null,
 };
