@@ -761,19 +761,11 @@ fn ata_probe(device: *driver.storage.StorageDevice) !void {
     try part.parsePartitionTable(drive);
     try driver.bdev.addBdev(
         &device.dev,
-        kernel.fs.UMode{
-            .usr = 0o6,
-            .grp = 0o6,
-            .other = 0
-        }
+        kernel.fs.UMode.blockdev()
     );
     for (drive.partitions.items, 0..) |item, idx| {
         try driver.bdev.addDevFile(
-            kernel.fs.UMode{
-                .usr = 0o6,
-                .grp = 0o6,
-                .other = 0
-            },
+            kernel.fs.UMode.blockdev(),
             try part.allocPartName(device.dev.name, idx + 1),
             &device.dev
         );

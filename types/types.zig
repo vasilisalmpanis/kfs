@@ -798,6 +798,7 @@ pub const kernel = struct {
             rmdir : ?*const fn(*kernel.fs.DEntry, *kernel.fs.DEntry) anyerror!void= null,
             get_link : ?*const fn(*kernel.fs.Inode, *[]u8) anyerror!void,
             chmod : ?*const fn(*kernel.fs.Inode, kernel.fs.UMode) anyerror!void= null,
+            symlink : ?*const fn(*kernel.fs.DEntry, []const u8, []const u8) anyerror!void= null,
         };
 
 
