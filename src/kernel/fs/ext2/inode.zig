@@ -573,6 +573,30 @@ pub const Ext2Inode = struct {
         ext2_inode.data.i_mode.copyPerms(base.mode);
         try ext2_inode.iput();
     }
+
+
+    fn symlink(parent: *fs.DEntry, name: []const u8, target: []const u8) !void {
+        const new_link =  try parent.inode.ops.create(
+            parent.inode,
+            name,
+            fs.UMode.link(),
+            parent
+        );
+        const ext2_inode = new_link.inode.getImpl(Ext2Inode, "base");
+        if (target.len >= 60) {
+            const pbn = try ext2_inode.allocBlock();
+            const ext2_super = parent.sb.getImpl(ext2_sb.Ext2Super, "base");
+            const res = try ext2_super.writeBuff(pbn, target.ptr, target.len);
+            if (res != target.len) {
+                return kernel.errors.PosixError.EIO;
+            }
+        } else {
+            const target_buf: [*]u8 = @ptrCast(&ext2_inode.data.i_block);
+            @memset(target_buf[0..60], 0);
+            @memcpy(target_buf[0..target.len], target);
+        }
+        try ext2_inode.iput();
+    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -582,4 +606,5 @@ const ext2_inode_ops = fs.InodeOps {
     .mkdir = Ext2Inode.mkdir,
     .get_link = Ext2Inode.getLink,
     .chmod = Ext2Inode.chmod,
+    .symlink = Ext2Inode.symlink,
 };
