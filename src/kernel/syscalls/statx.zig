@@ -67,7 +67,7 @@ pub fn do_statx(inode: *fs.Inode, buf: *Statx) !u32 {
     buf.stx_mask = 0;
     buf.stx_blksize = sb.block_size;
     buf.stx_attributes = 0;
-    buf.stx_nlink = 0;
+    buf.stx_nlink = inode.links;
     buf.stx_uid = inode.uid;
     buf.stx_gid = inode.gid;
     buf.stx_mode = inode.mode.toU16();

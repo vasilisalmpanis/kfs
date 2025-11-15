@@ -237,6 +237,7 @@ pub const Ext2Inode = struct {
         try new_inode.insertDirent(new_inode.base.i_no, ".", mode);
         try new_inode.insertDirent(base.i_no, "..", base.mode);
         new_inode.data.i_links_count = 2;
+        new_inode.base.links = 2;
         new_inode.data.i_size = base.sb.?.block_size;
         new_inode.base.size = new_inode.data.i_size;
         try new_inode.iput();
@@ -357,7 +358,10 @@ pub const Ext2Inode = struct {
                     name,
                     mode
                 );
-                parent_inode.data.i_links_count += 1;
+                if (mode.isDir()) {
+                    parent_inode.data.i_links_count += 1;
+                    parent_inode.base.links += 1;
+                }
                 parent_inode.data.i_mtime = curr_seconds;
                 parent_inode.base.mtime = curr_seconds;
                 _ = try parent_inode.iput();
