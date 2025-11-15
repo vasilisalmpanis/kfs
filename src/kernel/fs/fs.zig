@@ -339,6 +339,81 @@ pub const UMode = packed struct {
             self.unSetSGID();
         }
     }
+
+    pub fn applyUmask(self: *UMode, umask: u32) void {
+        const usr_mask: u3 = @intCast((umask >> 6) & 0o7);
+        const grp_mask: u3 = @intCast((umask >> 3) & 0o7);
+        const oth_mask: u3 = @intCast((umask >> 0) & 0o7);
+        self.usr &= ~usr_mask;
+        self.grp &= ~grp_mask;
+        self.other &= ~oth_mask;
+    }
+
+    pub fn link() UMode {
+        return UMode{
+            .grp = 0o7,
+            .usr = 0o7,
+            .other = 0o7,
+            .type = S_IFLNK,
+        };
+    }
+
+    pub fn directory() UMode {
+        var ret = UMode{
+            .grp = 0o7,
+            .usr = 0o7,
+            .other = 0o7,
+            .type = S_IFDIR,
+        };
+        if (kernel.task.current == &kernel.task.initial_task) {
+            ret.applyUmask(0o22);
+        } else {
+            ret.applyUmask(kernel.task.current.fs.umask);
+        }
+        return ret;
+    }
+
+    pub fn regular() UMode {
+        var ret = UMode{
+            .grp = 0o6,
+            .usr = 0o6,
+            .other = 0o6,
+            .type = S_IFREG,
+        };
+        if (kernel.task.current == &kernel.task.initial_task) {
+            ret.applyUmask(0o22);
+        } else {
+            ret.applyUmask(kernel.task.current.fs.umask);
+        }
+        return ret;
+    }
+
+    pub fn chardev() UMode {
+        return UMode{
+            .grp = 0o6,
+            .usr = 0o6,
+            .other = 0o6,
+            .type = S_IFCHR,
+        };
+    }
+
+    pub fn blockdev() UMode {
+        return UMode{
+            .grp = 0o6,
+            .usr = 0o6,
+            .other = 0o0,
+            .type = S_IFBLK,
+        };
+    }
+
+    pub fn socket() UMode {
+        return UMode{
+            .grp = 0o6,
+            .usr = 0o6,
+            .other = 0o6,
+            .type = S_IFSOCK,
+        };
+    }
 };
 
 pub const FSInfo = struct {
