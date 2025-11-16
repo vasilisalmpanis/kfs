@@ -4,6 +4,10 @@ const fs = @import("../fs/fs.zig");
 const std = @import("std");
 const kernel = @import("../main.zig");
 
+// Flag for faccessat(2). //
+const AT_EACCESS		        = 0x200;    // Test access permitted for
+                                                    // effective IDs, not real IDs.  //
+
 const F_OK: i32 = 0;
 const X_OK: i32 = 1;
 const W_OK: i32 = 2;

@@ -427,6 +427,7 @@ pub const Ext2Inode = struct {
         inode.base.atime = inode.data.i_atime;
         inode.base.ctime = inode.data.i_ctime;
         inode.base.mtime = inode.data.i_mtime;
+        inode.base.links = inode.data.i_links_count;
         inode.base.setCreds(
             raw_inode.i_uid | (@as(u32, raw_inode.osd2.linux2.l_i_uid_high) << 16),
             raw_inode.i_gid | (@as(u32, raw_inode.osd2.linux2.l_i_gid_high) << 16),
@@ -601,6 +602,19 @@ pub const Ext2Inode = struct {
         }
         try ext2_inode.iput();
     }
+
+    fn link(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) !void {
+        const parent_ext2_inode = parent.inode.getImpl(Ext2Inode, "base");
+        try parent_ext2_inode.insertDirent(target.dentry.inode.i_no, name, target.dentry.inode.mode);
+        const target_ext2_inode = target.dentry.inode.getImpl(Ext2Inode, "base");
+        target_ext2_inode.base.links += 1;
+        target_ext2_inode.data.i_links_count += 1;
+        const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
+        target_ext2_inode.data.i_mtime = curr_seconds;
+        target_ext2_inode.base.mtime = curr_seconds;
+        try target_ext2_inode.iput();
+        _ = try parent.new(name, target.dentry.inode);
+    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -611,4 +625,5 @@ const ext2_inode_ops = fs.InodeOps {
     .get_link = Ext2Inode.getLink,
     .chmod = Ext2Inode.chmod,
     .symlink = Ext2Inode.symlink,
+    .link = Ext2Inode.link,
 };
