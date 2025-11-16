@@ -116,7 +116,7 @@ pub const Inode = struct {
 pub const InodeOps = struct {
     create: *const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) anyerror!*fs.DEntry,
     mknod: ?*const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry, dev: drv.device.dev_t) anyerror!*fs.DEntry,
-    unlink: ?*const fn(dentry: *fs.DEntry) anyerror!void = null,
+    unlink: ?*const fn(parent: *fs.Inode, dentry: *fs.DEntry) anyerror!void = null,
     lookup: *const fn (parent: *fs.DEntry, name: []const u8) anyerror!*fs.DEntry,
     mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
     rmdir: ?*const fn (current: *fs.DEntry, parent: *fs.DEntry) anyerror!void = null,

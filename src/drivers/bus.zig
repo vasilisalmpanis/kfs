@@ -100,7 +100,7 @@ pub const Bus = struct {
         if (bus.sysfs_devices) |d| {
             const device_file = try d.inode.ops.lookup(d, device.name);
             if (d.inode.ops.unlink) |unlink| {
-                try unlink(device_file);
+                try unlink(d.inode, device_file);
             }
         }
         if (bus.devices) |head| {

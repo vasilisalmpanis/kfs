@@ -571,6 +571,53 @@ pub const Ext2Inode = struct {
         }
     }
 
+    pub fn removeDirent(self: *Ext2Inode, target_name: []const u8, child_ino: u32) !void {
+        const sb: *fs.SuperBlock = if (self.base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
+        if (!self.base.mode.isDir()) {
+            return kernel.errors.PosixError.ENOTDIR;
+        }
+        const ext2_super = sb.getImpl(ext2_sb.Ext2Super, "base");
+        var prev_entry: ?*Ext2DirEntry = null;
+
+        for (0..self.maxBlockIdx()) |idx| {
+            const block: u32 = self.data.i_block[idx];
+            // TODO: read dir entries of other blocks too.
+            const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
+            defer kernel.mm.kfree(block_slice.ptr);
+            const ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
+            if (ext_dir) |first| {
+                var it = first.iterator(ext2_super.base.block_size);
+                while (it.next()) |curr_dir| {
+                    const name = curr_dir.getName();
+                    if (curr_dir.inode == child_ino and std.mem.eql(u8, target_name, name)) {
+                        if (prev_entry) |en| {
+                            en.rec_len += curr_dir.rec_len;
+                            if (curr_dir.file_type == EXT2_FT_DIR) {
+                                self.base.links -= 1;
+                                self.data.i_links_count -= 1;
+                                // Add modification time.
+                                try self.iput();
+                            }
+                            curr_dir.inode = 0;
+                            curr_dir.rec_len = 0;
+                            curr_dir.file_type = 0;
+                            const array: [*]u8 = @constCast(name.ptr);
+                            @memset(array[0..name.len], 0);
+                            curr_dir.name_len = 0;
+                            _ = try ext2_super.writeBuff(block, block_slice.ptr, block_slice.len);
+                            return ;
+                        } else {
+                            kernel.logger.ERROR("Removing . or .. from ext2 dir\n", .{});
+                            return kernel.errors.PosixError.EIO;
+                        }
+                    }
+                    prev_entry = curr_dir;
+                }
+            }
+        }
+        return kernel.errors.PosixError.ENOENT;
+    }
+
     pub fn chmod(base: *fs.Inode, mode: fs.UMode) !void {
         const ext2_inode = base.getImpl(Ext2Inode, "base");
         try base.chmod(mode);
@@ -641,6 +688,16 @@ pub const Ext2Inode = struct {
             return to_write;
         }
     }
+
+    fn unlink(parent: *fs.Inode, dentry: *fs.DEntry) !void {
+        const ext2_parent_inode = parent.getImpl(Ext2Inode, "base");
+        const ext2_child_inode = dentry.inode.getImpl(Ext2Inode, "base");
+        try ext2_parent_inode.removeDirent(dentry.name, dentry.inode.i_no);
+
+        ext2_child_inode.base.links -= 1;
+        ext2_child_inode.data.i_links_count -= 1;
+        try ext2_child_inode.iput();
+    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -650,7 +707,9 @@ const ext2_inode_ops = fs.InodeOps {
     .mkdir = Ext2Inode.mkdir,
     .get_link = Ext2Inode.getLink,
     .chmod = Ext2Inode.chmod,
-    .symlink = Ext2Inode.symlink,
     .link = Ext2Inode.link,
+    .symlink = Ext2Inode.symlink,
+    .unlink = Ext2Inode.unlink,
     .readlink = Ext2Inode.readlink,
+
 };

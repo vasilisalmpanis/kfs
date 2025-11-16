@@ -44,6 +44,10 @@ pub const DEntry = struct {
             _ = dentry.sb.inode_map.remove(dentry.inode.i_no);
             _parent.ref.unref();
         }
+        if (dentry.sb.ops.destroy_inode) |_destroy_fn| {
+            _destroy_fn(dentry.sb, dentry.inode) catch {
+            };
+        }
         kernel.mm.kfree(dentry.name.ptr);
         dentry.tree.del();
         kernel.mm.kfree(dentry);

@@ -102,26 +102,23 @@ pub const SysInode = struct {
         return error.Exists;
     }
 
-    fn unlink(_dentry: *fs.DEntry) !void {
+    fn unlink(_: *fs.Inode, _dentry: *fs.DEntry) !void {
         _ = if (_dentry.inode.sb) |_s| _s else
             return kernel.errors.PosixError.EINVAL;
-        const sys_inode = _dentry.inode.getImpl(SysInode, "base");
 
         if (_dentry.inode.mode.isDir())
             return kernel.errors.PosixError.EISDIR;
 
         if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
+
+        _dentry.inode.links -= 1;
         _dentry.ref.unref();
-        sys_inode.deinit();
-        _dentry.release();
     }
 
-    fn deinit(self: *SysInode) void {
-        if (self.base.links == 1) {
+    pub fn deinit(self: *SysInode) void {
+        if (self.base.links == 0) {
             kernel.mm.kfree(self);
-        } else {
-            self.base.links -= 1;
         }
     }
 };

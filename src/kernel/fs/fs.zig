@@ -47,6 +47,8 @@ pub const DentryHash = struct {
     name: []const u8,
 };
 
+pub const AT_FDCWD = -100;
+
 pub const InoNameContext = struct {
     pub fn hash(self: @This(), val: DentryHash) u64 {
         _ = self;

@@ -39,10 +39,17 @@ pub const ProcSuper = struct {
         _fs.sbs.add(&proc_super.base.list);
         return &proc_super.base;
     }
+
+    fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
+        _ = self.inode_map.remove(base.i_no);
+        const proc_inode = base.getImpl(ProcInode, "base");
+        proc_inode.deinit();
+    }
 };
 
 const proc_super_ops = fs.SuperOps{
     .alloc_inode = ProcSuper.allocInode,
+    .destroy_inode = ProcSuper.destroyInode,
 };
 
 pub var proc_super = ProcSuper{

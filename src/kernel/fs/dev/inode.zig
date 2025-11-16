@@ -122,26 +122,22 @@ pub const DevInode = struct {
         return error.Exists;
     }
 
-    fn unlink(_dentry: *fs.DEntry) !void {
+    fn unlink(_: *fs.Inode, _dentry: *fs.DEntry) !void {
         _ = if (_dentry.inode.sb) |_s| _s else
             return kernel.errors.PosixError.EINVAL;
         if (_dentry.inode.mode.isDir())
             return kernel.errors.PosixError.EISDIR;
-        const dev_inode = _dentry.inode.getImpl(DevInode, "base");
 
-        kernel.logger.DEBUG("unlink {d}", .{_dentry.ref.getValue()});
         if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
+
+        _dentry.inode.links -= 1;
         _dentry.ref.unref();
-        dev_inode.deinit();
-        _dentry.release();
     }
 
-    fn deinit(self: *DevInode) void {
-        if (self.base.links == 1) {
+    pub fn deinit(self: *DevInode) void {
+        if (self.base.links == 0) {
             kernel.mm.kfree(self);
-        } else {
-            self.base.links -= 1;
         }
     }
 };
