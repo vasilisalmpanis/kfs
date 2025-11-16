@@ -801,6 +801,7 @@ pub const kernel = struct {
             chmod : ?*const fn(*kernel.fs.Inode, kernel.fs.UMode) anyerror!void= null,
             symlink : ?*const fn(*kernel.fs.DEntry, []const u8, []const u8) anyerror!void= null,
             link : ?*const fn(*kernel.fs.DEntry, []const u8, kernel.fs.path.Path) anyerror!void= null,
+            readlink : ?*const fn(*kernel.fs.Inode, [*]u8, u32) anyerror!u32= null,
         };
 
 
