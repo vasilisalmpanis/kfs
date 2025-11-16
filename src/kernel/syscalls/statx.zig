@@ -11,9 +11,6 @@ const AT_SYMLINK_FOLLOW		        = 0x400;   // Follow symbolic links.
 const AT_NO_AUTOMOUNT			= 0x800;   // Suppress terminal automount
 const AT_EMPTY_PATH		        = 0x1000;  // Allow empty relative
 						   // pathname to operate on dirfd
-						   // directly.
-const AT_FDCWD = -100;
-
 const StatxTimestamp = extern struct{
 	tv_sec: i64,
 	tv_nsec: u32,
@@ -131,7 +128,7 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
     if (path == null or statxbuf == null)
         return errors.EFAULT;
     const path_s: []const u8 = std.mem.span(path.?);
-    if (dirfd != AT_FDCWD and dirfd < 0)
+    if (dirfd != fs.AT_FDCWD and dirfd < 0)
         return errors.EBADF;
     krn.logger.DEBUG(
         "statx {s} in {d} flags: {x}, mask: {x}, buf addr: {x}",
@@ -148,7 +145,7 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
     }
     var from_path = krn.task.current.fs.pwd;
     if (path_s[0] != '/') {
-        if (dirfd == AT_FDCWD) {
+        if (dirfd == fs.AT_FDCWD) {
 
         } else if (krn.task.current.files.fds.get(@intCast(dirfd))) |file| {
             if (!file.inode.mode.isDir())

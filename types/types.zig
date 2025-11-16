@@ -731,6 +731,7 @@ pub const kernel = struct {
 
         pub const SuperOps = struct {
             alloc_inode : *const fn(*kernel.fs.SuperBlock) anyerror!*kernel.fs.Inode,
+            destroy_inode : ?*const fn(*kernel.fs.SuperBlock, *kernel.fs.Inode) anyerror!void= null,
             statfs : ?*const fn(*kernel.fs.SuperBlock) anyerror!kernel.fs.Statfs= null,
         };
 
@@ -793,7 +794,7 @@ pub const kernel = struct {
         pub const InodeOps = struct {
             create : *const fn(*kernel.fs.Inode, []const u8, kernel.fs.UMode, *kernel.fs.DEntry) anyerror!*kernel.fs.DEntry,
             mknod : ?*const fn(*kernel.fs.Inode, []const u8, kernel.fs.UMode, *kernel.fs.DEntry, drivers.device.dev_t) anyerror!*kernel.fs.DEntry,
-            unlink : ?*const fn(*kernel.fs.DEntry) anyerror!void= null,
+            unlink : ?*const fn(*kernel.fs.Inode, *kernel.fs.DEntry) anyerror!void= null,
             lookup : *const fn(*kernel.fs.DEntry, []const u8) anyerror!*kernel.fs.DEntry,
             mkdir : *const fn(*kernel.fs.Inode, *kernel.fs.DEntry, []const u8, kernel.fs.UMode) anyerror!*kernel.fs.DEntry,
             rmdir : ?*const fn(*kernel.fs.DEntry, *kernel.fs.DEntry) anyerror!void= null,

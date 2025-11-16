@@ -1,6 +1,6 @@
 const fs = @import("../fs.zig");
 const kernel = fs.kernel;
-const ExampleInode = @import("inode.zig").DevInode;
+const DevInode = @import("inode.zig").DevInode;
 const std = @import("std");
 const device = @import("drivers").device;
 
@@ -19,7 +19,7 @@ pub const DevSuper = struct {
             sb.base.block_size = 0;
             sb.base.magic = DEVFS_MAGIC;
             sb.base.dev_file = null;
-            const root_inode = ExampleInode.new(&sb.base) catch |err| {
+            const root_inode = DevInode.new(&sb.base) catch |err| {
                 kernel.mm.kfree(sb);
                 return err;
             };
@@ -46,8 +46,15 @@ pub const DevSuper = struct {
         }
         return error.OutOfMemory;
     }
+
+    fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
+        _ = self.inode_map.remove(base.i_no);
+        const dev_inode = base.getImpl(DevInode, "base");
+        dev_inode.deinit();
+    }
 };
 
 const dev_super_ops = fs.SuperOps{
     .alloc_inode = DevSuper.allocInode,
+    .destroy_inode = DevSuper.destroyInode,
 };

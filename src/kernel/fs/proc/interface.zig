@@ -32,11 +32,13 @@ pub fn deleteRecursive(dentry: *fs.DEntry) !void {
                 if (child.inode.ops.rmdir) |callback| {
                     it.reset(node.curr);
                     try callback(child, dentry);
+                    child.release();
                 }
             } else {
                 if (child.inode.ops.unlink) |callback| {
                     it.reset(node.curr);
-                    try callback(child);
+                    try callback(dentry.inode, child);
+                    child.release();
                 }
             }
         }
@@ -45,6 +47,7 @@ pub fn deleteRecursive(dentry: *fs.DEntry) !void {
         if (dentry.tree.parent) |node| {
             const parent: *fs.DEntry = node.entry(fs.DEntry, "tree");
             try callback(dentry, parent);
+            parent.release();
         }
     }
 }

@@ -10,7 +10,7 @@ const ext2_inode = @import("./inode.zig");
 const EXT2_MAGIC: u32 = 0xEF53;
 
 const BGDT = extern struct {
-    bg_block_bitmap: u32,
+        bg_block_bitmap: u32,
         bg_inode_bitmap: u32,
         bg_inode_table: u32,
         bg_free_blocks_count: u16,
@@ -23,7 +23,7 @@ const BGDT = extern struct {
 };
 
 const Ext2SuperData = extern struct {
-    s_inodes_count		    :u32,	// Inodes count
+        s_inodes_count		    :u32,	// Inodes count
 	s_blocks_count			:u32,	// Blocks count
 	s_r_blocks_count		:u32,	// Reserved blocks count
 	s_free_blocks_count		:u32,	// Free blocks count
@@ -36,16 +36,16 @@ const Ext2SuperData = extern struct {
 	s_inodes_per_group		:u32,	// # Inodes per group
 	s_mtime		        	:u32,	// Mount time
 	s_wtime		        	:u32,	// Write time
-	s_mnt_count			    :u16,	// Mount count
+	s_mnt_count			:u16,	// Mount count
 	s_max_mnt_count 		:i16,	// Maximal mount count
 	s_magic		        	:u16,	// Magic signature
 	s_state		        	:u16,	// File system state
-	s_errors			    :u16,	// Behaviour when detecting errors
+	s_errors			:u16,	// Behaviour when detecting errors
 	s_minor_rev_level 		:u16,	// minor revision level
-	s_lastcheck			    :u32,	// time of last check
-	s_checkinterval	        :u32,	// max. time between checks
+	s_lastcheck			:u32,	// time of last check
+	s_checkinterval	                :u32,	// max. time between checks
 	s_creator_os			:u32,	// OS
-	s_rev_level			    :u32,	// Revision level
+	s_rev_level			:u32,	// Revision level
 	s_def_resuid			:u16,	// Default uid for reserved blocks 
 	s_def_resgid			:u16,	// Default gid for reserved blocks
 
@@ -67,7 +67,7 @@ const Ext2SuperData = extern struct {
 	s_block_group_nr 	    :u16,           // block group # of this superblock */
 	s_feature_compat 	    :u32,           // compatible feature set */
 	s_feature_incompat 	    :u32,           // incompatible feature set */
-	s_feature_ro_compat     :u32,           // readonly-compatible feature set */
+	s_feature_ro_compat         :u32,           // readonly-compatible feature set */
 	s_reserved	            :[230] u32,     // Padding to the end of the block */
 };
 
@@ -424,9 +424,61 @@ pub const Ext2Super = struct {
             .fsid = 0,
         };
     }
+
+    fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
+        const ext2_sb = self.getImpl(Ext2Super, "base");
+        const ext2_target_inode = base.getImpl(Ext2Inode, "base");
+
+        if (base.links != 0) {
+            return ;
+        }
+
+        // Inode Bitmap
+        const bgdt_idx = (base.i_no - 1) / ext2_sb.data.s_inodes_per_group;
+        const bgdt_entry = &ext2_sb.bgdt[bgdt_idx];
+        const inode_index = (base.i_no - 1) % ext2_sb.data.s_inodes_per_group;
+
+        const bgdt_bitmap_slice = try ext2_sb.readBlocks(bgdt_entry.bg_inode_bitmap, 1);
+        defer kernel.mm.kfree(bgdt_bitmap_slice.ptr);
+
+        const bit = (base.i_no - 1) % ext2_sb.data.s_inodes_per_group;
+        const byte = bit >> 3;
+        const mask: u8 = ~@as(u8, 1) << @intCast(bit & 7);
+
+        bgdt_bitmap_slice[byte] &= mask;
+        _ = try ext2_sb.writeBuff(bgdt_entry.bg_inode_bitmap, bgdt_bitmap_slice.ptr, bgdt_bitmap_slice.len);
+
+        // Inode table
+        var rel_offset = inode_index * ext2_sb.data.s_inode_size;
+        const block = bgdt_entry.bg_inode_table + (rel_offset >> @as(u5, @truncate(ext2_sb.data.s_log_block_size + 10)));
+        const size = @sizeOf(Ext2InodeData);
+
+        const bgdt_inode_slice = try ext2_sb.readBlocks(block, 1);
+        defer kernel.mm.kfree(bgdt_inode_slice.ptr);
+
+        rel_offset &= (ext2_sb.base.block_size - 1);
+        @memset(bgdt_inode_slice[rel_offset..rel_offset + size], 0);
+        _ = try ext2_sb.writeBuff(block, bgdt_inode_slice.ptr, bgdt_inode_slice.len);
+
+        // Free blocks
+        for (0..ext2_target_inode.data.i_blocks) |_| {
+            // TODO: free remaining blocks
+            // - take into account dounle and triple indirection
+            // - also change bgdt_entry.free_blocks and same for superblock
+        }
+
+        bgdt_entry.bg_free_inodes_count += 1;
+        ext2_sb.data.s_free_inodes_count += 1;
+        try ext2_sb.writeGDTEntry(bgdt_idx);
+        try ext2_sb.writeSuper();
+        // Free blocks in sb
+        // Free Inode in sb
+        kernel.mm.kfree(ext2_target_inode);
+    }
 };
 
 const ext2_super_ops = fs.SuperOps{
     .alloc_inode = Ext2Super.allocInode,
+    .destroy_inode = Ext2Super.destroyInode,
     .statfs = Ext2Super.statfs,
 };
