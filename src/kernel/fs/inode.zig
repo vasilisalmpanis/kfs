@@ -124,4 +124,5 @@ pub const InodeOps = struct {
     chmod: ?*const fn(base: *Inode, mode: fs.UMode) anyerror!void = Inode.chmod,
     symlink: ?*const fn(parent: *fs.DEntry, name: []const u8, target: []const u8) anyerror!void = null,
     link: ?*const fn(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) anyerror!void = null,
+    readlink: ?*const fn(base: *fs.Inode, buf: [*]u8, size: usize) anyerror!u32 = null,
 };
