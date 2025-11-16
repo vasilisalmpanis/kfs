@@ -5,6 +5,9 @@ const std = @import("std");
 const errors = @import("error-codes.zig").PosixError;
 const drv = @import("drivers");
 
+// Flag for unlinkat(2). //
+const AT_REMOVEDIR		        = 0x200;              // Remove directory instead of
+
 pub fn mkdir(
     path_name: ?[*:0]const u8,
     mode: u16,

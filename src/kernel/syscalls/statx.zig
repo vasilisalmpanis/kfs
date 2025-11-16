@@ -6,6 +6,12 @@ const fs = @import("../fs/fs.zig");
 const std = @import("std");
 const krn = @import("../main.zig");
 
+const AT_SYMLINK_NOFOLLOW		= 0x100;   // Do not follow symbolic links
+const AT_SYMLINK_FOLLOW		        = 0x400;   // Follow symbolic links.
+const AT_NO_AUTOMOUNT			= 0x800;   // Suppress terminal automount
+const AT_EMPTY_PATH		        = 0x1000;  // Allow empty relative
+						   // pathname to operate on dirfd
+						   // directly.
 const AT_FDCWD = -100;
 
 const StatxTimestamp = extern struct{
@@ -156,6 +162,12 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
     }
     const clone_path = from_path.clone();
     defer clone_path.release();
+    if (flags & AT_SYMLINK_NOFOLLOW != 0) {
+        var segment: []const u8 = "";
+        const parent = try fs.path.dir_resolve_from(path_s, clone_path, &segment);
+        const target = try parent.dentry.inode.ops.lookup(parent.dentry, segment);
+        return try do_statx(target.inode, statxbuf.?);
+    }
     const target_path = try fs.path.resolveFrom(path_s, clone_path);
     defer target_path.release();
     return try do_statx(target_path.dentry.inode, statxbuf.?);
