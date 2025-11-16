@@ -89,18 +89,17 @@ pub const ProcInode = struct {
         return ;
     }
 
-    fn unlink(_dentry: *fs.DEntry) !void {
+    fn unlink(_: *fs.Inode, _dentry: *fs.DEntry) !void {
         _ = if (_dentry.inode.sb) |_s| _s else
             return kernel.errors.PosixError.EINVAL;
         if (_dentry.inode.mode.isDir())
             return kernel.errors.PosixError.EISDIR;
-        const proc_inode = _dentry.inode.getImpl(ProcInode, "base");
 
         if (_dentry.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
+
+        _dentry.inode.links -= 1;
         _dentry.ref.unref();
-        proc_inode.deinit();
-        _dentry.release();
     }
 
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
@@ -146,11 +145,9 @@ pub const ProcInode = struct {
         dent.ref.ref();
     }
 
-    fn deinit(self: *ProcInode) void {
-        if (self.base.links == 1) {
+    pub fn deinit(self: *ProcInode) void {
+        if (self.base.links == 0) {
             kernel.mm.kfree(self);
-        } else {
-            self.base.links -= 1;
         }
     }
 };
