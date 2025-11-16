@@ -615,6 +615,32 @@ pub const Ext2Inode = struct {
         try target_ext2_inode.iput();
         _ = try parent.new(name, target.dentry.inode);
     }
+
+    fn readlink(base: *fs.Inode, buf: [*]u8, size: usize) !u32 {
+        const sb = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
+        const ext2_inode = base.getImpl(Ext2Inode, "base");
+        const ext2_s = sb.getImpl(ext2_sb.Ext2Super, "base");
+        if (ext2_inode.data.i_blocks > 0) {
+            const lbn = try ext2_s.resolveLbn(ext2_inode, 0);
+            const block = try ext2_s.readBlocks(lbn, 1);
+            const span: []u8 = std.mem.span(@as([*:0]u8, @ptrCast(block.ptr)));
+
+            var to_write: u32 = size;
+            if (span.len < size)
+                to_write = span.len;
+            @memcpy(buf[0..to_write], span[0..to_write]);
+            return to_write;
+        } else {
+            const block: [*:0]u8 = @ptrCast(&ext2_inode.data.i_block);
+            const span: []u8 = std.mem.span(block);
+
+            var to_write: u32 = size;
+            if (span.len < size)
+                to_write = span.len;
+            @memcpy(buf[0..to_write], span[0..to_write]);
+            return to_write;
+        }
+    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -626,4 +652,5 @@ const ext2_inode_ops = fs.InodeOps {
     .chmod = Ext2Inode.chmod,
     .symlink = Ext2Inode.symlink,
     .link = Ext2Inode.link,
+    .readlink = Ext2Inode.readlink,
 };
