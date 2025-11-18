@@ -302,6 +302,9 @@ pub const Ext2Inode = struct {
                     }
                     inode_no += 1;
                 }
+                if (inode_no >= max_ino_idx) {
+                    return kernel.errors.PosixError.ENOSPC;
+                }
 
                 // Construct ext2 inode data
                 const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
@@ -391,18 +394,14 @@ pub const Ext2Inode = struct {
         var rel_offset = ((i_no - 1) % sb.data.s_inodes_per_group) * sb.data.s_inode_size;
         const block = gd.bg_inode_table + (rel_offset >> @as(u5, @truncate(sb.data.s_log_block_size + 10)));
 
-        const raw_buff: []u8 = try sb.readBlocks(block, 1);
-        rel_offset &= (sb.base.block_size - 1);
+        rel_offset = rel_offset % sb.base.block_size;
         const size = @sizeOf(Ext2InodeData);
         const src: [*]const u8 = @ptrCast(&self.data);
-        @memcpy(
-            raw_buff[rel_offset..rel_offset + size],
-            src[0..size]
-        );
-        _ = try sb.writeBuff(
+        _ = try sb.writeBuffAtOffset(
             block,
-            raw_buff.ptr,
-            sb.base.block_size
+            src,
+            size,
+            rel_offset
         );
     }
 
@@ -420,9 +419,10 @@ pub const Ext2Inode = struct {
 
 
         const raw_buff: []u8 = try sb.readBlocks(block, 1);
-        rel_offset &= (sb.base.block_size - 1);
+        rel_offset = rel_offset % sb.base.block_size;
         const raw_inode: *Ext2InodeData = @ptrCast(@alignCast(&raw_buff[rel_offset]));
         inode.data = raw_inode.*;
+        inode.base.i_no = i_no;
         inode.base.size = inode.data.i_size;
         inode.base.atime = inode.data.i_atime;
         inode.base.ctime = inode.data.i_ctime;
@@ -579,7 +579,10 @@ pub const Ext2Inode = struct {
         const ext2_super = sb.getImpl(ext2_sb.Ext2Super, "base");
         var prev_entry: ?*Ext2DirEntry = null;
 
-        for (0..self.maxBlockIdx()) |idx| {
+        var limit: u32 =  self.maxBlockIdx();
+        if (limit > 11)
+            limit = 11;
+        for (0..limit + 1) |idx| {
             const block: u32 = self.data.i_block[idx];
             // TODO: read dir entries of other blocks too.
             const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
@@ -607,6 +610,7 @@ pub const Ext2Inode = struct {
                             _ = try ext2_super.writeBuff(block, block_slice.ptr, block_slice.len);
                             return ;
                         } else {
+                            // TODO: Free this block
                             kernel.logger.ERROR("Removing . or .. from ext2 dir\n", .{});
                             return kernel.errors.PosixError.EIO;
                         }

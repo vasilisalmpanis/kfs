@@ -199,8 +199,9 @@ pub const Ext2Super = struct {
             buff[0..size],
             src[0..size]
         );
-        const block = 1042 / self.base.block_size;
-        _ = try self.writeBuff(block, &buff, size);
+        const block: u32 = if (self.base.block_size == 1024) 1 else 0;
+        const offset: u32 = if (self.base.block_size == 1024) 0 else 1024;
+        _ = try self.writeBuffAtOffset(block, &buff, size, offset);
     }
 
     pub fn writeGDTEntry(self: *Ext2Super, entry_idx: u32) !void {
@@ -251,23 +252,33 @@ pub const Ext2Super = struct {
         }
     }
 
+    pub fn writeBuffAtOffset(
+        sb: *Ext2Super,
+        block: u32,
+        buff: [*]const u8,
+        size: u32,
+        offset: u32
+    ) !u32 {
+        var to_write: u32 = size;
+        sb.base.dev_file.?.pos = sb.base.block_size * block + offset;
+        var written: u32 = 0;
+        while (written < size) {
+            const single_write: u32 = try sb.base.dev_file.?.ops.write(
+                sb.base.dev_file.?,
+                @ptrCast(&buff[written]),
+                to_write
+            );
+            sb.base.dev_file.?.pos += single_write;
+            to_write -= single_write;
+            if (single_write == 0)
+                break;
+            written += single_write;
+        }
+        return written;
+    }
+
     pub fn writeBuff(sb: *Ext2Super, block: u32, buff: [*]const u8, size: u32) !u32 {
-            var to_write: u32 = size;
-            sb.base.dev_file.?.pos = sb.base.block_size * block;
-            var written: u32 = 0;
-            while (written < size) {
-                const single_write: u32 = try sb.base.dev_file.?.ops.write(
-                    sb.base.dev_file.?,
-                    @ptrCast(&buff[written]),
-                    to_write
-                );
-                sb.base.dev_file.?.pos += single_write;
-                to_write -= single_write;
-                if (single_write == 0)
-                    break;
-                written += single_write;
-            }
-            return written;
+        return try sb.writeBuffAtOffset(block, buff, size, 0);
     }
 
     pub fn getFirstInodeIdx(self: *Ext2Super) u32 {
@@ -590,14 +601,15 @@ pub const Ext2Super = struct {
         const block_idx = block % self.data.s_blocks_per_group;
         const bitmap_byte = block_idx / 8;
         const bitmap_bit: u8 = @intCast(block_idx % 8);
-        var bgd = self.bgdt[bgdt_idx];
+        var bgd = &self.bgdt[bgdt_idx];
         const block_bitmap = try self.readBlocks(bgd.bg_block_bitmap, 1);
         defer kernel.mm.kfree(block_bitmap.ptr);
-        var mask = block_bitmap[bitmap_byte];
-        if (mask & bitmap_bit == 0)
+        var current_byte = block_bitmap[bitmap_byte];
+        const mask: u8 = ~(@as(u8, 1) << @intCast(bitmap_bit));
+        if (current_byte & ~mask == 0)
             kernel.logger.WARN("Freeing block which is already free", .{});
-        mask = mask & ~bitmap_bit;
-        block_bitmap[bitmap_byte] = mask;
+        current_byte = current_byte & mask;
+        block_bitmap[bitmap_byte] = current_byte;
         _ = try self.writeBuff(
             bgd.bg_block_bitmap, 
             block_bitmap.ptr, 
@@ -626,7 +638,7 @@ pub const Ext2Super = struct {
 
         const bit = (base.i_no - 1) % ext2_sb.data.s_inodes_per_group;
         const byte = bit >> 3;
-        const mask: u8 = ~@as(u8, 1) << @intCast(bit & 7);
+        const mask: u8 = ~(@as(u8, 1) << @intCast(bit & 7));
 
         bgdt_bitmap_slice[byte] &= mask;
         _ = try ext2_sb.writeBuff(
