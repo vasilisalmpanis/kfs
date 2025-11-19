@@ -29,25 +29,22 @@ pub fn deleteRecursive(dentry: *fs.DEntry) !void {
             const child = node.curr.entry(fs.DEntry, "tree");
             if (child.inode.mode.isDir()) {
                 try deleteRecursive(child);
-                if (child.inode.ops.rmdir) |callback| {
+                if (child.inode.ops.rmdir) |_rmdir| {
                     it.reset(node.curr);
-                    try callback(child, dentry);
-                    child.release();
+                    try _rmdir(child, dentry);
                 }
             } else {
-                if (child.inode.ops.unlink) |callback| {
+                if (child.inode.ops.unlink) |_unlink| {
                     it.reset(node.curr);
-                    try callback(dentry.inode, child);
-                    child.release();
+                    try _unlink(dentry.inode, child);
                 }
             }
         }
     }
-    if (dentry.inode.ops.rmdir) |callback| {
+    if (dentry.inode.ops.rmdir) |_rmdir| {
         if (dentry.tree.parent) |node| {
             const parent: *fs.DEntry = node.entry(fs.DEntry, "tree");
-            try callback(dentry, parent);
-            parent.release();
+            try _rmdir(dentry, parent);
         }
     }
 }
