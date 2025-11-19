@@ -67,6 +67,7 @@ pub const ProcInode = struct {
         errdefer kernel.mm.kfree(new_inode);
         var new_dentry = try fs.DEntry.alloc(name, sb, new_inode);
         errdefer kernel.mm.kfree(new_dentry);
+        parent.inode.links += 1;
         parent.tree.addChild(&new_dentry.tree);
         parent.ref.ref();
         cash_key.name = new_dentry.name;
@@ -74,19 +75,16 @@ pub const ProcInode = struct {
         return new_dentry;
     }
 
-    fn rmdir(current: *fs.DEntry, _: *fs.DEntry) !void {
+    fn rmdir(current: *fs.DEntry, parent: *fs.DEntry) !void {
         _ = if (current.inode.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         if (current.tree.hasChildren())
             return kernel.errors.PosixError.ENOTEMPTY;
         if (current.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
-        const proc_inode = current.inode.getImpl(ProcInode, "base");
 
-        current.ref.unref();
-
-        proc_inode.deinit();
+        parent.inode.links -= 1;
         current.release();
-        return ;
+        current.release();
     }
 
     fn unlink(_: *fs.Inode, _dentry: *fs.DEntry) !void {
@@ -99,7 +97,8 @@ pub const ProcInode = struct {
             return kernel.errors.PosixError.EBUSY;
 
         _dentry.inode.links -= 1;
-        _dentry.ref.unref();
+        _dentry.release();
+        _dentry.release();
     }
 
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {

@@ -66,6 +66,7 @@ pub const ExampleInode = struct {
         errdefer kernel.mm.kfree(new_inode);
         var new_dentry = try fs.DEntry.alloc(name, sb, new_inode);
         errdefer kernel.mm.kfree(new_dentry);
+        parent.inode.links += 1;
         parent.tree.addChild(&new_dentry.tree);
         parent.ref.ref();
         cash_key.name = new_dentry.name;
