@@ -647,6 +647,10 @@ pub const Ext2Super = struct {
             bgdt_bitmap_slice.len
         );
 
+        if (ext2_target_inode.base.mode.isDir()) {
+            bgdt_entry.bg_used_dirs_count -= 1;
+        }
+
         // Inode table
         var rel_offset = inode_index * ext2_sb.data.s_inode_size;
         const block = bgdt_entry.bg_inode_table + (rel_offset >> @as(u5, @truncate(ext2_sb.data.s_log_block_size + 10)));

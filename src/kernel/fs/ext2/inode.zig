@@ -702,6 +702,28 @@ pub const Ext2Inode = struct {
         ext2_child_inode.data.i_links_count -= 1;
         try ext2_child_inode.iput();
     }
+
+    fn isEmptyDir(_: Ext2Inode) bool {
+        return true;
+    }
+
+    fn rmdir(current: *fs.DEntry, parent: *fs.DEntry) !void {
+        if (!current.inode.mode.isDir())
+            return kernel.errors.PosixError.ENOTDIR;
+        if (current.inode.links > 2)
+            return kernel.errors.PosixError.ENOTEMPTY;
+        const current_inode = current.inode.getImpl(Ext2Inode, "base");
+        if (!current_inode.isEmptyDir())
+            return kernel.errors.PosixError.ENOTEMPTY;
+
+        const parent_inode = parent.inode.getImpl(Ext2Inode, "base");
+        try parent_inode.removeDirent(current.name, current.inode.i_no);
+
+        current_inode.data.i_links_count = 0;
+        current_inode.base.links = 0;
+        try current_inode.iput();
+        current.release();
+    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -715,5 +737,5 @@ const ext2_inode_ops = fs.InodeOps {
     .symlink = Ext2Inode.symlink,
     .unlink = Ext2Inode.unlink,
     .readlink = Ext2Inode.readlink,
-
+    .rmdir = Ext2Inode.rmdir,
 };
