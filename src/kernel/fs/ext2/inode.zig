@@ -166,7 +166,7 @@ pub const Ext2Inode = struct {
         return error.OutOfMemory;
     }
 
-    pub inline fn maxBlockIdx(self: *Ext2Inode) u32 {
+    pub inline fn maxBlockIdx(self: *const Ext2Inode) u32 {
         const sb = self.base.sb.?.getImpl(
             ext2_sb.Ext2Super,
             "base"
@@ -703,7 +703,43 @@ pub const Ext2Inode = struct {
         try ext2_child_inode.iput();
     }
 
-    fn isEmptyDir(_: Ext2Inode) bool {
+    fn isEmptyDir(dir: Ext2Inode) bool {
+        if (dir.base.sb == null)
+            return false;
+        const ext2_super = dir.base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
+        for (0..dir.maxBlockIdx()) |idx| {
+            // TODO: resolve blocks
+            if (idx >= 12)
+                break;
+            const block: u32 = dir.data.i_block[idx];
+            const block_slice: []u8 = ext2_super.readBlocks(block, 1) catch {
+                return false;
+            };
+            defer kernel.mm.kfree(block_slice.ptr);
+            const ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
+            if (ext_dir) |first| {
+                var it = first.iterator(ext2_super.base.block_size);
+                while (it.next()) |curr_ent| {
+                    if (curr_ent.rec_len == 0) {
+                        kernel.logger.WARN("ext2 0 rec_len directory entry {s}\n", .{first.getName()});
+                        return false;
+                    }
+                    if (curr_ent.inode != 0) {
+                        const name = curr_ent.getName();
+                        if (name[0] != '.')
+                            return false;
+                        if (name.len > 2)
+                            return false;
+                        if (name.len < 2) {
+                            if (curr_ent.inode != dir.base.i_no)
+                                return false;
+                        } else if (name[1] != '.') {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
         return true;
     }
 
