@@ -39,6 +39,7 @@ pub const ShadowEntryIterator = struct {
         if (line.len == 0) {
             return null;
         }
+        r.seek += 1;
         return try ShadowEntry.fromShadowLine(line);
     }
 };

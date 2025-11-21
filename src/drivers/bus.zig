@@ -30,26 +30,20 @@ pub const Bus = struct {
                 d.inode,
                 d,
                 bus.name,
-                kern.fs.UMode{
-                    .usr = 0o6,
-                }
+                kern.fs.UMode.directory()
             );
             if (bus.sysfs_dentry) |_d| {
                 bus.sysfs_devices = try _d.inode.ops.mkdir(
                     _d.inode,
                     _d,
                     "devices",
-                    kern.fs.UMode{
-                        .usr = 0o6,
-                    }
+                    kern.fs.UMode.directory()
                 );
                 bus.sysfs_drivers = try _d.inode.ops.mkdir(
                     _d.inode,
                     _d,
                     "drivers",
-                    kern.fs.UMode{
-                        .usr = 0o6,
-                    }
+                    kern.fs.UMode.directory()
                 );
             }
         }
@@ -85,9 +79,7 @@ pub const Bus = struct {
             _ = try d.inode.ops.create(
                 d.inode,
                 device.name,
-                kern.fs.UMode{
-                    .usr = 0o6,
-                },
+                kern.fs.UMode.regular(),
                 d
             );
         }
@@ -108,7 +100,7 @@ pub const Bus = struct {
         if (bus.sysfs_devices) |d| {
             const device_file = try d.inode.ops.lookup(d, device.name);
             if (d.inode.ops.unlink) |unlink| {
-                try unlink(device_file);
+                try unlink(d.inode, device_file);
             }
         }
         if (bus.devices) |head| {

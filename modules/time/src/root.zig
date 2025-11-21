@@ -22,6 +22,7 @@ pub fn initCMOS() kfs.drivers.cmos.CMOS {
         .updateTime = updateTime,
         .incSec = incSec,
         .toUnixSeconds = toUnixSeconds,
+        .setTime = setTime,
     };
     _cmos.updateTime(&_cmos);
     return _cmos;
@@ -64,6 +65,76 @@ fn updateTime(self: *kfs.drivers.cmos.CMOS) void {
     // Convert 12 hour clock to 24 hour clock if necessary
     if ((status & 0x02 == 0) and (self.curr_time[2] & 0x80 != 0)) {
         self.curr_time[2] = ((self.curr_time[2] & 0x7F) + 12) % 24;
+    }
+}
+
+fn binToBCD(bin_val: u8) u8 {
+    return (bin_val / 10 * 16) + (bin_val % 10);
+}
+
+fn setTime(self: *kfs.drivers.cmos.CMOS, timestamp: u64) void {
+    const epoch_secs = std.time.epoch.EpochSeconds{ .secs =  timestamp };
+
+    const day_secs = epoch_secs.getDaySeconds();
+    const epoch_day = epoch_secs.getEpochDay();
+    const year_day = epoch_day.calculateYearDay();
+    const month_day = year_day.calculateMonthDay();
+    
+    const sec = day_secs.getSecondsIntoMinute();
+    const mins = day_secs.getMinutesIntoHour();
+    const hours = day_secs.getHoursIntoDay();
+    const day = month_day.day_index + 1;
+    const month = month_day.month.numeric();
+    var year = year_day.year;
+    var century: u8 = 0;
+    if (year >= 2000) {
+        year -= 2000;
+        century = 20;
+    } else {
+        year -= 1900;
+        century = 19;
+    }
+
+    var bin_mode: bool = false;
+
+    var cmos_hours: u8 = hours;
+
+    while (updateInProgress()) {}
+    const status = readByte(0x0B);
+    if (status & 0x02 == 0) {
+        if (hours == 0)
+            cmos_hours = 24;
+        if (cmos_hours > 12) {
+            cmos_hours -= 12;
+            cmos_hours |= 0x80;
+        }
+    }
+    if (status & 0x04 != 0)
+        bin_mode = true;
+
+    if (self.curr_time[5] != year) {
+        writeByte(0x09, if (bin_mode) @intCast(year) else binToBCD(@intCast(year)));
+        self.curr_time[5] = @intCast(year);
+    }
+    if (self.curr_time[4] != month) {
+        writeByte(0x08, if (bin_mode) month else binToBCD(month));
+        self.curr_time[4] = month;
+    }
+    if (self.curr_time[3] != day) {
+        writeByte(0x07, if (bin_mode) day else binToBCD(day));
+        self.curr_time[3] = day;
+    }
+    if (self.curr_time[2] != hours) {
+        writeByte(0x04, if (bin_mode) cmos_hours else binToBCD(cmos_hours));
+        self.curr_time[2] = hours;
+    }
+    if (self.curr_time[1] != mins) {
+        writeByte(0x02, if (bin_mode) mins else binToBCD(mins));
+        self.curr_time[1] = mins;
+    }
+    if (self.curr_time[0] != sec) {
+        writeByte(0x00, if (bin_mode) sec else binToBCD(sec));
+        self.curr_time[0] = sec;
     }
 }
 

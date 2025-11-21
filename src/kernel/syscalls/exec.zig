@@ -4,6 +4,10 @@ const arch = @import("arch");
 const errors = @import("error-codes.zig").PosixError;
 const std = @import("std");
 
+// Flags for execveat2(2). //
+const AT_EXECVE_CHECK		        = 0x10000; // Only perform a check if execution
+
+
 pub fn freeSlices(
     slice: []const []const u8,
     len: u32

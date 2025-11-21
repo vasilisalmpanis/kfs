@@ -6,8 +6,11 @@ const fs = @import("../fs/fs.zig");
 const std = @import("std");
 const krn = @import("../main.zig");
 
-const AT_FDCWD = -100;
-
+const AT_SYMLINK_NOFOLLOW		= 0x100;   // Do not follow symbolic links
+const AT_SYMLINK_FOLLOW		        = 0x400;   // Follow symbolic links.
+const AT_NO_AUTOMOUNT			= 0x800;   // Suppress terminal automount
+const AT_EMPTY_PATH		        = 0x1000;  // Allow empty relative
+						   // pathname to operate on dirfd
 const StatxTimestamp = extern struct{
 	tv_sec: i64,
 	tv_nsec: u32,
@@ -55,8 +58,10 @@ const Statx = extern struct{
 	stx_atomic_write_unit_min: u32,	    // Min atomic write unit in bytes
 	stx_atomic_write_unit_max: u32,	    // Max atomic write unit in bytes
 	stx_atomic_write_segments_max: u32, // Max atomic write segment count
-	__spare1: u32,
-	__spare3: [9]u64,   	            // Spare space for future expansion
+        stx_dio_read_offset_align: u32,
+        stx_atomic_write_unix_max_opt: u32,
+	__spare1: [1]u32,
+	__spare3: [8]u64,   	            // Spare space for future expansion
 };
 
 pub fn do_statx(inode: *fs.Inode, buf: *Statx) !u32 {
@@ -65,7 +70,7 @@ pub fn do_statx(inode: *fs.Inode, buf: *Statx) !u32 {
     buf.stx_mask = 0;
     buf.stx_blksize = sb.block_size;
     buf.stx_attributes = 0;
-    buf.stx_nlink = 0;
+    buf.stx_nlink = inode.links;
     buf.stx_uid = inode.uid;
     buf.stx_gid = inode.gid;
     buf.stx_mode = inode.mode.toU16();
@@ -112,8 +117,10 @@ pub fn do_statx(inode: *fs.Inode, buf: *Statx) !u32 {
     buf.stx_atomic_write_unit_max = 0;
     buf.stx_atomic_write_segments_max = 0;
 
-    buf.__spare1 = 0;
-    buf.__spare3 = [_]u64{0} ** 9;
+    buf.stx_dio_read_offset_align = 0;
+    buf.stx_atomic_write_unix_max_opt = 0;
+    buf.__spare1[0] = 0;
+    buf.__spare3 = [_]u64{0} ** 8;
     return 0;
 }
 
@@ -121,7 +128,7 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
     if (path == null or statxbuf == null)
         return errors.EFAULT;
     const path_s: []const u8 = std.mem.span(path.?);
-    if (dirfd != AT_FDCWD and dirfd < 0)
+    if (dirfd != fs.AT_FDCWD and dirfd < 0)
         return errors.EBADF;
     krn.logger.DEBUG(
         "statx {s} in {d} flags: {x}, mask: {x}, buf addr: {x}",
@@ -138,10 +145,8 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
     }
     var from_path = krn.task.current.fs.pwd;
     if (path_s[0] != '/') {
-        if (dirfd == AT_FDCWD) {
-            const cwd = krn.task.current.fs.pwd.clone();
-            defer cwd.release();
-            return try do_statx(cwd.dentry.inode, statxbuf.?);
+        if (dirfd == fs.AT_FDCWD) {
+
         } else if (krn.task.current.files.fds.get(@intCast(dirfd))) |file| {
             if (!file.inode.mode.isDir())
                 return errors.ENOTDIR;
@@ -154,6 +159,13 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
     }
     const clone_path = from_path.clone();
     defer clone_path.release();
+    if (flags & AT_SYMLINK_NOFOLLOW != 0) {
+        var segment: []const u8 = "";
+        const parent = try fs.path.dir_resolve_from(path_s, clone_path, &segment);
+        defer parent.release();
+        const target = try parent.dentry.inode.ops.lookup(parent.dentry, segment);
+        return try do_statx(target.inode, statxbuf.?);
+    }
     const target_path = try fs.path.resolveFrom(path_s, clone_path);
     defer target_path.release();
     return try do_statx(target_path.dentry.inode, statxbuf.?);

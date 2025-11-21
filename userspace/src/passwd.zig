@@ -35,6 +35,7 @@ pub const PasswdEntryIterator = struct {
         if (line.len == 0) {
             return null;
         }
+        r.seek += 1;
         return try PasswdEntry.fromPasswdLine(line);
     }
 };

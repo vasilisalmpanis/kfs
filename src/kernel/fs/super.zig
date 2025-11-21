@@ -44,6 +44,7 @@ pub const Statfs = extern struct {
 pub const SuperOps = struct {
     // responsible of allocating a concrete inode type
     alloc_inode: *const fn (base: *SuperBlock) anyerror!*fs.Inode,
+    destroy_inode: ?*const fn (base: *SuperBlock, base: *fs.Inode) anyerror!void = null,
     statfs: ?*const fn (base: *SuperBlock) anyerror!Statfs = vfs_statfs,
 };
 

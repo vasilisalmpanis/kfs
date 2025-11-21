@@ -1,6 +1,6 @@
 const fs = @import("../fs.zig");
 const kernel = fs.kernel;
-const ExampleInode = @import("inode.zig").SysInode;
+const SysInode = @import("inode.zig").SysInode;
 const std = @import("std");
 const device = @import("drivers").device;
 
@@ -19,17 +19,11 @@ pub const SysSuper = struct {
             sb.base.block_size = 0;
             sb.base.magic = SYSFS_MAGIC;
             sb.base.dev_file = null;
-            const root_inode = ExampleInode.new(&sb.base) catch |err| {
+            const root_inode = SysInode.new(&sb.base) catch |err| {
                 kernel.mm.kfree(sb);
                 return err;
             };
-            root_inode.mode = fs.UMode{
-                // This should come from mount.
-                .type   = fs.S_IFDIR,
-                .usr    = 0o7,
-                .grp    = 0o5,
-                .other  = 0o5,
-            };
+            root_inode.mode = fs.UMode.directory();
             sb.base.inode_map.put(root_inode.i_no, root_inode) catch |err| {
                 kernel.mm.kfree(root_inode);
                 kernel.mm.kfree(sb);
@@ -52,8 +46,15 @@ pub const SysSuper = struct {
         }
         return error.OutOfMemory;
     }
+
+    fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
+        _ = self.inode_map.remove(base.i_no);
+        const sys_inode = base.getImpl(SysInode, "base");
+        sys_inode.deinit();
+    }
 };
 
 const sys_super_ops = fs.SuperOps{
     .alloc_inode = SysSuper.allocInode,
+    .destroy_inode = SysSuper.destroyInode,
 };

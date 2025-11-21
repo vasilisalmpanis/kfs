@@ -6,8 +6,6 @@ const fs = @import("../fs/fs.zig");
 const std = @import("std");
 const kernel = @import("../main.zig");
 
-const AT_FDCWD = -100;
-
 pub fn do_open(
     parent_dir: fs.path.Path,
     name: []const u8,
@@ -129,7 +127,7 @@ pub fn openat(
     if (!kernel.fs.path.isRelative(path_sl)) {
         return try open(path, flags, mode);
     }
-    if (dirfd == AT_FDCWD and kernel.fs.path.isRelative(path_sl)) {
+    if (dirfd == fs.AT_FDCWD and kernel.fs.path.isRelative(path_sl)) {
         const cwd = kernel.task.current.fs.pwd.clone();
         defer cwd.release();
         var file_segment: []const u8 = "";

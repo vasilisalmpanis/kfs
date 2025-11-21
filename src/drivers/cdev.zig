@@ -105,7 +105,7 @@ pub fn rmCdev(devt: dev.dev_t) !void {
             _dev.name
         );
         if (_d.inode.ops.unlink) |_unlink| {
-            try _unlink(_d);
+            try _unlink(drivers.devfs_path.dentry.inode, _d);
         }
         _ = cdev_map.remove(devt);
         return ;

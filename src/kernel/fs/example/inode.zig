@@ -43,7 +43,7 @@ pub const ExampleInode = struct {
         if (fs.dcache.get(key)) |entry| {
             return entry;
         }
-        return error.InodeNotFound;
+        return kernel.errors.PosixError.ENOENT;
     }
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
@@ -62,9 +62,11 @@ pub const ExampleInode = struct {
             kernel.task.current.gid,
             mode
         );
+        new_inode.links = 2;
         errdefer kernel.mm.kfree(new_inode);
         var new_dentry = try fs.DEntry.alloc(name, sb, new_inode);
         errdefer kernel.mm.kfree(new_dentry);
+        parent.inode.links += 1;
         parent.tree.addChild(&new_dentry.tree);
         parent.ref.ref();
         cash_key.name = new_dentry.name;
@@ -75,9 +77,10 @@ pub const ExampleInode = struct {
     pub fn create(base: *fs.Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) !*fs.DEntry {
         const sb: *fs.SuperBlock = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         if (!base.mode.isDir())
-            return error.NotDirectory;
+            return kernel.errors.PosixError.ENOTDIR;
         if (!base.mode.canWrite(base.uid, base.gid))
-            return error.Access;
+            return kernel.errors.PosixError.EACCES;
+
 
         // Lookup if file already exists.
         _ = base.ops.lookup(parent, name) catch {
@@ -90,19 +93,53 @@ pub const ExampleInode = struct {
             );
             var dent = try parent.new(name, new_inode);
             dent.ref.ref();
+            if (mode.isDir())
+                base.links += 1;
             return dent;
         };
-        return error.Exists;
+        return kernel.errors.PosixError.EEXIST;
     }
 
     pub fn getLink(base: *fs.Inode, resulting_link: *[]u8) !void {
         const example_inode = base.getImpl(ExampleInode, "base");
-        const span = std.mem.span(@as([*:0]u8, @ptrCast(&example_inode.buff)));
+        const span: []const u8 = std.mem.span(@as([*:0]u8, @ptrCast(&example_inode.buff)));
         if (span.len > resulting_link.len) {
             return kernel.errors.PosixError.EINVAL;
         }
         @memcpy(resulting_link.*[0..span.len], span);
+        resulting_link.len = span.len;
         return ;
+    }
+
+    fn symlink(parent: *fs.DEntry, name: []const u8, target: []const u8) !void {
+        const new_inode = try ExampleInode.new(parent.sb);
+        errdefer kernel.mm.kfree(new_inode);
+        new_inode.setCreds(
+            kernel.task.current.uid,
+            kernel.task.current.gid,
+            fs.UMode.link()
+        );
+        const example_inode = new_inode.getImpl(ExampleInode, "base");
+        if (target.len + 1 > example_inode.buff.len)
+            return kernel.errors.PosixError.ENAMETOOLONG;
+        @memset(example_inode.buff[0..example_inode.buff.len], 0);
+        @memcpy(example_inode.buff[0..target.len], target);
+        var dent = try parent.new(name, new_inode);
+        dent.ref.ref();
+    }
+
+    fn link(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) !void {
+        target.dentry.inode.links += 1;
+        var dent = try parent.new(name, target.dentry.inode);
+        dent.ref.ref();
+    }
+
+    fn deinit(self: *ExampleInode) void {
+        if (self.base.links == 1) {
+            kernel.mm.kfree(self);
+        } else {
+            self.base.links -= 1;
+        }
     }
 };
 
@@ -112,4 +149,6 @@ const example_inode_ops = fs.InodeOps {
     .lookup = ExampleInode.lookup,
     .mkdir = ExampleInode.mkdir,
     .get_link = ExampleInode.getLink,
+    .symlink = ExampleInode.symlink,
+    .link = ExampleInode.link,
 };

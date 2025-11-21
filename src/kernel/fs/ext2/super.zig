@@ -10,7 +10,7 @@ const ext2_inode = @import("./inode.zig");
 const EXT2_MAGIC: u32 = 0xEF53;
 
 const BGDT = extern struct {
-    bg_block_bitmap: u32,
+        bg_block_bitmap: u32,
         bg_inode_bitmap: u32,
         bg_inode_table: u32,
         bg_free_blocks_count: u16,
@@ -23,7 +23,7 @@ const BGDT = extern struct {
 };
 
 const Ext2SuperData = extern struct {
-    s_inodes_count		    :u32,	// Inodes count
+        s_inodes_count		    :u32,	// Inodes count
 	s_blocks_count			:u32,	// Blocks count
 	s_r_blocks_count		:u32,	// Reserved blocks count
 	s_free_blocks_count		:u32,	// Free blocks count
@@ -36,16 +36,16 @@ const Ext2SuperData = extern struct {
 	s_inodes_per_group		:u32,	// # Inodes per group
 	s_mtime		        	:u32,	// Mount time
 	s_wtime		        	:u32,	// Write time
-	s_mnt_count			    :u16,	// Mount count
+	s_mnt_count			:u16,	// Mount count
 	s_max_mnt_count 		:i16,	// Maximal mount count
 	s_magic		        	:u16,	// Magic signature
 	s_state		        	:u16,	// File system state
-	s_errors			    :u16,	// Behaviour when detecting errors
+	s_errors			:u16,	// Behaviour when detecting errors
 	s_minor_rev_level 		:u16,	// minor revision level
-	s_lastcheck			    :u32,	// time of last check
-	s_checkinterval	        :u32,	// max. time between checks
+	s_lastcheck			:u32,	// time of last check
+	s_checkinterval	                :u32,	// max. time between checks
 	s_creator_os			:u32,	// OS
-	s_rev_level			    :u32,	// Revision level
+	s_rev_level			:u32,	// Revision level
 	s_def_resuid			:u16,	// Default uid for reserved blocks 
 	s_def_resgid			:u16,	// Default gid for reserved blocks
 
@@ -67,7 +67,7 @@ const Ext2SuperData = extern struct {
 	s_block_group_nr 	    :u16,           // block group # of this superblock */
 	s_feature_compat 	    :u32,           // compatible feature set */
 	s_feature_incompat 	    :u32,           // incompatible feature set */
-	s_feature_ro_compat     :u32,           // readonly-compatible feature set */
+	s_feature_ro_compat         :u32,           // readonly-compatible feature set */
 	s_reserved	            :[230] u32,     // Padding to the end of the block */
 };
 
@@ -126,13 +126,7 @@ pub const Ext2Super = struct {
                 return kernel.errors.PosixError.ENOENT;
             }
 
-            root_inode.mode = fs.UMode{
-                // This should come from mount.
-                .type   = fs.S_IFDIR,
-                .usr    = 0o7,
-                .grp    = 0o5,
-                .other  = 0o5,
-            };
+            root_inode.mode = fs.UMode.directory();
             sb.base.inode_map.put(
                 root_inode.i_no,
                 root_inode
@@ -205,8 +199,9 @@ pub const Ext2Super = struct {
             buff[0..size],
             src[0..size]
         );
-        const block = 1042 / self.base.block_size;
-        _ = try self.writeBuff(block, &buff, size);
+        const block: u32 = if (self.base.block_size == 1024) 1 else 0;
+        const offset: u32 = if (self.base.block_size == 1024) 0 else 1024;
+        _ = try self.writeBuffAtOffset(block, &buff, size, offset);
     }
 
     pub fn writeGDTEntry(self: *Ext2Super, entry_idx: u32) !void {
@@ -257,23 +252,33 @@ pub const Ext2Super = struct {
         }
     }
 
+    pub fn writeBuffAtOffset(
+        sb: *Ext2Super,
+        block: u32,
+        buff: [*]const u8,
+        size: u32,
+        offset: u32
+    ) !u32 {
+        var to_write: u32 = size;
+        sb.base.dev_file.?.pos = sb.base.block_size * block + offset;
+        var written: u32 = 0;
+        while (written < size) {
+            const single_write: u32 = try sb.base.dev_file.?.ops.write(
+                sb.base.dev_file.?,
+                @ptrCast(&buff[written]),
+                to_write
+            );
+            sb.base.dev_file.?.pos += single_write;
+            to_write -= single_write;
+            if (single_write == 0)
+                break;
+            written += single_write;
+        }
+        return written;
+    }
+
     pub fn writeBuff(sb: *Ext2Super, block: u32, buff: [*]const u8, size: u32) !u32 {
-            var to_write: u32 = size;
-            sb.base.dev_file.?.pos = sb.base.block_size * block;
-            var written: u32 = 0;
-            while (written < size) {
-                const single_write: u32 = try sb.base.dev_file.?.ops.write(
-                    sb.base.dev_file.?,
-                    @ptrCast(&buff[written]),
-                    to_write
-                );
-                sb.base.dev_file.?.pos += single_write;
-                to_write -= single_write;
-                if (single_write == 0)
-                    break;
-                written += single_write;
-            }
-            return written;
+        return try sb.writeBuffAtOffset(block, buff, size, 0);
     }
 
     pub fn getFirstInodeIdx(self: *Ext2Super) u32 {
@@ -430,9 +435,249 @@ pub const Ext2Super = struct {
             .fsid = 0,
         };
     }
+
+    fn commitBGDTEntries(self: *Ext2Super, bgdt_idxs: []bool) !void {
+        for (bgdt_idxs, 0..) |used, gdt_idx| {
+            if (used) {
+                try self.writeGDTEntry(gdt_idx);
+            }
+        }
+    }
+
+    pub fn freeInodeBlocks(self: *Ext2Super, ino: *Ext2Inode) !void {
+        const bs = self.base.block_size;
+        const ptrs_per_block = bs / 4; // 4 bytes per block pointer (u32)
+        const max_iblocks_idx = ino.maxBlockIdx();
+        const blocks_used = ino.data.i_blocks * 512 / self.base.block_size;
+        var blocks_freed: u32 = 0;
+        if (blocks_used == 0)
+            return ;
+
+        var changed_bgds = kernel.mm.kmallocSlice(bool, self.bgdt.len) orelse
+            return kernel.errors.PosixError.ENOMEM;
+        @memset(changed_bgds, false);
+        defer self.commitBGDTEntries(changed_bgds) catch {};
+        defer kernel.mm.kfree(changed_bgds.ptr);
+        const max_direct = if (max_iblocks_idx > 11)
+            12 else max_iblocks_idx + 1;
+        for (0..max_direct) |idx| {
+            const block = ino.data.i_block[idx];
+            if (block != 0) {
+                const bgd_idx = try self.freeBlock(block);
+                changed_bgds[bgd_idx] = true;
+                blocks_freed += 1;
+                if (blocks_freed >= blocks_used)
+                    return ;
+            }
+        }
+
+        if (max_iblocks_idx < 12)
+            return;
+        const indirect_block = ino.data.i_block[12];
+        if (indirect_block != 0) {
+            const buf = try self.readBlocks(indirect_block, 1);
+            defer kernel.mm.kfree(buf.ptr);
+            const u32_ptr: [*]u32 = @ptrCast(@alignCast(buf.ptr));
+            const slice_len = buf.len / 4;
+            const slice: []const u32 = u32_ptr[0..slice_len];
+            for(0..ptrs_per_block) |index| {
+                if (index >= slice_len)
+                    return kernel.errors.PosixError.EINVAL;
+                const block = slice[index];
+                if (block != 0) {
+                    const bgd_idx = try self.freeBlock(block);
+                    changed_bgds[bgd_idx] = true;
+                    blocks_freed += 1;
+                    if (blocks_used >= blocks_freed)
+                        break ;
+                }
+            }
+            const bgd_idx = try self.freeBlock(indirect_block);
+            changed_bgds[bgd_idx] = true;
+            blocks_freed += 1;
+            if (blocks_freed >= blocks_used)
+                return ;
+        }
+
+        if (max_iblocks_idx < 13)
+            return;
+        const dbl_block = ino.data.i_block[13];
+        if (dbl_block != 0) {
+            const dbl_buf = try self.readBlocks(dbl_block, 1);
+            defer kernel.mm.kfree(dbl_buf.ptr);
+            const dbl_u32_ptr: [*]u32 = @ptrCast(@alignCast(dbl_buf.ptr));
+            const dbl_slice_len = dbl_buf.len / 4;
+            for (0..dbl_slice_len) |dbl_idx| {
+
+                const indirect_block_num = dbl_u32_ptr[dbl_idx];
+                if (indirect_block_num == 0)
+                    continue ;
+
+                const ind_buf = try self.readBlocks(indirect_block_num, 1);
+                defer kernel.mm.kfree(ind_buf.ptr);
+                const ind_u32_ptr: [*]u32 = @ptrCast(@alignCast(ind_buf.ptr));
+                const ind_slice_len = ind_buf.len / 4;
+                for (0..ind_slice_len) |idx| {
+                    const block = ind_u32_ptr[idx];
+                    if (block != 0) {
+                        const bgd_idx = try self.freeBlock(block);
+                        changed_bgds[bgd_idx] = true;
+                        blocks_freed += 1;
+                        if (blocks_freed >= blocks_used)
+                            break ;
+                    }
+                }
+                const bgd_idx = try self.freeBlock(indirect_block_num);
+                changed_bgds[bgd_idx] = true;
+                blocks_freed += 1;
+                if (blocks_freed >= blocks_used)
+                    break ;
+            }
+            const bgd_idx = try self.freeBlock(dbl_block);
+            changed_bgds[bgd_idx] = true;
+            blocks_freed += 1;
+            if (blocks_freed >= blocks_used)
+                return ;
+        }
+        if (max_iblocks_idx < 14)
+            return;
+
+        const trpl_block: u32 = ino.data.i_block[14];
+        if (trpl_block == 0)
+            return ;
+        const trpl_ind_buf: []u32 = @ptrCast(@alignCast(
+            try self.readBlocks(trpl_block, 1)
+        ));
+        defer kernel.mm.kfree(trpl_ind_buf.ptr);
+        for (0..trpl_ind_buf.len) |first_idx| {
+            const dbl_indirect_block_num = trpl_ind_buf[first_idx];
+            if (dbl_indirect_block_num == 0)
+                continue ;
+
+            const dbl_ind_buf: []u32 = @ptrCast(@alignCast(
+                try self.readBlocks(dbl_indirect_block_num, 1)
+            ));
+            defer kernel.mm.kfree(dbl_ind_buf.ptr);
+            for (0..dbl_ind_buf.len) |second_idx| {
+                const indirect_block_num = dbl_ind_buf[second_idx];
+                if (indirect_block_num == 0)
+                    continue ;
+
+                const ind_buf: []u32 = @ptrCast(@alignCast(
+                    try self.readBlocks(indirect_block_num, 1)
+                ));
+                defer kernel.mm.kfree(ind_buf.ptr);
+                for (0..ind_buf.len) |third_idx| {
+                    const block = ind_buf[third_idx];
+                    if (block != 0) {
+                        const bgd_idx = try self.freeBlock(block);
+                        changed_bgds[bgd_idx] = true;
+                        blocks_freed += 1;
+                        if (blocks_freed >= blocks_used)
+                            break ;
+                    }
+                }
+                const bgd_idx = try self.freeBlock(indirect_block_num);
+                changed_bgds[bgd_idx] = true;
+                blocks_freed += 1;
+                if (blocks_freed >= blocks_used)
+                    break ;
+            }
+            const bgd_idx = try self.freeBlock(dbl_indirect_block_num);
+            changed_bgds[bgd_idx] = true;
+            blocks_freed += 1;
+            if (blocks_freed >= blocks_used)
+                break ;
+        }
+        const bgd_idx = try self.freeBlock(trpl_block);
+        changed_bgds[bgd_idx] = true;
+        blocks_freed += 1;
+        if (blocks_freed >= blocks_used)
+            return ;
+    }
+
+    fn freeBlock(self: *Ext2Super, block: u32) !u32 {
+        const bgdt_idx = block / self.data.s_blocks_per_group;
+        const block_idx = block % self.data.s_blocks_per_group;
+        const bitmap_byte = block_idx / 8;
+        const bitmap_bit: u8 = @intCast(block_idx % 8);
+        var bgd = &self.bgdt[bgdt_idx];
+        const block_bitmap = try self.readBlocks(bgd.bg_block_bitmap, 1);
+        defer kernel.mm.kfree(block_bitmap.ptr);
+        var current_byte = block_bitmap[bitmap_byte];
+        const mask: u8 = ~(@as(u8, 1) << @intCast(bitmap_bit));
+        if (current_byte & ~mask == 0)
+            kernel.logger.WARN("Freeing block which is already free", .{});
+        current_byte = current_byte & mask;
+        block_bitmap[bitmap_byte] = current_byte;
+        _ = try self.writeBuff(
+            bgd.bg_block_bitmap, 
+            block_bitmap.ptr, 
+            block_bitmap.len
+        );
+        self.data.s_free_blocks_count += 1;
+        bgd.bg_free_blocks_count += 1;
+        return bgdt_idx;
+    }
+
+    fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
+        const ext2_sb = self.getImpl(Ext2Super, "base");
+        const ext2_target_inode = base.getImpl(Ext2Inode, "base");
+
+        if (base.links != 0) {
+            return ;
+        }
+
+        // Inode Bitmap
+        const bgdt_idx = (base.i_no - 1) / ext2_sb.data.s_inodes_per_group;
+        const bgdt_entry = &ext2_sb.bgdt[bgdt_idx];
+        const inode_index = (base.i_no - 1) % ext2_sb.data.s_inodes_per_group;
+
+        const bgdt_bitmap_slice = try ext2_sb.readBlocks(bgdt_entry.bg_inode_bitmap, 1);
+        defer kernel.mm.kfree(bgdt_bitmap_slice.ptr);
+
+        const bit = (base.i_no - 1) % ext2_sb.data.s_inodes_per_group;
+        const byte = bit >> 3;
+        const mask: u8 = ~(@as(u8, 1) << @intCast(bit & 7));
+
+        bgdt_bitmap_slice[byte] &= mask;
+        _ = try ext2_sb.writeBuff(
+            bgdt_entry.bg_inode_bitmap,
+            bgdt_bitmap_slice.ptr,
+            bgdt_bitmap_slice.len
+        );
+
+        if (ext2_target_inode.base.mode.isDir()) {
+            bgdt_entry.bg_used_dirs_count -= 1;
+        }
+
+        // Inode table
+        var rel_offset = inode_index * ext2_sb.data.s_inode_size;
+        const block = bgdt_entry.bg_inode_table + (rel_offset >> @as(u5, @truncate(ext2_sb.data.s_log_block_size + 10)));
+        const size = @sizeOf(Ext2InodeData);
+
+        const bgdt_inode_slice = try ext2_sb.readBlocks(block, 1);
+        defer kernel.mm.kfree(bgdt_inode_slice.ptr);
+
+        rel_offset &= (ext2_sb.base.block_size - 1);
+        @memset(bgdt_inode_slice[rel_offset..rel_offset + size], 0);
+        _ = try ext2_sb.writeBuff(block, bgdt_inode_slice.ptr, bgdt_inode_slice.len);
+
+        // Free blocks
+        try ext2_sb.freeInodeBlocks(ext2_target_inode);
+
+        bgdt_entry.bg_free_inodes_count += 1;
+        ext2_sb.data.s_free_inodes_count += 1;
+        try ext2_sb.writeGDTEntry(bgdt_idx);
+        try ext2_sb.writeSuper();
+        // Free blocks in sb
+        // Free Inode in sb
+        kernel.mm.kfree(ext2_target_inode);
+    }
 };
 
 const ext2_super_ops = fs.SuperOps{
     .alloc_inode = Ext2Super.allocInode,
+    .destroy_inode = Ext2Super.destroyInode,
     .statfs = Ext2Super.statfs,
 };

@@ -38,9 +38,7 @@ pub const Driver = struct {
             _ = try d.inode.ops.create(
                 d.inode,
                 self.name,
-                kern.fs.UMode{
-                    .usr = 0o6,
-                },
+                kern.fs.UMode.regular(),
                 d
             );
         }
@@ -86,7 +84,7 @@ pub const Driver = struct {
         if (bus.sysfs_drivers) |_drivers| {
             const driver_file = try _drivers.inode.ops.lookup(_drivers, self.name);
             if (driver_file.inode.ops.unlink) |unlink| {
-                try unlink(driver_file);
+                try unlink(_drivers.inode, driver_file);
             }
         }
         if (bus.devices) |head| {

@@ -63,9 +63,11 @@ pub const DevInode = struct {
                 mode
             );
             new_inode.mode.type |= kernel.fs.S_IFDIR;
+            new_inode.links = 2;
             errdefer kernel.mm.kfree(new_inode);
             var new_dentry = try fs.DEntry.alloc(_name, sb, new_inode);
             errdefer kernel.mm.kfree(new_dentry);
+            parent.inode.links += 1;
             parent.tree.addChild(&new_dentry.tree);
             parent.ref.ref();
             cash_key.name = new_dentry.name;
@@ -114,39 +116,31 @@ pub const DevInode = struct {
             );
             var dent = try parent.new(name, new_inode);
             dent.ref.ref();
+            if (mode.isDir())
+                base.links += 1;
             return dent;
         };
         return error.Exists;
     }
 
-    fn unlink(_dentry: *fs.DEntry) !void {
-        const sb = if (_dentry.inode.sb) |_s| _s else
+    fn unlink(_: *fs.Inode, _dentry: *fs.DEntry) !void {
+        _ = if (_dentry.inode.sb) |_s| _s else
             return kernel.errors.PosixError.EINVAL;
         if (_dentry.inode.mode.isDir())
             return kernel.errors.PosixError.EISDIR;
-        const dev_inode = _dentry.inode.getImpl(DevInode, "base");
 
-        kernel.logger.DEBUG("unlink {d}", .{_dentry.ref.getValue()});
         if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
             return kernel.errors.PosixError.EBUSY;
-        _dentry.ref.unref();
-        if (_dentry.tree.parent) |_p| {
-            const _parent = _p.entry(fs.DEntry, "tree");
-            const key = fs.DentryHash{
-                .sb = @intFromPtr(sb),
-                .ino = _parent.inode.i_no,
-                .name = _dentry.name
-            };
-            _ = fs.dcache.remove(key);
-            _ = sb.inode_map.remove(_dentry.inode.i_no);
-            _parent.ref.unref();
-        }
-        dev_inode.deinit();
+
+        _dentry.inode.links -= 1;
+        _dentry.release();
         _dentry.release();
     }
 
-    fn deinit(self: *DevInode) void {
-        kernel.mm.kfree(self);
+    pub fn deinit(self: *DevInode) void {
+        if (self.base.links == 0) {
+            kernel.mm.kfree(self);
+        }
     }
 };
 

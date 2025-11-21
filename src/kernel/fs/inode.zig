@@ -24,6 +24,7 @@ pub const Inode = struct {
         sock: ?*Socket,
     },
     size: u32 = 0,
+    links: u32 = 1,
     ops: *const InodeOps,
     fops: *const fs.FileOps,
 
@@ -44,6 +45,7 @@ pub const Inode = struct {
         self.atime = 0;
         self.ctime = 0;
         self.mtime = 0;
+        self.links = 1;
         self.dev_id = drv.device.dev_t {
             .minor = 0,
             .major = 0,
@@ -102,15 +104,25 @@ pub const Inode = struct {
             return true;
         return false;
     }
+
+    pub fn chmod(base: *Inode, mode: fs.UMode) !void {
+        const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
+        base.mode.copyPerms(mode);
+        base.mtime = curr_seconds;
+    }
 };
 
 // TODO: define the Inode Ops struct with documentation.
 pub const InodeOps = struct {
     create: *const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) anyerror!*fs.DEntry,
     mknod: ?*const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry, dev: drv.device.dev_t) anyerror!*fs.DEntry,
-    unlink: ?*const fn(dentry: *fs.DEntry) anyerror!void = null,
+    unlink: ?*const fn(parent: *fs.Inode, dentry: *fs.DEntry) anyerror!void = null,
     lookup: *const fn (parent: *fs.DEntry, name: []const u8) anyerror!*fs.DEntry,
     mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
     rmdir: ?*const fn (current: *fs.DEntry, parent: *fs.DEntry) anyerror!void = null,
     get_link: ?*const fn(base: *Inode, resulting_link: *[]u8) anyerror!void,
+    chmod: ?*const fn(base: *Inode, mode: fs.UMode) anyerror!void = Inode.chmod,
+    symlink: ?*const fn(parent: *fs.DEntry, name: []const u8, target: []const u8) anyerror!void = null,
+    link: ?*const fn(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) anyerror!void = null,
+    readlink: ?*const fn(base: *fs.Inode, buf: [*]u8, size: usize) anyerror!u32 = null,
 };

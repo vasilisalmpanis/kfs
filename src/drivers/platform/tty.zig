@@ -68,7 +68,7 @@ fn tty_probe(device: *pdev.PlatformDevice) !void {
         return krn.errors.PosixError.EIO;
     const tty: *TTY = @ptrCast(@alignCast(device.dev.data));
     tty.clear();
-    try cdev.addCdev(&device.dev, krn.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0o6});
+    try cdev.addCdev(&device.dev, krn.fs.UMode.chardev());
 }
 
 fn tty_remove(device: *pdev.PlatformDevice) !void {

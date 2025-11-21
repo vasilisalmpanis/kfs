@@ -32,6 +32,23 @@ pub const DEntry = struct {
 
     pub fn drop(self: *Refcount) void {
         const dentry: *DEntry = list.containerOf(DEntry, @intFromPtr(self), "ref");
+        kernel.logger.WARN("Dropping {s}\n", .{dentry.name});
+        if (dentry.tree.parent) |_p| {
+            const _parent = _p.entry(fs.DEntry, "tree");
+            const key = fs.DentryHash{
+                .sb = @intFromPtr(dentry.sb),
+                .ino = _parent.inode.i_no,
+                .name = dentry.name
+            };
+            _ = fs.dcache.remove(key);
+            _ = dentry.sb.inode_map.remove(dentry.inode.i_no);
+            _parent.ref.unref();
+        }
+        if (dentry.sb.ops.destroy_inode) |_destroy_fn| {
+            _destroy_fn(dentry.sb, dentry.inode) catch {
+            };
+        }
+        kernel.mm.kfree(dentry.name.ptr);
         dentry.tree.del();
         kernel.mm.kfree(dentry);
     }
@@ -79,7 +96,6 @@ pub const DEntry = struct {
     }
 
     pub fn release(self: *DEntry) void {
-        kernel.mm.kfree(self.name.ptr);
         self.ref.unref();
     }
 };

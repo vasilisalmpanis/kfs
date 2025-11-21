@@ -52,7 +52,7 @@ fn serial_probe(device: *pdev.PlatformDevice) !void {
         return kernel.errors.PosixError.EIO;
     const serial: *Serial = @ptrCast(@alignCast(device.dev.data));
     serial.setup();
-    try cdev.addCdev(&device.dev, kernel.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0o6});
+    try cdev.addCdev(&device.dev, kernel.fs.UMode.chardev());
 }
 
 fn serial_remove(device: *pdev.PlatformDevice) !void {

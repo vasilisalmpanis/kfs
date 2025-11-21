@@ -166,7 +166,7 @@ pub const Ext2Inode = struct {
         return error.OutOfMemory;
     }
 
-    pub inline fn maxBlockIdx(self: *Ext2Inode) u32 {
+    pub inline fn maxBlockIdx(self: *const Ext2Inode) u32 {
         const sb = self.base.sb.?.getImpl(
             ext2_sb.Ext2Super,
             "base"
@@ -237,6 +237,7 @@ pub const Ext2Inode = struct {
         try new_inode.insertDirent(new_inode.base.i_no, ".", mode);
         try new_inode.insertDirent(base.i_no, "..", base.mode);
         new_inode.data.i_links_count = 2;
+        new_inode.base.links = 2;
         new_inode.data.i_size = base.sb.?.block_size;
         new_inode.base.size = new_inode.data.i_size;
         try new_inode.iput();
@@ -301,6 +302,9 @@ pub const Ext2Inode = struct {
                     }
                     inode_no += 1;
                 }
+                if (inode_no >= max_ino_idx) {
+                    return kernel.errors.PosixError.ENOSPC;
+                }
 
                 // Construct ext2 inode data
                 const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
@@ -357,7 +361,10 @@ pub const Ext2Inode = struct {
                     name,
                     mode
                 );
-                parent_inode.data.i_links_count += 1;
+                if (mode.isDir()) {
+                    parent_inode.data.i_links_count += 1;
+                    parent_inode.base.links += 1;
+                }
                 parent_inode.data.i_mtime = curr_seconds;
                 parent_inode.base.mtime = curr_seconds;
                 _ = try parent_inode.iput();
@@ -387,18 +394,14 @@ pub const Ext2Inode = struct {
         var rel_offset = ((i_no - 1) % sb.data.s_inodes_per_group) * sb.data.s_inode_size;
         const block = gd.bg_inode_table + (rel_offset >> @as(u5, @truncate(sb.data.s_log_block_size + 10)));
 
-        const raw_buff: []u8 = try sb.readBlocks(block, 1);
-        rel_offset &= (sb.base.block_size - 1);
+        rel_offset = rel_offset % sb.base.block_size;
         const size = @sizeOf(Ext2InodeData);
         const src: [*]const u8 = @ptrCast(&self.data);
-        @memcpy(
-            raw_buff[rel_offset..rel_offset + size],
-            src[0..size]
-        );
-        _ = try sb.writeBuff(
+        _ = try sb.writeBuffAtOffset(
             block,
-            raw_buff.ptr,
-            sb.base.block_size
+            src,
+            size,
+            rel_offset
         );
     }
 
@@ -416,13 +419,15 @@ pub const Ext2Inode = struct {
 
 
         const raw_buff: []u8 = try sb.readBlocks(block, 1);
-        rel_offset &= (sb.base.block_size - 1);
+        rel_offset = rel_offset % sb.base.block_size;
         const raw_inode: *Ext2InodeData = @ptrCast(@alignCast(&raw_buff[rel_offset]));
         inode.data = raw_inode.*;
+        inode.base.i_no = i_no;
         inode.base.size = inode.data.i_size;
         inode.base.atime = inode.data.i_atime;
         inode.base.ctime = inode.data.i_ctime;
         inode.base.mtime = inode.data.i_mtime;
+        inode.base.links = inode.data.i_links_count;
         inode.base.setCreds(
             raw_inode.i_uid | (@as(u32, raw_inode.osd2.linux2.l_i_uid_high) << 16),
             raw_inode.i_gid | (@as(u32, raw_inode.osd2.linux2.l_i_gid_high) << 16),
@@ -565,6 +570,196 @@ pub const Ext2Inode = struct {
             blk_idx += 1;
         }
     }
+
+    pub fn removeDirent(self: *Ext2Inode, target_name: []const u8, child_ino: u32) !void {
+        const sb: *fs.SuperBlock = if (self.base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
+        if (!self.base.mode.isDir()) {
+            return kernel.errors.PosixError.ENOTDIR;
+        }
+        const ext2_super = sb.getImpl(ext2_sb.Ext2Super, "base");
+        var prev_entry: ?*Ext2DirEntry = null;
+
+        var limit: u32 =  self.maxBlockIdx();
+        if (limit > 11)
+            limit = 11;
+        for (0..limit + 1) |idx| {
+            const block: u32 = self.data.i_block[idx];
+            // TODO: read dir entries of other blocks too.
+            const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
+            defer kernel.mm.kfree(block_slice.ptr);
+            const ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
+            if (ext_dir) |first| {
+                var it = first.iterator(ext2_super.base.block_size);
+                while (it.next()) |curr_dir| {
+                    const name = curr_dir.getName();
+                    if (curr_dir.inode == child_ino and std.mem.eql(u8, target_name, name)) {
+                        if (prev_entry) |en| {
+                            en.rec_len += curr_dir.rec_len;
+                            if (curr_dir.file_type == EXT2_FT_DIR) {
+                                self.base.links -= 1;
+                                self.data.i_links_count -= 1;
+                                // Add modification time.
+                                try self.iput();
+                            }
+                            curr_dir.inode = 0;
+                            curr_dir.rec_len = 0;
+                            curr_dir.file_type = 0;
+                            const array: [*]u8 = @constCast(name.ptr);
+                            @memset(array[0..name.len], 0);
+                            curr_dir.name_len = 0;
+                            _ = try ext2_super.writeBuff(block, block_slice.ptr, block_slice.len);
+                            return ;
+                        } else {
+                            // TODO: Free this block
+                            kernel.logger.ERROR("Removing . or .. from ext2 dir\n", .{});
+                            return kernel.errors.PosixError.EIO;
+                        }
+                    }
+                    prev_entry = curr_dir;
+                }
+            }
+        }
+        return kernel.errors.PosixError.ENOENT;
+    }
+
+    pub fn chmod(base: *fs.Inode, mode: fs.UMode) !void {
+        const ext2_inode = base.getImpl(Ext2Inode, "base");
+        try base.chmod(mode);
+        ext2_inode.data.i_mtime = base.mtime;
+        ext2_inode.data.i_mode.copyPerms(base.mode);
+        try ext2_inode.iput();
+    }
+
+
+    fn symlink(parent: *fs.DEntry, name: []const u8, target: []const u8) !void {
+        const new_link =  try parent.inode.ops.create(
+            parent.inode,
+            name,
+            fs.UMode.link(),
+            parent
+        );
+        const ext2_inode = new_link.inode.getImpl(Ext2Inode, "base");
+        if (target.len >= 60) {
+            const pbn = try ext2_inode.allocBlock();
+            const ext2_super = parent.sb.getImpl(ext2_sb.Ext2Super, "base");
+            const res = try ext2_super.writeBuff(pbn, target.ptr, target.len);
+            if (res != target.len) {
+                return kernel.errors.PosixError.EIO;
+            }
+        } else {
+            const target_buf: [*]u8 = @ptrCast(&ext2_inode.data.i_block);
+            @memset(target_buf[0..60], 0);
+            @memcpy(target_buf[0..target.len], target);
+        }
+        try ext2_inode.iput();
+    }
+
+    fn link(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) !void {
+        const parent_ext2_inode = parent.inode.getImpl(Ext2Inode, "base");
+        try parent_ext2_inode.insertDirent(target.dentry.inode.i_no, name, target.dentry.inode.mode);
+        const target_ext2_inode = target.dentry.inode.getImpl(Ext2Inode, "base");
+        target_ext2_inode.base.links += 1;
+        target_ext2_inode.data.i_links_count += 1;
+        const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
+        target_ext2_inode.data.i_mtime = curr_seconds;
+        target_ext2_inode.base.mtime = curr_seconds;
+        try target_ext2_inode.iput();
+        _ = try parent.new(name, target.dentry.inode);
+    }
+
+    fn readlink(base: *fs.Inode, buf: [*]u8, size: usize) !u32 {
+        const sb = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
+        const ext2_inode = base.getImpl(Ext2Inode, "base");
+        const ext2_s = sb.getImpl(ext2_sb.Ext2Super, "base");
+        if (ext2_inode.data.i_blocks > 0) {
+            const lbn = try ext2_s.resolveLbn(ext2_inode, 0);
+            const block = try ext2_s.readBlocks(lbn, 1);
+            const span: []u8 = std.mem.span(@as([*:0]u8, @ptrCast(block.ptr)));
+
+            var to_write: u32 = size;
+            if (span.len < size)
+                to_write = span.len;
+            @memcpy(buf[0..to_write], span[0..to_write]);
+            return to_write;
+        } else {
+            const block: [*:0]u8 = @ptrCast(&ext2_inode.data.i_block);
+            const span: []u8 = std.mem.span(block);
+
+            var to_write: u32 = size;
+            if (span.len < size)
+                to_write = span.len;
+            @memcpy(buf[0..to_write], span[0..to_write]);
+            return to_write;
+        }
+    }
+
+    fn unlink(parent: *fs.Inode, dentry: *fs.DEntry) !void {
+        const ext2_parent_inode = parent.getImpl(Ext2Inode, "base");
+        const ext2_child_inode = dentry.inode.getImpl(Ext2Inode, "base");
+        try ext2_parent_inode.removeDirent(dentry.name, dentry.inode.i_no);
+
+        ext2_child_inode.base.links -= 1;
+        ext2_child_inode.data.i_links_count -= 1;
+        try ext2_child_inode.iput();
+    }
+
+    fn isEmptyDir(dir: Ext2Inode) bool {
+        if (dir.base.sb == null)
+            return false;
+        const ext2_super = dir.base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
+        for (0..dir.maxBlockIdx()) |idx| {
+            // TODO: resolve blocks
+            if (idx >= 12)
+                break;
+            const block: u32 = dir.data.i_block[idx];
+            const block_slice: []u8 = ext2_super.readBlocks(block, 1) catch {
+                return false;
+            };
+            defer kernel.mm.kfree(block_slice.ptr);
+            const ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
+            if (ext_dir) |first| {
+                var it = first.iterator(ext2_super.base.block_size);
+                while (it.next()) |curr_ent| {
+                    if (curr_ent.rec_len == 0) {
+                        kernel.logger.WARN("ext2 0 rec_len directory entry {s}\n", .{first.getName()});
+                        return false;
+                    }
+                    if (curr_ent.inode != 0) {
+                        const name = curr_ent.getName();
+                        if (name[0] != '.')
+                            return false;
+                        if (name.len > 2)
+                            return false;
+                        if (name.len < 2) {
+                            if (curr_ent.inode != dir.base.i_no)
+                                return false;
+                        } else if (name[1] != '.') {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    fn rmdir(current: *fs.DEntry, parent: *fs.DEntry) !void {
+        if (!current.inode.mode.isDir())
+            return kernel.errors.PosixError.ENOTDIR;
+        if (current.inode.links > 2)
+            return kernel.errors.PosixError.ENOTEMPTY;
+        const current_inode = current.inode.getImpl(Ext2Inode, "base");
+        if (!current_inode.isEmptyDir())
+            return kernel.errors.PosixError.ENOTEMPTY;
+
+        const parent_inode = parent.inode.getImpl(Ext2Inode, "base");
+        try parent_inode.removeDirent(current.name, current.inode.i_no);
+
+        current_inode.data.i_links_count = 0;
+        current_inode.base.links = 0;
+        try current_inode.iput();
+        current.release();
+    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -573,4 +768,10 @@ const ext2_inode_ops = fs.InodeOps {
     .lookup = Ext2Inode.lookup,
     .mkdir = Ext2Inode.mkdir,
     .get_link = Ext2Inode.getLink,
+    .chmod = Ext2Inode.chmod,
+    .link = Ext2Inode.link,
+    .symlink = Ext2Inode.symlink,
+    .unlink = Ext2Inode.unlink,
+    .readlink = Ext2Inode.readlink,
+    .rmdir = Ext2Inode.rmdir,
 };
