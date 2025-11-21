@@ -19,6 +19,7 @@ pub fn mkdir(
     const parent = fs.path.dir_resolve(stripped_path, &dir_name) catch |err| {
         return err;
     };
+    defer parent.release();
     if (dir_name.len == 0)
         return errors.EEXIST;
     if (
