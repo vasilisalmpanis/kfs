@@ -141,6 +141,42 @@ pub const ExampleInode = struct {
             self.base.links -= 1;
         }
     }
+
+    pub fn rename(
+        old_parent: *fs.DEntry, old: *fs.DEntry,
+        new_parent: *fs.DEntry, new_name: []const u8
+    ) !void {
+        if (old.ref.getValue() > 2)
+            return kernel.errors.PosixError.EBUSY;
+        const new_d: ?*fs.DEntry = new_parent.inode.ops.lookup(
+            new_parent,
+            new_name
+        ) catch |err| blk: {
+            switch (err) {
+                kernel.errors.PosixError.ENOENT => break :blk null,
+                else => return err,
+            }
+        };
+        if (new_d) |_d| {
+            if (_d.ref.getValue() > 2)
+                return kernel.errors.PosixError.EBUSY;
+            if (_d.inode.mode.isDir() and _d.tree.hasChildren())
+                return kernel.errors.PosixError.ENOTEMPTY;
+            _d.inode.links -= 1;
+            if (_d.inode.mode.isDir())
+                new_parent.inode.links -= 1;
+            _d.release();
+            _d.release();
+        }
+        var dent = try new_parent.new(new_name, old.inode);
+        dent.ref.ref();
+        if (old.inode.mode.isDir()) {
+            new_parent.inode.links += 1;
+            old_parent.inode.links -= 1;
+        }
+        old.release();
+        old.release();
+    }
 };
 
 const example_inode_ops = fs.InodeOps {
@@ -151,4 +187,5 @@ const example_inode_ops = fs.InodeOps {
     .get_link = ExampleInode.getLink,
     .symlink = ExampleInode.symlink,
     .link = ExampleInode.link,
+    .rename = ExampleInode.rename,
 };
