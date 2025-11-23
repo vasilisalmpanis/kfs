@@ -163,7 +163,12 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
         var segment: []const u8 = "";
         const parent = try fs.path.dir_resolve_from(path_s, clone_path, &segment);
         defer parent.release();
-        const target = try parent.dentry.inode.ops.lookup(parent.dentry, segment);
+        var target: *fs.DEntry = undefined;
+        if (segment.len == 1 and segment[0] == '.') {
+            target = parent.dentry;
+        } else {
+            target = try parent.dentry.inode.ops.lookup(parent.dentry, segment);
+        }
         return try do_statx(target.inode, statxbuf.?);
     }
     const target_path = try fs.path.resolveFrom(path_s, clone_path);

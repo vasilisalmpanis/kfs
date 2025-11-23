@@ -20,6 +20,17 @@ pub const TreeNode = struct {
         return self.child != null;
     }
 
+    pub fn childrenCount(self: *TreeNode) u32 {
+        var count: u32 = 0;
+        if (self.child) |ch| {
+            var it = ch.siblingsIterator();
+            while (it.next()) |_| {
+                count += 1;
+            }
+        }
+        return count;
+    }
+
     pub fn hasSiblings(self: *TreeNode) bool {
         return self.next != self;
     }

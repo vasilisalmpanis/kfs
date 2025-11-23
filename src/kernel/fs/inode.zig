@@ -125,4 +125,5 @@ pub const InodeOps = struct {
     symlink: ?*const fn(parent: *fs.DEntry, name: []const u8, target: []const u8) anyerror!void = null,
     link: ?*const fn(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) anyerror!void = null,
     readlink: ?*const fn(base: *fs.Inode, buf: [*]u8, size: usize) anyerror!u32 = null,
+    rename: ?*const fn(old_parent: *fs.DEntry, old: *fs.DEntry, new_parent: *fs.DEntry, new_name: []const u8) anyerror!void = null,
 };

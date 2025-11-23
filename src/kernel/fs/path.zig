@@ -123,6 +123,16 @@ pub const Path = struct {
         );
         return buf[0..res.len + _d.name.len + 1];
     }
+
+    pub fn isSubPathOf(self: *const Path, other: *const Path) bool {
+        var tree_node: ?*krn.tree.TreeNode = &self.dentry.tree;
+        while (tree_node) |node| {
+            if (node == &other.dentry.tree)
+                return true;
+            tree_node = node.parent;
+        }
+        return false;
+    }
 };
 
 pub fn remove_trailing_slashes(path: []const u8) []const u8 {
