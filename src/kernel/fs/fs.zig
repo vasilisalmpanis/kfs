@@ -47,7 +47,12 @@ pub const DentryHash = struct {
     name: []const u8,
 };
 
-pub const AT_FDCWD = -100;
+pub const AT_FDCWD              = -100;
+pub const AT_SYMLINK_NOFOLLOW	= 0x100;   // Do not follow symbolic links
+pub const AT_SYMLINK_FOLLOW	= 0x400;   // Follow symbolic links.
+pub const AT_NO_AUTOMOUNT	= 0x800;   // Suppress terminal automount
+pub const AT_EMPTY_PATH		= 0x1000;  // Allow empty relative
+					   // pathname to operate on dirfd
 
 pub const InoNameContext = struct {
     pub fn hash(self: @This(), val: DentryHash) u64 {
