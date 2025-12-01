@@ -189,10 +189,6 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
 }
 
 pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) !void {
-    validateElfHeader(userspace) catch |err| {
-        krn.logger.ERROR("ELF validation failed: {}\n", .{err});
-        return krn.errors.PosixError.ENOEXEC;
-    };
 
     const stack_pages: u32 = 10;
     var heap_start: u32 = 0;

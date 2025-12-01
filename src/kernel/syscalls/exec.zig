@@ -45,9 +45,15 @@ pub fn doExecve(
 
     krn.task.current.setName(path.dentry.name); // TODO: make copy of filename and set name only if we will execute
 
+    krn.userspace.validateElfHeader(slice) catch |err| {
+        krn.logger.ERROR("ELF validation failed: {}\n", .{err});
+        return errors.ENOEXEC;
+    };
+
     if (krn.task.current.mm) |_mm| {
         _mm.releaseMappings();
     }
+
     try krn.userspace.prepareBinary(
         slice,
         argv,
@@ -56,7 +62,6 @@ pub fn doExecve(
 
     freeSlices(argv, argv.len);
     freeSlices(envp, envp.len);
-
     
     krn.task.current.sighand = krn.signals.SigHand.init();
     var it = krn.task.current.files.fds.iterator();
