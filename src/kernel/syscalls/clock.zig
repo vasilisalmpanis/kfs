@@ -13,12 +13,7 @@ const CLOCK_BOOTTIME			= 7;
 const CLOCK_REALTIME_ALARM	= 8;
 const CLOCK_BOOTTIME_ALARM	= 9;
 
-const kernel_timespec = extern struct {
-    tv_sec: i64,
-    tv_nsec: i64,
-};
-
-pub fn clock_gettime64(clock_id: u32, _tp: ?*kernel_timespec) !u32 {
+pub fn clock_gettime64(clock_id: u32, _tp: ?*krn.kernel_timespec) !u32 {
     const  tp = _tp orelse {
         return errors.EFAULT;
     };
@@ -42,7 +37,7 @@ pub fn clock_gettime64(clock_id: u32, _tp: ?*kernel_timespec) !u32 {
     return errors.EINVAL;
 }
 
-pub fn clock_settime(clock_id: u32, _tp: ?*kernel_timespec) !u32 {
+pub fn clock_settime(clock_id: u32, _tp: ?*krn.kernel_timespec) !u32 {
     const  tp = _tp orelse {
         return errors.EFAULT;
     };

@@ -841,6 +841,17 @@ pub const Ext2Inode = struct {
         try new_parent_ino_ext2.insertDirent(old.inode.i_no, new_name, old.inode.mode);
         old.release();
     }
+
+    fn chown(base: *fs.Inode, uid: u32, gid: u32) !void {
+        const ext2_inode = base.getImpl(Ext2Inode, "base");
+        if (uid > 0xFFFF or gid > 0xFFFF)
+            return kernel.errors.PosixError.EINVAL;
+        ext2_inode.base.uid = uid;
+        ext2_inode.data.i_uid = @intCast(uid);
+        ext2_inode.base.gid = gid;
+        ext2_inode.data.i_gid = @intCast(gid);
+        try ext2_inode.iput();
+    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -856,4 +867,5 @@ const ext2_inode_ops = fs.InodeOps {
     .readlink = Ext2Inode.readlink,
     .rmdir = Ext2Inode.rmdir,
     .rename = Ext2Inode.rename,
+    .chown = Ext2Inode.chown,
 };
