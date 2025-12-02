@@ -32,8 +32,12 @@ pub fn do_chown(
     const target = try fs.path.resolveFrom(path, from);
     defer target.release();
 
-    if (target.dentry.inode.ops.chown) |_chown| {
-        try _chown(target.dentry.inode, uid, gid);
+    if (target.dentry.inode.ops.setattr) |_setattr| {
+        const attr = fs.InodeAttrs{
+            .uid = uid,
+            .gid = gid,
+        };
+        try _setattr(target.dentry.inode, &attr);
         return 0;
     }
     return errors.EINVAL;

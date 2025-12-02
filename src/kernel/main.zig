@@ -54,4 +54,4 @@ pub const do_umount = @import("./syscalls/mount.zig").do_umount;
 pub const do_munmap = @import("./syscalls/mmap.zig").do_munmap;
 
 pub const kernel_timespec = @import("time/spec.zig").kernel_timespec;
-
+pub const time = @import("./time/spec.zig");

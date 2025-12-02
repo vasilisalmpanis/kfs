@@ -75,17 +75,17 @@ pub fn do_statx(inode: *fs.Inode, buf: *Statx) !u32 {
     buf.stx_blocks = 0;
     buf.stx_attributes_mask = 0;
 
-    buf.stx_ctime = StatxTimestamp.initEmpty();
+    buf.stx_ctime = StatxTimestamp{
+        .tv_sec = inode.ctime,
+        .tv_nsec = 0,
+        .__reserved = 0,
+    };
     buf.stx_atime = StatxTimestamp{
         .tv_sec = inode.atime,
         .tv_nsec = 0,
         .__reserved = 0,
     };
-    buf.stx_btime = StatxTimestamp{
-        .tv_sec = inode.ctime,
-        .tv_nsec = 0,
-        .__reserved = 0,
-    };
+    buf.stx_btime = StatxTimestamp.initEmpty();
     buf.stx_mtime = StatxTimestamp{
         .tv_sec = inode.mtime,
         .tv_nsec = 0,
