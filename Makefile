@@ -28,7 +28,12 @@ GRUB_CFG = $(ISO_DIR)/boot/grub/grub.cfg
 QEMU = qemu-system-i386
 
 MKRESCUE = grub-mkrescue
-KVM = -enable-kvm
+KVM := $(shell \
+	if command -v kvm-ok >/dev/null 2>&1 && kvm-ok >/dev/null 2>&1; \
+    	then echo "-enable-kvm"; \
+		else echo ""; \
+	fi)
+
 ifeq ($(OS),macos)
 	MKRESCUE = i686-elf-grub-mkrescue
 	KVM = 

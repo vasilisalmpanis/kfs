@@ -616,14 +616,36 @@ pub const Ext2Inode = struct {
         return kernel.errors.PosixError.ENOENT;
     }
 
-    pub fn chmod(base: *fs.Inode, mode: fs.UMode) !void {
+    pub fn setattr(base: *fs.Inode, attrs: *const fs.InodeAttrs) !void {
+        var updated: bool = false;
         const ext2_inode = base.getImpl(Ext2Inode, "base");
-        try base.chmod(mode);
-        ext2_inode.data.i_mtime = base.mtime;
-        ext2_inode.data.i_mode.copyPerms(base.mode);
-        try ext2_inode.iput();
+        try base.setattr(attrs);
+        if (attrs.mode != null) {
+            updated = true;
+            ext2_inode.data.i_mtime = base.mtime;
+            ext2_inode.data.i_mode.copyPerms(base.mode);
+        }
+        if (attrs.uid != null) {
+            updated = true;
+            ext2_inode.data.i_uid = @intCast(base.uid & 0x0000FFFF);
+            ext2_inode.data.osd2.linux2.l_i_uid_high = @intCast(base.uid >> 16);
+        }
+        if (attrs.gid != null) {
+            updated = true;
+            ext2_inode.data.i_gid = @intCast(base.gid & 0x0000FFFF);
+            ext2_inode.data.osd2.linux2.l_i_gid_high = @intCast(base.gid >> 16);
+        }
+        if (ext2_inode.data.i_atime != base.atime) {
+            updated = true;
+            ext2_inode.data.i_atime = base.atime;
+        }
+        if (ext2_inode.data.i_mtime != base.mtime) {
+            updated = true;
+            ext2_inode.data.i_mtime = base.mtime;
+        }
+        if (updated)
+            try ext2_inode.iput();
     }
-
 
     fn symlink(parent: *fs.DEntry, name: []const u8, target: []const u8) !void {
         const new_link =  try parent.inode.ops.create(
@@ -841,17 +863,6 @@ pub const Ext2Inode = struct {
         try new_parent_ino_ext2.insertDirent(old.inode.i_no, new_name, old.inode.mode);
         old.release();
     }
-
-    fn chown(base: *fs.Inode, uid: u32, gid: u32) !void {
-        const ext2_inode = base.getImpl(Ext2Inode, "base");
-        if (uid > 0xFFFF or gid > 0xFFFF)
-            return kernel.errors.PosixError.EINVAL;
-        ext2_inode.base.uid = uid;
-        ext2_inode.data.i_uid = @intCast(uid);
-        ext2_inode.base.gid = gid;
-        ext2_inode.data.i_gid = @intCast(gid);
-        try ext2_inode.iput();
-    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -860,12 +871,11 @@ const ext2_inode_ops = fs.InodeOps {
     .lookup = Ext2Inode.lookup,
     .mkdir = Ext2Inode.mkdir,
     .get_link = Ext2Inode.getLink,
-    .chmod = Ext2Inode.chmod,
     .link = Ext2Inode.link,
     .symlink = Ext2Inode.symlink,
     .unlink = Ext2Inode.unlink,
     .readlink = Ext2Inode.readlink,
     .rmdir = Ext2Inode.rmdir,
     .rename = Ext2Inode.rename,
-    .chown = Ext2Inode.chown,
+    .setattr = Ext2Inode.setattr,
 };

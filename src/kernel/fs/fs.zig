@@ -19,6 +19,7 @@ pub const FileSystemOps = filesystem.FileSystemOps;
 // Inode
 pub const Inode = @import("inode.zig").Inode;
 pub const InodeOps = @import("inode.zig").InodeOps;
+pub const InodeAttrs = @import("inode.zig").InodeAttrs;
 
 // Utils
 pub const Refcount = @import("../sched/task.zig").RefCount;
