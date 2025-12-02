@@ -18,12 +18,17 @@ pub fn time(t: u32, _: u32, _: u32, _: u32, _: u32, _: u32) !u32 {
 pub fn utimensat(
     dirfd: i32,
     _path: ?[*:0] const u8,
-    times: ?*[2]kernel.kernel_timespec,
+    _times: ?*[2]kernel.kernel_timespec,
     flags: u32,
 ) !u32 {
     _ = flags;
-    _ = times;
     const path = _path orelse
+        return errors.EINVAL;
+    const times = _times orelse
+        return errors.EACCES;
+    if (!times[0].isValid())
+        return errors.EINVAL;
+    if (!times[1].isValid())
         return errors.EINVAL;
     const span = std.mem.span(path);
     var from = kernel.task.current.fs.pwd.clone();
@@ -39,8 +44,17 @@ pub fn utimensat(
                 from = file_path.clone();
             }
         }
-        return errors.ENOENT;
+        return errors.EBADF;
     }
     const target = try fs.path.resolveFrom(path, from);
     defer target.release();
+    if (target.dentry.inode.ops.setattr) |_setattr| {
+        const attr = fs.InodeAttrs{
+            .atime = times[0],
+            .mtime = times[1],
+        };
+        _setattr(target.dentry.inode, &attr);
+        return 0;
+    }
+    return errors.EROFS;
 }

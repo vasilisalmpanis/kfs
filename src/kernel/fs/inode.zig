@@ -105,11 +105,43 @@ pub const Inode = struct {
         return false;
     }
 
-    pub fn chmod(base: *Inode, mode: fs.UMode) !void {
-        const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
-        base.mode.copyPerms(mode);
-        base.mtime = curr_seconds;
+    pub fn setattr(base: *fs.Inode, attr: *const InodeAttrs) !void {
+        if (attr.mode) |new_mode| {
+            base.mode.copyPerms(new_mode.*);
+        }
+        if (attr.gid) |_gid| {
+            base.gid = _gid;
+        }
+        if (attr.uid) |_uid| {
+            base.uid = _uid;
+        }
+        if (attr.atime) |_atime| {
+            var to_set: u32 = @intCast(_atime.tv_sec);
+            if (_atime.isNow()) {
+                to_set = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
+            } else if (_atime.isOmit()) {
+                to_set = base.atime;
+            }
+            base.atime = to_set;
+        }
+        if (attr.mtime) |_mtime| {
+            var to_set: u32 = @intCast(_mtime.tv_sec);
+            if (_mtime.isNow()) {
+                to_set = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
+            } else if (_mtime.isOmit()) {
+                to_set = base.mtime;
+            }
+            base.mtime = to_set;
+        }
     }
+};
+
+pub const InodeAttrs = struct {
+    mode: ?*fs.UMode = null,
+    uid: ?u32 = null,
+    gid: ?u32 = null,
+    atime: ?*kernel.kernel_timespec = null,
+    mtime: ?*kernel.kernel_timespec = null,
 };
 
 // TODO: define the Inode Ops struct with documentation.
@@ -121,10 +153,9 @@ pub const InodeOps = struct {
     mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
     rmdir: ?*const fn (current: *fs.DEntry, parent: *fs.DEntry) anyerror!void = null,
     get_link: ?*const fn(base: *Inode, resulting_link: *[]u8) anyerror!void,
-    chmod: ?*const fn(base: *Inode, mode: fs.UMode) anyerror!void = Inode.chmod,
     symlink: ?*const fn(parent: *fs.DEntry, name: []const u8, target: []const u8) anyerror!void = null,
     link: ?*const fn(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) anyerror!void = null,
     readlink: ?*const fn(base: *fs.Inode, buf: [*]u8, size: usize) anyerror!u32 = null,
     rename: ?*const fn(old_parent: *fs.DEntry, old: *fs.DEntry, new_parent: *fs.DEntry, new_name: []const u8) anyerror!void = null,
-    chown: ?*const fn(base: *fs.Inode, uid: u32, gid: u32) anyerror!void = null,
+    setattr: ?*const fn(base: *fs.Inode, attr: *const InodeAttrs) anyerror!void = Inode.setattr,
 };

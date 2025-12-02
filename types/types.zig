@@ -799,12 +799,19 @@ pub const kernel = struct {
             mkdir : *const fn(*kernel.fs.Inode, *kernel.fs.DEntry, []const u8, kernel.fs.UMode) anyerror!*kernel.fs.DEntry,
             rmdir : ?*const fn(*kernel.fs.DEntry, *kernel.fs.DEntry) anyerror!void= null,
             get_link : ?*const fn(*kernel.fs.Inode, *[]u8) anyerror!void,
-            chmod : ?*const fn(*kernel.fs.Inode, kernel.fs.UMode) anyerror!void= null,
             symlink : ?*const fn(*kernel.fs.DEntry, []const u8, []const u8) anyerror!void= null,
             link : ?*const fn(*kernel.fs.DEntry, []const u8, kernel.fs.path.Path) anyerror!void= null,
             readlink : ?*const fn(*kernel.fs.Inode, [*]u8, u32) anyerror!u32= null,
             rename : ?*const fn(*kernel.fs.DEntry, *kernel.fs.DEntry, *kernel.fs.DEntry, []const u8) anyerror!void= null,
-            chown : ?*const fn(*kernel.fs.Inode, u32, u32) anyerror!void= null,
+            setattr : ?*const fn(*kernel.fs.Inode, *const kernel.fs.InodeAttrs) anyerror!void= null,
+        };
+
+        pub const InodeAttrs = struct {
+            mode : ?*kernel.fs.UMode= null,
+            uid : ?u32= null,
+            gid : ?u32= null,
+            atime : ?*kernel.kernel_timespec= null,
+            mtime : ?*kernel.kernel_timespec= null,
         };
 
 
@@ -926,6 +933,15 @@ pub const kernel = struct {
             pwd : kernel.fs.path.Path,
             umask : u32= 18,
         };
+
+    };
+
+    pub const kernel_timespec = extern struct {
+        tv_sec : i64,
+        tv_nsec : i64,
+    };
+
+    pub const time = struct {
 
     };
 
