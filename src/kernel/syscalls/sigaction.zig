@@ -36,9 +36,9 @@ pub fn sigreturn() !u32 {
     return 0;
 }
 
-const SIG_BLOCK  : i32 = 1;	// for blocking signals
-const SIG_UNBLOCK: i32 = 2;	// for unblocking signals
-const SIG_SETMASK: i32 = 3;     // for setting the signal mask
+const SIG_BLOCK  : i32 = 0;	// for blocking signals
+const SIG_UNBLOCK: i32 = 1;	// for unblocking signals
+const SIG_SETMASK: i32 = 2;     // for setting the signal mask
 
 pub fn rt_sigprocmask(
     how: i32,
@@ -117,6 +117,5 @@ pub fn rt_sigsuspend(mask: u32) !u32 {
     // krn.task.current.state = .INTERRUPTIBLE_SLEEP;
     krn.sched.reschedule();
     // krn.task.current.sigmask._bits[0] = old;
-    krn.logger.INFO("Sigsuspend finished\n", .{});
     return errors.EINTR;
 }
