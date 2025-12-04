@@ -620,14 +620,14 @@ pub const kernel = struct {
     };
 
     pub const signals = struct {
-        pub const Siginfo = struct {
+        pub const Siginfo = extern struct {
             signo : i32,
             errno : i32,
             code : i32,
             fields : std.sched.signals.SiginfoFieldsUnion,
         };
 
-        pub const sigset_t = struct {
+        pub const sigset_t = extern struct {
             _bits : [2]u32,
         };
 

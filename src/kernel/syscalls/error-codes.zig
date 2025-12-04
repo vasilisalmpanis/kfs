@@ -140,3 +140,9 @@ pub const PosixError = error{
 pub inline fn toErrno(err: PosixError) i32 {
     return -@as(i32, @intCast((@intFromError(err) - @intFromError(PosixError.EPERM) + 1)));
 }
+
+pub inline fn fromErrno(err: i32) PosixError {
+    const eperm_int: i32 = @intFromError(PosixError.EPERM);
+    const err_offset = -err + eperm_int - 1;
+    return @errorCast(@errorFromInt(@as(u16, @intCast(err_offset))));
+}
