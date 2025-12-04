@@ -4,18 +4,18 @@ const std = @import("std");
 const arch = @import("arch");
 pub const SIG_COUNT: u8 = 32;
 
-pub const Sigval = union {
+pub const Sigval = extern union {
     int: i32,
     ptr: *anyopaque,
 };
 
-const SigAltStack = struct {
+const SigAltStack = extern struct {
     sp: *anyopaque,
     flags: i32,
     size: usize,
 };
 
-const SigContext = struct {
+const SigContext = extern struct {
     gs: u16,
 	fs: u16,
 	es: u16,
@@ -42,7 +42,7 @@ const SigContext = struct {
 	cr2: u32,
 };
 
-const Ucontext = struct {
+const Ucontext = extern struct {
     flags: u32,
     link: *@This(),
     stack: SigAltStack,
@@ -50,58 +50,58 @@ const Ucontext = struct {
     mask: sigset_t,
 };
 
-pub const SiginfoFieldsUnion = union {
+pub const SiginfoFieldsUnion = extern union {
     pad: [128 - 2 * @sizeOf(c_int) - @sizeOf(c_long)]u8,
-    common: struct {
-        first: union {
-            piduid: struct {
-                pid: u32,
-                uid: u32,
+    common: extern struct {
+        first: extern union {
+            piduid: extern struct {
+                pid: u32 = 0,
+                uid: u32 = 0,
             },
-            timer: struct {
-                timerid: i32,
-                overrun: i32,
+            timer: extern struct {
+                timerid: i32 = 0,
+                overrun: i32 = 0,
             },
         },
-        second: union {
+        second: extern union {
             value: Sigval,
-            sigchld: struct {
+            sigchld: extern struct {
                 status: i32,
                 utime: isize,
                 stime: isize,
             },
         },
     },
-    sigfault: struct {
+    sigfault: extern struct {
         addr: *allowzero anyopaque,
         addr_lsb: i16,
-        first: union {
-            addr_bnd: struct {
+        first: extern union {
+            addr_bnd: extern struct {
                 lower: *anyopaque,
                 upper: *anyopaque,
             },
             pkey: u32,
         },
     },
-    sigpoll: struct {
+    sigpoll: extern struct {
         band: isize,
         fd: i32,
     },
-    sigsys: struct {
+    sigsys: extern struct {
         call_addr: *anyopaque,
         syscall: i32,
         native_arch: u32,
     },
 };
 
-pub const Siginfo = struct {
+pub const Siginfo = extern struct {
     signo: i32,
     errno: i32,
     code: i32,
     fields: SiginfoFieldsUnion,
 };
 
-pub const sigset_t = struct {
+pub const sigset_t = extern struct {
     _bits: [2]u32,
 
     pub fn init() sigset_t {
@@ -119,7 +119,7 @@ pub const sigset_t = struct {
     }
 
     pub fn sigIsSet(self: *const sigset_t, signal: Signal) bool {
-        return self._bits[0] & sigmask(signal) != 0;
+        return (self._bits[0] & sigmask(signal)) != 0;
     }
 };
 
@@ -139,9 +139,9 @@ pub const Sigaction = struct {
 };
 
 pub fn sigmask(sig: Signal) u32 {
-        const num: u32 = @intFromEnum(sig);
-        const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
-        return bit_index;
+    const num: u32 = @intFromEnum(sig);
+    const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
+    return bit_index;
 }
 
 pub const SA_NOCLDSTOP: u32  = 0x00000001; // Don't send SIGCHLD when children stop
@@ -353,6 +353,9 @@ fn setupSigactionFnFrame(regs: *arch.Regs, result: SigRes) void {
 
     const siginfo_cnt: [*]u8 = @ptrFromInt(siginfo_ptr);
     @memset(siginfo_cnt[0..@sizeOf(Siginfo)], 0);
+
+    const siginfo: *Siginfo = @ptrFromInt(siginfo_ptr);
+    siginfo.signo = @intCast(result.signal);
 
     const ucontext_ptr = siginfo_ptr + @sizeOf(Siginfo);
 

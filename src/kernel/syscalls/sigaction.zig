@@ -33,7 +33,28 @@ pub fn sigreturn() !u32 {
     signal_regs.* = saved_regs.*;
     action.mask.sigDelSet(signal);
     tsk.current.sighand.actions.set(signal, action);
-    return 0;
+    if (saved_regs.eax >= 0)
+        return @intCast(saved_regs.eax);
+    return krn.errors.fromErrno(saved_regs.eax);
+}
+
+pub fn rt_sigreturn() !u32 {
+    const signal_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
+    const num: *u32 = @ptrFromInt(signal_regs.useresp);
+    const signal: signals.Signal = @enumFromInt(num.*);
+    var action = tsk.current.sighand.actions.get(signal);
+    // for normal handlers offset should be 0 because restorer pops the signal number
+    var regs_offset: u32 = 0;
+    if (action.flags & signals.SA_SIGINFO != 0) {
+        regs_offset += 12;
+    }
+    const saved_regs: *arch.Regs = @ptrFromInt(signal_regs.useresp + regs_offset);
+    signal_regs.* = saved_regs.*;
+    action.mask.sigDelSet(signal);
+    tsk.current.sighand.actions.set(signal, action);
+    if (saved_regs.eax >= 0)
+        return @intCast(saved_regs.eax);
+    return krn.errors.fromErrno(saved_regs.eax);
 }
 
 const SIG_BLOCK  : i32 = 0;	// for blocking signals
@@ -109,13 +130,16 @@ pub fn sigpending(uset: ?*signals.sigset_t) u32 {
     return 0;
 }
 
-pub fn rt_sigsuspend(mask: u32) !u32 {
-    // krn.logger.INFO("Sigsuspend mask {b}\n", .{mask});
+pub fn rt_sigsuspend(_mask: ?*signals.sigset_t) !u32 {
+    const mask = _mask orelse
+        return errors.EFAULT;
+    krn.logger.INFO("sigsuspend mask {b:0>32}", .{mask._bits[0]});
+    
     // const old: u32 = krn.task.current.sigmask._bits[0];
-    _ = mask;
+    // defer krn.task.current.sigmask._bits[0] = old;
+
+    krn.task.current.sigmask._bits[0] = mask._bits[0];
+    krn.task.current.sigmask._bits[1] = mask._bits[1];
     krn.task.current.sigmask.sigDelSet(signals.Signal.SIGCHLD);
-    // krn.task.current.state = .INTERRUPTIBLE_SLEEP;
-    krn.sched.reschedule();
-    // krn.task.current.sigmask._bits[0] = old;
     return errors.EINTR;
 }

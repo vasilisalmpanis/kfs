@@ -47,7 +47,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
             if (stat_addr != null) {
                 stat_addr.?.* = task.result;
             }
-            return 0;
+            return @intCast(pid);
         } else {
             krn.logger.INFO("ERROR\n", .{});
             return errors.ECHILD;
@@ -64,12 +64,13 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 var it = tsk.current.tree.child.?.siblingsIterator();
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
+                    const child_pid = res.pid;
                     if (res.state == .ZOMBIE and res.pgid == tsk.current.pgid) {
                         res.finish();
                         if (stat_addr != null) {
                             stat_addr.?.* = res.result;
                         }
-                        return 0;
+                        return child_pid;
                     }
                 }
                 if (options & WNOHANG > 0)
@@ -86,12 +87,13 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 var it = tsk.current.tree.child.?.siblingsIterator();
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
+                    const child_pid = res.pid;
                     if (res.state == .ZOMBIE) {
                         res.finish();
                         if (stat_addr != null) {
                             stat_addr.?.* = res.result;
                         }
-                        return 0;
+                        return child_pid;
                     }
                 }
                 if (options & WNOHANG > 0)
@@ -109,12 +111,13 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 var it = tsk.current.tree.child.?.siblingsIterator();
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
+                    const child_pid = res.pid;
                     if (res.state == .ZOMBIE and pgid == res.pgid) {
                         res.finish();
                         if (stat_addr != null) {
                             stat_addr.?.* = res.result;
                         }
-                        return 0;
+                        return child_pid;
                     }
                 }
                 if (options & WNOHANG > 0)
