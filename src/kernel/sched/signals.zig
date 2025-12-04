@@ -288,6 +288,20 @@ pub const SigHand = struct {
         return false;
     }
 
+    pub fn hasPending(self: *SigHand) bool {
+        if (!self.isReady())
+            return false;
+        var it = self.pending.iterator(.{});
+        while (it.next()) |i| {
+            const signal: Signal = @enumFromInt(i);
+            if (self.isBlocked(signal)) {
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
     pub fn deliverSignal(self: *SigHand) SigRes {
         var it = self.pending.iterator(.{});
         while (it.next()) |i| {
