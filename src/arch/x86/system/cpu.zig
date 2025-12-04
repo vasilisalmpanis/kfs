@@ -50,6 +50,11 @@ pub const Regs = struct {
         };
     }
 
+    pub fn state() *Regs{
+        const stack_bottom = krn.task.current.stack_bottom;
+        return @ptrFromInt(stack_bottom + krn.STACK_SIZE - @sizeOf(Regs));
+    }
+
     pub fn dump(self: *Regs) void {
         krn.logger.INFO("EIP: {X:0>8}\n", .{ self.eip});
 
