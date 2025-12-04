@@ -131,15 +131,25 @@ pub fn sigpending(uset: ?*signals.sigset_t) u32 {
 }
 
 pub fn rt_sigsuspend(_mask: ?*signals.sigset_t) !u32 {
+    const state = arch.Regs.state();
     const mask = _mask orelse
         return errors.EFAULT;
     krn.logger.INFO("sigsuspend mask {b:0>32}", .{mask._bits[0]});
     
-    // const old: u32 = krn.task.current.sigmask._bits[0];
-    // defer krn.task.current.sigmask._bits[0] = old;
+    const old  = krn.task.current.sigmask;
+    defer krn.task.current.sigmask = old;
 
-    krn.task.current.sigmask._bits[0] = mask._bits[0];
-    krn.task.current.sigmask._bits[1] = mask._bits[1];
-    krn.task.current.sigmask.sigDelSet(signals.Signal.SIGCHLD);
+    krn.task.current.sigmask = mask.*;
+
+    if (krn.task.current.sighand.hasPending()) {
+        _ = signals.processSignals(state);
+        return errors.EINTR;
+    }
+
+    krn.task.current.state = .INTERRUPTIBLE_SLEEP;
+    krn.sched.reschedule();
+
+    _ = signals.processSignals(state);
+
     return errors.EINTR;
 }

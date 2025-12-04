@@ -106,6 +106,8 @@ fn findNextTask() *tsk.Task {
         const task = i.curr.entry(tsk.Task, "list");
         if (task.state == .UNINTERRUPTIBLE_SLEEP and currentMs() >= task.wakeup_time)
             task.state = .RUNNING;
+        if (task.state == .INTERRUPTIBLE_SLEEP and task.sighand.hasPending())
+            task.state = .RUNNING;
         if (task.state == .RUNNING) {
             return task;
         }
