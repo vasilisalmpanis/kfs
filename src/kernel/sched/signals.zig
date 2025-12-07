@@ -10,44 +10,44 @@ pub const Sigval = extern union {
 };
 
 const SigAltStack = extern struct {
-    sp: *anyopaque,
-    flags: i32,
-    size: usize,
+    sp: ?*anyopaque = null,
+    flags: i32 = 0,
+    size: usize = 0,
 };
 
 const SigContext = extern struct {
-    gs: u16,
-	fs: u16,
-	es: u16,
-	ds: u16,
-	edi: u32,
-	esi: u32,
-	ebp: u32,
-	esp: u32,
-	ebx: u32,
-	edx: u32,
-	ecx: u32,
-	eax: u32,
-	trapno: u32,
-	err: u32,
-	eip: u32,
-	cs: u16,
-    __csh: u16,
-	eflags: u32,
-	esp_at_signal: u32,
-	ss: u16,
-    __ssh: u16,
-	fpstate: u32,
-	oldmask: u32,
-	cr2: u32,
+    gs: u16 = 0,
+	fs: u16 = 0,
+	es: u16 = 0,
+	ds: u16 = 0,
+	edi: u32 = 0,
+	esi: u32 = 0,
+	ebp: u32 = 0,
+	esp: u32 = 0,
+	ebx: u32 = 0,
+	edx: u32 = 0,
+	ecx: u32 = 0,
+	eax: u32 = 0,
+	trapno: u32 = 0,
+	err: u32 = 0,
+	eip: u32 = 0,
+	cs: u16 = 0,
+    __csh: u16 = 0,
+	eflags: u32 = 0,
+	esp_at_signal: u32 = 0,
+	ss: u16 = 0,
+    __ssh: u16 = 0,
+	fpstate: u32 = 0,
+	oldmask: u32 = 0,
+	cr2: u32 = 0,
 };
 
-const Ucontext = extern struct {
-    flags: u32,
-    link: *@This(),
-    stack: SigAltStack,
-    mcontext: SigContext,
-    mask: sigset_t,
+pub const Ucontext = extern struct {
+    flags: u32 = 0,
+    link: ?*@This() = null,
+    stack: SigAltStack = SigAltStack{},
+    mcontext: SigContext = SigContext{},
+    mask: sigset_t = .{ ._bits = .{0, 0} },
 };
 
 pub const SiginfoFieldsUnion = extern union {
@@ -343,44 +343,55 @@ pub const SigHand = struct {
     }
 };
 
-fn setupHadlerFnFrame(regs: *arch.Regs, result: SigRes) void {
-    const returnAddrSize: u32 = 4 + 4 + @sizeOf(arch.Regs);
-    const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 8);
-    saved_regs.* = regs.*;
-    regs.eip = @intFromPtr(result.action.handler.handler);
-    regs.useresp -= returnAddrSize;
+fn setupSiginfo(ptr: u32, sig: u32, siginfo: ?*Siginfo) void {
+    const arr: [*]u8 = @ptrFromInt(ptr);
+    @memset(arr[0..@sizeOf(Siginfo)], 0);
 
-    const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
-    signal_stack[0] = @intFromPtr(result.action.restorer);
-    signal_stack[1] = result.signal;
+    const _siginfo: *Siginfo = @ptrFromInt(ptr);
+    if (siginfo) |s| {
+        _siginfo.* = s.*;
+    } else {
+        _siginfo.signo = @intCast(sig);
+    }
 }
 
-fn setupSigactionFnFrame(regs: *arch.Regs, result: SigRes) void {
+fn setupUcontext(ptr: u32, ucontext: ?*Ucontext) void {
+    const arr: [*]u8 = @ptrFromInt(ptr);
+    @memset(arr[0..@sizeOf(Ucontext)], 0);
+
+    const _ucontext: *Ucontext = @ptrFromInt(ptr);
+    if (ucontext) |u| {
+        _ucontext.* = u.*;
+    } else {
+        _ucontext.mask._bits[0] = krn.task.current.sigmask._bits[0];
+        _ucontext.mask._bits[1] = krn.task.current.sigmask._bits[1];
+    }
+}
+
+fn setupHandlerFnFrame(
+    regs: *arch.Regs,
+    result: SigRes,
+    ucontext: ?*Ucontext,
+) void {
     const returnAddrSize: u32 = 4 + 4 + 4 + 4 + @sizeOf(arch.Regs) + @sizeOf(Siginfo) + @sizeOf(Ucontext);
     const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 16);
     const regs_ptr: u32 = @intFromPtr(saved_regs);
+
     saved_regs.* = regs.*;
     regs.eip = @intFromPtr(result.action.handler.sigaction);
     regs.useresp -= returnAddrSize;
 
     const siginfo_ptr = regs_ptr + @sizeOf(arch.Regs);
-
-    const siginfo_cnt: [*]u8 = @ptrFromInt(siginfo_ptr);
-    @memset(siginfo_cnt[0..@sizeOf(Siginfo)], 0);
-
-    const siginfo: *Siginfo = @ptrFromInt(siginfo_ptr);
-    siginfo.signo = @intCast(result.signal);
+    setupSiginfo(siginfo_ptr, result.signal, null);
 
     const ucontext_ptr = siginfo_ptr + @sizeOf(Siginfo);
-
-    const ucontext_cnt: [*]u8 = @ptrFromInt(ucontext_ptr);
-    @memset(ucontext_cnt[0..@sizeOf(Ucontext)], 0);
+    setupUcontext(ucontext_ptr, ucontext);
 
     const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
     signal_stack[0] = @intFromPtr(result.action.restorer);
     signal_stack[1] = result.signal;
     signal_stack[2] = siginfo_ptr;
-    signal_stack[3] = 0;
+    signal_stack[3] = ucontext_ptr;
 }
 
 pub fn setupRegs(regs: *arch.Regs) *arch.Regs {
@@ -394,7 +405,7 @@ pub fn setupRegs(regs: *arch.Regs) *arch.Regs {
     return regs;
 }
 
-pub fn processSignals(regs: *arch.Regs) *arch.Regs {
+pub fn processSignals(regs: *arch.Regs, ucontext: ?*Ucontext) *arch.Regs {
     const task = krn.task.current;
     if (task.sighand.isReady()) {
         const result = task.sighand.deliverSignal();
@@ -403,11 +414,11 @@ pub fn processSignals(regs: *arch.Regs) *arch.Regs {
         if (result.action.handler.handler == default_sigaction.handler.handler)
             return defaultHandler(@enumFromInt(result.signal), regs);
         regs.* = setupRegs(regs).*;
-        if (result.action.flags & SA_SIGINFO == 0) {
-            setupHadlerFnFrame(regs, result);
-        } else {
-            setupSigactionFnFrame(regs, result);
-        }
+        setupHandlerFnFrame(
+            regs,
+            result,
+            ucontext,
+        );
         return regs;
     }
     return regs;

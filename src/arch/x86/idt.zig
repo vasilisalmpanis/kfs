@@ -53,7 +53,7 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
         new_state = krn.sched.schedule(state);
     }
     if (tsk.current.tsktype != .KTHREAD)
-        new_state = signals.processSignals(new_state);
+        new_state = signals.processSignals(new_state, null);
     return new_state;
 }
 

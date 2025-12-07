@@ -620,6 +620,14 @@ pub const kernel = struct {
     };
 
     pub const signals = struct {
+        pub const Ucontext = extern struct {
+            flags : u32= 0,
+            link : ?*kernel.signals.Ucontext= null,
+            stack : std.sched.signals.SigAltStack,
+            mcontext : std.sched.signals.SigContext,
+            mask : kernel.signals.sigset_t,
+        };
+
         pub const Siginfo = extern struct {
             signo : i32,
             errno : i32,
