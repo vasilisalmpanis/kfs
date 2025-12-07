@@ -68,6 +68,7 @@ pub const Regs = struct {
         krn.logger.INFO("ds {X:0>8}\n", .{self.ds});
         krn.logger.INFO("cs {X:0>8}\n", .{self.cs});
         krn.logger.INFO("ss {X:0>8}\n", .{self.ss});
+        krn.logger.INFO("int_no {X:0>8}\n", .{self.int_no});
     }
 
     pub fn isRing3(self: *Regs) bool {

@@ -25,12 +25,19 @@ pub fn sigreturn() !u32 {
     const signal: signals.Signal = @enumFromInt(num.*);
     var action = tsk.current.sighand.actions.get(signal);
     // for normal handlers offset should be 0 because restorer pops the signal number
-    var regs_offset: u32 = 0;
-    if (action.flags & signals.SA_SIGINFO != 0) {
-        regs_offset += 8;
-    }
-    const saved_regs: *arch.Regs = @ptrFromInt(signal_regs.useresp + regs_offset);
+    const regs_addr: u32 = signal_regs.useresp + 8;
+    const saved_regs: *arch.Regs = @ptrFromInt(regs_addr);
+
+    const siginfo_addr: u32 = regs_addr + @sizeOf(arch.Regs);
+    const siginfo: *signals.Siginfo = @ptrFromInt(siginfo_addr);
+    _ = siginfo;
+
+    const ucontext_addr: u32 = siginfo_addr + @sizeOf(signals.Siginfo);
+    const ucontext: *signals.Ucontext = @ptrFromInt(ucontext_addr);
+
     signal_regs.* = saved_regs.*;
+    tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
+    tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
     action.mask.sigDelSet(signal);
     tsk.current.sighand.actions.set(signal, action);
     if (saved_regs.eax >= 0)
@@ -44,12 +51,19 @@ pub fn rt_sigreturn() !u32 {
     const signal: signals.Signal = @enumFromInt(num.*);
     var action = tsk.current.sighand.actions.get(signal);
     // for normal handlers offset should be 0 because restorer pops the signal number
-    var regs_offset: u32 = 0;
-    if (action.flags & signals.SA_SIGINFO != 0) {
-        regs_offset += 12;
-    }
-    const saved_regs: *arch.Regs = @ptrFromInt(signal_regs.useresp + regs_offset);
+    const regs_addr: u32 = signal_regs.useresp + 12;
+    const saved_regs: *arch.Regs = @ptrFromInt(regs_addr);
+
+    const siginfo_addr: u32 = regs_addr + @sizeOf(arch.Regs);
+    const siginfo: *signals.Siginfo = @ptrFromInt(siginfo_addr);
+    _ = siginfo;
+
+    const ucontext_addr: u32 = siginfo_addr + @sizeOf(signals.Siginfo);
+    const ucontext: *signals.Ucontext = @ptrFromInt(ucontext_addr);
+
     signal_regs.* = saved_regs.*;
+    tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
+    tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
     action.mask.sigDelSet(signal);
     tsk.current.sighand.actions.set(signal, action);
     if (saved_regs.eax >= 0)
@@ -136,20 +150,20 @@ pub fn rt_sigsuspend(_mask: ?*signals.sigset_t) !u32 {
         return errors.EFAULT;
     krn.logger.INFO("sigsuspend mask {b:0>32}", .{mask._bits[0]});
     
-    const old  = krn.task.current.sigmask;
-    defer krn.task.current.sigmask = old;
+    var uctx = signals.Ucontext{};
+    uctx.mask = krn.task.current.sigmask;
 
     krn.task.current.sigmask = mask.*;
 
     if (krn.task.current.sighand.hasPending()) {
-        _ = signals.processSignals(state);
+        _ = signals.processSignals(state, &uctx);
         return errors.EINTR;
     }
 
     krn.task.current.state = .INTERRUPTIBLE_SLEEP;
     krn.sched.reschedule();
 
-    _ = signals.processSignals(state);
+    _ = signals.processSignals(state, &uctx);
 
     return errors.EINTR;
 }
