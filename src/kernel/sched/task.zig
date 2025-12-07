@@ -199,6 +199,7 @@ pub const Task = struct {
 
         self.setName(name);
         self.sighand = current.sighand;
+        self.sigmask = current.sigmask;
         self.sighand.pending = std.StaticBitSet(32).initEmpty();
 
         if (tp != .KTHREAD) { // For now
