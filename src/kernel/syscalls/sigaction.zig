@@ -40,8 +40,9 @@ pub fn sigreturn() !u32 {
     tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
     action.mask.sigDelSet(signal);
     tsk.current.sighand.actions.set(signal, action);
-    if (saved_regs.eax >= 0)
+    if (saved_regs.eax >= 0) { // ERESTARTSYS
         return @intCast(saved_regs.eax);
+    }
     return krn.errors.fromErrno(saved_regs.eax);
 }
 
@@ -156,6 +157,7 @@ pub fn rt_sigsuspend(_mask: ?*signals.sigset_t) !u32 {
     krn.task.current.sigmask = mask.*;
 
     if (krn.task.current.sighand.hasPending()) {
+        state.eax = krn.errors.toErrno(errors.EINTR);
         _ = signals.processSignals(state, &uctx);
         return errors.EINTR;
     }
@@ -163,6 +165,7 @@ pub fn rt_sigsuspend(_mask: ?*signals.sigset_t) !u32 {
     krn.task.current.state = .INTERRUPTIBLE_SLEEP;
     krn.sched.reschedule();
 
+    state.eax = krn.errors.toErrno(errors.EINTR);
     _ = signals.processSignals(state, &uctx);
 
     return errors.EINTR;
