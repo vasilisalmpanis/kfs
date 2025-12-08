@@ -33,6 +33,7 @@ pub export fn exceptionHandler(state: *Regs) callconv(.c) void {
 
 pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     @setRuntimeSafety(false);
+    const orig_eax = state.eax;
     if (@intFromPtr(state) % 4 != 0)
         krn.logger.WARN("IRQ: Unaligned stack address {x}\n", .{@intFromPtr(state)});
     var new_state: *Regs = state;
@@ -52,8 +53,12 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     if (state.int_no == TIMER_INTERRUPT) {
         new_state = krn.sched.schedule(state);
     }
-    if (tsk.current.tsktype != .KTHREAD)
-        new_state = signals.processSignals(new_state, null);
+    if (tsk.current.tsktype != .KTHREAD) {
+        var ucontext = signals.Ucontext{};
+        ucontext.setRegs(new_state, orig_eax);
+        ucontext.mask = tsk.current.sigmask;
+        new_state = signals.processSignals(new_state, &ucontext);
+    }
     return new_state;
 }
 

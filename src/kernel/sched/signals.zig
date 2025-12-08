@@ -16,7 +16,7 @@ const SigAltStack = extern struct {
 };
 
 const SigContext = extern struct {
-    gs: u16 = 0,
+        gs: u16 = 0,
 	fs: u16 = 0,
 	es: u16 = 0,
 	ds: u16 = 0,
@@ -32,11 +32,11 @@ const SigContext = extern struct {
 	err: u32 = 0,
 	eip: u32 = 0,
 	cs: u16 = 0,
-    __csh: u16 = 0,
+        __csh: u16 = 0,
 	eflags: u32 = 0,
 	esp_at_signal: u32 = 0,
 	ss: u16 = 0,
-    __ssh: u16 = 0,
+        __ssh: u16 = 0,
 	fpstate: u32 = 0,
 	oldmask: u32 = 0,
 	cr2: u32 = 0,
@@ -48,6 +48,12 @@ pub const Ucontext = extern struct {
     stack: SigAltStack = SigAltStack{},
     mcontext: SigContext = SigContext{},
     mask: sigset_t = .{ ._bits = .{0, 0} },
+
+    pub fn setRegs(self: *Ucontext, regs: *arch.Regs, syscall: i32) void {
+        self.mcontext.eax = @bitCast(regs.eax);
+        self.mcontext.trapno = @bitCast(syscall);
+        // TODO add the rest of the regs
+    }
 };
 
 pub const SiginfoFieldsUnion = extern union {
@@ -394,17 +400,6 @@ fn setupHandlerFnFrame(
     signal_stack[3] = ucontext_ptr;
 }
 
-pub fn setupRegs(regs: *arch.Regs) *arch.Regs {
-    if (!regs.isRing3()) {
-        const uregs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
-        regs.* = uregs.*;
-        if (regs.int_no == arch.idt.SYSCALL_INTERRUPT) {
-            regs.eax = krn.errors.toErrno(krn.errors.PosixError.EINTR);
-        }
-    }
-    return regs;
-}
-
 pub fn processSignals(regs: *arch.Regs, ucontext: ?*Ucontext) *arch.Regs {
     const task = krn.task.current;
     if (task.sighand.isReady()) {
@@ -413,7 +408,10 @@ pub fn processSignals(regs: *arch.Regs, ucontext: ?*Ucontext) *arch.Regs {
             return regs;
         if (result.action.handler.handler == default_sigaction.handler.handler)
             return defaultHandler(@enumFromInt(result.signal), regs);
-        regs.* = setupRegs(regs).*;
+        if (!regs.isRing3()) {
+            tsk.current.sighand.pending.toggle(result.signal);
+            return regs;
+        }
         setupHandlerFnFrame(
             regs,
             result,
