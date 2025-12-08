@@ -136,6 +136,9 @@ pub const PosixError = error{
     ENOTRECOVERABLE, // 131 - State not recoverable
     ERFKILL,         // 132 - Operation not possible due to RF-kill
     EHWPOISON,       // 133 - Memory page has hardware error
+
+    // From here on these errors belong only in kernel space
+    ERESTARTSYS,     // 134 - KFS internal error for restarting syscalls
 };
 pub inline fn toErrno(err: PosixError) i32 {
     return -@as(i32, @intCast((@intFromError(err) - @intFromError(PosixError.EPERM) + 1)));
