@@ -401,24 +401,31 @@ fn setupHandlerFnFrame(
 }
 
 pub fn processSignals(regs: *arch.Regs, ucontext: ?*Ucontext) *arch.Regs {
+    if (!regs.isRing3()) {
+        return regs;
+    }
+
     const task = krn.task.current;
     if (task.sighand.isReady()) {
         const result = task.sighand.deliverSignal();
-        if (result.signal == 0)
+        if (result.signal == 0) {
+            // maybe restart
             return regs;
-        if (result.action.handler.handler == default_sigaction.handler.handler)
-            return defaultHandler(@enumFromInt(result.signal), regs);
-        if (!regs.isRing3()) {
-            tsk.current.sighand.pending.toggle(result.signal);
-            return regs;
+        }
+        if (result.action.handler.handler == default_sigaction.handler.handler) {
+            const _regs = defaultHandler(@enumFromInt(result.signal), regs);
+            // maybe restart
+            return _regs;
         }
         setupHandlerFnFrame(
             regs,
             result,
             ucontext,
         );
+        // Go to signal handler
         return regs;
     }
+    // maybe restart
     return regs;
 }
 
