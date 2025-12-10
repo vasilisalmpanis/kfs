@@ -39,14 +39,13 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
     krn.logger.DEBUG("waiting pid {d} from pid {d} rusage {x}", .{pid, tsk.current.pid, @intFromPtr(rusage)});
     if (pid > 0) {
         if (tsk.current.findChildByPid(@intCast(pid))) |task| {
-            defer task.refcount.unref();
             while (task.state != .ZOMBIE) {
                 sched.reschedule();
             }
-            task.finish();
             if (stat_addr != null) {
                 stat_addr.?.* = task.result;
             }
+            task.finish();
             return @intCast(pid);
         } else {
             krn.logger.INFO("ERROR\n", .{});
@@ -66,10 +65,10 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                     const res = i.curr.entry(tsk.Task, "tree");
                     const child_pid = res.pid;
                     if (res.state == .ZOMBIE and res.pgid == tsk.current.pgid) {
-                        res.finish();
                         if (stat_addr != null) {
                             stat_addr.?.* = res.result;
                         }
+                        res.finish();
                         return child_pid;
                     }
                 }
@@ -89,10 +88,10 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                     const res = i.curr.entry(tsk.Task, "tree");
                     const child_pid = res.pid;
                     if (res.state == .ZOMBIE) {
-                        res.finish();
                         if (stat_addr != null) {
                             stat_addr.?.* = res.result;
                         }
+                        res.finish();
                         return child_pid;
                     }
                 }
@@ -113,10 +112,10 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                     const res = i.curr.entry(tsk.Task, "tree");
                     const child_pid = res.pid;
                     if (res.state == .ZOMBIE and pgid == res.pgid) {
-                        res.finish();
                         if (stat_addr != null) {
                             stat_addr.?.* = res.result;
                         }
+                        res.finish();
                         return child_pid;
                     }
                 }
