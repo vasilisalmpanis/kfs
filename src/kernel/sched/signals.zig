@@ -281,15 +281,10 @@ pub const SigHand = struct {
     }
 
 
-    pub fn isBlocked(self: *SigHand, signal: Signal) bool {
-        if (tsk.current.sigmask.sigIsSet(signal))
+    pub fn isBlocked(_: *SigHand, signal: Signal) bool {
+        if (tsk.current.sigmask.sigIsSet(signal)) {
+            krn.logger.INFO("Blocked in mask\n", .{});
             return true;
-        for(1..32) |idx| {
-            const action = self.actions.get(@enumFromInt(idx));
-            if (action.mask.sigIsSet(@enumFromInt(idx))) {
-                if (action.mask.sigIsSet(signal))
-                    return true;
-            }
         }
         return false;
     }
@@ -411,6 +406,10 @@ pub fn processSignals(regs: *arch.Regs, ucontext: ?*Ucontext) *arch.Regs {
         if (result.signal == 0) {
             // maybe restart
             return regs;
+        }
+        if (result.action.handler.handler != default_sigaction.handler.handler and
+            result.action.handler.handler != ignore_sigaction.handler.handler) {
+            tsk.current.sigmask = result.action.mask;
         }
         if (result.action.handler.handler == default_sigaction.handler.handler) {
             const _regs = defaultHandler(@enumFromInt(result.signal), regs);
