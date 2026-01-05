@@ -67,11 +67,19 @@ fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
         @panic("Should not happen");
     };
     var buffer: [256]u8 = .{0} ** 256;
+    const status: u8 = switch (task.state) {
+        .RUNNING => 'R',
+        .INTERRUPTIBLE_SLEEP => 'S',
+        .UNINTERRUPTIBLE_SLEEP => 'D',
+        .STOPPED => 'T',
+        .ZOMBIE => 'Z',
+    };
     const string = try std.fmt.bufPrint(buffer[0..256],
-        "{d} ({s}) S 2 0 0 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 14 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+        "{d} ({s}) {c} 2 0 0 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 14 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
         .{
             task.pid,
             std.mem.span(@as([*:0]u8, @ptrCast(&task.name))),
+            status,
         }
     );
     var to_read: u32 = size;

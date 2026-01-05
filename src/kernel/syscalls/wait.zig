@@ -41,6 +41,8 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
         if (tsk.current.findChildByPid(@intCast(pid))) |task| {
             while (task.state != .ZOMBIE) {
                 sched.reschedule();
+                if (tsk.current.sighand.hasPending())
+                    return errors.EINTR;
             }
             if (stat_addr != null) {
                 stat_addr.?.* = task.result;
@@ -75,6 +77,8 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 if (options & WNOHANG > 0)
                     break;
                 sched.reschedule();
+                if (tsk.current.sighand.hasPending())
+                    return errors.EINTR;
             }
         }
     } else if (pid == -1) {
@@ -98,6 +102,8 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 if (options & WNOHANG > 0)
                     break;
                 sched.reschedule();
+                if (tsk.current.sighand.hasPending())
+                    return errors.EINTR;
             }
         }
     } else {
@@ -122,6 +128,8 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 if (options & WNOHANG > 0)
                     break;
                 sched.reschedule();
+                if (tsk.current.sighand.hasPending())
+                    return errors.EINTR;
             }
         } else {
         }
