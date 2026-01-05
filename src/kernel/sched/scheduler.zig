@@ -72,6 +72,7 @@ fn processTasks() void {
             if (curr == tsk.stopped_tasks)
                 tsk.stopped_tasks = curr.next;
         }
+        krn.fs.procfs.deleteProcess(task);
         curr.del();
         task.delFromTree(); // Already done in task finish but safe
         task.mm.?.delete();
