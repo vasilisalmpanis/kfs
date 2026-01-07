@@ -945,8 +945,8 @@ pub const kernel = struct {
     };
 
     pub const kernel_timespec = extern struct {
-        tv_sec : i64,
-        tv_nsec : i64,
+        tv_sec : i32,
+        tv_nsec : i32,
     };
 
     pub const time = struct {
