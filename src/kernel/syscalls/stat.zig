@@ -268,7 +268,7 @@ pub fn fstatat64(
             return errors.ENOENT;
         const from_path = file.path.?.clone();
         defer from_path.release();
-        const target = try fs.path.resolveFrom(path_slice, from_path);
+        const target = try fs.path.resolveFrom(path_slice, from_path, true);
         defer target.release();
         krn.logger.INFO(" target {s} {any}\n", .{target.dentry.name, target.dentry.inode.mode.isDir()});
         try do_stat(target.dentry.inode, buf.?);

@@ -56,9 +56,9 @@ pub fn renameat2(
     defer old_parent.release();
     const new_parent = try resolveat(newdirfd, _newpath, &newname);
     defer new_parent.release();
-    const old_path = try fs.path.resolveFrom(oldname, old_parent);
+    const old_path = try fs.path.resolveFrom(oldname, old_parent, true);
     errdefer old_path.release();
-    const new_path: ?fs.path.Path = fs.path.resolveFrom(newname, new_parent) catch |err| blk: {
+    const new_path: ?fs.path.Path = fs.path.resolveFrom(newname, new_parent, true) catch |err| blk: {
         switch (err) {
             errors.ENOENT => break :blk null,
             else => return err,

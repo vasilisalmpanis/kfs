@@ -48,7 +48,7 @@ pub const Path = struct {
             var path: [1024]u8 = .{0} ** 1024;
             var path_slice: []u8 = path[0..1024];
             try getLink(self.dentry.inode, &path_slice);
-            const new_path = try resolveFrom(path_slice, prev_path);
+            const new_path = try resolveFrom(path_slice, prev_path, true);
             self.release();
             self.dentry = new_path.dentry;
             self.mnt = new_path.mnt;
@@ -57,7 +57,7 @@ pub const Path = struct {
         }
     }
 
-    pub fn stepInto(self: *Path, segment: [] const u8) !void {
+    pub fn stepInto(self: *Path, segment: [] const u8, follow: bool) !void {
         if (segment.len == 0) return;
         var prev_path: Path = self.clone();
         defer prev_path.release();
@@ -94,7 +94,7 @@ pub const Path = struct {
             self.setDentry(dentry);
         }
         self.resolveMount();
-        if (self.dentry.inode.mode.isLink()) {
+        if (self.dentry.inode.mode.isLink() and follow) {
             try self.followLink(prev_path);
         }
     }
@@ -105,7 +105,7 @@ pub const Path = struct {
         ) {
             return buf[0..0];
         }
-        var curr = try resolveFrom("..", self);
+        var curr = try resolveFrom("..", self, true);
         const res = try curr.getAbsPath(buf);
         buf[res.len] = '/';
         var _d: *fs.DEntry = undefined;
@@ -159,7 +159,7 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !Path {
         cwd.mnt,
         cwd.dentry
     );
-    try curr.stepInto(".");
+    try curr.stepInto(".", true);
     var it = std.mem.tokenizeScalar(
         u8,
         path,
@@ -170,7 +170,7 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !Path {
             last.* = segment;
             return curr;
         }
-        try curr.stepInto(segment);
+        try curr.stepInto(segment, true);
     }
     return curr;
 }
@@ -188,7 +188,7 @@ pub fn dir_resolve_from(path: []const u8, from: Path, last: *[]const u8) !Path {
         cwd.mnt,
         cwd.dentry
     );
-    try curr.stepInto(".");
+    try curr.stepInto(".", true);
     var it = std.mem.tokenizeScalar(
         u8,
         path,
@@ -199,7 +199,7 @@ pub fn dir_resolve_from(path: []const u8, from: Path, last: *[]const u8) !Path {
             last.* = segment;
             return curr;
         }
-        try curr.stepInto(segment);
+        try curr.stepInto(segment, true);
     }
     return curr;
 }
@@ -210,11 +210,11 @@ pub fn isRelative(path: []const u8) bool {
     return false;
 }
 
-pub fn resolveFrom(path: []const u8, from: Path) !Path {
+pub fn resolveFrom(path: []const u8, from: Path, follow: bool) !Path {
     var last: [] const u8 = "";
     var res = try dir_resolve_from(path, from, &last);
     if (last.len > 0) {
-        try res.stepInto(last);
+        try res.stepInto(last, follow);
     }
     return res;
 }
@@ -223,7 +223,7 @@ pub fn resolve(path: []const u8) !Path {
     var last: [] const u8 = "";
     var res = try dir_resolve(path, &last);
     if (last.len > 0) {
-        try res.stepInto(last);
+        try res.stepInto(last, true);
     }
     return res;
 }
