@@ -20,7 +20,7 @@ pub fn do_open(
     errdefer _ = tsk.current.files.releaseFD(fd);
     const parent_inode: *fs.Inode = parent_dir.dentry.inode;
     var target_path = parent_dir.clone();
-    target_path.stepInto(name) catch {
+    target_path.stepInto(name, true) catch {
         if (flags & fs.file.O_CREAT != 0) {
             new_mode.type = kernel.fs.S_IFREG;
             if (

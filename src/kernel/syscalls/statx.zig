@@ -138,7 +138,8 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
         }
         return errors.EBADF;
     }
-    var from_path = krn.task.current.fs.pwd;
+    var from_path = krn.task.current.fs.pwd.clone();
+    defer from_path.release();
     if (path_s[0] != '/') {
         if (dirfd == fs.AT_FDCWD) {
 
@@ -154,19 +155,7 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
     }
     const clone_path = from_path.clone();
     defer clone_path.release();
-    if (flags & fs.AT_SYMLINK_NOFOLLOW != 0) {
-        var segment: []const u8 = "";
-        const parent = try fs.path.dir_resolve_from(path_s, clone_path, &segment);
-        defer parent.release();
-        var target: *fs.DEntry = undefined;
-        if (segment.len == 1 and segment[0] == '.') {
-            target = parent.dentry;
-        } else {
-            target = try parent.dentry.inode.ops.lookup(parent.dentry, segment);
-        }
-        return try do_statx(target.inode, statxbuf.?);
-    }
-    const target_path = try fs.path.resolveFrom(path_s, clone_path);
+    const target_path = try fs.path.resolveFrom(path_s, clone_path, flags & fs.AT_SYMLINK_NOFOLLOW == 0);
     defer target_path.release();
     return try do_statx(target_path.dentry.inode, statxbuf.?);
 }

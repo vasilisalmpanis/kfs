@@ -29,7 +29,7 @@ pub fn do_chown(
         }
         return errors.ENOENT;
     }
-    const target = try fs.path.resolveFrom(path, from);
+    const target = try fs.path.resolveFrom(path, from, true);
     defer target.release();
 
     if (target.dentry.inode.ops.setattr) |_setattr| {

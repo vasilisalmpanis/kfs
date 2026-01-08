@@ -46,7 +46,7 @@ pub fn utimensat(
         }
         return errors.EBADF;
     }
-    const target = try fs.path.resolveFrom(path, from);
+    const target = try fs.path.resolveFrom(path, from, true);
     defer target.release();
     if (target.dentry.inode.ops.setattr) |_setattr| {
         const attr = fs.InodeAttrs{
