@@ -324,8 +324,8 @@ pub const MM = struct {
                     if (hint < self.vmas.?.start)
                         self.vmas = new_vma;        
                     krn.logger.DEBUG(
-                        "mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
-                        .{hint, end}
+                        "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+                        .{krn.task.current.pid, hint, end}
                     );
                     return @intCast(hint);
                 }
@@ -357,8 +357,8 @@ pub const MM = struct {
             self.vmas = new_vma;
         }
         krn.logger.DEBUG(
-            "mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
-            .{hint, end}
+            "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+            .{krn.task.current.pid, hint, end}
         );
         return @intCast(hint);
     }

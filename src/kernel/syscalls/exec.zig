@@ -39,6 +39,8 @@ pub fn doExecve(
         return errors.ENOMEM;
     var read: u32 = 0;
     krn.logger.INFO("Executing {s} {d}\n", .{filename, file.inode.size});
+    asm volatile("cli;");
+    defer asm volatile("sti;");
     while (read < file.inode.size) {
         read += try file.ops.read(file, @ptrCast(&slice[read]), slice.len);
     }

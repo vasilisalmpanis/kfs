@@ -8,7 +8,7 @@ pub fn close(fd: i32) !u32 {
     if (fd < 0)
         return errors.EBADF;
     if (tsk.current.files.releaseFD(@intCast(fd))) {
-        kernel.logger.INFO("finished closing {d}\n", .{fd});
+        kernel.logger.INFO("[PID {d}] finished closing {d}\n", .{tsk.current.pid, fd});
         return 0;
     }
     kernel.logger.INFO("error closing {d}\n", .{fd});

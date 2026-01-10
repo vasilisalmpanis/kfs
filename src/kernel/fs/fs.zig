@@ -35,6 +35,9 @@ pub const File = file.File;
 pub const TaskFiles = file.TaskFiles;
 pub const FileOps = file.FileOps;
 
+// Pipe
+pub const pipe = @import("./pipe.zig");
+
 pub const examplefs = @import("example/filesystem.zig");
 pub const sysfs = @import("sys/filesystem.zig");
 pub const devfs = @import("dev/filesystem.zig");
@@ -420,6 +423,15 @@ pub const UMode = packed struct {
             .usr = 0o6,
             .other = 0o6,
             .type = S_IFSOCK,
+        };
+    }
+
+    pub fn fifo() UMode {
+        return UMode{
+            .grp = 0o6,
+            .usr = 0o6,
+            .other = 0o6,
+            .type = S_IFIFO,
         };
     }
 };
