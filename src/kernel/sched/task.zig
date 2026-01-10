@@ -202,16 +202,6 @@ pub const Task = struct {
         self.sigmask = current.sigmask;
         self.sighand.pending = std.StaticBitSet(32).initEmpty();
 
-        if (tp != .KTHREAD) { // For now
-            if (krn.fs.TaskFiles.new()) |files| {
-                try files.dup(current.files);
-                self.files = files;
-            } else {
-                krn.logger.ERROR("task: initSelf: failed to alloc TaskFiles", .{});
-                return errors.ENOMEM;
-            }
-        }
-
         tasks_mutex.lock();
         current.tree.addChild(&self.tree);
         current.list.addTail(&self.list);

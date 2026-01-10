@@ -792,7 +792,7 @@ pub const kernel = struct {
             ctime : u32= 0,
             mtime : u32= 0,
             dev_id : drivers.device.dev_t,
-            data : extern union { dev: ?*drivers.device.Device, sock: ?*kernel.socket.Socket },
+            data : extern union { dev: ?*drivers.device.Device, sock: ?*kernel.socket.Socket, pipe: ?*kernel.fs.pipe.Pipe },
             size : u32= 0,
             links : u32= 1,
             ops : *const kernel.fs.InodeOps,
@@ -863,6 +863,18 @@ pub const kernel = struct {
 
 
 
+
+        pub const pipe = struct {
+            pub const Pipe = struct {
+                _buffer : [128]u8,
+                writer : std.Io.Writer,
+                reader : std.Io.Reader,
+                readers : u32= 1,
+                writers : u32= 1,
+                lock : kernel.Mutex,
+            };
+
+        };
 
         pub const examplefs = struct {
             pub const ExampleFileSystem = struct {

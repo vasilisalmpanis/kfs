@@ -22,6 +22,7 @@ pub const Inode = struct {
     data: extern union {
         dev: ?*drv.device.Device,
         sock: ?*Socket,
+        pipe: ?*fs.pipe.Pipe,
     },
     size: u32 = 0,
     links: u32 = 1,

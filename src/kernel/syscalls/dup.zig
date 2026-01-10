@@ -6,6 +6,7 @@ const std = @import("std");
 const krn = @import("../main.zig");
 
 pub fn dup2(old_fd: u32, new_fd: u32) !u32 {
+    krn.logger.INFO("dup2 {d} -> {d}", .{old_fd, new_fd});
     if (krn.task.current.files.fds.get(old_fd)) |file| {
         if (old_fd == new_fd) {
             return new_fd;
