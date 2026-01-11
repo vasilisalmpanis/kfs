@@ -1,8 +1,6 @@
 const std = @import("std");
 const krn = @import("kernel");
 const io = @import("arch").io;
-const printf = @import("debug").printf;
-
 const scr = @import("../screen.zig");
 const kbd = @import("../kbd.zig");
 
@@ -11,20 +9,53 @@ const cdev = @import("../cdev.zig");
 
 const pdev = @import("./device.zig");
 const pdrv = @import("./driver.zig");
-const pbus = @import("./bus.zig");
 
-var tty_driver = pdrv.PlatformDriver {
-    .driver = drv.Driver {
+const t = @import("./termios.zig");
+const tty = @import("./tty_struct.zig");
+pub const TTY = tty.TTY;
+pub const ConsoleColors = tty.ConsoleColors;
+
+// tty ioctl
+pub const TCGETS: u32 = 0x5401;
+pub const TCSETS: u32 = 0x5402;
+pub const TCSETSW: u32 = 0x5403;
+pub const TCSETSF: u32 = 0x5404;
+pub const TCSBRK: u32 = 0x5409;
+pub const TCXONC: u32 = 0x540A;
+pub const TCFLSH: u32 = 0x540B;
+pub const TIOCGPGRP: u32 = 0x540F;
+pub const TIOCSPGRP: u32 = 0x5410;
+pub const TIOCOUTQ: u32 = 0x5411;
+pub const TIOCGWINSZ: u32 = 0x5413;
+pub const TIOCSWINSZ: u32 = 0x5414;
+pub const TIOCINQ: u32 = 0x541B;
+pub const TIOCNOTTY: u32 = 0x5422;
+pub const TIOCSCTTY: u32 = 0x540E;
+pub const TIOCGSID: u32 = 0x5429;
+pub const FIONBIO: u32 = 0x5421;
+// VT/KD stubs
+pub const VT_OPENQRY: u32 = 0x5600;
+pub const VT_GETSTATE: u32 = 0x5603;
+pub const VT_ACTIVATE: u32 = 0x5606;
+pub const VT_WAITACTIVE: u32 = 0x5607;
+pub const KDGETMODE: u32 = 0x4B3B;
+pub const KDSETMODE: u32 = 0x4B3A;
+pub const KD_TEXT: u32 = 0x00;
+pub const KD_GRAPHICS: u32 = 0x01;
+
+// driver
+var tty_driver = pdrv.PlatformDriver{
+    .driver = drv.Driver{
         .list = undefined,
         .name = "tty",
         .probe = undefined,
         .remove = undefined,
-        .fops = &tty_file_ops,
+        .fops = &tty_file_ops
     },
     .probe = tty_probe,
-    .remove = tty_remove,
-};
-
+    .remove = tty_remove
+}
+;
 var tty_file_ops = krn.fs.FileOps{
     .open = tty_open,
     .close = tty_close,
@@ -32,43 +63,300 @@ var tty_file_ops = krn.fs.FileOps{
     .write = tty_write,
     .lseek = null,
     .readdir = null,
+    .ioctl = tty_ioctl
 };
 
-fn tty_open(_: *krn.fs.File, _: *krn.fs.Inode) !void {
-    krn.logger.WARN("tty file opened\n", .{});
+// file ops
+fn getTTY(file: *krn.fs.File) !*TTY {
+    if (file.inode.data.dev) |_d|
+        return @ptrCast(@alignCast(_d.data));
+    return krn.errors.PosixError.EIO;
 }
 
-fn tty_close(_: *krn.fs.File) void {
+fn tty_open(_: *krn.fs.File, _: *krn.fs.Inode) !void {
+    krn.logger.WARN("TTY file opened\n", .{});
+}
+
+fn tty_close(base: *krn.fs.File) void {
+    krn.logger.WARN("TTY {s} closed\n", .{base.path.?.dentry.name});
 }
 
 fn tty_read(file: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
-    if (file.inode.data.dev) |_d| {
-        const tty: *TTY = @ptrCast(@alignCast(_d.data));
-
-        while (!tty.file_buff.hasLine()) {}
-
-        tty.lock.lock();
-        defer tty.lock.unlock();
-        return @intCast(tty.file_buff.readLineInto(buf[0..size]));
+    var _tty = try getTTY(file);
+    if (_tty.term.c_lflag.ICANON) {
+        while (!_tty.file_buff.hasLine()){}
+        _tty.lock.lock();
+        defer _tty.lock.unlock();
+        return @intCast(_tty.file_buff.readLineInto(buf[0..size]));
+    } else {
+        const vmin: u8 = _tty.term.c_cc[t.VMIN];
+        while (true) {
+            const avail = _tty.file_buff.available();
+            if (avail == 0) {
+                if (vmin == 0 or _tty.nonblock)
+                    return 0;
+                continue;
+            }
+            const to_read = @min(@as(u32, avail), size);
+            _tty.lock.lock();
+            const n = _tty.file_buff.readInto(buf[0..to_read]);
+            _tty.lock.unlock();
+            return @intCast(n);
+        }
     }
-    return krn.errors.PosixError.EIO;
 }
 
 fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
-    const msg_slice: []const u8 = buf[0..size];
-    if (file.inode.data.dev) |_d| {
-        const tty: *TTY = @ptrCast(@alignCast(_d.data));
-        tty.print(msg_slice);
-        return size;
+    var _tty = try getTTY(file);
+    const msg = buf[0..size];
+    krn.logger.DEBUG("TTY write {s}\n", .{msg});
+    var i: u32 = 0;
+    while (i < msg.len) : (i += 1) {
+        const c = msg[i];
+        if (c == '\n' and _tty.term.c_oflag.OPOST and _tty.term.c_oflag.ONLCR) {
+            _tty.consume('\r');
+            _tty.consume('\n');
+        } else {
+            _tty.consume(c);
+        }
     }
-    return krn.errors.PosixError.EIO;
+    _tty.render();
+    return size;
 }
 
+fn tty_ioctl(
+    file: *krn.fs.File,
+    op: u32,
+    data: ?*anyopaque
+) !u32 {
+    var _tty = try getTTY(file);
+    switch (op) {
+        TCGETS => {
+            if (data) |p| {
+                krn.logger.DEBUG("tty_ioctl TCGETS\n", .{});
+                const user_term: *t.Termios = @ptrCast(@alignCast(p));
+                user_term.* = _tty.term;
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        TCSETS, TCSETSW, TCSETSF => {
+            if (data) |p| {
+                const new_term: *const t.Termios = @ptrCast(@alignCast(p));
+                krn.logger.DEBUG("tty_ioctl TCSETS, TCSETSW, TCSETSF\n", .{});
+                _tty.term.printDiff(new_term);
+                if (op == TCSETSW or op == TCSETSF) {
+                    // wait for output to drain
+                    // TODO
+                }
+                if (op == TCSETSF) { // flush input queue
+                    _tty.lock.lock();
+                    _ = _tty.file_buff.reset();
+                    _tty.lock.unlock();
+                }
+                _tty.term = new_term.*;
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        TCSBRK => {
+            krn.logger.DEBUG("tty_ioctl TCSBRK\n", .{});
+            return 0;
+        },
+        TCXONC => {
+            krn.logger.DEBUG("tty_ioctl TCXONC\n", .{});
+            return 0;
+        },
+        TCFLSH => {
+            // arg: 0=flush input, 1=flush output, 2=both
+            if (data) |p| {
+                const arg: u32 = @intFromPtr(p);
+                krn.logger.DEBUG("tty_ioctl TCFLSH {}\n", .{arg});
+                switch (arg & 3) {
+                    0 => {
+                        _tty.lock.lock();
+                        _ = _tty.file_buff.reset();
+                        _tty.lock.unlock();
+                    },
+                    1 => {},
+                    2 => {
+                        _tty.lock.lock();
+                        _ = _tty.file_buff.reset();
+                        _tty.lock.unlock();
+                    },
+                    else => {},
+                }
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        TIOCGWINSZ => {
+            if (data) |p| {
+                krn.logger.DEBUG("tty_ioctl TIOCGWINSZ\n", .{});
+                const user_winsz: *tty.WinSize = @ptrCast(@alignCast(p));
+                user_winsz.* = _tty.winsz;
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        TIOCSWINSZ => {
+            if (data) |p| {
+                const user_winsz: *const tty.WinSize = @ptrCast(@alignCast(p));
+                _tty.winsz = user_winsz.*;
+                krn.logger.DEBUG("tty_ioctl TIOCSWINSZ new winsz: {}\n", .{_tty.winsz});
+                _tty.sendSigToProcGrp(krn.signals.Signal.SIGWINCH);
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        TIOCINQ => {
+            if (data) |p| {
+                krn.logger.DEBUG(
+                    "tty_ioctl TIOCINQ, user gets: {d}\n",
+                    .{_tty.file_buff.available()}
+                );
+                const user_inq: *u32 = @ptrCast(@alignCast(p));
+                user_inq.* = @intCast(_tty.file_buff.available());
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        TIOCOUTQ => {
+            if (data) |p| {
+                krn.logger.DEBUG(
+                    "tty_ioctl TIOCOUTQ, user gets: {d}\n",
+                    .{0}
+                );
+                const user_outq: *u32 = @ptrCast(@alignCast(p));
+                user_outq.* = 0; // TODO: output queue size
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        TIOCGPGRP => {
+            if (data) |p| {
+                krn.logger.DEBUG(
+                    "tty_ioctl TIOCGPGRP, user gets: {d}\n",
+                    .{_tty.fg_pgid}
+                );
+                const user_pgid: *i32 = @ptrCast(@alignCast(p));
+                user_pgid.* = _tty.fg_pgid;
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        TIOCSPGRP => {
+            if (data) |p| {
+                const new_pgid: i32 = @as(*i32, @ptrCast(@alignCast(p))).*;
+                _tty.fg_pgid = new_pgid;
+                krn.logger.DEBUG(
+                    "tty_ioctl TIOCSPGRP, new fg_pgid: {d}\n",
+                    .{_tty.fg_pgid}
+                );
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        TIOCGSID => {
+            if (data) |p| {
+                krn.logger.DEBUG(
+                    "tty_ioctl TIOCGSID, user gets {d}\n",
+                    .{_tty.session_id}
+                );
+                const user_sid: *i32 = @ptrCast(@alignCast(p));
+                user_sid.* = _tty.session_id;
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        TIOCSCTTY => {
+            krn.logger.DEBUG("tty_ioctl TIOCSCTTY\n", .{});
+            _tty.is_controlling = true;
+            _tty.session_id = 0; // krn.task.current.session_id;
+            _tty.fg_pgid = krn.task.current.pgid;
+            return 0;
+        },
+        TIOCNOTTY => {
+            krn.logger.DEBUG("tty_ioctl TIOCNOTTY\n", .{});
+            _tty.is_controlling = false;
+            return 0;
+        },
+        FIONBIO => {
+            if (data) |p| {
+                const user_nonblock: *i32 = @ptrCast(@alignCast(p));
+                _tty.nonblock = (user_nonblock.* != 0);
+                krn.logger.DEBUG(
+                    "tty_ioctl FIONBIO, set nonblock to {}\n", 
+                    .{_tty.nonblock}
+                );
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        // VT/KD
+        VT_OPENQRY => {
+            // TODO: find free tty
+            if (data) |p| {
+                krn.logger.DEBUG(
+                    "tty_ioctl VT_OPENQRY, user gets {d}\n",
+                    .{_tty.vt_index}
+                );
+                const user_vt: *i32 = @ptrCast(@alignCast(p));
+                user_vt.* = _tty.vt_index;
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        VT_GETSTATE => {
+            if (data) |p| {
+                _ = p;
+                krn.logger.DEBUG("tty_ioctl VT_GETSTATE\n", .{});
+                // TODO: support multiple VTs
+                return krn.errors.PosixError.EINVAL;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        VT_ACTIVATE => {
+            krn.logger.DEBUG("tty_ioctl VT_ACTIVATE\n", .{});
+            _tty.vt_active = true;
+            return 0;
+        },
+        VT_WAITACTIVE => {
+            krn.logger.DEBUG("tty_ioctl VT_WAITACTIVE\n", .{});
+            return 0;
+        },
+        KDGETMODE => {
+            if (data) |p| {
+                krn.logger.DEBUG(
+                    "tty_ioctl KDGETMODE old kd_mode {d}\n",
+                    .{_tty.kd_mode}
+                );
+                @as(*u32, @ptrCast(@alignCast(p))).* = _tty.kd_mode;
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        KDSETMODE => {
+            if (data) |p| {
+                _tty.kd_mode = @as(*u32, @ptrCast(@alignCast(p))).*;
+                krn.logger.DEBUG(
+                    "tty_ioctl KDSETMODE new kd_mode: {d}\n",
+                    .{_tty.kd_mode}
+                );
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        else => return krn.errors.PosixError.EINVAL,
+    }
+}
+
+// probe / thread / init
 fn tty_probe(device: *pdev.PlatformDevice) !void {
     if (device.dev.data == null)
         return krn.errors.PosixError.EIO;
-    const tty: *TTY = @ptrCast(@alignCast(device.dev.data));
-    tty.clear();
+    const cur_tty: *TTY = @ptrCast(@alignCast(device.dev.data));
+    cur_tty.clear();
     try cdev.addCdev(&device.dev, krn.fs.UMode.chardev());
 }
 
@@ -88,10 +376,10 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
 
 fn addTTYDev(name: []const u8) !void {
     if (pdev.PlatformDevice.alloc(name)) |platform_tty| {
-        if (krn.mm.kmalloc(TTY)) |tty| {
-            tty.* = TTY.init(scr.framebuffer.cwidth, scr.framebuffer.cheight);
-            scr.current_tty = tty;
-            platform_tty.dev.data = @ptrCast(@alignCast(tty));
+        if (krn.mm.kmalloc(TTY)) |curr_tty| {
+            curr_tty.* = TTY.init(scr.framebuffer.cwidth, scr.framebuffer.cheight);
+            scr.current_tty = curr_tty;
+            platform_tty.dev.data = @ptrCast(@alignCast(curr_tty));
         } else {
             return krn.errors.PosixError.ENOMEM;
         }
@@ -103,7 +391,6 @@ fn addTTYDev(name: []const u8) !void {
 }
 
 pub fn init() void {
-    krn.logger.DEBUG("DRIVER INIT TTY", .{});
     addTTYDev("tty10") catch return;
     addTTYDev("tty9") catch return;
     addTTYDev("tty8") catch return;
@@ -153,466 +440,11 @@ fn switchTTY(ctrl: kbd.CtrlType) void {
         return ;
     };
     if (path.dentry.inode.data.dev) |_d| {
-        const tty: *TTY = @ptrCast(@alignCast(_d.data));
-        scr.current_tty = tty;
+        const curr_tty: *TTY = @ptrCast(@alignCast(_d.data));
+        scr.current_tty = curr_tty;
         scr.current_tty.?.reRenderAll();
     } else {
         krn.logger.ERROR("switchTTY: no tty dev", .{});
         return ;
     }
 }
-
-pub const ConsoleColors = enum(u32) {
-    Black = 0x000000,
-    Blue = 0x0000FF,
-    Green = 0x00FF00,
-    Cyan = 0x00FFFF,
-    Red = 0xFF0000,
-    Magenta = 0xFF00FF,
-    Brown = 0xFFA500,
-    LightGray = 0xD3D3D3,
-    DarkGray = 0xa9a9a9,
-    LightBlue = 0xADD8E6,
-    LightGreen = 0xCFD8D9,
-    LightCyan = 0xE0FFFF,
-    LightRed = 0xFFCCCB,
-    LightMagenta = 0xFF06B5,
-    LightBrown = 0xC4A484,
-    White = 0x00FFFFFF,
-};
-
-pub const DirtyRect = struct {
-    x1: u32,
-    y1: u32,
-    x2: u32,
-    y2: u32,
-    
-    pub fn init(x1: u32, y1: u32, x2: u32, y2: u32) DirtyRect {
-        return DirtyRect{
-            .x1 = x1,
-            .y1 = y1,
-            .x2 = x2,
-            .y2 = y2,
-        };
-    }
-    
-    pub fn fullScreen(width: u32, height: u32) DirtyRect {
-        return DirtyRect{
-            .x1 = 0,
-            .y1 = 0,
-            .x2 = width - 1,
-            .y2 = height - 1,
-        };
-    }
-    
-    pub fn singleChar(x: u32, y: u32) DirtyRect {
-        return DirtyRect{
-            .x1 = x,
-            .y1 = y,
-            .x2 = x,
-            .y2 = y,
-        };
-    }
-    
-    pub fn line(y: u32, x1: u32, x2: u32) DirtyRect {
-        return DirtyRect{
-            .x1 = x1,
-            .y1 = y,
-            .x2 = x2,
-            .y2 = y,
-        };
-    }
-    
-    pub fn merge(self: DirtyRect, other: DirtyRect) DirtyRect {
-        return DirtyRect{
-            .x1 = @min(self.x1, other.x1),
-            .y1 = @min(self.y1, other.y1),
-            .x2 = @max(self.x2, other.x2),
-            .y2 = @max(self.y2, other.y2),
-        };
-    }
-
-    pub fn isEmpty(self: DirtyRect) bool {
-        return self.x1 > self.x2 or self.y1 > self.y2;
-    }
-};
-
-pub const TTY = struct {
-    width: u32 = 80,
-    height: u32 = 25,
-    _x: u32 = 0,
-    _y: u32 = 0,
-    _bg_colour: u32 = @intFromEnum(ConsoleColors.Black),
-    _fg_colour: u32 = @intFromEnum(ConsoleColors.White),
-
-    // screen buffers
-    _buffer : [*]u8,
-    _prev_buffer : [*]u8,
-    _line: [*]u8,
-    _input_len: u32 = 0,
-
-
-    _prev_x: u32 = 0,
-    _prev_y: u32 = 0,
-    _dirty_rect: DirtyRect = DirtyRect.init(0, 0, 0, 0),
-    _has_dirty_rect: bool = false,
-
-    // file buffer
-    file_buff: krn.ringbuf.RingBuf = undefined,
-    lock: krn.Mutex = krn.Mutex.init(),
-
-    pub fn init(width: u32, height: u32) TTY {
-        const buffer: [*]u8 = if (krn.mm.kmallocArray(u8, width * height)) |buf| buf
-            else @panic("buffer");
-        const prev_buffer: [*]u8 = if (krn.mm.kmallocArray(u8, width * height)) |buf| buf
-            else @panic("prev_buffer");
-        const line: [*]u8 = if (krn.mm.kmallocArray(u8, width)) |_line| _line
-            else @panic("line");
-        const file_buff = krn.ringbuf.RingBuf.new(2048)
-            catch @panic("file_buff");
-        var tty = TTY{
-            .width = width,
-            .height = height,
-            ._buffer = buffer,
-            ._prev_buffer = prev_buffer,
-            ._line = line,
-            .file_buff = file_buff,
-            .lock = krn.Mutex.init(),
-        };
-        @memset(tty._buffer[0..width * height], 0);
-        @memset(tty._prev_buffer[0..width * height], 0);
-        tty.clear();
-        return tty;
-    }
-
-    fn renderCursor(self: *TTY) void {
-        scr.framebuffer.cursor(self._x, self._y, self._fg_colour);
-    }
-
-    fn saveCursor(self: *TTY) void {
-        self._prev_x = self._x;
-        self._prev_y = self._y;
-    }
-
-    fn move(self: *TTY, direction : u8) void {
-        self.saveCursor();
-        if (direction == 0) {
-            if (self._x > 0)
-                self._x -= 1;
-        } else {
-            if (
-                self._x < self.width - 1
-                and self._buffer[self._y * self.width + self._x] != 0
-            )
-                self._x += 1;
-        }
-        self.render();
-    }
-
-    fn cursorUpdated(self: *TTY) bool {
-        return (self._x != self._prev_x or self._y != self._prev_y);
-    }
-
-    pub fn reRenderAll(self: *TTY) void {
-        scr.framebuffer.clear(self._bg_colour);
-        @memset(
-            self._prev_buffer[0..self.height * self.width],
-            0
-        );
-        self.markDirty(DirtyRect.fullScreen(
-            self.width,
-            self.height
-        ));
-        self.render();
-    }
-
-    pub fn render(self: *TTY) void {
-        if (self != scr.current_tty)    
-            return ;
-        if (!self._has_dirty_rect and !self.cursorUpdated())
-            return ;
-        if (self._has_dirty_rect) {
-            const x1 = self._dirty_rect.x1;
-            const y1 = self._dirty_rect.y1;
-            const x2 = @min(self._dirty_rect.x2, self.width - 1);
-            const y2 = @min(self._dirty_rect.y2, self.height - 1);
-
-            if (x1 <= x2 and y1 <= y2) {
-                for (y1..(y2 + 1)) |row| {
-                    for (x1..(x2 + 1)) |col| {
-                        const off = row * self.width + col;
-                        const c = self._buffer[off];
-                        if (c != self._prev_buffer[off]) {
-                            scr.framebuffer.putchar(
-                                c,
-                                col, row,
-                                self._bg_colour,
-                                self._fg_colour
-                            );
-                            self._prev_buffer[off] = c;
-                        }
-                    }
-                }
-            }
-        }
-        const c = self._buffer[self._prev_y * self.width + self._prev_x];
-        scr.framebuffer.putchar(
-            c,
-            self._prev_x, self._prev_y,
-            self._bg_colour,
-            self._fg_colour
-        );
-        self.renderCursor();
-        scr.framebuffer.render();
-        self._has_dirty_rect = false;
-    }
-
-    fn _scroll(self: *TTY) void {
-        var i: u32 = 1;
-        while (i < self.height) : (i += 1) {
-            const p: u32 = i * self.width;
-            @memcpy(
-                self._buffer[p - self.width..p],
-                self._buffer[p..p + self.width]
-            );
-        }
-        const p: u32 = self.height * self.width;
-        @memset(
-            self._buffer[p - self.width..p],
-            0
-        );
-        @memset(
-            self._prev_buffer[p - self.width..p],
-            1
-        );
-        self._y = self.height - 1;
-        self.saveCursor();
-        self.markDirty(DirtyRect.fullScreen(self.width, self.height));
-    }
-
-    fn clear(self: *TTY) void {
-        @memset(
-            self._buffer[0..self.height * self.width],
-            0
-        );
-        self.saveCursor();
-        self._x = 0;
-        self._y = 0;
-        self.markDirty(DirtyRect.fullScreen(
-            self.width,
-            self.height
-        ));
-        self.render();
-    }
-
-    fn markDirty(self: *TTY, rect: DirtyRect) void {
-        if (self._has_dirty_rect) {
-            self._dirty_rect = self._dirty_rect.merge(rect);
-        } else {
-            self._dirty_rect = rect;
-            self._has_dirty_rect = true;
-        }
-    }
-    
-    fn markCellDirty(self: *TTY, x: u32, y: u32) void {
-        self.markDirty(DirtyRect.singleChar(x, y));
-    }
-
-    fn printVga(self: *TTY, ch: u8) void {
-        self._buffer[self._y * self.width + self._x] = ch;
-        self.markCellDirty(self._x, self._y);
-        self._x += 1;
-        if (self._x >= self.width) {
-            self._x = 0;
-            self._y += 1;
-        }
-        if (self._y >= self.height)
-            self._scroll();
-    }
-
-    fn printChar(self: *TTY, c: u8) void {
-        switch (c) {
-            '\n'    => {
-                self._y += 1;
-                self._x = 0;
-                if (self._y >= self.height)
-                    self._scroll();
-            },
-            // 3       => {self._y += 1; self._x = 0;},
-            8       => self.removeAtCursor(),
-            12      => self.clear(),
-            '\t'    => self.print("    "),
-            else    => self.printVga(c),
-        }
-    }
-
-    fn home(self: *TTY) void {
-        self.markDirty(DirtyRect.init(0, self._y, self._x, self._y));
-        self.saveCursor();
-        self._x = 0;
-        self.render();
-    }
-
-    fn endline(self: *TTY) void {
-        self.saveCursor();
-        const row = self._y * self.width;
-        while (self._buffer[row + self._x] != 0 and self._x < self.width - 1)
-            self._x += 1;
-        self.markDirty(DirtyRect.init(0, self._y, self._x, self._y));
-        self.render();
-    }
-
-    fn shiftBufferRight(self: *TTY) void {
-        var i = self._input_len;
-        const pos = self._y * self.width;
-        while (i > self._x): (i -= 1) {
-            self._buffer[pos + i] = self._buffer[pos + i - 1];
-        }
-    }
-
-    fn shiftBufferLeft(self: *TTY) void {
-        if (self._input_len == 0) return;
-        var i = self._x;
-        const pos = self._y * self.width;
-        while (i + 1 < self._input_len and i + 1 < self.width): (i += 1) {
-            self._buffer[pos + i] = self._buffer[pos + i + 1];
-        }
-        const last = @min(self._input_len - 1, self.width - 1);
-        self._buffer[pos + last] = 0;
-    }
-
-    fn currentLineLen(self: *TTY) u32 {
-        var len: u32 = 0;
-        const pos = self._y * self.width;
-        while (len < self.width
-            and self._buffer[pos + len] != 0)
-        {
-            len += 1;
-        }
-        return len;
-    }
-
-    fn insertAtCursor(self: *TTY, c: u8) void {
-        if (self._x < self.width - 1) {
-            if (self._input_len == 0)
-                self._input_len = self.currentLineLen();
-            self.shiftBufferRight();
-            self._buffer[self._y * self.width + self._x] = c;
-            if (self._input_len < self.width)
-                self._input_len += 1;
-
-            const end   = @min(self.width - 1, self._input_len);
-            self.markDirty(
-                DirtyRect.init(self._x, self._y, end, self._y)
-            );
-            self.saveCursor();
-            self._x += 1;
-            self.render();
-        }
-    }
-
-    fn removeAtCursor(self: *TTY) void {
-        if (self._x > 0) {
-            if (self._input_len == 0)
-                self._input_len = self.currentLineLen();
-            if (self._input_len == 0) {
-                self.saveCursor();
-                self.render();
-                return;
-            }
-            self.saveCursor();
-            self._x -= 1;
-            if (self._x < self._input_len) {
-                self.shiftBufferLeft();
-                self._input_len -= 1;
-            } else {
-                if (self._input_len > 0) {
-                    self._input_len -= 1;
-                    const last = @min(self._input_len, self.width - 1);
-                    self._buffer[self._y * self.width + last] = 0;
-                }
-            }
-            const end = if (self._input_len == 0) self._x
-                else @min(self._input_len, self.width - 1);
-            self.markDirty(
-                DirtyRect.init(self._x, self._y, end, self._y)
-            );
-            self.render();
-        }
-    }
-
-    fn pushInputByte(self: *TTY, c: u8) void {
-        self.insertAtCursor(c);
-        self.lock.lock();
-        defer self.lock.unlock();
-
-        _ = self.file_buff.push(c);
-    }
-
-    fn processEnter(self: *TTY) void {
-        const pos = self._y * self.width;
-        @memcpy(
-            self._line[0..self._input_len],
-            self._buffer[pos..pos+self._input_len]
-        );
-        self._input_len = 0;
-        self.saveCursor();
-        self.printChar('\n');
-        self.render();
-
-        self.lock.lock();
-        defer self.lock.unlock();
-
-        _ = self.file_buff.push('\n');
-    }
-
-    pub fn input(self: *TTY, data: [] const kbd.KeyEvent) void {
-        for (data) |event| {
-            if (!event.ctl) {
-                switch (event.val) {
-                    '\n' => self.processEnter(),
-                    12 => self.clear(),
-                    8 => {
-                        self.removeAtCursor();
-                        self.lock.lock();
-                        _ = self.file_buff.unwrite(1);
-                        self.lock.unlock();
-                    },
-                    else => {
-                        self.insertAtCursor(event.val);
-                        self.lock.lock();
-                        _ = self.file_buff.push(event.val);
-                        self.lock.unlock();
-                    }, 
-                }
-            } else {
-                const ctl: kbd.CtrlType = @enumFromInt(event.val);
-                switch (ctl) {
-                    .LEFT => self.move(0),
-                    .RIGHT => self.move(1),
-                    .HOME => self.home(),
-                    .END => self.endline(),
-                    .TTY1,.TTY2,.TTY3,.TTY4,.TTY5,
-                    .TTY6,.TTY7,.TTY8,.TTY9,.TTY10 => return switchTTY(ctl),
-                    else => {},
-                }
-            }
-        }
-    }
-
-    pub fn print(self: *TTY, msg: [] const u8) void {
-        self.saveCursor();
-        for (msg) |c| {
-            self.printChar(c);
-        }
-        self.render();
-    }
-
-    pub fn setColor(self: *TTY, fg: u32) void {
-        self._fg_colour = fg;
-    }
-
-    pub fn setBgColor(self: *TTY, bg: u32) void {
-        self._bg_colour = bg;
-    }
-};
