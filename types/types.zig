@@ -851,6 +851,7 @@ pub const kernel = struct {
                 read : *const fn(*kernel.fs.file.File, [*]u8, u32) anyerror!u32,
                 lseek : ?*const fn(*kernel.fs.file.File, u32, u32) anyerror!u32= null,
                 readdir : ?*const fn(*kernel.fs.file.File, []u8) anyerror!u32= null,
+                ioctl : ?*const fn(*kernel.fs.file.File, u32, ?*anyopaque) anyerror!u32= null,
             };
 
             pub const TaskFiles = struct {
@@ -1322,51 +1323,65 @@ pub const drivers = struct {
         };
 
         pub const tty = struct {
-            pub const ConsoleColors = enum(u32) {
-                Black = 0,
-                Blue = 255,
-                Green = 65280,
-                Cyan = 65535,
-                Red = 16711680,
-                Magenta = 16711935,
-                Brown = 16753920,
-                LightGray = 13882323,
-                DarkGray = 11119017,
-                LightBlue = 11393254,
-                LightGreen = 13621465,
-                LightCyan = 14745599,
-                LightRed = 16764107,
-                LightMagenta = 16713397,
-                LightBrown = 12887172,
-                White = 16777215,
-            };
-
-
-            pub const DirtyRect = struct {
-                x1 : u32,
-                y1 : u32,
-                x2 : u32,
-                y2 : u32,
-            };
-
             pub const TTY = struct {
                 width : u32= 80,
                 height : u32= 25,
                 _x : u32= 0,
                 _y : u32= 0,
-                _bg_colour : u32= 0,
-                _fg_colour : u32= 16777215,
+                _bg : u32= 0,
+                _fg : u32= 16777215,
                 _buffer : [*]u8,
                 _prev_buffer : [*]u8,
                 _line : [*]u8,
-                _input_len : u32= 0,
                 _prev_x : u32= 0,
                 _prev_y : u32= 0,
-                _dirty_rect : drivers.platform.tty.DirtyRect,
-                _has_dirty_rect : bool= false,
+                _dirty : std.platform.tty_struct.DirtyRect,
+                _has_dirty : bool= false,
+                term : std.platform.termios.Termios,
+                winsz : std.platform.tty_struct.WinSize,
                 file_buff : kernel.ringbuf.RingBuf,
                 lock : kernel.Mutex,
+                nonblock : bool= false,
+                session_id : i32= 1,
+                fg_pgid : i32= 1,
+                is_controlling : bool= true,
+                vt_index : u16= 1,
+                vt_active : bool= true,
+                kd_mode : u32= 0,
+                _input_len : u32= 0,
+                tab_len : u32= 8,
+                cursor_type : std.platform.tty_struct.CursorType,
+                curson_on : bool= true,
+                saved_x : u32= 0,
+                saved_y : u32= 0,
+                attr_inverse : bool= false,
+                pstate : std.platform.tty_struct.ParserState,
+                csi_params : [8]u16,
+                csi_mask : u8= 0,
+                csi_n : u8= 0,
+                csi_priv : bool= false,
             };
+
+            pub const ConsoleColors = enum(u32) {
+                Black = 0,
+                White = 16777215,
+                Red = 16711680,
+                Green = 65280,
+                Blue = 255,
+                Yellow = 16776960,
+                Magenta = 16711935,
+                Cyan = 65535,
+                LightGray = 13027014,
+                DarkGray = 8816262,
+                LightRed = 16738408,
+                LightGreen = 8847238,
+                LightBlue = 8816383,
+                LightYellow = 16777094,
+                LightMagenta = 16746239,
+                LightCyan = 8847359,
+                Brown = 8816128,
+            };
+
 
         };
 
