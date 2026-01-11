@@ -1351,7 +1351,7 @@ pub const drivers = struct {
                 _input_len : u32= 0,
                 tab_len : u32= 8,
                 cursor_type : std.platform.tty_struct.CursorType,
-                curson_on : bool= true,
+                cursor_on : bool= true,
                 saved_x : u32= 0,
                 saved_y : u32= 0,
                 attr_inverse : bool= false,

@@ -137,7 +137,7 @@ pub const TTY = struct {
 
     // cursor
     cursor_type: CursorType = .Block,
-    curson_on: bool = true,
+    cursor_on: bool = true,
     saved_x: u32 = 0,
     saved_y: u32 = 0,
 
@@ -237,7 +237,7 @@ pub const TTY = struct {
 
     // rendering
     fn renderCursor(self: *TTY) void {
-        if (self.cursor_type == .None or !self.curson_on)
+        if (self.cursor_type == .None or !self.cursor_on)
             return;
         const off = self._y * self.width + self._x;
         const ch = self._buffer[off];
@@ -283,6 +283,20 @@ pub const TTY = struct {
         ) {
             return;
         }
+
+        if (self._prev_x != self._x or self._prev_y != self._y) {
+            const off = self._prev_y * self.width + self._prev_x;
+            const ch = self._buffer[off];
+            scr.framebuffer.putchar(
+                ch,
+                self._prev_x,
+                self._prev_y,
+                self._bg,
+                self._fg
+            );
+            self._prev_buffer[off] = ch;
+        }
+
         if (self._has_dirty) {
             const x1 = self._dirty.x1;
             const y1 = self._dirty.y1;
@@ -308,25 +322,12 @@ pub const TTY = struct {
                 }
             }
         }
-        // restore previous cell
-        const cprev = self._buffer[self._prev_y * self.width + self._prev_x];
-        var bg = self._bg;
-        var fg = self._fg;
-        if (self.attr_inverse) {
-            const _tmp = bg;
-            bg = fg;
-            fg = _tmp;
-        }
-        scr.framebuffer.putchar(
-            cprev,
-            self._prev_x,
-            self._prev_y,
-            bg,
-            fg
-        );
+        
         self.renderCursor();
         scr.framebuffer.render();
         self._has_dirty = false;
+        self._prev_x = self._x;
+        self._prev_y = self._y;
     }
 
     fn markDirty(self: *TTY, r: DirtyRect) void {
@@ -742,6 +743,8 @@ pub const TTY = struct {
         switch (final) {
             'A' => { // UP (CUU)
                 const n = param(self, 0, 1);
+                self._prev_x = self._x;
+                self._prev_y = self._y;
                 var i: u16 = 0;
                 while (i < n and self._y > 0) : (i += 1) {
                     self._y -= 1;
@@ -750,6 +753,8 @@ pub const TTY = struct {
             },
             'B' => { // DOWN (CUD)
                 const n = param(self, 0, 1);
+                self._prev_x = self._x;
+                self._prev_y = self._y;
                 var i: u16 = 0;
                 while (i < n and self._y < self.height - 1) : (i += 1) {
                     self._y += 1;
@@ -758,6 +763,8 @@ pub const TTY = struct {
             },
             'C' => { // Forward (CUF)
                 const n = param(self, 0, 1);
+                self._prev_x = self._x;
+                self._prev_y = self._y;
                 var i: u16 = 0;
                 while (i < n and self._x < self.width - 1) : (i += 1) {
                     self._x += 1;
@@ -766,6 +773,8 @@ pub const TTY = struct {
             },
             'D' => { // Back (CUB)
                 const n = param(self, 0, 1);
+                self._prev_x = self._x;
+                self._prev_y = self._y;
                 var i: u16 = 0;
                 while (i < n and self._x > 0) : (i += 1) {
                     self._x -= 1;
@@ -773,6 +782,8 @@ pub const TTY = struct {
                 self.render();
             },
             'H', 'f' => { // CUP/HVP 1-based
+                self._prev_x = self._x;
+                self._prev_y = self._y;
                 var r = param(self, 0, 1);
                 var c = param(self, 1, 1);
                 if (r < 1)
@@ -834,9 +845,9 @@ pub const TTY = struct {
                 if (self.csi_priv) {
                     if (self.csi_n > 0 and self.csi_params[0] == 25) {
                         if (final == 'h') {
-                            self.curson_on = true;
+                            self.cursor_on = true;
                         } else {
-                            self.curson_on = false;
+                            self.cursor_on = false;
                         }
                         self.render();
                     }
