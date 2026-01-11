@@ -699,8 +699,7 @@ pub const kernel = struct {
     pub const socket = struct {
         pub const Socket = struct {
             _buffer : [128]u8,
-            writer : std.Io.Writer,
-            reader : std.Io.Reader,
+            rb : kernel.ringbuf.RingBuf,
             conn : ?*kernel.socket.Socket,
             list : kernel.list.ListHead,
             lock : kernel.Mutex,
@@ -866,9 +865,8 @@ pub const kernel = struct {
 
         pub const pipe = struct {
             pub const Pipe = struct {
-                _buffer : [128]u8,
-                writer : std.Io.Writer,
-                reader : std.Io.Reader,
+                _buffer : [2048]u8,
+                rb : kernel.ringbuf.RingBuf,
                 readers : u32= 1,
                 writers : u32= 1,
                 lock : kernel.Mutex,

@@ -26,12 +26,17 @@ pub fn writev(fd: u32, iov: [*]IoVec, iovcnt: u32) !u32 {
     var ret: u32 = 0;
     for (0..iovcnt) |idx| {
         const curr = iov[idx];
-        if (curr.len > 0)
-            ret += try write(
+        if (curr.len > 0) {
+            const single_write: u32 = try write(
                 fd,
                 @intFromPtr(curr.base),
                 curr.len
             );
+            ret += single_write;
+            if (single_write != curr.len) {
+                return ret;
+            }
+        }
     }
     return ret;
 }
