@@ -106,6 +106,7 @@ pub const FileOps = struct {
     read: *const fn (base: *File, buf: [*]u8, size: u32) anyerror!u32,
     lseek: ?*const fn (base: *File, offset: u32, origin: u32) anyerror!u32 = null,
     readdir: ?*const fn (base: *File, buf: []u8) anyerror!u32 = readdirVFS,
+    ioctl: ?*const fn (base: *File, op: u32, data: ?*anyopaque) anyerror!u32 = null,
 };
 
 pub const TaskFiles = struct {

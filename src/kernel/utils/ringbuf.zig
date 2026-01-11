@@ -10,10 +10,7 @@ pub const RingBuf = struct {
 
     fn _init(buff: []u8) !RingBuf {
         if (buff.len == 0 or (buff.len & (buff.len - 1)) != 0) {
-            krn.logger.ERROR(
-                "RingBuf buffer length must be power of two, got {d}\n",
-                .{buff.len}
-            );
+            krn.logger.ERROR("RingBuf buffer length must be power of two, got {d}\n", .{ buff.len });
             return krn.errors.PosixError.EINVAL;
         }
         return RingBuf{
@@ -28,7 +25,7 @@ pub const RingBuf = struct {
         }
         var _size = size;
         if ((size & (size - 1)) != 0) {
-            _size = @as(usize, 1) << @truncate(std.math.log2_int_ceil(usize, size));
+            _size = (@as(usize, 1) << @truncate(std.math.log2_int_ceil(usize, size)));
         }
         if (krn.mm.kmallocSlice(u8, _size)) |buf| {
             errdefer krn.mm.kfree(buf.ptr);
@@ -41,12 +38,23 @@ pub const RingBuf = struct {
         krn.mm.kfree(self.buf.ptr);
         self.* = .{
             .buf = self.buf[0..0],
-            .mask = 0
+            .mask = 0,
+            .r = 0,
+            .w = 0,
+            .line_count = 0,
         };
+    }
+
+    pub inline fn capacity(self: *const RingBuf) usize {
+        return self.buf.len;
     }
 
     pub inline fn len(self: *const RingBuf) usize {
         return (self.w + self.buf.len - self.r) & self.mask;
+    }
+
+    pub inline fn available(self: *const RingBuf) usize {
+        return self.len();
     }
 
     pub inline fn isEmpty(self: *const RingBuf) bool {
@@ -57,12 +65,32 @@ pub const RingBuf = struct {
         return ((self.w + 1) & self.mask) == self.r;
     }
 
+    pub inline fn freeSpace(self: *const RingBuf) usize {
+        return self.buf.len - 1 - self.len();
+    }
+
+    pub fn reset(self: *RingBuf) usize {
+        const dropped = self.len();
+        self.r = 0;
+        self.w = 0;
+        self.line_count = 0;
+        return dropped;
+    }
+
     pub fn push(self: *RingBuf, b: u8) bool {
         if (self.isFull()) return false;
         self.buf[self.w] = b;
         self.w = (self.w + 1) & self.mask;
         if (b == '\n') self.line_count += 1;
         return true;
+    }
+
+    pub fn pushSlice(self: *RingBuf, src: []const u8) usize {
+        var i: usize = 0;
+        while (i < src.len and !self.isFull()) : (i += 1) {
+            _ = self.push(src[i]);
+        }
+        return i;
     }
 
     pub fn unwrite(self: *RingBuf, n: usize) usize {
@@ -103,7 +131,8 @@ pub const RingBuf = struct {
         var i = self.r;
         var count: usize = 0;
         while (i != self.w) : (i = (i + 1) & self.mask) {
-            if (self.buf[i] == '\n') return count + 1;
+            if (self.buf[i] == '\n')
+                return count + 1;
             count += 1;
         }
         return null;
