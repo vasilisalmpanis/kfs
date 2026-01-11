@@ -5,16 +5,17 @@ const mutex = @import("../sched/mutex.zig");
 
 pub const Socket = struct {
     _buffer: [128]u8,
-    writer: std.Io.Writer,
-    reader: std.Io.Reader,
+    rb: krn.ringbuf.RingBuf,
     conn: ?*Socket,
     list: lst.ListHead,
     lock: mutex.Mutex = mutex.Mutex.init(),
 
     pub fn setup(self: *Socket) void {
         self._buffer = .{0} ** 128;
-        self.writer = std.Io.Writer.fixed(&self._buffer);
-        self.reader = std.Io.Reader.fixed(&self._buffer);
+        self.rb = krn.ringbuf.RingBuf{
+            .buf = self._buffer[0..128],
+            .mask = 127,
+        };
         self.conn = null;
         self.list.next = &self.list;
         self.list.prev = &self.list;
@@ -43,11 +44,11 @@ pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
     if (base.inode.data.sock == null) return krn.errors.PosixError.EBADF;
     sock = base.inode.data.sock.?;
     sock.lock.lock();
-    const avail = sock.reader.end - sock.reader.seek;
-    const to_read = if (avail > size) size else avail;
     defer sock.lock.unlock();
-    _ = sock.reader.readSliceShort(buf[0..to_read]) catch {};
-    return @intCast(to_read);
+    if (!sock.rb.isEmpty()) {
+        return sock.rb.readInto(buf[0..size]);
+    }
+    return 0;
 }
 
 pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
@@ -55,11 +56,13 @@ pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
     if (base.inode.data.sock == null) return krn.errors.PosixError.EBADF;
     sock = base.inode.data.sock.?;
     if (sock.conn) |remote| {
-        krn.logger.INFO("sending data {d} \n", .{krn.task.current.pid});
         remote.lock.lock();
         defer remote.lock.unlock();
-        const res = remote.writer.write(buf[0..size]) catch 0;
-        return @intCast(res);
+        for (buf[0..size], 0..) |ch, idx| {
+            if (!remote.rb.push(ch))
+                return idx;
+        }
+        return size;
     } else {
         return krn.errors.PosixError.ENOTCONN;
     }

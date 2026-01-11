@@ -2,20 +2,23 @@ const std = @import("std");
 const krn = @import("../main.zig");
 const mutex = @import("../sched/mutex.zig");
 
+const BUFFER_SIZE = 2048;
+
 pub const Pipe = struct {
-    _buffer: [128]u8,
-    writer: std.Io.Writer,
-    reader: std.Io.Reader,
+    _buffer: [BUFFER_SIZE]u8,
+    rb: krn.ringbuf.RingBuf,
     readers: u32 = 1,
     writers: u32 = 1,
     lock: mutex.Mutex = mutex.Mutex.init(),
 
     pub fn setup(self: *Pipe) void {
-        self._buffer = .{0} ** 128;
+        self._buffer = .{0} ** BUFFER_SIZE;
         self.readers = 1;
         self.writers = 1;
-        self.writer = std.Io.Writer.fixed(&self._buffer);
-        self.reader = std.Io.Reader.fixed(&self._buffer);
+        self.rb = krn.ringbuf.RingBuf{
+            .buf = self._buffer[0..BUFFER_SIZE],
+            .mask = BUFFER_SIZE - 1,
+        };
         self.lock = mutex.Mutex.init();
     }
 
@@ -54,34 +57,35 @@ pub fn close(base: *krn.fs.File) void {
 }
 
 pub fn read(base: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
-    krn.logger.INFO("pipe read {d}", .{size});
     const pipe = base.inode.data.pipe
         orelse return krn.errors.PosixError.EFAULT;
-    while (pipe.reader.end <= pipe.reader.seek) {
+    while (pipe.rb.isEmpty()) {
         if (pipe.writers == 0)
             return 0;
     }
+
     pipe.lock.lock();
     defer pipe.lock.unlock();
-    const len = pipe.reader.readSliceShort(buf[0..size]) catch {
-        return krn.errors.PosixError.EIO;
-    };
-    return len;
+    const ret_size: u32 = pipe.rb.readInto(buf[0..size]);
+    return ret_size;
 }
 
 pub fn write(base: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
-    krn.logger.INFO("pipe write {d}", .{size});
     const pipe = base.inode.data.pipe
         orelse return krn.errors.PosixError.EFAULT;
     if (pipe.readers == 0) {
         return krn.errors.PosixError.EPIPE;
     }
+    while (pipe.rb.isFull()) {
+    }
     pipe.lock.lock();
     defer pipe.lock.unlock();
-    const len = pipe.writer.write(buf[0..size]) catch {
-        return krn.errors.PosixError.EIO;
-    };
-    return len;
+    for (buf[0..size], 0..) |ch, idx| {
+        if (!pipe.rb.push(ch)) {
+            return idx;
+        }
+    }
+    return size;
 }
 
 pub const PipeFileOps: krn.fs.FileOps = krn.fs.FileOps {
