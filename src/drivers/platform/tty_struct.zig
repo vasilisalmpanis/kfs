@@ -397,7 +397,7 @@ pub const TTY = struct {
                 self._x = 0;
                 self.render();
             },
-            8 => self.removeAtCursor(),
+            8 => self.move(0),
             12 => self.clear(),
             '\t' => {
                 const spaces = self.tab_len - (self._x % self.tab_len);

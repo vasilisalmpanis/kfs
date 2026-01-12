@@ -111,6 +111,7 @@ pub const FileOps = struct {
 
 pub const TaskFiles = struct {
     map: std.DynamicBitSet,
+    closexec: std.DynamicBitSet,
     fds: std.AutoHashMap(u32, *File),
 
     pub fn new() ?*TaskFiles {
@@ -119,6 +120,10 @@ pub const TaskFiles = struct {
                 kernel.mm.kfree(files);
                 return null;
             }; // Bits per long
+            files.closexec = std.DynamicBitSet.initEmpty(kernel.mm.kernel_allocator.allocator(), 64) catch {
+                kernel.mm.kfree(files);
+                return null;
+            }; 
             files.fds = std.AutoHashMap(u32, *File).init(kernel.mm.kernel_allocator.allocator());
             return files;
         }
@@ -133,8 +138,14 @@ pub const TaskFiles = struct {
                     kernel.logger.ERROR("TaskFiles.dup(): failed to resize map: {any}", .{err});
                     return errors.ENOMEM;
                 };
+                self.closexec.resize(self.map.capacity() * 2, false) catch |err| {
+                    kernel.logger.ERROR("TaskFiles.dup(): failed to resize map: {any}", .{err});
+                    return errors.ENOMEM;
+                };
             }
             self.map.set(id);
+            if (old.closexec.isSet(id))
+                self.closexec.set(id);
             errdefer self.map.unset(id);
             if (old.fds.get(id)) |file| {
                 file.ref.ref();
@@ -168,13 +179,45 @@ pub const TaskFiles = struct {
         }
         const result = self.map.capacity(); // Look into if capacity is taken or not
         try self.map.resize(self.map.capacity() * 2 , false);
+        try self.closexec.resize(self.map.capacity() * 2 , false);
         self.map.set(result);
         return result;
+    }
+
+    pub fn getNextFromFD(self: *TaskFiles, from_fd: u32) !u32 {
+        if (from_fd >= self.map.capacity()) {
+            self.map.resize(from_fd + 1, false) catch |err| {
+                kernel.logger.ERROR(
+                    "TaskFiles.getNextFromFD(): failed to resize map: {t}",
+                    .{err}
+                );
+                return errors.ENOMEM;
+            };
+            self.closexec.resize(from_fd + 1, false) catch |err| {
+                kernel.logger.ERROR(
+                    "TaskFiles.getNextFromFD(): failed to resize map: {t}",
+                    .{err}
+                );
+                return errors.ENOMEM;
+            };
+        }
+        var it = self.map.iterator(.{
+            .kind = .unset,
+            .direction = .forward,
+        });
+        it.bit_offset = from_fd;
+        if (it.next()) |index| {
+            self.map.set(index);
+            return index;
+        } else {
+            return errors.EMFILE;
+        }
     }
 
     pub fn unsetFD(self: *TaskFiles, fd: u32) void {
         if (fd < self.map.capacity()) {
             self.map.unset(fd);
+            self.closexec.unset(fd);
         }
     }
 
@@ -183,6 +226,13 @@ pub const TaskFiles = struct {
             self.map.resize(fd + 1, false) catch |err| {
                 kernel.logger.ERROR(
                     "TaskFiles.setFD(): failed to resize map: {t}",
+                    .{err}
+                );
+                return errors.ENOMEM;
+            };
+            self.closexec.resize(fd + 1, false) catch |err| {
+                kernel.logger.ERROR(
+                    "TaskFiles.setFD(): failed to resize closexec: {t}",
                     .{err}
                 );
                 return errors.ENOMEM;

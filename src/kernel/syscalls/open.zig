@@ -9,7 +9,7 @@ const kernel = @import("../main.zig");
 pub fn do_open(
     parent_dir: fs.path.Path,
     name: []const u8,
-    flags: u16,
+    flags: u32,
     mode: fs.UMode
 ) !u32 {
     var new: bool = false;
@@ -84,13 +84,15 @@ pub fn do_open(
         kernel.mm.kfree(target_path.dentry);
         return errors.ENOENT;
     };
+    if (flags & fs.file.O_CLOEXEC != 0)
+        kernel.task.current.files.closexec.set(fd);
     kernel.logger.DEBUG("opened {s} with fd {d}", .{name, fd});
     return fd;
 }
 
 pub fn open(
     filename: ?[*:0]const u8,
-    flags: u16,
+    flags: u32,
     mode: fs.UMode,
 ) !u32 {
     if (filename) |f| {
