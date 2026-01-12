@@ -67,13 +67,12 @@ pub fn doExecve(
     freeSlices(envp, envp.len);
     
     krn.task.current.sighand = krn.signals.SigHand.init();
-    var it = krn.task.current.files.fds.iterator();
-    while (it.next()) |_i| {
-        if (_i.value_ptr.*.*.flags & krn.fs.file.O_CLOEXEC != 0) {
-            _ = krn.task.current.files.releaseFD(_i.key_ptr.*);
-        }
+    var it = krn.task.current.files.closexec.iterator(
+        .{.direction = .forward, .kind = .set}
+    );
+    while (it.next()) |_fd| {
+        _ = krn.task.current.files.releaseFD(_fd);
     }
-
     krn.userspace.goUserspace();
     return 0;
 }

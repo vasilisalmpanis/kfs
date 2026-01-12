@@ -93,7 +93,7 @@ pub const Inode = struct {
         return self.mode.canExecute(self.uid, self.gid);
     }
 
-    pub fn canAccess(self: *Inode, flags: u16) bool {
+    pub fn canAccess(self: *Inode, flags: u32) bool {
         if (kernel.task.current.uid == 0) {
             return true;
         }

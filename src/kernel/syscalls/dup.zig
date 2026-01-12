@@ -12,10 +12,10 @@ pub fn dup2(old_fd: u32, new_fd: u32) !u32 {
             return new_fd;
         }
         if (krn.task.current.files.fds.get(new_fd) != null) {
-            file.ref.ref();
             _ = krn.task.current.files.releaseFD(new_fd);
         }
         try krn.task.current.files.setFD(new_fd, file);
+        file.ref.ref();
         return new_fd;
     }
     return errors.EBADF;
@@ -28,6 +28,7 @@ pub fn dup(old_fd: u32) !u32 {
             return errors.EMFILE;
         };
         try krn.task.current.files.setFD(new_fd, file);
+        file.ref.ref();
         return new_fd;
     }
     return errors.EBADF;

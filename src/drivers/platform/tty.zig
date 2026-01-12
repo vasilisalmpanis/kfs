@@ -109,7 +109,7 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
 fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
     var _tty = try getTTY(file);
     const msg = buf[0..size];
-    krn.logger.DEBUG("TTY write {s}\n", .{msg});
+    krn.logger.DEBUG("TTY write {s} |{any}|\n", .{msg, msg});
     var i: u32 = 0;
     while (i < msg.len) : (i += 1) {
         const c = msg[i];
@@ -391,6 +391,7 @@ fn addTTYDev(name: []const u8) !void {
 }
 
 pub fn init() void {
+    addTTYDev("tty") catch return;
     addTTYDev("tty10") catch return;
     addTTYDev("tty9") catch return;
     addTTYDev("tty8") catch return;

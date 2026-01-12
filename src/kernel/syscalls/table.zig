@@ -84,6 +84,7 @@ pub const SyscallTable = brk: {
         .SYS_lock                       = &notImpl,
         .SYS_ioctl                      = @ptrCast(&@import("ioctl.zig").ioctl),
         .SYS_fcntl                      = @ptrCast(&@import("./fcntl.zig").fcntl),
+        .SYS_fcntl64                    = @ptrCast(&@import("./fcntl.zig").fcntl64),
         .SYS_mpx                        = &notImpl,
         .SYS_setpgid                    = @ptrCast(&@import("../sched/process.zig").setPGID),
         .SYS_ulimit                     = &notImpl,
