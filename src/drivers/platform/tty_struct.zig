@@ -151,7 +151,7 @@ pub const TTY = struct {
     csi_n: u8 = 0,
     csi_priv: bool = false,
 
-    pub fn init(w: u32, h: u32) TTY {
+    pub fn init(w: u32, h: u32, vt_idx: u16) TTY {
         const buffer: [*]u8 = krn.mm.kmallocArray(u8, w * h)
             orelse @panic("buffer");
         const prev: [*]u8 = krn.mm.kmallocArray(u8, w * h)
@@ -175,6 +175,7 @@ pub const TTY = struct {
                 .ws_col = @intCast(w)
             },
             .term = default_termios(),
+            .vt_index = vt_idx,
         };
 
         @memset(_tty._buffer[0 .. w * h], 0);
@@ -228,10 +229,19 @@ pub const TTY = struct {
         sig: krn.signals.Signal
     ) void {
         if (self.fg_pgid > 0) {
+            krn.logger.DEBUG(
+                "TTY {x}: Sending signal {s} to process group {d}\n",
+                .{@intFromPtr(self), @tagName(sig), self.fg_pgid}
+            );
             _ = krn.kill(
                 self.fg_pgid, 
                 @intFromEnum(sig)
             ) catch 0;
+        } else {
+            krn.logger.WARN(
+                "TTY: Cannot send signal {s}, fg_pgid is {d}\n",
+                .{@tagName(sig), self.fg_pgid}
+            );
         }
     }
 
@@ -277,6 +287,12 @@ pub const TTY = struct {
     }
 
     pub fn render(self: *TTY) void {
+        if (scr.current_tty) |current| {
+            if (self != current) {
+                return;
+            }
+        }
+
         if (!self._has_dirty 
             and self._x == self._prev_x
             and self._y == self._prev_y
@@ -608,6 +624,29 @@ pub const TTY = struct {
                     continue;
                 }
                 if (self.term.c_lflag.ICANON) {
+                    if (b == self.term.c_cc[t.VEOF] and b != 0) {
+                        self._input_len = 0;
+                        self.lock.lock();
+                        _ = self.file_buff.push('\n');
+                        self.lock.unlock();
+                        continue;
+                    }
+                    if (b == self.term.c_cc[t.VKILL] and b != 0) {
+                        const line_len = self.currentLineLen();
+                        if (line_len > 0) {
+                            if (self.term.c_lflag.ECHO) {
+                                var i: u32 = 0;
+                                while (i < line_len) : (i += 1) {
+                                    self.removeAtCursor();
+                                }
+                            }
+                            self.lock.lock();
+                            _ = self.file_buff.unwrite(line_len);
+                            self.lock.unlock();
+                            self._input_len = 0;
+                        }
+                        continue;
+                    }
                     if (b == '\n') { 
                         self.processEnter(); 
                         continue;

@@ -118,6 +118,7 @@ pub fn getPGID(pid_arg: u32) !u32 {
 pub fn setPGID(pid_arg: u32, pgid_arg: u32) !u32 {
     const pid: i32 = @intCast(pid_arg);
     const pgid: i32 = @intCast(pgid_arg);
+    krn.logger.INFO("setPGID pid: {d}, pgid: {d}", .{pid, pgid});
     if (pid < 0) {
         return errors.ESRCH;
     } else if (pid == 0) {
