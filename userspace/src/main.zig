@@ -309,7 +309,7 @@ pub export fn main() noreturn {
     load_modules() catch {};
     _ = std.os.linux.mount("procfs", "/proc", "procfs", 0, 0);
     // run_test();
-    for (1..5) |idx| {
+    for (0..1) |idx| {
         var buff: [10]u8 = undefined;
         const tty_path = std.fmt.bufPrint(
             buff[0..10],
@@ -323,7 +323,7 @@ pub export fn main() noreturn {
         };
         if (pid == 0) {
             const tty = std.posix.open(
-                tty_path,
+                if (idx > 0) tty_path else "/dev/tty",
                 std.os.linux.O{ .ACCMODE = .RDWR },
                 0o666
             ) catch 0;

@@ -1384,6 +1384,12 @@ pub const drivers = struct {
             };
 
 
+            pub const VtStat = extern struct {
+                v_active : u16,
+                v_signal : u16,
+                v_state : u16,
+            };
+
         };
 
 
