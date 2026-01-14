@@ -132,3 +132,15 @@ pub fn setPGID(pid_arg: u32, pgid_arg: u32) !u32 {
     }
     return errors.ESRCH;
 }
+
+pub fn getEUID() !u32 {
+    return krn.task.current.uid;
+}
+
+pub fn getEUID32() !u32 {
+    return krn.task.current.uid;
+}
+
+pub fn getEGID() !u32 {
+    return krn.task.current.gid;
+}

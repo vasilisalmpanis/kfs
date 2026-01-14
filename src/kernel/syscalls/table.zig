@@ -77,8 +77,9 @@ pub const SyscallTable = brk: {
         .SYS_setgid                     = @ptrCast(&@import("../sched/process.zig").setGID),
         .SYS_getgid                     = @ptrCast(&@import("../sched/process.zig").getPID),
         .SYS_signal                     = &notImpl,
-        .SYS_geteuid                    = &notImpl,
-        .SYS_getegid                    = &notImpl,
+        .SYS_geteuid                    = @ptrCast(&@import("../sched/process.zig").getEUID),
+        .SYS_geteuid32                  = @ptrCast(&@import("../sched/process.zig").getEUID32),
+        .SYS_getegid                    = @ptrCast(&@import("../sched/process.zig").getEGID),
         .SYS_acct                       = &notImpl,
         .SYS_umount2                    = @ptrCast(&@import("./mount.zig").umount2),
         .SYS_lock                       = &notImpl,
@@ -250,6 +251,7 @@ pub const SyscallTable = brk: {
         .SYS_statx                      = @ptrCast(&@import("statx.zig").statx),
         .SYS_clock_gettime64            = @ptrCast(&@import("clock.zig").clock_gettime64),
         .SYS_clock_settime              = @ptrCast(&@import("clock.zig").clock_settime),
+        .SYS_tkill                      = @ptrCast(&@import("kill.zig").tkill)
     });
 };
 

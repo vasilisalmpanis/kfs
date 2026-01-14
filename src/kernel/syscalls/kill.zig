@@ -8,7 +8,7 @@ fn send_signal(task: *tsk.Task, signal: signals.Signal) !u32 {
         return errors.EPERM;
     if (signal != .EMPTY) {
         task.sighand.setSignal(signal);
-        if (task.state != .ZOMBIE and task.state != .STOPPED)
+        if (task.state != .ZOMBIE and task.state != .STOPPED and task.state != .UNINTERRUPTIBLE_SLEEP)
             task.state = .RUNNING;
     }
     return 0;
@@ -48,4 +48,8 @@ pub fn kill(pid: i32, sig: u32) !u32 {
         return try send_signal(task, signal);
     }
     return errors.EPERM;
+}
+
+pub fn tkill(tid: i32, signal: u32) !u32 {
+    return try kill(tid, signal);
 }

@@ -90,6 +90,14 @@ fn tty_close(base: *krn.fs.File) void {
 
 fn tty_read(file: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
     var _tty = try getTTY(file);
+    if (krn.task.current.pgid != _tty.fg_pgid) {
+        _ = krn.kill(
+            -@as(i32, @intCast(krn.task.current.pgid)),
+            @intFromEnum(krn.signals.Signal.SIGTTIN)
+        ) catch {
+        };
+        return krn.errors.PosixError.EINTR;
+    }
     if (_tty.term.c_lflag.ICANON) {
         while (true) {
             _tty.lock.lock();
@@ -132,6 +140,13 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
 
 fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
     var _tty = try getTTY(file);
+    if (krn.task.current.pgid != _tty.fg_pgid) {
+        _ = krn.kill(
+            -@as(i32, @intCast(krn.task.current.pgid)),
+            @intFromEnum(krn.signals.Signal.SIGTTOU)
+        ) catch {};
+        return krn.errors.PosixError.EINTR;
+    }
     const msg = buf[0..size];
     krn.logger.DEBUG("TTY write {s} |{any}|\n", .{msg, msg});
     var i: u32 = 0;
