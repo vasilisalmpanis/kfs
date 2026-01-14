@@ -435,8 +435,9 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         .SIGTSTP,
         .SIGTTIN,
         .SIGTTOU => {
+            task.wakeup_time = 0;
             task.state = .INTERRUPTIBLE_SLEEP;
-            krn.sched.reschedule();
+            return krn.sched.schedule(regs);
         },
         .SIGCONT => {},
         .SIGCHLD,
