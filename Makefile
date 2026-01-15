@@ -1,5 +1,6 @@
 NAME = kfs.iso
 KERNEL = zig-out/bin/kfs.bin
+USERSPACE = zig-out/bin/userspace.bin
 
 ISO_DIR = iso
 SRC_DIR = src
@@ -44,6 +45,9 @@ all: $(NAME)
 $(NAME): $(KERNEL) $(GRUB_CFG)
 	cp $(KERNEL) $(ISO_DIR)/boot/
 	$(MKRESCUE) --compress=xz -o $(NAME) $(ISO_DIR)
+
+$(USERSPACE):
+	zig build userspace.bin
 
 $(KERNEL): $(SRC) $(ASM_SRC)
 	zig build -freference-trace=20 # -Doptimize=ReleaseSafe
@@ -94,7 +98,7 @@ $(IMG): $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:=.o)) \
 		$(IMG) \
 		$(IMG_SIZE)
 
-$(IMG_DIR):
+$(IMG_DIR): $(USERSPACE)
 	mkdir -p $(IMG_DIR)
 	mkdir -p $(IMG_DIR)/bin
 	mkdir -p $(IMG_DIR)/modules
@@ -105,6 +109,7 @@ $(IMG_DIR):
 	mkdir -p $(IMG_DIR)/tmp
 	mkdir -p $(IMG_DIR)/var
 	mkdir -p $(IMG_DIR)/proc
+	cp $(USERSPACE) $(IMG_DIR)/bin/init
 
 modules: $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:=.o))
 

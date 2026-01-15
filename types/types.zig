@@ -849,7 +849,7 @@ pub const kernel = struct {
                 close : *const fn(*kernel.fs.file.File) void,
                 write : *const fn(*kernel.fs.file.File, [*]const u8, u32) anyerror!u32,
                 read : *const fn(*kernel.fs.file.File, [*]u8, u32) anyerror!u32,
-                lseek : ?*const fn(*kernel.fs.file.File, u32, u32) anyerror!u32= null,
+                lseek : ?*const fn(*kernel.fs.file.File, i32, u32) anyerror!u32= null,
                 readdir : ?*const fn(*kernel.fs.file.File, []u8) anyerror!u32= null,
                 ioctl : ?*const fn(*kernel.fs.file.File, u32, ?*anyopaque) anyerror!u32= null,
             };

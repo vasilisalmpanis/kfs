@@ -21,8 +21,6 @@ const cpu = @import("arch").cpu;
 const io = @import("arch").io;
 const modules = @import("modules");
 
-const init = @embedFile("userspace");
-
 pub fn panic(
     msg: []const u8,
     stack: ?*builtin.StackTrace,
@@ -99,18 +97,15 @@ fn user_thread(_: ?*const anyopaque) i32 {
     krn.task.current.mm = krn.task.initial_task.mm;
     krn.task.current.fs = krn.task.initial_task.fs;
     krn.task.current.files = krn.task.initial_task.files;
-    krn.userspace.validateElfHeader(init) catch |err| {
-        krn.logger.ERROR("ELF validation failed: {}\n", .{err});
-        @panic("Init binary is not a valid ELF");
-    };
-    krn.userspace.prepareBinary(
-        init,
+    _ = krn.doExecve(
+        "/bin/init",
         krn.userspace.argv_init,
         krn.userspace.envp_init,
-    ) catch {
-        @panic("We cannot go to userspace");
+        false
+    ) catch |err| {
+        krn.logger.ERROR("Failed execute init: {t}", .{err});
+        @panic("execve /bin/init");
     };
-    krn.userspace.goUserspace();
     return 0;
 }
 

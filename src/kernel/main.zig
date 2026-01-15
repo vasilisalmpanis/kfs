@@ -57,3 +57,4 @@ pub const do_munmap = @import("./syscalls/mmap.zig").do_munmap;
 pub const kernel_timespec = @import("time/spec.zig").kernel_timespec;
 pub const time = @import("./time/spec.zig");
 pub const kill = @import("./syscalls/kill.zig").kill;
+pub const doExecve = @import("./syscalls/exec.zig").doExecve;
