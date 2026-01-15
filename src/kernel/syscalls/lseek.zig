@@ -7,29 +7,28 @@ const SEEK_SET = 0;
 const SEEK_CUR = 1;
 const SEEK_END = 2;
 
-pub fn lseek(fd: u32, offset: u32, whence: u32) !u32 {
+pub fn lseek(fd: u32, offset: i32, whence: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
         if (file.ops.lseek) |_lseek| {
             return try _lseek(file, offset, whence);
         }
-        var new_pos = offset;
+        var new_pos: i64 = @intCast(offset);
         switch (whence) {
-            SEEK_CUR => new_pos = file.pos +| offset,
-            SEEK_END => new_pos = file.inode.size +| offset,
+            SEEK_CUR => new_pos = @as(i64, @intCast(file.pos)) + offset,
+            SEEK_END => new_pos = @as(i64, @intCast(file.inode.size)) + offset,
             else => {}
         }
-        if (new_pos > file.inode.size) {
+        if (new_pos < 0 or new_pos > file.inode.size)
             return errors.PosixError.EINVAL;
-        }
-        file.pos = new_pos;
-        return new_pos;
+        file.pos = @intCast(new_pos);
+        return file.pos;
     }
     return errors.PosixError.ENOENT;
 }
 
 pub fn llseek(fd: u32, offset_high: u32, offset_low: u32, result: *u64, whence: u32) !u32 {
-    _ = offset_high;
-    const res = try lseek(fd, offset_low, whence);
+    const offset: i64 = @as(i64 , @intCast(offset_high)) << 32 | @as(i64, @intCast(offset_low));
+    const res = try lseek(fd, @intCast(offset), whence);
     result.* = @intCast(res);
     return 0;
 }

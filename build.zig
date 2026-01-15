@@ -94,34 +94,8 @@ pub fn build(b: *std.Build) !void {
         // kernel.setVerboseLink(true);
         b.installArtifact(kernel);
 
-        // Add userspace binary
-        // const userspace_bin_path = b.path("./userspace_c/userspace.bin");
-        const userspace_bin_path = b.path("./zig-out/bin/userspace.bin");
         target.abi = .musl;
         target.os_tag = .linux;
-        const userspace = b.addExecutable(.{
-            .name = userspace_name,
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("./userspace/src/main.zig"),
-                .target = b.resolveTargetQuery(target),
-                .optimize = .ReleaseSmall,
-                .code_model = .default,
-                .strip = false,
-                .error_tracing = false,
-                .link_libc = false,
-                .single_threaded = true,
-            }),
-            .linkage = .static,
-        });
-        userspace.setLinkerScript(b.path("./userspace/linker.ld"));
-        b.installArtifact(userspace);
-
-        kernel.root_module.addAnonymousImport("userspace", .{
-            .root_source_file = userspace_bin_path,
-        });
-        kernel.step.dependOn(&userspace.step);
-
-
         const codegen_step = b.step("gen", "Build module types");
         const codegen = b.addExecutable(.{
             .name = "codegen",
@@ -144,5 +118,32 @@ pub fn build(b: *std.Build) !void {
         const kernel_step = b.step(name, "Build the kernel");
         kernel.step.dependOn(codegen_step);
         kernel_step.dependOn(&kernel.step);
+
+        // Add userspace binary
+        // const userspace_bin_path = b.path("./userspace_c/userspace.bin");
+        // const userspace_bin_path = b.path("./zig-out/bin/userspace.bin");
+        const userspace = b.addExecutable(.{
+            .name = userspace_name,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("./userspace/src/main.zig"),
+                .target = b.resolveTargetQuery(target),
+                .optimize = .ReleaseSmall,
+                .code_model = .default,
+                .strip = false,
+                .error_tracing = false,
+                .link_libc = false,
+                .single_threaded = true,
+            }),
+            .linkage = .static,
+        });
+        userspace.setLinkerScript(b.path("./userspace/linker.ld"));
+
+        // kernel.root_module.addAnonymousImport("userspace", .{
+        //     .root_source_file = userspace_bin_path,
+        // });
+        // kernel.step.dependOn(&userspace.step);
+        const userspace_step = b.step(userspace_name, "Compile userspace init binary");
+        userspace_step.dependOn(&userspace.step);
+        userspace_step.dependOn(&b.addInstallArtifact(userspace, .{}).step);
     }
 }

@@ -22,6 +22,7 @@ pub fn doExecve(
     filename: []const u8,
     argv: []const []const u8,
     envp: []const []const u8,
+    free_arg_env: bool,
 ) !u32 {
     // TODO:
     // - check suid / sgid and change euid / egid if needed
@@ -63,8 +64,10 @@ pub fn doExecve(
         envp,
     );
 
-    freeSlices(argv, argv.len);
-    freeSlices(envp, envp.len);
+    if (free_arg_env) {
+        freeSlices(argv, argv.len);
+        freeSlices(envp, envp.len);
+    }
     
     krn.task.current.sighand = krn.signals.SigHand.init();
     var it = krn.task.current.files.closexec.iterator(
@@ -121,5 +124,6 @@ pub fn execve(
         span,
         argv_slice,
         envp_slice,
+        true,
     );
 }

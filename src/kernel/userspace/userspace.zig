@@ -267,7 +267,6 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
 }
 
 pub fn goUserspace() void {
-
     asm volatile(
         \\ cli
         \\ mov $((8 * 4) | 3), %%bx
