@@ -279,7 +279,6 @@ pub fn load_modules() !void {
         if (line.len == 0) {
             return;
         }
-        r.seek += 1;
         if (line[0] == '#') {
             continue ;
         }
