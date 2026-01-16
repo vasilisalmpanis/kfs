@@ -249,8 +249,12 @@ pub fn load_module(slice: []u8, name: []const u8) !*Module {
         errdefer kernel.mm.kfree(mod);
         mod.exit = exit;       
         mod.list.setup();
-        if (kernel.mm.kmallocSlice(u8, name.len)) |_name| {
-            @memcpy(_name[0..name.len], name);
+        const name_len = if (std.mem.lastIndexOf(u8, name, ".")) |idx|
+            idx
+        else
+            name.len;
+        if (kernel.mm.kmallocSlice(u8, name_len)) |_name| {
+            @memcpy(_name[0..name_len], name[0..name_len]);
             mod.name = _name;
         } else {
             return kernel.errors.PosixError.ENOMEM;
