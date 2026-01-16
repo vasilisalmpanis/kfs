@@ -1338,6 +1338,7 @@ pub const drivers = struct {
                 _prev_y : u32= 0,
                 _dirty : std.platform.tty_struct.DirtyRect,
                 _has_dirty : bool= false,
+                _should_wrap : bool= false,
                 term : std.platform.termios.Termios,
                 winsz : std.platform.tty_struct.WinSize,
                 file_buff : kernel.ringbuf.RingBuf,
