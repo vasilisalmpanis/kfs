@@ -111,6 +111,7 @@ pub const TTY = struct {
         0, 0, 0, 0
     ),
     _has_dirty: bool = false,
+    _should_wrap: bool = false,
 
     // termios & winsize
     term: t.Termios,
@@ -387,23 +388,35 @@ pub const TTY = struct {
         self.render();
     }
 
+    pub fn clearScreen(self: *TTY) void {
+        @memset(self._buffer[0 .. self.height * self.width], 0);
+        self.markDirty(DirtyRect.fullScreen(self.width, self.height));
+        self.render();
+    }
+
+    fn wrapLine(self: *TTY) void {
+        self._x = 0;
+        self._y += 1;
+        self._should_wrap = false;
+    }
+
     fn printVga(self: *TTY, b: u8) void {
         self._buffer[self._y * self.width + self._x] = b;
         self.markCellDirty(self._x, self._y);
         self._x += 1;
         if (self._x >= self.width) {
-            self._x = 0;
-            self._y += 1;
+            self._should_wrap = true;
         }
         if (self._y >= self.height)
             self._scroll();
     }
 
     fn printChar(self: *TTY, c: u8) void {
+        if (self._should_wrap)
+            self.wrapLine();
         switch (c) {
             '\n' => {
-                self._y += 1;
-                self._x = 0;
+                self._should_wrap = true;
                 if (self._y >= self.height)
                     self._scroll();
             },
@@ -831,6 +844,7 @@ pub const TTY = struct {
                     c = 1;
                 self._y = @min(@as(u32, r - 1), self.height - 1);
                 self._x = @min(@as(u32, c - 1), self.width - 1);
+                krn.logger.INFO("cursor x {d} y {d}\n", .{self._x, self._y});
                 self.render();
             },
             'J' => { // ED
@@ -844,7 +858,7 @@ pub const TTY = struct {
                         self.clearFromStartToCursor();
                     },
                     else => {
-                        self.clear();
+                        self.clearScreen();
                     },
                 }
             },
@@ -948,8 +962,14 @@ pub const TTY = struct {
             @memset(self._buffer[p .. p + self.width], 0);
         }
         self.markDirty(DirtyRect.init(
-            0,
+            self._x,
             self._y,
+            self._x,
+            self.height - 1
+        ));
+        self.markDirty(DirtyRect.init(
+            0,
+            self._y + 1,
             self.width - 1,
             self.height - 1
         ));
@@ -988,8 +1008,14 @@ pub const TTY = struct {
                     self.csiReset();
                     self.pstate = .Csi;
                 },
-                '7' => self.saveCursor(),
-                '8' => self.restoreCursor(),
+                '7' => {
+                    self.saveCursor();
+                    self.pstate = .Normal;
+                },
+                '8' => {
+                    self.restoreCursor();
+                    self.pstate = .Normal;
+                },
                 else => self.pstate = .Normal,
             },
             .Csi => {
