@@ -395,6 +395,8 @@ pub const TTY = struct {
     }
 
     fn wrapLine(self: *TTY) void {
+        self._prev_x = self._x;
+        self._prev_y = self._y;
         self._x = 0;
         self._y += 1;
         self._should_wrap = false;
@@ -417,6 +419,7 @@ pub const TTY = struct {
         switch (c) {
             '\n' => {
                 self._should_wrap = true;
+                self.wrapLine();
                 if (self._y >= self.height)
                     self._scroll();
             },
@@ -936,7 +939,7 @@ pub const TTY = struct {
         self.markDirty(DirtyRect.init(
             0,
             self._y,
-            self._x,
+            self._x + 1,
             self._y
         ));
         self.render();
@@ -962,12 +965,6 @@ pub const TTY = struct {
             @memset(self._buffer[p .. p + self.width], 0);
         }
         self.markDirty(DirtyRect.init(
-            self._x,
-            self._y,
-            self._x,
-            self.height - 1
-        ));
-        self.markDirty(DirtyRect.init(
             0,
             self._y + 1,
             self.width - 1,
@@ -977,21 +974,17 @@ pub const TTY = struct {
     }
 
     fn clearFromStartToCursor(self: *TTY) void {
+        self.clearToBol();
         var row: u32 = 0;
         while (row < self._y) : (row += 1) {
             const p = row * self.width;
             @memset(self._buffer[p .. p + self.width], 0);
         }
-        const pos = self._y * self.width;
-        var x: u32 = 0;
-        while (x <= self._x) : (x += 1) {
-            self._buffer[pos + x] = 0;
-        }
         self.markDirty(DirtyRect.init(
             0,
             0,
             self.width - 1,
-            self._y
+            self._y - 1
         ));
         self.render();
     }

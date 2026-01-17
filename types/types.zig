@@ -852,6 +852,7 @@ pub const kernel = struct {
                 lseek : ?*const fn(*kernel.fs.file.File, i32, u32) anyerror!u32= null,
                 readdir : ?*const fn(*kernel.fs.file.File, []u8) anyerror!u32= null,
                 ioctl : ?*const fn(*kernel.fs.file.File, u32, ?*anyopaque) anyerror!u32= null,
+                poll : ?*const fn(*kernel.fs.file.File, *kernel.poll.PollFd) anyerror!u32= null,
             };
 
             pub const TaskFiles = struct {
@@ -962,6 +963,15 @@ pub const kernel = struct {
     };
 
     pub const time = struct {
+
+    };
+
+    pub const poll = struct {
+        pub const PollFd = extern struct {
+            fd : i32,
+            events : u16,
+            revents : u16,
+        };
 
     };
 
