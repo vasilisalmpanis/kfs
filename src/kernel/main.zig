@@ -58,3 +58,4 @@ pub const kernel_timespec = @import("time/spec.zig").kernel_timespec;
 pub const time = @import("./time/spec.zig");
 pub const kill = @import("./syscalls/kill.zig").kill;
 pub const doExecve = @import("./syscalls/exec.zig").doExecve;
+pub const poll = @import("./syscalls/poll.zig");

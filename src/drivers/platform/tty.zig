@@ -70,7 +70,8 @@ var tty_file_ops = krn.fs.FileOps{
     .write = tty_write,
     .lseek = null,
     .readdir = null,
-    .ioctl = tty_ioctl
+    .ioctl = tty_ioctl,
+    .poll = tty_poll,
 };
 
 // file ops
@@ -395,6 +396,24 @@ fn tty_ioctl(
         },
         else => return krn.errors.PosixError.EINVAL,
     }
+}
+
+fn tty_poll(base: *krn.fs.File, pollfd: *krn.poll.PollFd) !u32 {
+    const _tty = try getTTY(base);
+    var ready: bool = false;
+    if (pollfd.events & krn.poll.POLLOUT != 0) {
+        pollfd.revents |= krn.poll.POLLOUT;
+        ready = true;
+    }
+    if (pollfd.events & krn.poll.POLLIN != 0) {
+        if (_tty.file_buff.available() > 0) {
+            pollfd.revents |= krn.poll.POLLIN;
+            ready = true;
+        }
+    }
+    if (ready)
+        return 1;
+    return 0;
 }
 
 // probe / thread / init

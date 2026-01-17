@@ -33,7 +33,12 @@ pub fn fcntl64(fd: u32, cmd: u32, arg: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
         krn.logger.DEBUG(
             "fcntl64 {d}: {s}, cmd 0x{x}, arg 0x{x}", 
-            .{fd, file.path.?.dentry.name, cmd, arg}
+            .{
+                fd,
+                if (file.path) |_p| _p.dentry.name else "-",
+                cmd,
+                arg
+            }
         );
         switch (cmd) {
             F_DUPFD, F_DUPFD_CLOEXEC => {

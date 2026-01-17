@@ -107,6 +107,7 @@ pub const FileOps = struct {
     lseek: ?*const fn (base: *File, offset: i32, origin: u32) anyerror!u32 = null,
     readdir: ?*const fn (base: *File, buf: []u8) anyerror!u32 = readdirVFS,
     ioctl: ?*const fn (base: *File, op: u32, data: ?*anyopaque) anyerror!u32 = null,
+    poll: ?*const fn (base: *File, pollfd: *kernel.poll.PollFd) anyerror!u32 = pollVFS,
 };
 
 pub const TaskFiles = struct {
@@ -287,6 +288,18 @@ pub fn readdirVFS(base: *fs.File, buf: []u8) !u32 {
         }
         base.pos = idx;
         return off;
+    }
+    return 0;
+}
+
+pub fn pollVFS(_: *fs.File, pollfd: *kernel.poll.PollFd) !u32 {
+    // Immediately report fd as ready
+    if (pollfd.events & kernel.poll.POLLIN != 0)
+        pollfd.revents |= kernel.poll.POLLIN;
+    if (pollfd.events & kernel.poll.POLLOUT != 0)
+        pollfd.revents |= kernel.poll.POLLOUT;
+    if (pollfd.revents != 0) {
+        return 1;
     }
     return 0;
 }
