@@ -23,7 +23,7 @@ ifeq ($(shell uname -s),Darwin)
 endif
 
 SRC = $(shell find $(SRC_DIR) -name '*.zig')
-SRC += $(shell find $(USERSPACE_DIR) -name '*.zig')
+USERSPACE_SRC = $(shell find $(USERSPACE_DIR) -name '*.zig')
 ASM_SRC = $(shell find $(SRC_DIR) -name '*.s')
 GRUB_CFG = $(ISO_DIR)/boot/grub/grub.cfg
 QEMU = qemu-system-i386
@@ -46,7 +46,7 @@ $(NAME): $(KERNEL) $(GRUB_CFG)
 	cp $(KERNEL) $(ISO_DIR)/boot/
 	$(MKRESCUE) --compress=xz -o $(NAME) $(ISO_DIR)
 
-$(USERSPACE):
+$(USERSPACE): $(USERSPACE_SRC)
 	zig build userspace.bin
 
 $(KERNEL): $(SRC) $(ASM_SRC)

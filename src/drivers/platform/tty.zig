@@ -133,16 +133,35 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
             }
             const to_read = @min(@as(u32, avail), size);
             const n = _tty.file_buff.readInto(buf[0..to_read]);
+            krn.logger.INFO("Read {any}\n", .{buf[0..n]});
             _tty.lock.unlock();
             return @intCast(n);
         }
     }
 }
 
+fn print_raw_input(msg: []const u8) void {
+    krn.serial.print("tty_write: |");
+    for (msg) |_ch| {
+        if (std.ascii.isPrint(_ch)) {
+            krn.serial.putchar(_ch);
+        } else {
+            var buff: [5]u8 = .{0} ** 5;
+            const buff_s: []u8 = buff[0..5];
+            const res = std.fmt.bufPrint(
+                buff_s,
+                "\\{d}\\", .{_ch}
+            ) catch "";
+            krn.serial.print(res);
+        }
+    }
+    krn.serial.print("|\n");
+}
+
 fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
     var _tty = try getTTY(file);
     const msg = buf[0..size];
-    krn.logger.DEBUG("TTY write |{any}|\n", .{msg});
+    print_raw_input(msg);
     var i: u32 = 0;
     while (i < msg.len) : (i += 1) {
         const c = msg[i];
