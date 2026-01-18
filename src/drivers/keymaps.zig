@@ -33,7 +33,7 @@ pub const keymap_us = std.EnumMap(
     .K_P            = .{ .normal = 'p', .shift = 'P', .ctrl = 16, },
     .K_OSQB         = .{ .normal = '[', .shift = '{' }, 
     .K_CSQB         = .{ .normal = ']', .shift = '}' }, 
-    .K_ENTER        = .{ .normal = '\n', },
+    .K_ENTER        = .{ .normal = '\r', },
 
     .K_A            = .{ .normal = 'a', .shift = 'A', .ctrl = 1, },
     .K_S            = .{ .normal = 's', .shift = 'S', .ctrl = 19, },

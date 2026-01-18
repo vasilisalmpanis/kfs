@@ -87,7 +87,7 @@ pub const Shell = struct {
         @memcpy(self.line_buff[0..input.len], input);
         const _line: []const u8 = self.line_buff[0..input.len];
         var arg_count: usize = 0;
-        var it = std.mem.tokenizeAny(u8, _line, " \t\n");
+        var it = std.mem.tokenizeAny(u8, _line, " \t\r\n");
         while (it.next()) |arg| {
             if (arg_count < MAX_ARGS) {
                 self.arg_buf[arg_count] = arg;
@@ -98,6 +98,7 @@ pub const Shell = struct {
         
         const cmd_name = self.arg_buf[0];
         const cmd_args = self.arg_buf[1..arg_count];
+        self.print("\n", .{});
         if (self.commands.get(cmd_name)) |cmd| {
             cmd.hndl(self, cmd_args);
         } else {
