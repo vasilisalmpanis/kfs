@@ -55,7 +55,6 @@ pub const Shell = struct {
         self.registerCommand(.{ .name = "shutdown", .desc = "Power off the PC", .hndl = &shutdown });
         self.registerCommand(.{ .name = "halt", .desc = "Halt the PC", .hndl = &halt });
         self.registerCommand(.{ .name = "test", .desc = "Run tests", .hndl = &runTests });
-        self.registerCommand(.{ .name = "color", .desc = "Change the input color (color FFAABB bg)", .hndl = &color });
         self.registerCommand(.{ .name = "mm", .desc = "Walk page tables", .hndl = &mm });
         self.registerCommand(.{ .name = "mm-usage", .desc = "Show memory usage", .hndl = &mmUsage });
         self.registerCommand(.{ .name = "sym", .desc = "Lookup symbol name by address", .hndl = &sym });
@@ -182,45 +181,6 @@ fn mm(_: *Shell, _: [][]const u8) void {
 
 fn mmUsage(_: *Shell, _: [][]const u8) void {
     debug.printMapped();
-}
-
-fn color(_: *Shell, args: [][]const u8) void {
-    if (args.len < 1) {
-        debug.printf(
-            \\Usage: color <color> [bg]
-            \\  Available colors: red, green, blue, orange, magenta, white, black
-            \\  Or a hex value (FFAABB)
-            \\  Example: color FFAABB bg
-            \\
-            , .{}
-        );
-        return;
-    }
-    var col: u32 = 0;
-    if (mem.eql(u8, args[0], "red")) {
-        col = @intFromEnum(tty.ConsoleColors.Red);
-    } else if (mem.eql(u8, args[0], "green")) {
-        col = @intFromEnum(tty.ConsoleColors.Green);
-    } else if (mem.eql(u8, args[0], "blue")) {
-        col = @intFromEnum(tty.ConsoleColors.Blue);
-    } else if (mem.eql(u8, args[0], "orange")) {
-        col = @intFromEnum(tty.ConsoleColors.Brown);
-    } else if (mem.eql(u8, args[0], "magenta")) {
-        col = @intFromEnum(tty.ConsoleColors.Magenta);
-    } else if (mem.eql(u8, args[0], "white")) {
-        col = @intFromEnum(tty.ConsoleColors.White);
-    } else if (mem.eql(u8, args[0], "black")) {
-        col = @intFromEnum(tty.ConsoleColors.Black);
-    } else {
-        col = std.fmt.parseInt(u32, args[0], 16) catch 0;
-    }
-
-    if (args.len > 1 and std.mem.eql(u8, args[1], "bg")) {
-        screen.current_tty.?.setBgColor(col);
-    } else {
-        screen.current_tty.?.setColor(col);
-    }
-    screen.current_tty.?.reRenderAll();
 }
 
 fn sym(_: *Shell, args: [][]const u8) void {

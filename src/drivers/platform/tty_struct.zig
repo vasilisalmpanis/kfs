@@ -53,6 +53,13 @@ pub const DirtyRect = struct {
             .y2 = @max(self.y2, other.y2)
         };
     }
+
+    pub fn reset(self: *DirtyRect) void {
+        self.x1 = 0;
+        self.x2 = 0;
+        self.y1 = 0;
+        self.y2 = 0;
+    }
 };
 
 const ParserState = enum {
@@ -74,44 +81,410 @@ pub const WinSize = extern struct {
     ws_ypixel: u16 = 0    
 };
 
-pub const ConsoleColors = enum(u32) {
-    Black = 0x000000,
-    White = 0x00FFFFFF,
-    Red = 0x00FF0000,
-    Green = 0x0000FF00,
-    Blue = 0x000000FF,
-    Yellow = 0x00FFFF00,
-    Magenta = 0x00FF00FF,
-    Cyan = 0x0000FFFF,
-    LightGray = 0x00C6C6C6,
-    DarkGray = 0x00868686,
-    LightRed = 0x00FF6868,
-    LightGreen = 0x0086FF86,
-    LightBlue = 0x008686FF,
-    LightYellow = 0x00FFFF86,
-    LightMagenta = 0x00FF86FF,
-    LightCyan = 0x0086FFFF,
-    Brown = 0x00868600,
+const AnsiColor = enum(u4) {
+    BLACK,
+    RED,
+    GREEN,
+    YELLOW,
+    BLUE,
+    MAGENTA,
+    CYAN,
+    WHITE,
+    BR_BLACK,
+    BR_RED,
+    BR_GREEN,
+    BR_YELLOW,
+    BR_BLUE,
+    BR_MAGENTA,
+    BR_CYAN,
+    BR_WHITE,
+
+    pub fn toU32(self: AnsiColor) u32 {
+        return switch (self) {
+            .BLACK =>       0x00000000,
+            .RED =>         0x00990000,
+            .GREEN =>       0x0000A600,
+            .YELLOW =>      0x00999900,
+            .BLUE =>        0x000000b2,
+            .MAGENTA =>     0x00b200b2,
+            .CYAN =>        0x0000a6b2,
+            .WHITE =>       0x00bfbfbf,
+            .BR_BLACK =>    0x00666666,
+            .BR_RED =>      0x00e60000,
+            .BR_GREEN =>    0x0000d900,
+            .BR_YELLOW =>   0x00e6e600,
+            .BR_BLUE =>     0x000000FF,
+            .BR_MAGENTA =>  0x00e600e6,
+            .BR_CYAN =>     0x0000e6e6,
+            .BR_WHITE =>    0x00e6e6e6,
+        };
+    }
+
+    pub fn fromAnsiCode(code: u32) AnsiColor {
+        switch (code) {
+            30, 40 =>   return .BLACK,
+            31, 41 =>   return .RED,
+            32, 42 =>   return .GREEN,
+            33, 43 =>   return .YELLOW,
+            34, 44 =>   return .BLUE,
+            35, 45 =>   return .MAGENTA,
+            36, 46 =>   return .CYAN,
+            37, 47 =>   return .WHITE,
+            90, 100 =>  return .BR_BLACK,
+            91, 101 =>  return .BR_RED,
+            92, 102 =>  return .BR_GREEN,
+            93, 103 =>  return .BR_YELLOW,
+            94, 104 =>  return .BR_BLUE,
+            95, 105 =>  return .BR_MAGENTA,
+            96, 106 =>  return .BR_CYAN,
+            97, 107 =>  return .BR_WHITE,
+            else => return .BLACK,
+        }
+    }
+};
+
+const Cursor = struct {
+    kind: CursorType = .Block,
+    x: u32 = 0,
+    y: u32 = 0,
+
+    prev_x: u32 = 0,
+    prev_y: u32 = 0,
+
+    drawn: bool = false,
+    on: bool = true,
+
+    pub fn init() Cursor {
+        return Cursor{};
+    }
+
+    pub fn set(self: *Cursor, x: u32, y: u32) void {
+        if (self.drawn) {
+            self.prev_x = self.x;
+            self.prev_y = self.y;
+        }
+        self.x = x;
+        self.y = y;
+    }
+
+    pub fn setX(self: *Cursor, x: u32) void {
+        self.set(x, self.y);
+    }
+
+    pub fn setY(self: *Cursor, y: u32) void {
+        self.set(self.x, y);
+    }
+
+    pub fn draw(self: *Cursor) void {
+        self.drawn = true;
+    }
+};
+
+const Cell = struct {
+    ch: u8 = 0,
+    bg: AnsiColor,
+    fg: AnsiColor,
+
+    pub fn eql(self: *const Cell, other: *const Cell) bool {
+        return (
+            self.ch == other.ch
+            and self.bg == other.bg
+            and self.fg == other.fg
+        );
+    }
+
+    pub fn isEmpty(self: *const Cell) bool {
+        return self.ch == 0;
+    }
+
+    pub fn makeEmpty(self: *Cell) void {
+        self.ch = 0;
+        self.bg = .BLACK;
+        self.fg = .WHITE;
+    }
+
+    pub fn invert(self: *Cell) void {
+        const _bg = self.bg;
+        self.bg = self.fg;
+        self.fg = _bg;
+    }
+};
+
+const Page = struct {
+    width: u32,
+    height: u32,
+    buff: [*]Cell,
+    prev: [*]Cell,
+
+    curr_fg: AnsiColor = .WHITE,
+    curr_bg: AnsiColor = .BLACK,
+    inverse: bool = false,
+
+    dirty: DirtyRect = DirtyRect.init(0, 0, 0, 0),
+    has_dirty: bool = false,
+
+    cursor: Cursor = Cursor.init(),
+
+    pub fn init(w: u32, h: u32) !Page {
+        const buff: [*]Cell = @ptrCast(@alignCast(
+            krn.mm.kmallocArray(Cell, w * h)
+            orelse return krn.errors.PosixError.ENOMEM
+        ));
+        const prev: [*]Cell = @ptrCast(@alignCast(
+            krn.mm.kmallocArray(Cell, w * h)
+            orelse return krn.errors.PosixError.ENOMEM
+        ));
+        const page = Page {
+            .width = w,
+            .height = h,
+            .buff = buff,
+            .prev = prev,
+        };
+        @memset(
+            page.buff[0..w * h],
+            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+        );
+        @memset(
+            page.prev[0..w * h],
+            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+        );
+        return page;
+    }
+
+    pub fn getCh(self: *Page, x: u32, y: u32) u8 {
+        return self.buff[y * self.width + x].ch;
+    }
+
+    pub fn getCell(self: *Page, x: u32, y: u32) *Cell {
+        return &self.buff[y * self.width + x];
+    }
+
+    pub fn getCurrCell(self: *Page) *Cell {
+        return self.getCell(self.cursor.x, self.cursor.y);
+    }
+
+    pub fn setCursor(self: *Page, x: u32, y: u32) void {
+        if (self.cursor.drawn) {
+            self.markCellDirty(self.cursor.x, self.cursor.y);
+            const off = self.cursor.y * self.width + self.cursor.x;
+            self.prev[off].ch = 0xFF;
+        }
+        self.cursor.set(x, y);
+    }
+
+    pub fn setCursorX(self: *Page, x: u32) void {
+        self.setCursor(x, self.cursor.y);
+    }
+
+    pub fn setCursorY(self: *Page, y: u32) void {
+        self.setCursor(self.cursor.x, y);
+    }
+
+    fn restorePrevCursorPos(self: *Page) void {
+        if (!self.cursor.drawn)
+            return;
+        if (
+            self.cursor.prev_x >= self.width
+            or self.cursor.prev_y >= self.height
+        ) {
+            return;
+        }
+        const cell = self.getCell(self.cursor.prev_x, self.cursor.prev_y);
+        scr.framebuffer.putchar(
+            cell.ch,
+            self.cursor.prev_x,
+            self.cursor.prev_y,
+            cell.bg.toU32(),
+            cell.fg.toU32(),
+        );
+    }
+
+    fn renderCursor(self: *Page) void {
+        if (self.cursor.kind == .None or !self.cursor.on)
+            return;
+        if (
+            self.cursor.x >= self.width
+            or self.cursor.y >= self.height
+        ) {
+            return;
+        }
+        self.restorePrevCursorPos();
+        if (self.cursor.kind == .Underline) {
+            scr.framebuffer.cursor(
+                self.cursor.x,
+                self.cursor.y,
+                self.curr_fg.toU32(),
+            );
+        } else if (self.cursor.kind == .Block) {
+            const cell = self.getCell(self.cursor.x, self.cursor.y);
+            const ch = if (cell.ch == 0) ' ' else cell.ch;
+            scr.framebuffer.putchar(
+                ch,
+                self.cursor.x,
+                self.cursor.y,
+                cell.fg.toU32(),
+                cell.bg.toU32(),
+            );
+        }
+        self.cursor.drawn = true;
+    }
+
+    pub fn render(self: *Page) void {
+        if (self.has_dirty) {
+            const x1 = self.dirty.x1;
+            const y1 = self.dirty.y1;
+            const x2 = @min(self.dirty.x2, self.width - 1);
+            const y2 = @min(self.dirty.y2, self.height - 1);
+            if (x1 <= x2 and y1 <= y2) {
+                for (y1..(y2 + 1)) |row| {
+                    for (x1..(x2 + 1)) |col| {
+                        const off = row * self.width + col;
+                        const cell = self.buff[off];
+                        if (!cell.eql(&self.prev[off])) {
+                            if (cell.isEmpty()) {
+                                scr.framebuffer.clearChar(
+                                    col, row,
+                                    self.curr_bg.toU32()
+                                );
+                            } else {
+                                scr.framebuffer.putchar(
+                                    cell.ch,
+                                    col,
+                                    row,
+                                    cell.bg.toU32(),
+                                    cell.fg.toU32(),
+                                );
+                            }
+                            self.prev[off] = cell;
+                        }
+                    }
+                }
+            }
+        }
+        self.renderCursor();
+        scr.framebuffer.render();
+        self.has_dirty = false;
+        self.dirty.reset();
+    }
+
+    fn markDirty(self: *Page, r: DirtyRect) void {
+        if (self.has_dirty)
+            self.dirty = self.dirty.merge(r)
+        else {
+            self.dirty = r;
+            self.has_dirty = true;
+        }
+    }
+
+    fn markCellDirty(self: *Page, x: u32, y: u32) void {
+        self.markDirty(DirtyRect.singleChar(x, y));
+    }
+
+    pub fn scroll(self: *Page, lines: u32) void {
+        if (lines == 0)
+            return;
+        if (lines >= self.height) {
+            self.clear();
+            return;
+        }
+        const pos = self.width * lines;
+        const end = self.width * self.height;
+        const buff_end = end - pos;
+
+        @memmove(
+            self.buff[0..buff_end],
+            self.buff[pos..end]
+        );
+        @memset(
+            self.buff[buff_end..end],
+            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+        );
+        self.markDirty(
+            DirtyRect.fullScreen(self.width, self.height)
+        );
+    }
+
+    pub fn reRenderAll(self: *Page) void {
+        scr.framebuffer.clear(self.curr_bg.toU32());
+        @memset(
+            self.prev[0..self.height * self.width],
+            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+        );
+        self.markDirty(
+            DirtyRect.fullScreen(self.width, self.height)
+        );
+        self.render();
+    }
+
+    pub fn setColors(self: *Page, fg: AnsiColor, bg: AnsiColor) void {
+        self.curr_bg = bg;
+        self.curr_fg = fg;
+    }
+
+    pub fn clear(self: *Page) void {
+        @memset(
+            self.buff[0..self.height * self.width],
+            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+        );
+        self.setCursor(0, 0);
+        self.markDirty(
+            DirtyRect.fullScreen(self.width, self.height)
+        );
+        self.render();
+    }
+
+    pub fn clearScreen(self: *Page) void {
+        @memset(
+            self.buff[0..self.height * self.width],
+            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+        );
+        self.markDirty(
+            DirtyRect.fullScreen(self.width, self.height)
+        );
+        self.render();
+    }
+
+    fn wrapLine(self: *Page) void {
+        const new_y = self.cursor.y + 1;
+        if (new_y >= self.height) {
+            self.scroll(1);
+            self.setCursor(0, self.height - 1);
+        } else {
+            self.setCursor(0, new_y);
+        }
+    }
+
+    fn printChar(self: *Page, ch: u8) void {
+        const cell = self.getCurrCell();
+        cell.ch = ch;
+        cell.fg = if (self.inverse) self.curr_bg else self.curr_fg;
+        cell.bg = if (self.inverse) self.curr_fg else self.curr_bg;
+        self.markCellDirty(self.cursor.x, self.cursor.y);
+        self.setCursorX(self.cursor.x + 1);
+        if (self.cursor.x >= self.width) {
+            self.wrapLine();
+        }
+    }
+
+    pub fn endlineXPos(self: *Page) u32 {
+        var x = self.cursor.x;
+        while (x < self.width) {
+            if (self.getCell(x, self.cursor.y).isEmpty())
+                break ;
+            x += 1;
+        }
+        return x;        
+    }
 };
 
 pub const TTY = struct {
     width: u32 = 80,
     height: u32 = 25,
-    _x: u32 = 0,
-    _y: u32 = 0,
-    _bg: u32 = @intFromEnum(ConsoleColors.Black),
-    _fg: u32 = @intFromEnum(ConsoleColors.White),
 
-    _buffer: [*]u8,
-    _prev_buffer: [*]u8,
-    _line: [*]u8,
-    _prev_x: u32 = 0,
-    _prev_y: u32 = 0,
-    _dirty: DirtyRect = DirtyRect.init(
-        0, 0, 0, 0
-    ),
-    _has_dirty: bool = false,
-    _should_wrap: bool = false,
+    main_page: Page,
+    alt_page: Page,
+    curr_page: *Page,
+    use_alt_screen: bool = false,
 
     // termios & winsize
     term: t.Termios,
@@ -136,14 +509,9 @@ pub const TTY = struct {
     _input_len: u32 = 0,
     tab_len: u32 = 8,
 
-    // cursor
-    cursor_type: CursorType = .Block,
-    cursor_on: bool = true,
+    // cursor save/restore
     saved_x: u32 = 0,
     saved_y: u32 = 0,
-
-    // SGR attributes (minimal)
-    attr_inverse: bool = false,
 
     // CSI parser state
     pstate: ParserState = .Normal,
@@ -152,22 +520,15 @@ pub const TTY = struct {
     csi_n: u8 = 0,
     csi_priv: bool = false,
 
-    pub fn init(w: u32, h: u32, vt_idx: u16) TTY {
-        const buffer: [*]u8 = krn.mm.kmallocArray(u8, w * h)
-            orelse @panic("buffer");
-        const prev: [*]u8 = krn.mm.kmallocArray(u8, w * h)
-            orelse @panic("prev_buffer");
-        const line: [*]u8 = krn.mm.kmallocArray(u8, w)
-            orelse @panic("line");
-        const rb = krn.ringbuf.RingBuf.new(4096)
-            catch @panic("ringbuf");
-
-        var _tty = TTY{
+    pub fn init(w: u32, h: u32, vt_idx: u16) !TTY {
+        const rb = try krn.ringbuf.RingBuf.new(4096);
+        const _tty = TTY{
             .width = w,
             .height = h,
-            ._buffer = buffer,
-            ._prev_buffer = prev,
-            ._line = line,
+            .main_page = try Page.init(w, h),
+            .alt_page = try Page.init(w, h),
+            .curr_page = undefined,
+
             .file_buff = rb,
             .lock = krn.Mutex.init(),
             .tab_len = 8,
@@ -178,11 +539,12 @@ pub const TTY = struct {
             .term = default_termios(),
             .vt_index = vt_idx,
         };
-
-        @memset(_tty._buffer[0 .. w * h], 0);
-        @memset(_tty._prev_buffer[0 .. w * h], 0);
-        _tty.clear();
         return _tty;
+    }
+
+    pub fn setup(self: *TTY) void {
+        self.curr_page = &self.main_page;
+        self.curr_page.clear();
     }
 
     fn default_termios() t.Termios {
@@ -246,325 +608,141 @@ pub const TTY = struct {
         }
     }
 
-    // rendering
-    fn renderCursor(self: *TTY) void {
-        if (self.cursor_type == .None or !self.cursor_on)
-            return;
-        const off = self._y * self.width + self._x;
-        const ch = self._buffer[off];
-        if (self.cursor_type == .Underline) {
-            scr.framebuffer.cursor(
-                self._x,
-                self._y,
-                self._fg
-            );
-        } else if (self.cursor_type == .Block) {
-            scr.framebuffer.putchar(
-                ch,
-                self._x,
-                self._y,
-                self._fg,
-                self._bg
-            );
+    pub fn render(self: *TTY) void {
+        if (scr.current_tty) |curr| {
+            if (self != curr)
+                return ;
         }
+        self.curr_page.render();
     }
 
     fn saveCursor(self: *TTY) void {
-        self.saved_x = self._x;
-        self.saved_y = self._y;
+        self.saved_x = self.curr_page.cursor.x;
+        self.saved_y = self.curr_page.cursor.y;
     }
 
     fn restoreCursor(self: *TTY) void {
-        self._x = self.saved_x;
-        self._y = self.saved_y;
+        self.curr_page.setCursor(self.saved_x, self.saved_y);
         self.render();
-    }
-
-    pub fn reRenderAll(self: *TTY) void {
-        scr.framebuffer.clear(self._bg);
-        @memset(self._prev_buffer[0 .. self.height * self.width], 0);
-        self.markDirty(DirtyRect.fullScreen(self.width, self.height));
-        self.render();
-    }
-
-    pub fn render(self: *TTY) void {
-        if (scr.current_tty) |current| {
-            if (self != current) {
-                return;
-            }
-        }
-
-        if (!self._has_dirty 
-            and self._x == self._prev_x
-            and self._y == self._prev_y
-        ) {
-            return;
-        }
-
-        if (self._prev_x != self._x or self._prev_y != self._y) {
-            const off = self._prev_y * self.width + self._prev_x;
-            const ch = self._buffer[off];
-            scr.framebuffer.putchar(
-                ch,
-                self._prev_x,
-                self._prev_y,
-                self._bg,
-                self._fg
-            );
-            self._prev_buffer[off] = ch;
-        }
-
-        if (self._has_dirty) {
-            const x1 = self._dirty.x1;
-            const y1 = self._dirty.y1;
-            const x2 = @min(self._dirty.x2, self.width - 1);
-            const y2 = @min(self._dirty.y2, self.height - 1);
-            if (x1 <= x2 and y1 <= y2) {
-                for (y1..(y2 + 1)) |row| {
-                    for (x1..(x2 + 1)) |col| {
-                        const off = row * self.width + col;
-                        const ch = self._buffer[off];
-                        if (ch != self._prev_buffer[off]) {
-                            var bg = self._bg;
-                            var fg = self._fg;
-                            if (self.attr_inverse) {
-                                const _tmp = bg;
-                                bg = fg;
-                                fg = _tmp;
-                            }
-                            scr.framebuffer.putchar(ch, col, row, bg, fg);
-                            self._prev_buffer[off] = ch;
-                        }
-                    }
-                }
-            }
-        }
-        
-        self.renderCursor();
-        scr.framebuffer.render();
-        self._has_dirty = false;
-        self._prev_x = self._x;
-        self._prev_y = self._y;
-    }
-
-    fn markDirty(self: *TTY, r: DirtyRect) void {
-        if (self._has_dirty)
-            self._dirty = self._dirty.merge(r)
-        else {
-            self._dirty = r;
-            self._has_dirty = true;
-        }
-    }
-
-    fn markCellDirty(self: *TTY, x: u32, y: u32) void {
-        self.markDirty(DirtyRect.singleChar(x, y));
-    }
-
-    fn _scroll(self: *TTY) void {
-        var i: u32 = 1;
-        while (i < self.height) : (i += 1) {
-            const p: u32 = i * self.width;
-            @memcpy(
-                self._buffer[p - self.width .. p],
-                self._buffer[p .. p + self.width]
-            );
-        }
-        const p: u32 = self.height * self.width;
-        @memset(self._buffer[p - self.width .. p], 0);
-        @memset(self._prev_buffer[p - self.width .. p], 1);
-        self._y = self.height - 1;
-        self._prev_x = self._x;
-        self._prev_y = self._y;
-        self.markDirty(DirtyRect.fullScreen(self.width, self.height));
-    }
-
-    pub fn clear(self: *TTY) void {
-        @memset(self._buffer[0 .. self.height * self.width], 0);
-        self._x = 0;
-        self._y = 0;
-        self._prev_x = 0;
-        self._prev_y = 0;
-        self.markDirty(DirtyRect.fullScreen(self.width, self.height));
-        self.render();
-    }
-
-    pub fn clearScreen(self: *TTY) void {
-        @memset(self._buffer[0 .. self.height * self.width], 0);
-        self.markDirty(DirtyRect.fullScreen(self.width, self.height));
-        self.render();
-    }
-
-    fn wrapLine(self: *TTY) void {
-        self._prev_x = self._x;
-        self._prev_y = self._y;
-        self._x = 0;
-        self._y += 1;
-        self._should_wrap = false;
-    }
-
-    fn printVga(self: *TTY, b: u8) void {
-        self._buffer[self._y * self.width + self._x] = b;
-        self.markCellDirty(self._x, self._y);
-        self._x += 1;
-        if (self._x >= self.width) {
-            self._should_wrap = true;
-        }
-        if (self._y >= self.height)
-            self._scroll();
     }
 
     fn printChar(self: *TTY, c: u8) void {
-        if (self._should_wrap)
-            self.wrapLine();
         switch (c) {
             '\n' => {
-                self._should_wrap = true;
-                self.wrapLine();
-                if (self._y >= self.height)
-                    self._scroll();
+                self.curr_page.wrapLine();
             },
             '\r' => {
-                self._prev_x = self._x;
-                self._prev_y = self._y;
-                self._x = 0;
+                self.curr_page.setCursorX(0);
                 self.render();
             },
             7 => {},
             8 => self.move(0),
             12 => self.clear(),
             '\t' => {
-                const spaces = self.tab_len - (self._x % self.tab_len);
+                const spaces = self.tab_len - (self.curr_page.cursor.x % self.tab_len);
                 self.print("        "[0..spaces]);
             },
-            else => self.printVga(c),
+            else => self.curr_page.printChar(c),
         }
     }
 
     fn home(self: *TTY) void {
-        self.markDirty(DirtyRect.init(
-            0,
-            self._y,
-            self._x,
-            self._y
-        ));
-        self._prev_x = self._x;
-        self._prev_y = self._y;
-        self._x = 0;
-        self.render();
+        self.curr_page.setCursorX(0);
+        self.curr_page.render();
     }
 
     fn endline(self: *TTY) void {
-        self._prev_x = self._x;
-        self._prev_y = self._y;
-        const row = self._y * self.width;
-        while (
-            self._buffer[row + self._x] != 0
-            and self._x < self.width - 1
-        ) {
-            self._x += 1;
-        }
-        self.markDirty(DirtyRect.init(
-            0,
-            self._y,
-            self._x,
-            self._y
-        ));
-        self.render();
+        self.curr_page.setCursorX(self.curr_page.endlineXPos());
+        self.curr_page.render();
     }
 
     fn shiftRight(self: *TTY) void {
         var i = self._input_len;
-        const pos = self._y * self.width;
-        while (i > self._x) : (i -= 1) {
-            self._buffer[pos + i] = self._buffer[pos + i - 1];
+        const y = self.curr_page.cursor.y;
+        while (i > self.curr_page.cursor.x) : (i -= 1) {
+            const curr_cell = self.curr_page.getCell(i, y);
+            const prev_cell = self.curr_page.getCell(i - 1, y);
+            curr_cell.* = prev_cell.*;
         }
     }
 
     fn shiftLeft(self: *TTY) void {
         if (self._input_len == 0)
             return;
-        var i = self._x;
-        const pos = self._y * self.width;
+        var i = self.curr_page.cursor.x;
+        const y = self.curr_page.cursor.y;
         while (
             i + 1 < self._input_len
             and i + 1 < self.width
         ) : (i += 1) {
-            self._buffer[pos + i] = self._buffer[pos + i + 1];
+            const curr_cell = self.curr_page.getCell(i, y);
+            const next_cell = self.curr_page.getCell(i + 1, y);
+            curr_cell.* = next_cell.*;
         }
         const last = @min(self._input_len - 1, self.width - 1);
-        self._buffer[pos + last] = 0;
+        self.curr_page.getCell(last, y).makeEmpty();
     }
 
     fn currentLineLen(self: *TTY) u32 {
         var len: u32 = 0;
-        const pos = self._y * self.width;
-        while (
-            len < self.width
-            and self._buffer[pos + len] != 0
-        ) {
+        const y = self.curr_page.cursor.y;
+        while (len < self.width) {
+            const cell = self.curr_page.getCell(len, y);
+            if (cell.isEmpty())
+                break;
             len += 1;
         }
         return len;
     }
 
     fn insertAtCursor(self: *TTY, b: u8) void {
-        if (self._x < self.width - 1) {
+        const x = self.curr_page.cursor.x;
+        const y = self.curr_page.cursor.y;
+        if (x < self.width - 1) {
             if (self._input_len == 0)
                 self._input_len = self.currentLineLen();
             self.shiftRight();
-            self._buffer[self._y * self.width + self._x] = b;
+            const cell = self.curr_page.getCell(x, y);
+            cell.ch = b;
+            cell.fg = self.curr_page.curr_fg;
+            cell.bg = self.curr_page.curr_bg;
             if (self._input_len < self.width)
                 self._input_len += 1;
             const end = @min(self.width - 1, self._input_len);
-            self.markDirty(DirtyRect.init(
-                self._x,
-                self._y,
-                end,
-                self._y
-            ));
-            self._prev_x = self._x;
-            self._prev_y = self._y;
-            self._x += 1;
+            self.curr_page.markDirty(DirtyRect.init(x, y, end, y));
+            self.curr_page.setCursorX(x + 1);
             self.render();
         }
     }
 
     fn removeAtCursor(self: *TTY) void {
-        if (self._x > 0) {
-            if (self._input_len == 0)   
+        const x = self.curr_page.cursor.x;
+        const y = self.curr_page.cursor.y;
+        if (x > 0) {
+            if (self._input_len == 0)
                 self._input_len = self.currentLineLen();
             if (self._input_len == 0) {
-                self._prev_x = self._x;
-                self._prev_y = self._y;
                 self.render();
                 return;
             }
-            self._prev_x = self._x;
-            self._prev_y = self._y;
-            self._x -= 1;
-            if (self._x < self._input_len) {
+            self.curr_page.setCursorX(x - 1);
+            if (x - 1 < self._input_len) {
                 self.shiftLeft();
                 self._input_len -= 1;
             } else {
                 if (self._input_len > 0) {
                     self._input_len -= 1;
                     const last = @min(self._input_len, self.width - 1);
-                    self._buffer[self._y * self.width + last] = 0;
+                    self.curr_page.getCell(last, y).makeEmpty();
                 }
             }
-            const end = if (self._input_len == 0) self._x
+            const end = if (self._input_len == 0) x - 1
                 else @min(self._input_len, self.width - 1);
-            self.markDirty(DirtyRect.init(
-                self._x,
-                self._y,
-                end,
-                self._y
-            ));
+            self.curr_page.markDirty(DirtyRect.init(x - 1, y, end, y));
             self.render();
         }
     }
 
-    // line discipline helpers
     fn translateInput(self: *TTY, b: u8) u8 {
         if (self.term.c_iflag.ICRNL and b == '\r')
             return '\n';
@@ -574,6 +752,7 @@ pub const TTY = struct {
             return 0;
         return b;
     }
+
     fn outputNL(self: *TTY) void {
         if (self.term.c_oflag.OPOST and self.term.c_oflag.ONLCR) {
             self.printChar('\r');
@@ -582,6 +761,7 @@ pub const TTY = struct {
             self.printChar('\n');
         }
     }
+
     fn echoIF(self: *TTY, b: u8) void {
         if (self.term.c_lflag.ECHO)
             self.insertAtCursor(b);
@@ -716,6 +896,10 @@ pub const TTY = struct {
                         .LEFT => self.pushSeq("\x1b[D"),
                         .HOME => self.pushSeq("\x1b[H"),
                         .END => self.pushSeq("\x1b[F"),
+                        .PGUP => self.pushSeq("\x1b[5~"),
+                        .PGDN => self.pushSeq("\x1b[6~"),
+                        .INSERT => self.pushSeq("\x1b[2~"),
+                        .DELETE => self.pushSeq("\x1b[3~"),
                         
                         else => {},
                     }
@@ -734,37 +918,40 @@ pub const TTY = struct {
     }
 
     fn move(self: *TTY, dir: u8) void {
-        self._prev_x = self._x;
-        self._prev_y = self._y;
+        const x = self.curr_page.cursor.x;
         if (dir == 0) {
-            if (self._x > 0)
-                self._x -= 1;
+            if (x > 0)
+                self.curr_page.setCursorX(x - 1);
         } else {
-            if (
-                self._x < self.width - 1
-                and self._buffer[self._y * self.width + self._x] != 0
-            ) {
-                self._x += 1;
+            const cell = self.curr_page.getCell(x, self.curr_page.cursor.y);
+            if (x < self.width - 1 and !cell.isEmpty()) {
+                self.curr_page.setCursorX(x + 1);
             }
         }
         self.render();
     }
 
     pub fn print(self: *TTY, msg: []const u8) void {
-        self._prev_x = self._x;
-        self._prev_y = self._y;
         for (msg) |c| {
             self.printChar(c);
         }
         self.render();
     }
 
-    pub fn setColor(self: *TTY, fg: u32) void {
-        self._fg = fg;
+    pub fn setColor(self: *TTY, fg: AnsiColor) void {
+        self.curr_page.curr_fg = fg;
     }
 
-    pub fn setBgColor(self: *TTY, bg: u32) void {
-        self._bg = bg;
+    pub fn setBgColor(self: *TTY, bg: AnsiColor) void {
+        self.curr_page.curr_bg = bg;
+    }
+
+    pub fn clear(self: *TTY) void {
+        self.curr_page.clear();
+    }
+
+    pub fn reRenderAll(self: *TTY) void {
+        self.curr_page.reRenderAll();
     }
 
     // CSI parser
@@ -795,60 +982,87 @@ pub const TTY = struct {
         return self.csi_params[i];
     }
 
+    fn switchToAltScreen(self: *TTY) void {
+        if (!self.use_alt_screen) {
+            self.use_alt_screen = true;
+            self.curr_page = &self.alt_page;
+            self.reRenderAll();
+        }
+    }
+
+    fn switchToMainScreen(self: *TTY) void {
+        if (self.use_alt_screen) {
+            self.use_alt_screen = false;
+            self.curr_page = &self.main_page;
+            self.reRenderAll();
+        }
+    }
+
     fn csiAct(self: *TTY, final: u8) void {
         switch (final) {
             'A' => { // UP (CUU)
-                const n = param(self, 0, 1);
-                self._prev_x = self._x;
-                self._prev_y = self._y;
-                var i: u16 = 0;
-                while (i < n and self._y > 0) : (i += 1) {
-                    self._y -= 1;
-                }
+                const n = self.param(0, 1);
+                const new_y = if (self.curr_page.cursor.y >= n)
+                    self.curr_page.cursor.y - n
+                else
+                    0;
+                self.curr_page.setCursorY(@intCast(new_y));
                 self.render();
             },
             'B' => { // DOWN (CUD)
-                const n = param(self, 0, 1);
-                self._prev_x = self._x;
-                self._prev_y = self._y;
-                var i: u16 = 0;
-                while (i < n and self._y < self.height - 1) : (i += 1) {
-                    self._y += 1;
-                }
+                const n = self.param(0, 1);
+                const new_y = @min(self.curr_page.cursor.y + n, self.height - 1);
+                self.curr_page.setCursorY(new_y);
                 self.render();
             },
             'C' => { // Forward (CUF)
-                const n = param(self, 0, 1);
-                self._prev_x = self._x;
-                self._prev_y = self._y;
-                var i: u16 = 0;
-                while (i < n and self._x < self.width - 1) : (i += 1) {
-                    self._x += 1;
-                }
+                const n = self.param(0, 1);
+                const new_x = @min(self.curr_page.cursor.x + n, self.width - 1);
+                self.curr_page.setCursorX(new_x);
                 self.render();
             },
             'D' => { // Back (CUB)
-                const n = param(self, 0, 1);
-                self._prev_x = self._x;
-                self._prev_y = self._y;
-                var i: u16 = 0;
-                while (i < n and self._x > 0) : (i += 1) {
-                    self._x -= 1;
-                }
+                const n = self.param(0, 1);
+                const new_x = if (self.curr_page.cursor.x >= n)
+                    self.curr_page.cursor.x - n
+                else
+                    0;
+                self.curr_page.setCursorX(@intCast(new_x));
+                self.render();
+            },
+            'E' => { // Cursor Next Line (CNL)
+                const n = self.param(0, 1);
+                const new_y = @min(self.curr_page.cursor.y + n, self.height - 1);
+                self.curr_page.setCursor(0, new_y);
+                self.render();
+            },
+            'F' => { // Cursor Previous Line (CPL)
+                const n = self.param(0, 1);
+                const new_y = if (self.curr_page.cursor.y >= n)
+                    self.curr_page.cursor.y - n
+                else
+                    0;
+                self.curr_page.setCursor(0, @intCast(new_y));
+                self.render();
+            },
+            'G' => { // Cursor Horizontal Absolute (CHA)
+                const col = self.param(0, 1);
+                self.curr_page.setCursorX(@min(
+                    if (col > 0) col - 1 else 0,
+                    self.width - 1
+                ));
                 self.render();
             },
             'H', 'f' => { // CUP/HVP 1-based
-                self._prev_x = self._x;
-                self._prev_y = self._y;
-                var r = param(self, 0, 1);
-                var c = param(self, 1, 1);
+                var r = self.param(0, 1);
+                var c = self.param(1, 1);
                 if (r < 1)
                     r = 1;
                 if (c < 1)
                     c = 1;
-                self._y = @min(@as(u32, r - 1), self.height - 1);
-                self._x = @min(@as(u32, c - 1), self.width - 1);
-                krn.logger.INFO("cursor x {d} y {d}\n", .{self._x, self._y});
+                const y = @min(@as(u32, r - 1), self.height - 1);
+                const x = @min(@as(u32, c - 1), self.width - 1);
+                self.curr_page.setCursor(x, y);
                 self.render();
             },
             'J' => { // ED
@@ -875,22 +1089,90 @@ pub const TTY = struct {
                     else => self.clearLine(),
                 }
             },
-            'm' => { // SGR minimal
+            'L' => { // Insert Lines (IL)
+                const n = self.param(0, 1);
+                self.insertLines(@intCast(n));
+            },
+            'M' => { // Delete Lines (DL)
+                const n = self.param(0, 1);
+                self.deleteLines(@intCast(n));
+            },
+            'P' => { // Delete Character (DCH)
+                const n = self.param(0, 1);
+                self.deleteChars(@intCast(n));
+            },
+            '@' => { // Insert Character (ICH)
+                const n = self.param(0, 1);
+                self.insertChars(@intCast(n));
+            },
+            'S' => { // Scroll Up (SU)
+                const n = self.param(0, 1);
+                self.curr_page.scroll(@intCast(n));
+                self.render();
+            },
+            'T' => { // Scroll Down (SD)
+                const n = self.param(0, 1);
+                self.scrollDown(@intCast(n));
+            },
+            'd' => { // VPA
+                const row = self.param(0, 1);
+                self.curr_page.setCursorY(@min(
+                    if (row > 0) row - 1 else 0,
+                    self.height - 1
+                ));
+                self.render();
+            },
+            'n' => { // DSR
+                const mode = self.param(0, 0);
+                if (mode == 6) {
+                    self.reportCursorPosition();
+                }
+            },
+            'r' => { // Set Scrolling Region (DECSTBM)
+                // TODO
+            },
+            'm' => { // SGR with full color support
                 if (self.csi_n == 0) {
-                    self.attr_inverse = false;
+                    self.curr_page.curr_fg = .WHITE;
+                    self.curr_page.curr_bg = .BLACK;
+                    self.curr_page.inverse = false;
                 }
                 var i: u8 = 0;
                 while (i < self.csi_n) : (i += 1) {
                     const p = self.csi_params[i];
                     switch (p) {
                         0 => {
-                            self.attr_inverse = false;
+                            self.curr_page.curr_fg = .WHITE;
+                            self.curr_page.curr_bg = .BLACK;
+                            self.curr_page.inverse = false;
                         },
                         7 => {
-                            self.attr_inverse = true;
+                            self.curr_page.inverse = true;
                         },
                         27 => {
-                            self.attr_inverse = false;
+                            self.curr_page.inverse = false;
+                        },
+                        // Foreground colors
+                        30...37 => {
+                            self.curr_page.curr_fg = AnsiColor.fromAnsiCode(p);
+                        },
+                        39 => {
+                            self.curr_page.curr_fg = .WHITE;
+                        },
+                        // Background colors
+                        40...47 => {
+                            self.curr_page.curr_bg = AnsiColor.fromAnsiCode(p);
+                        },
+                        49 => {
+                            self.curr_page.curr_bg = .BLACK;
+                        },
+                        // Bright foreground colors
+                        90...97 => {
+                            self.curr_page.curr_fg = AnsiColor.fromAnsiCode(p);
+                        },
+                        // Bright background colors
+                        100...107 => {
+                            self.curr_page.curr_bg = AnsiColor.fromAnsiCode(p);
                         },
                         else => {},
                     }
@@ -900,13 +1182,24 @@ pub const TTY = struct {
             'u' => self.restoreCursor(),
             'h', 'l' => { // DEC private modes
                 if (self.csi_priv) {
-                    if (self.csi_n > 0 and self.csi_params[0] == 25) {
-                        if (final == 'h') {
-                            self.cursor_on = true;
-                        } else {
-                            self.cursor_on = false;
+                    if (self.csi_n > 0) {
+                        const mode = self.csi_params[0];
+                        switch (mode) {
+                            25 => {
+                                // Cursor visibility
+                                self.curr_page.cursor.on = (final == 'h');
+                                self.render();
+                            },
+                            1049, 47 => {
+                                // Alt screen buffer
+                                if (final == 'h') {
+                                    self.switchToAltScreen();
+                                } else {
+                                    self.switchToMainScreen();
+                                }
+                            },
+                            else => {},
                         }
-                        self.render();
                     }
                 }
             },
@@ -917,57 +1210,66 @@ pub const TTY = struct {
     }
 
     fn clearToEol(self: *TTY) void {
-        const pos = self._y * self.width;
-        var x = self._x;
+        const y = self.curr_page.cursor.y;
+        var x = self.curr_page.cursor.x;
         while (x < self.width) : (x += 1) {
-            self._buffer[pos + x] = 0;
+            self.curr_page.getCell(x, y).makeEmpty();
         }
-        self.markDirty(DirtyRect.init(
-            self._x,
-            self._y,
+        self.curr_page.markDirty(DirtyRect.init(
+            self.curr_page.cursor.x,
+            y,
             self.width - 1,
-            self._y
+            y
         ));
         self.render();
     }
 
     fn clearToBol(self: *TTY) void {
-        const pos = self._y * self.width;
+        const y = self.curr_page.cursor.y;
         var x: u32 = 0;
-        while (x <= self._x) : (x += 1) {
-            self._buffer[pos + x] = 0;
+        while (x <= self.curr_page.cursor.x) : (x += 1) {
+            self.curr_page.getCell(x, y).makeEmpty();
         }
-        self.markDirty(DirtyRect.init(
+        self.curr_page.markDirty(DirtyRect.init(
             0,
-            self._y,
-            self._x + 1,
-            self._y
+            y,
+            self.curr_page.cursor.x + 1,
+            y
         ));
         self.render();
     }
 
     fn clearLine(self: *TTY) void {
-        const pos = self._y * self.width;
-        @memset(self._buffer[pos .. pos + self.width], 0);
-        self.markDirty(DirtyRect.init(
+        const y = self.curr_page.cursor.y;
+        var x: u32 = 0;
+        while (x < self.width) : (x += 1) {
+            self.curr_page.getCell(x, y).makeEmpty();
+        }
+        self.curr_page.markDirty(DirtyRect.init(
             0,
-            self._y,
+            y,
             self.width - 1,
-            self._y
+            y
         ));
         self.render();
     }
 
+    fn clearScreen(self: *TTY) void {
+        self.curr_page.clearScreen();
+    }
+
     fn clearFromCursorToEnd(self: *TTY) void {
         self.clearToEol();
-        var row = self._y + 1;
+        var row = self.curr_page.cursor.y + 1;
         while (row < self.height) : (row += 1) {
-            const p = row * self.width;
-            @memset(self._buffer[p .. p + self.width], 0);
+            var x: u32 = 0;
+            while (x < self.width) : (x += 1) {
+                self.curr_page.getCell(x, row).makeEmpty();
+            }
         }
-        self.markDirty(DirtyRect.init(
+        self.curr_page.markDirty(DirtyRect.init(
             0,
-            self._y + 1,
+            self.curr_page.cursor.y + 1,
             self.width - 1,
             self.height - 1
         ));
@@ -977,17 +1279,179 @@ pub const TTY = struct {
     fn clearFromStartToCursor(self: *TTY) void {
         self.clearToBol();
         var row: u32 = 0;
-        while (row < self._y) : (row += 1) {
-            const p = row * self.width;
-            @memset(self._buffer[p .. p + self.width], 0);
+        while (row < self.curr_page.cursor.y) : (row += 1) {
+            var x: u32 = 0;
+            while (x < self.width) : (x += 1) {
+                self.curr_page.getCell(x, row).makeEmpty();
+            }
         }
-        self.markDirty(DirtyRect.init(
+        self.curr_page.markDirty(DirtyRect.init(
             0,
             0,
             self.width - 1,
-            self._y - 1
+            self.curr_page.cursor.y - 1
         ));
         self.render();
+    }
+
+    fn insertLines(self: *TTY, n: u32) void {
+        const y = self.curr_page.cursor.y;
+        const lines = @min(n, self.height - y);
+        if (lines == 0)
+            return;
+        
+        // Move lines down
+        var row = self.height - 1;
+        while (row >= y + lines) : (row -= 1) {
+            var x: u32 = 0;
+            while (x < self.width) : (x += 1) {
+                self.curr_page.getCell(x, row).* = self.curr_page.getCell(
+                    x, row - lines
+                ).*;
+            }
+            if (row == 0)
+                break;
+        }
+        
+        // Clear inserted lines
+        var clear_row = y;
+        while (clear_row < y + lines and clear_row < self.height) : (clear_row += 1) {
+            var x: u32 = 0;
+            while (x < self.width) : (x += 1) {
+                self.curr_page.getCell(x, clear_row).makeEmpty();
+            }
+        }
+        
+        self.curr_page.markDirty(
+            DirtyRect.init(0, y, self.width - 1, self.height - 1)
+        );
+        self.render();
+    }
+
+    fn deleteLines(self: *TTY, n: u32) void {
+        const y = self.curr_page.cursor.y;
+        const lines = @min(n, self.height - y);
+        if (lines == 0) return;
+        
+        // Move lines up
+        var row = y;
+        while (row < self.height - lines) : (row += 1) {
+            var x: u32 = 0;
+            while (x < self.width) : (x += 1) {
+                self.curr_page.getCell(x, row).* = self.curr_page.getCell(
+                    x, row + lines
+                ).*;
+            }
+        }
+        
+        // Clear bottom lines
+        while (row < self.height) : (row += 1) {
+            var x: u32 = 0;
+            while (x < self.width) : (x += 1) {
+                self.curr_page.getCell(x, row).makeEmpty();
+            }
+        }
+        
+        self.curr_page.markDirty(
+            DirtyRect.init(0, y, self.width - 1, self.height - 1));
+        self.render();
+    }
+
+    fn deleteChars(self: *TTY, n: u32) void {
+        const x = self.curr_page.cursor.x;
+        const y = self.curr_page.cursor.y;
+        const chars = @min(n, self.width - x);
+        if (chars == 0)
+            return;
+        
+        // Shift characters left
+        var col = x;
+        while (col < self.width - chars) : (col += 1) {
+            self.curr_page.getCell(col, y).* = self.curr_page.getCell(
+                col + chars, y
+            ).*;
+        }
+        
+        // Clear end of line
+        while (col < self.width) : (col += 1) {
+            self.curr_page.getCell(col, y).makeEmpty();
+        }
+        
+        self.curr_page.markDirty(
+            DirtyRect.init(x, y, self.width - 1, y)
+        );
+        self.render();
+    }
+
+    fn insertChars(self: *TTY, n: u32) void {
+        const x = self.curr_page.cursor.x;
+        const y = self.curr_page.cursor.y;
+        const chars = @min(n, self.width - x);
+        if (chars == 0)
+            return;
+        
+        // Shift characters right
+        var col = self.width - 1;
+        while (col >= x + chars) : (col -= 1) {
+            self.curr_page.getCell(col, y).* = self.curr_page.getCell(col - chars, y).*;
+            if (col == 0)
+                break;
+        }
+        
+        // Clear inserted space
+        var clear_col = x;
+        while (clear_col < x + chars and clear_col < self.width) : (clear_col += 1) {
+            self.curr_page.getCell(clear_col, y).makeEmpty();
+        }
+        
+        self.curr_page.markDirty(
+            DirtyRect.init(x, y, self.width - 1, y)
+        );
+        self.render();
+    }
+
+    fn scrollDown(self: *TTY, n: u32) void {
+        const lines = @min(n, self.height);
+        if (lines == 0) return;
+        
+        // Move lines down
+        var row = self.height - 1;
+        while (row >= lines) : (row -= 1) {
+            var x: u32 = 0;
+            while (x < self.width) : (x += 1) {
+                self.curr_page.getCell(x, row).* = self.curr_page.getCell(x, row - lines).*;
+            }
+            if (row == 0)
+                break;
+        }
+        
+        // Clear top lines
+        var clear_row: u32 = 0;
+        while (clear_row < lines) : (clear_row += 1) {
+            var x: u32 = 0;
+            while (x < self.width) : (x += 1) {
+                self.curr_page.getCell(x, clear_row).makeEmpty();
+            }
+        }
+        
+        self.curr_page.markDirty(
+            DirtyRect.fullScreen(self.width, self.height)
+        );
+        self.render();
+    }
+
+    fn reportCursorPosition(self: *TTY) void {
+        // Send cursor position: ESC [ row ; col R
+        var buf: [20]u8 = undefined;
+        const row = self.curr_page.cursor.y + 1;
+        const col = self.curr_page.cursor.x + 1;
+
+        const sl = std.fmt.bufPrint(
+            buf[0..20],
+            "\x1b[{d};{d}R",
+            .{row, col}
+        ) catch "\x1b[0;0R";
+        self.pushSeq(sl);
     }
 
     // consume one byte of OUTPUT
