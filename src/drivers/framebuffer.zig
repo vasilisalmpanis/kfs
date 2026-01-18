@@ -78,7 +78,7 @@ pub const FrameBuffer = struct {
         @memset(self.virtual_buffer[0 .. self.fb_info.height * self.fb_info.width], bg);
     }
 
-    fn clearChar(self: *FrameBuffer, cx: u32, cy: u32, bg: u32) void {
+    pub fn clearChar(self: *FrameBuffer, cx: u32, cy: u32, bg: u32) void {
         const x = cx * self.font.width;
         const y = cy * self.font.height;
         const width = (self.fb_info.pitch / 4);

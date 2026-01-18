@@ -13,7 +13,6 @@ const pdrv = @import("./driver.zig");
 const t = @import("./termios.zig");
 const tty = @import("./tty_struct.zig");
 pub const TTY = tty.TTY;
-pub const ConsoleColors = tty.ConsoleColors;
 
 // tty ioctl
 pub const TCGETS: u32 = 0x5401;
@@ -465,11 +464,12 @@ fn addTTYDev(name: []const u8) !void {
             if (name.len > 3 and std.mem.eql(u8, name[0..3], "tty")) {
                 vt_idx = std.fmt.parseInt(u16, name[3..], 10) catch 0;
             }
-            curr_tty.* = TTY.init(
+            curr_tty.* = try TTY.init(
                 scr.framebuffer.cwidth,
                 scr.framebuffer.cheight,
                 vt_idx
             );
+            curr_tty.setup();
             if (scr.current_tty == null) {
                 scr.current_tty = curr_tty;
             }
