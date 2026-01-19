@@ -9,6 +9,7 @@ const dbg = @import("debug");
 const drv = @import("drivers");
 const builtin = @import("std").builtin;
 const idt = @import("arch").idt;
+const fpu = @import("arch").fpu;
 const Serial = @import("drivers").Serial;
 const Logger = @import("debug").Logger;
 pub const mm = @import("kernel").mm;
@@ -128,6 +129,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     dbg.initSymbolTable(&krn.boot_info);
     krn.logger.INFO("GDT initialized", .{});
     krn.logger.INFO("Memory initialized", .{});
+
+    // Initialize FPU early
+    fpu.initFPU();
 
     screen.initScreen(&krn.scr, &krn.boot_info);
     krn.pit = PIT.init(1000);

@@ -5,6 +5,7 @@ pub const multiboot = @import("boot/multiboot.zig");
 pub const vmm = @import("mm/vmm.zig");
 pub const pmm = @import("mm/pmm.zig");
 pub const idt = @import("idt.zig");
+pub const fpu = @import("fpu.zig");
 pub const Regs = @import("system/cpu.zig").Regs;
 pub const cpu = @import("system/cpu.zig");
 pub const archReschedule = @import("system/cpu.zig").archReschedule;

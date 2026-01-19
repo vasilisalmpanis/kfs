@@ -1,5 +1,6 @@
 const std = @import("std");
 const arch = @import("arch");
+const fpu = @import("arch").fpu;
 const krn = @import("../main.zig");
 const vmm = @import("arch").vmm;
 const lst = @import("../utils/list.zig");
@@ -92,6 +93,10 @@ pub const Task = struct {
     regs:           Regs            = Regs.init(),
     tls:            u32             = 0,
     limit:          u32             = 0,
+
+    // FPU state for context switching
+    fpu_state:      fpu.FPUState    = undefined,
+    fpu_used:       bool            = false,
 
     tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
