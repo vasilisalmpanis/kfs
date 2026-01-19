@@ -1,4 +1,5 @@
 const Regs = @import("arch").Regs;
+const fpu = @import("arch").fpu;
 const std = @import("std");
 const dbg = @import("debug");
 const registerExceptionHandler = @import("./manage.zig").registerExceptionHandler;
@@ -104,14 +105,8 @@ pub fn hInvalidOpcode(regs: *Regs) *Regs {
 }
 
 pub fn hDeviceNotAvailable(regs: *Regs) *Regs {
-    if (regs.isRing3()) {
-        _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGSEGV)
-        ) catch {};
-        return regs;
-    }
-    if (true) @panic("hDeviceNotAvailable");
+    // Handle FPU context switching
+    fpu.handleDeviceNotAvailable();
     return regs;
 }
 

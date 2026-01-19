@@ -326,6 +326,25 @@ pub const arch = struct {
         pub extern fn irqHandler(*arch.Regs)*arch.Regs;
     };
 
+    pub const fpu = struct {
+        pub const FPUState = extern struct {
+            control : u16,
+            _reserved1 : u16,
+            status : u16,
+            _reserved2 : u16,
+            tag : u16,
+            _reserved3 : u16,
+            fip : u32,
+            fcs : u16,
+            _reserved4 : u16,
+            fdp : u32,
+            fds : u16,
+            _reserved5 : u16,
+            st : [8][10]u8,
+        };
+
+    };
+
     pub const Regs = struct {
         gs : u32,
         fs : u32,
@@ -591,6 +610,8 @@ pub const kernel = struct {
             regs : arch.Regs,
             tls : u32= 0,
             limit : u32= 0,
+            fpu_state : arch.fpu.FPUState,
+            fpu_used : bool= false,
             tree : kernel.tree.TreeNode,
             list : kernel.list.ListHead,
             refcount : kernel.task.RefCount,
