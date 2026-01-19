@@ -11,12 +11,12 @@ const WEXITED: u32 = 	0x00000004;
 const WCONTINUED: u32 = 0x00000008;
 const WNOWAIT: u32 = 	0x01000000;	// Don't reap, just poll status.
 
-const Timeval = packed struct {
+const Timeval = extern struct {
     tv_sec: u64,
     tv_usec: u32,
 };
 
-const Rusage = packed struct {
+const Rusage = extern struct {
     ru_utime: Timeval,       // user CPU time used
     ru_stime: Timeval,       // system CPU time used
     ru_maxrss: usize,        // maximum resident set size
@@ -35,17 +35,62 @@ const Rusage = packed struct {
     ru_nivcsw: usize,        // involuntary context switches
 };
 
+const WaitStates = struct {
+    exited: bool = true,
+    stopped: bool = false,
+    continued: bool = false,
+
+    pub fn init(options: u32) WaitStates {
+        var ret = WaitStates{};
+        if (options & WSTOPPED != 0) {
+            ret.stopped = true;
+        }
+        if (options & WCONTINUED != 0) {
+            ret.continued = true;
+        }
+        if (options & WEXITED != 0)
+            ret.exited = true;
+        return ret;
+    }
+
+    pub fn isSet(self: *const WaitStates, state: krn.task.TaskState) bool {
+        if (state == .ZOMBIE and self.exited)
+            return true;
+        if (state == .STOPPED and self.exited)
+            return true;
+        // if (state == .INTERRUPTIBLE_SLEEP and self.stopped)
+        //     return true;
+        return false;
+        // TODO: continued
+    }
+
+    pub fn status(_: *const WaitStates, task: *const krn.task.Task) i32 {
+        if (task.state == .ZOMBIE)
+            return task.result;
+        if (task.state == .INTERRUPTIBLE_SLEEP)
+            return (@as(i32, @intFromEnum(krn.signals.Signal.SIGSTOP)) << 8) | 0x7f;
+        // TODO: other cases
+        return 0xffff;
+    }
+};
+
 pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
-    krn.logger.DEBUG("waiting pid {d} from pid {d} rusage {x}", .{pid, tsk.current.pid, @intFromPtr(rusage)});
+    krn.logger.DEBUG(
+        "waiting pid {d} from pid {d} rusage {x}",
+        .{pid, tsk.current.pid, @intFromPtr(rusage)}
+    );
+    const wait_opts = WaitStates.init(options);
     if (pid > 0) {
         if (tsk.current.findChildByPid(@intCast(pid))) |task| {
-            while (task.state != .ZOMBIE) {
+            while (!wait_opts.isSet(task.state)) {
                 sched.reschedule();
                 if (tsk.current.sighand.hasPending())
                     return errors.EINTR;
+                if (options & WNOHANG > 0)
+                    return 0;
             }
             if (stat_addr != null) {
-                stat_addr.?.* = task.result;
+                stat_addr.?.* = wait_opts.status(task);
             }
             task.finish();
             return @intCast(pid);
@@ -66,9 +111,9 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
                     const child_pid = res.pid;
-                    if (res.state == .ZOMBIE and res.pgid == tsk.current.pgid) {
+                    if (wait_opts.isSet(res.state) and res.pgid == tsk.current.pgid) {
                         if (stat_addr != null) {
-                            stat_addr.?.* = res.result;
+                            stat_addr.?.* =  wait_opts.status(res);
                         }
                         res.finish();
                         return child_pid;
@@ -91,9 +136,9 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
                     const child_pid = res.pid;
-                    if (res.state == .ZOMBIE) {
+                    if (wait_opts.isSet(res.state)) {
                         if (stat_addr != null) {
-                            stat_addr.?.* = res.result;
+                            stat_addr.?.* = wait_opts.status(res);
                         }
                         res.finish();
                         return child_pid;
@@ -117,9 +162,9 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
                     const child_pid = res.pid;
-                    if (res.state == .ZOMBIE and pgid == res.pgid) {
+                    if (wait_opts.isSet(res.state) and pgid == res.pgid) {
                         if (stat_addr != null) {
-                            stat_addr.?.* = res.result;
+                            stat_addr.?.* = wait_opts.status(res);
                         }
                         res.finish();
                         return child_pid;

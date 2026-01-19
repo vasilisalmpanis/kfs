@@ -844,7 +844,7 @@ pub const TTY = struct {
                         }
                         continue;
                     }
-                    if (b == '\r') {
+                    if (b == '\n') {
                         self.processEnter(); 
                         continue;
                     }
@@ -874,7 +874,7 @@ pub const TTY = struct {
                 } else {
                     // raw mode
                     if (self.term.c_lflag.ECHO) {
-                        if (b == '\r'
+                        if (b == '\n'
                             and self.term.c_oflag.OPOST
                             and self.term.c_oflag.ONLCR
                         ) {
