@@ -435,6 +435,14 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         .SIGTSTP,
         .SIGTTIN,
         .SIGTTOU => {
+            // if (task.tree.parent) |p| {
+            //     const parent = p.entry(tsk.Task, "tree");
+            //     const act = parent.sighand.actions.get(.SIGCHLD);
+            //     if (act.handler.handler != sigIGN and (act.flags & SA_NOCLDSTOP == 0)) {
+            //         parent.sighand.setSignal(.SIGCHLD);
+            //         parent.state = .RUNNING;
+            //     }
+            // }
             task.wakeup_time = 0;
             task.state = .INTERRUPTIBLE_SLEEP;
             return krn.sched.schedule(regs);

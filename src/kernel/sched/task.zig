@@ -273,6 +273,8 @@ pub const Task = struct {
     }
 
     pub fn finish(self: *Task) void {
+        if (self.state != .ZOMBIE)
+            return ;
         self.state = .STOPPED;
         tasks_mutex.lock();
         self.list.del();
