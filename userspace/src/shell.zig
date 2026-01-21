@@ -98,7 +98,6 @@ pub const Shell = struct {
         
         const cmd_name = self.arg_buf[0];
         const cmd_args = self.arg_buf[1..arg_count];
-        self.print("\n", .{});
         if (self.commands.get(cmd_name)) |cmd| {
             cmd.hndl(self, cmd_args);
         } else {
