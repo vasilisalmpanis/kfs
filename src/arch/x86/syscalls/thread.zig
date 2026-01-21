@@ -1,10 +1,8 @@
-const tsk = @import("../sched/task.zig");
-const errors = @import("./error-codes.zig").PosixError;
-const arch = @import("arch");
-const sockets = @import("../net/socket.zig");
-const fs = @import("../fs/fs.zig");
+const krn = @import("kernel");
+const tsk = krn.task;
+const errors = krn.errors.PosixError;
+const arch = @import("../main.zig");
 const std = @import("std");
-const krn = @import("../main.zig");
 
 const UserDesc = extern struct{
     entry_number: i32,

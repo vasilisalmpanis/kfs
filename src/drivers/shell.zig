@@ -42,7 +42,6 @@ pub const Shell = struct {
 
     fn registerBuiltins(self: *Shell) void {
         self.registerCommand(.{ .name = "help", .desc = "Display this help message", .hndl = &help });
-        self.registerCommand(.{ .name = "kill", .desc = "Kill a process by PID (kill 3)", .hndl = &kill }); // FIX: killing with shell is not working. Something wrong with arguments.
         self.registerCommand(.{ .name = "ps", .desc = "Show tasks", .hndl = &ps });
         self.registerCommand(.{ .name = "pstree", .desc = "Show tasks tree", .hndl = &psTree });
         self.registerCommand(.{ .name = "stack", .desc = "Print the stack trace", .hndl = &stack });
@@ -102,29 +101,6 @@ fn help(self: *Shell, args: [][]const u8) void {
     while (it.next()) |entry| {
         printf("  {s}: {s}\n", .{entry.value_ptr.name, entry.value_ptr.desc});
     }
-}
-
-fn kill(_: *Shell, args: [][]const u8) void {
-    if (args.len < 2) {
-        debug.printf("Usage: kill <signal> <pid>\n", .{});
-        return;
-    }
-    const sig: u32 = std.fmt.parseInt(u8, args[0], 10) catch 0;
-    if (sig == 0 or sig >= 31) {
-        debug.printf("Invalid signal: {s}\n", .{args[0]});
-        return;
-    }
-    const pid = std.fmt.parseInt(u8, args[1], 10) catch 0;
-    if (pid == 0) {
-        debug.printf("Invalid PID: {s}\n", .{args[1]});
-        return;
-    }
-    asm volatile(
-        \\ mov $37, %eax
-        \\ int $0x80
-        :
-        : [ebx] "{ebx}" (pid), [ecx] "{ecx}" (sig),
-    );
 }
 
 fn ps(_: *Shell, _: [][]const u8) void {

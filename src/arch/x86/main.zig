@@ -9,6 +9,7 @@ pub const Regs = @import("system/cpu.zig").Regs;
 pub const cpu = @import("system/cpu.zig");
 pub const archReschedule = @import("system/cpu.zig").archReschedule;
 pub const setupStack = @import("system/cpu.zig").setupStack;
+pub const syscalls = @import("syscalls/syscalls.zig");
 
 pub const pageAlign = @import("mm/pmm.zig").pageAlign;
 pub const isPageAligned = @import("mm/pmm.zig").isPageAligned;

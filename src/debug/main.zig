@@ -14,7 +14,6 @@ pub const ps = @import("./tasks.zig").ps;
 pub const psTree = @import("./tasks.zig").psTree;
 pub const printGDT = @import("./gdt.zig").printGDT;
 pub const printTSS = @import("./gdt.zig").printTSS;
-pub const dumpRegs = @import("./trace.zig").dumpRegs;
 pub const initSymbolTable = @import("./symbols.zig").initSymbolTable;
 pub const lookupSymbol = @import("./symbols.zig").lookupSymbol;
 pub const lookupSymbolByName = @import("./symbols.zig").lookupSymbolByName;

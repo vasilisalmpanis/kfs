@@ -15,7 +15,7 @@ pub const mm = @import("kernel").mm;
 pub const vmm = @import("arch").vmm;
 pub const irq = @import("kernel").irq;
 const krn = @import("kernel");
-const syscalls = @import("kernel").syscalls;
+const syscalls = @import("arch").syscalls;
 const std = @import("std");
 const cpu = @import("arch").cpu;
 const io = @import("arch").io;
@@ -156,7 +156,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     kernel_ready = true;
 
     while (true) {
-        asm volatile ("hlt");
+        system.halt();
     }
     @panic("You shouldn't be here");
 }
