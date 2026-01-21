@@ -7,6 +7,8 @@ const printf = @import("debug").printf;
 const Regs = @import("system/cpu.zig").Regs;
 const signals = @import("kernel").signals;
 const tsk = @import("kernel").task;
+const gdt = @import("./gdt.zig");
+const vmm = @import("./mm/vmm.zig");
 
 pub const IDT_MAX_DESCRIPTORS   = 256;
 pub const CPU_EXCEPTION_COUNT   = 32;
@@ -22,6 +24,70 @@ pub const USER_DATA_SEGMENT   = 0x20;
 const ExceptionHandler  = fn (regs: *Regs) void;
 const SyscallHandler    = fn (regs: *Regs) void;
 const ISRHandler        = fn () callconv(.c) void;
+
+extern const stack_top: u32;
+
+pub fn goUserspace() void {
+    asm volatile(
+        \\ cli
+        \\ mov $((8 * 4) | 3), %%bx
+        \\ mov %%bx, %%ds
+        \\ mov %%bx, %%es
+        \\ mov %%bx, %%fs
+        \\ mov %%bx, %%gs
+        \\
+        \\ push $((8 * 4) | 3)
+        \\ push %[us]
+        \\ pushf
+        \\ pop %%ebx
+        \\ or $0x200, %%ebx
+        \\ push %%ebx
+        \\ push $((8 * 3) | 3)
+        \\ push %[uc]
+        \\ iret
+        \\
+        ::
+        [uc] "r" (krn.task.current.mm.?.code),
+        [us] "r" (krn.task.current.mm.?.argc),
+    );
+}
+
+pub fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
+    @setRuntimeSafety(false);
+    from.regs = state.*;
+    from.regs.setStackPointer(@intFromPtr(state));
+    tsk.current = to;
+    if (to == &tsk.initial_task) {
+        gdt.tss.esp0 = @intFromPtr(&stack_top);
+    } else {
+        gdt.tss.esp0 = to.stack_bottom + krn.STACK_SIZE; // this needs fixing
+    }
+    vmm.switchToVAS(to.mm.?.vas);
+    var access: u8 = 0;
+    access |= 0x10; // S=1
+    access |= 0x60; // DPL=3
+    access |= 0x02; // data, writable
+    access |= 0x80; // P=1  (force present, don’t trust user)
+
+    var gran: u8 = 0;
+    gran |= 0x80; // G=1 (pages)
+    gran |= 0x40; // D=1 (32-bit)
+    gran |= 0x10; // AVL=1 (harmless)
+    gdt.gdtSetEntry(
+        gdt.GDT_TLS0_INDEX,
+        to.tls,
+        to.limit,
+        access,
+        gran,
+    );
+    const sel: u16 = @intCast((gdt.GDT_TLS0_INDEX << 3) | 0x3);
+    asm volatile (
+        "mov %[_sel], %gs"
+        :: [_sel]"r"(sel)
+        : .{ .memory = true}
+    );
+    return @ptrFromInt(to.regs.getStackPointer());
+}
 
 pub export fn exceptionHandler(state: *Regs) callconv(.c) void {
     krn.logger.DEBUG("EXC {d}", .{state.int_no});

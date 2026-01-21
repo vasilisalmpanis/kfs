@@ -50,6 +50,14 @@ pub const Regs = struct {
         };
     }
 
+    pub inline fn setStackPointer(self: *Regs, sp: usize) void {
+        self.esp = @intCast(sp);
+    }
+
+    pub inline fn getStackPointer(self: *Regs) usize {
+        return @intCast(self.esp);
+    }
+
     pub fn state() *Regs{
         const stack_bottom = krn.task.current.stack_bottom;
         return @ptrFromInt(stack_bottom + krn.STACK_SIZE - @sizeOf(Regs));
@@ -244,3 +252,11 @@ pub const TSS = packed struct {
         };
     }
 };
+
+pub fn enableInterrupts() void {
+    asm volatile ("sti");
+}
+
+pub fn disableInterrupts() void {
+    asm volatile ("cli");
+}

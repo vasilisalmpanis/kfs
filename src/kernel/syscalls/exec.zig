@@ -40,12 +40,12 @@ pub fn doExecve(
         return errors.ENOMEM;
     var read: u32 = 0;
     krn.logger.INFO("Executing {s} {d}\n", .{filename, file.inode.size});
-    asm volatile("cli;");
+    arch.cpu.disableInterrupts();
     while (read < file.inode.size) {
-        errdefer asm volatile("sti;");
+        errdefer arch.cpu.enableInterrupts();
         read += try file.ops.read(file, @ptrCast(&slice[read]), slice.len);
     }
-    asm volatile("sti;");
+    arch.cpu.enableInterrupts();
 
     krn.task.current.setName(path.dentry.name); // TODO: make copy of filename and set name only if we will execute
 

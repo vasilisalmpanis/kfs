@@ -254,6 +254,7 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
     krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack_bottom, stack_bottom + stack_size});
     krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{ehdr.e_entry});
 
+    // Also arch specific
     arch.gdt.tss.esp0 = krn.task.current.regs.esp;
     heap_start = arch.pageAlign(heap_start, false);
     krn.logger.INFO("heap_start 0x{X:0>8}\n", .{heap_start});
@@ -267,26 +268,5 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
 }
 
 pub fn goUserspace() void {
-    asm volatile(
-        \\ cli
-        \\ mov $((8 * 4) | 3), %%bx
-        \\ mov %%bx, %%ds
-        \\ mov %%bx, %%es
-        \\ mov %%bx, %%fs
-        \\ mov %%bx, %%gs
-        \\
-        \\ push $((8 * 4) | 3)
-        \\ push %[us]
-        \\ pushf
-        \\ pop %%ebx
-        \\ or $0x200, %%ebx
-        \\ push %%ebx
-        \\ push $((8 * 3) | 3)
-        \\ push %[uc]
-        \\ iret
-        \\
-        ::
-        [uc] "r" (krn.task.current.mm.?.code),
-        [us] "r" (krn.task.current.mm.?.argc),
-    );
+    arch.idt.goUserspace();
 }

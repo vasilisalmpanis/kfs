@@ -386,6 +386,9 @@ pub const arch = struct {
 
     };
 
+    pub const syscalls = struct {
+    };
+
 };
 
 pub const kernel = struct {
@@ -512,9 +515,6 @@ pub const kernel = struct {
         };
 
 
-    };
-
-    pub const syscalls = struct {
     };
 
     pub const list = struct {
@@ -971,6 +971,202 @@ pub const kernel = struct {
             fd : i32,
             events : u16,
             revents : u16,
+        };
+
+    };
+
+    pub const syscalls = struct {
+        pub const access = struct {
+        };
+
+        pub const brk = struct {
+        };
+
+        pub const chdir = struct {
+        };
+
+        pub const chmod = struct {
+        };
+
+        pub const chown = struct {
+        };
+
+        pub const clock = struct {
+        };
+
+        pub const close = struct {
+        };
+
+        pub const dup = struct {
+        };
+
+        pub const exec = struct {
+        };
+
+        pub const exit = struct {
+        };
+
+        pub const fcntl = struct {
+        };
+
+        pub const fork = struct {
+        };
+
+        pub const getcwd = struct {
+        };
+
+        pub const getdents = struct {
+        };
+
+        pub const ioctl = struct {
+        };
+
+        pub const kill = struct {
+        };
+
+        pub const kshell = struct {
+        };
+
+        pub const link = struct {
+        };
+
+        pub const lseek = struct {
+        };
+
+        pub const mkdir = struct {
+        };
+
+        pub const mknod = struct {
+        };
+
+        pub const mmap = struct {
+        };
+
+        pub const module = struct {
+        };
+
+        pub const mount = struct {
+        };
+
+        pub const mprotect = struct {
+        };
+
+        pub const open = struct {
+        };
+
+        pub const pipe = struct {
+        };
+
+
+        pub const readlink = struct {
+        };
+
+        pub const read = struct {
+            pub const IoVec = extern struct {
+                base : [*]u8,
+                len : u32,
+            };
+
+        };
+
+        pub const rename = struct {
+        };
+
+        pub const sendfile = struct {
+        };
+
+        pub const sigaction = struct {
+        };
+
+        pub const sleep = struct {
+        };
+
+        pub const socketcall = struct {
+        };
+
+        pub const statfs = struct {
+        };
+
+        pub const statx = struct {
+        };
+
+        pub const stat = struct {
+            pub const Timespec = extern struct {
+                tv_sec : u32,
+                tv_nsec : u32,
+            };
+
+            pub const Stat = extern struct {
+                st_dev : u64,
+                __padding : u32,
+                _st_ino : u32,
+                st_mode : u32,
+                st_nlink : u32,
+                st_uid : u32,
+                st_gid : u32,
+                st_rdev : u64,
+                __pad0 : u32,
+                st_size : i64,
+                st_blksize : u32,
+                st_blocks : u64,
+                st_atim : kernel.syscalls.stat.Timespec,
+                st_mtim : kernel.syscalls.stat.Timespec,
+                st_ctim : kernel.syscalls.stat.Timespec,
+                st_ino : u64,
+            };
+
+            pub const timespec = extern struct {
+                sec : i32,
+                nsec : i32,
+            };
+
+            pub const StatLinux = extern struct {
+                dev : u64,
+                __dev_padding : u32,
+                __ino_truncated : u32,
+                mode : u32,
+                nlink : u32,
+                uid : u32,
+                gid : u32,
+                rdev : u64,
+                __rdev_padding : u32,
+                size : i64,
+                blksize : i32,
+                blocks : i64,
+                atim : kernel.syscalls.stat.timespec,
+                mtim : kernel.syscalls.stat.timespec,
+                ctim : kernel.syscalls.stat.timespec,
+                ino : u64,
+            };
+
+        };
+
+        pub const symlink = struct {
+        };
+
+        pub const time = struct {
+        };
+
+        pub const truncate = struct {
+        };
+
+        pub const umask = struct {
+        };
+
+        pub const uname = struct {
+        };
+
+        pub const unlink = struct {
+        };
+
+        pub const wait = struct {
+        };
+
+        pub const write = struct {
+
+        };
+
+        pub const id = struct {
         };
 
     };

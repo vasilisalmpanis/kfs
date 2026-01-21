@@ -1,14 +1,14 @@
-const arch = @import("arch");
-const tsk = @import("../sched/task.zig");
-const krn = @import("../main.zig");
-const registerHandler = @import("./manage.zig").registerHandler;
-const systable = @import("../syscalls/table.zig");
-const errors = @import("../syscalls/error-codes.zig");
+const arch = @import("../main.zig");
+const krn = @import("kernel");
+const tsk = krn.task;
+const registerHandler = krn.irq.registerHandler;
+const systable = @import("table.zig");
+const errors = krn.errors;
 
 pub fn syscallsManager(state: *arch.Regs) void {
     tsk.current.regs = state.*;
-    asm volatile ("sti;");
-    defer asm volatile ("cli;");
+    arch.cpu.enableInterrupts();
+    defer arch.cpu.disableInterrupts();
     if (state.eax < 0) {
         state.eax = -1;
         return;
