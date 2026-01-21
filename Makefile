@@ -30,7 +30,7 @@ QEMU = qemu-system-i386
 
 MKRESCUE = grub-mkrescue
 KVM := $(shell \
-	if command -v kvm-ok >/dev/null 2>&1 && kvm-ok >/dev/null 2>&1; \
+	if lsmod | grep kvm >/dev/null 2>&1; \
     	then echo "-enable-kvm"; \
 		else echo ""; \
 	fi)
