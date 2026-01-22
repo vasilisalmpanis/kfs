@@ -71,7 +71,7 @@ pub const KernelAllocator = struct {
     }
 
     fn alloc(_: *anyopaque, n: usize, _: Alignment, _: usize) ?[*]u8 {
-        return kmallocArray(u8, n);
+        return kmallocArray(u8, @intCast(n));
     }
     fn free(_: *anyopaque, buf: []u8, alignment: Alignment, ret_addr: usize) void {
         _ = alignment;

@@ -46,7 +46,7 @@ pub const procfs = @import("proc/filesystem.zig");
 
 const std = @import("std");
 pub const DentryHash = struct {
-    sb: u32,
+    sb: usize,
     ino: u32,
     name: []const u8,
 };

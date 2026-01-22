@@ -97,7 +97,7 @@ pub const ListHead = packed struct {
     }
 };
 
-pub fn containerOf(comptime T: type, ptr: u32, comptime member: []const u8) *T {
+pub fn containerOf(comptime T: type, ptr: usize, comptime member: []const u8) *T {
     const offset = @offsetOf(T, member);
     const result: *T = @ptrFromInt(ptr - offset);
     return result;
