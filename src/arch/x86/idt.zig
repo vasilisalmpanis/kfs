@@ -28,6 +28,7 @@ const ISRHandler        = fn () callconv(.c) void;
 extern const stack_top: u32;
 
 pub fn goUserspace() void {
+    gdt.tss.esp0 = krn.task.current.regs.esp;
     asm volatile(
         \\ cli
         \\ mov $((8 * 4) | 3), %%bx

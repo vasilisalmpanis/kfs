@@ -104,8 +104,8 @@ pub const DT_SOCK		= 12;
 pub const DT_WHT		= 14;
 
 pub const Dirent = extern struct {
-    ino: u32,
-    off: u32,
+    ino: usize,
+    off: usize,
     reclen: u16,
     name: [256]u8,
 };
@@ -119,7 +119,7 @@ pub const Dirent64 = extern struct {
 
 pub const LinuxDirent = extern struct {
     ino: u32,
-    off: u32,
+    off: usize,
     reclen: u16,
     type: u8,
 

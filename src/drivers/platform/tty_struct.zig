@@ -8,16 +8,16 @@ const t = @import("./termios.zig");
 const tty_drv = @import("tty.zig");
 
 pub const DirtyRect = struct {
-    x1: u32,
-    y1: u32,
-    x2: u32,
-    y2: u32,
+    x1: usize,
+    y1: usize,
+    x2: usize,
+    y2: usize,
 
     pub fn init(
-        x1: u32,
-        y1: u32,
-        x2: u32,
-        y2: u32
+        x1: usize,
+        y1: usize,
+        x2: usize,
+        y2: usize
     ) DirtyRect {
         return .{
             .x1 = x1,
@@ -27,7 +27,7 @@ pub const DirtyRect = struct {
         };
     }
 
-    pub fn fullScreen(w: u32, h: u32) DirtyRect {
+    pub fn fullScreen(w: usize, h: usize) DirtyRect {
         return .{
             .x1 = 0,
             .y1 = 0,
@@ -36,7 +36,7 @@ pub const DirtyRect = struct {
         };
     }
 
-    pub fn singleChar(x: u32, y: u32) DirtyRect {
+    pub fn singleChar(x: usize, y: usize) DirtyRect {
         return .{
             .x1 = x,
             .y1 = y,
@@ -145,11 +145,11 @@ const AnsiColor = enum(u4) {
 
 const Cursor = struct {
     kind: CursorType = .Block,
-    x: u32 = 0,
-    y: u32 = 0,
+    x: usize = 0,
+    y: usize = 0,
 
-    prev_x: u32 = 0,
-    prev_y: u32 = 0,
+    prev_x: usize = 0,
+    prev_y: usize = 0,
 
     drawn: bool = false,
     on: bool = true,
@@ -158,7 +158,7 @@ const Cursor = struct {
         return Cursor{};
     }
 
-    pub fn set(self: *Cursor, x: u32, y: u32) void {
+    pub fn set(self: *Cursor, x: usize, y: usize) void {
         if (self.drawn) {
             self.prev_x = self.x;
             self.prev_y = self.y;
@@ -167,11 +167,11 @@ const Cursor = struct {
         self.y = y;
     }
 
-    pub fn setX(self: *Cursor, x: u32) void {
+    pub fn setX(self: *Cursor, x: usize) void {
         self.set(x, self.y);
     }
 
-    pub fn setY(self: *Cursor, y: u32) void {
+    pub fn setY(self: *Cursor, y: usize) void {
         self.set(self.x, y);
     }
 
@@ -211,8 +211,8 @@ const Cell = struct {
 };
 
 const Page = struct {
-    width: u32,
-    height: u32,
+    width: usize,
+    height: usize,
     buff: [*]Cell,
     prev: [*]Cell,
 
@@ -225,7 +225,7 @@ const Page = struct {
 
     cursor: Cursor = Cursor.init(),
 
-    pub fn init(w: u32, h: u32) !Page {
+    pub fn init(w: usize, h: usize) !Page {
         const buff: [*]Cell = @ptrCast(@alignCast(
             krn.mm.kmallocArray(Cell, w * h)
             orelse return krn.errors.PosixError.ENOMEM
@@ -251,11 +251,11 @@ const Page = struct {
         return page;
     }
 
-    pub fn getCh(self: *Page, x: u32, y: u32) u8 {
+    pub fn getCh(self: *Page, x: usize, y: usize) u8 {
         return self.buff[y * self.width + x].ch;
     }
 
-    pub fn getCell(self: *Page, x: u32, y: u32) *Cell {
+    pub fn getCell(self: *Page, x: usize, y: usize) *Cell {
         return &self.buff[y * self.width + x];
     }
 
@@ -263,7 +263,7 @@ const Page = struct {
         return self.getCell(self.cursor.x, self.cursor.y);
     }
 
-    pub fn setCursor(self: *Page, x: u32, y: u32) void {
+    pub fn setCursor(self: *Page, x: usize, y: usize) void {
         if (self.cursor.drawn) {
             self.markCellDirty(self.cursor.x, self.cursor.y);
             const off = self.cursor.y * self.width + self.cursor.x;
@@ -272,11 +272,11 @@ const Page = struct {
         self.cursor.set(x, y);
     }
 
-    pub fn setCursorX(self: *Page, x: u32) void {
+    pub fn setCursorX(self: *Page, x: usize) void {
         self.setCursor(x, self.cursor.y);
     }
 
-    pub fn setCursorY(self: *Page, y: u32) void {
+    pub fn setCursorY(self: *Page, y: usize) void {
         self.setCursor(self.cursor.x, y);
     }
 
@@ -376,11 +376,11 @@ const Page = struct {
         }
     }
 
-    fn markCellDirty(self: *Page, x: u32, y: u32) void {
+    fn markCellDirty(self: *Page, x: usize, y: usize) void {
         self.markDirty(DirtyRect.singleChar(x, y));
     }
 
-    pub fn scroll(self: *Page, lines: u32) void {
+    pub fn scroll(self: *Page, lines: usize) void {
         if (lines == 0)
             return;
         if (lines >= self.height) {
@@ -466,7 +466,7 @@ const Page = struct {
         }
     }
 
-    pub fn endlineXPos(self: *Page) u32 {
+    pub fn endlineXPos(self: *Page) usize {
         var x = self.cursor.x;
         while (x < self.width) {
             if (self.getCell(x, self.cursor.y).isEmpty())
@@ -478,8 +478,8 @@ const Page = struct {
 };
 
 pub const TTY = struct {
-    width: u32 = 80,
-    height: u32 = 25,
+    width: usize = 80,
+    height: usize = 25,
 
     main_page: Page,
     alt_page: Page,
@@ -506,12 +506,12 @@ pub const TTY = struct {
     kd_mode: u32 = tty_drv.KD_TEXT,
 
     // editing
-    _input_len: u32 = 0,
-    tab_len: u32 = 8,
+    _input_len: usize = 0,
+    tab_len: usize = 8,
 
     // cursor save/restore
-    saved_x: u32 = 0,
-    saved_y: u32 = 0,
+    saved_x: usize = 0,
+    saved_y: usize = 0,
 
     // CSI parser state
     pstate: ParserState = .Normal,
@@ -520,7 +520,7 @@ pub const TTY = struct {
     csi_n: u8 = 0,
     csi_priv: bool = false,
 
-    pub fn init(w: u32, h: u32, vt_idx: u16) !TTY {
+    pub fn init(w: usize, h: usize, vt_idx: u16) !TTY {
         const rb = try krn.ringbuf.RingBuf.new(4096);
         const _tty = TTY{
             .width = w,
@@ -683,8 +683,8 @@ pub const TTY = struct {
         self.curr_page.getCell(last, y).makeEmpty();
     }
 
-    fn currentLineLen(self: *TTY) u32 {
-        var len: u32 = 0;
+    fn currentLineLen(self: *TTY) usize {
+        var len: usize = 0;
         const y = self.curr_page.cursor.y;
         while (len < self.width) {
             const cell = self.curr_page.getCell(len, y);
@@ -832,7 +832,7 @@ pub const TTY = struct {
                         const line_len = self.currentLineLen();
                         if (line_len > 0) {
                             if (self.term.c_lflag.ECHO) {
-                                var i: u32 = 0;
+                                var i: usize = 0;
                                 while (i < line_len) : (i += 1) {
                                     self.removeAtCursor();
                                 }
@@ -1060,8 +1060,8 @@ pub const TTY = struct {
                     r = 1;
                 if (c < 1)
                     c = 1;
-                const y = @min(@as(u32, r - 1), self.height - 1);
-                const x = @min(@as(u32, c - 1), self.width - 1);
+                const y = @min(@as(usize, r - 1), self.height - 1);
+                const x = @min(@as(usize, c - 1), self.width - 1);
                 self.curr_page.setCursor(x, y);
                 self.render();
             },
@@ -1226,7 +1226,7 @@ pub const TTY = struct {
 
     fn clearToBol(self: *TTY) void {
         const y = self.curr_page.cursor.y;
-        var x: u32 = 0;
+        var x: usize = 0;
         while (x <= self.curr_page.cursor.x) : (x += 1) {
             self.curr_page.getCell(x, y).makeEmpty();
         }
@@ -1241,7 +1241,7 @@ pub const TTY = struct {
 
     fn clearLine(self: *TTY) void {
         const y = self.curr_page.cursor.y;
-        var x: u32 = 0;
+        var x: usize = 0;
         while (x < self.width) : (x += 1) {
             self.curr_page.getCell(x, y).makeEmpty();
         }
@@ -1262,7 +1262,7 @@ pub const TTY = struct {
         self.clearToEol();
         var row = self.curr_page.cursor.y + 1;
         while (row < self.height) : (row += 1) {
-            var x: u32 = 0;
+            var x: usize = 0;
             while (x < self.width) : (x += 1) {
                 self.curr_page.getCell(x, row).makeEmpty();
             }
@@ -1278,9 +1278,9 @@ pub const TTY = struct {
 
     fn clearFromStartToCursor(self: *TTY) void {
         self.clearToBol();
-        var row: u32 = 0;
+        var row: usize = 0;
         while (row < self.curr_page.cursor.y) : (row += 1) {
-            var x: u32 = 0;
+            var x: usize = 0;
             while (x < self.width) : (x += 1) {
                 self.curr_page.getCell(x, row).makeEmpty();
             }
@@ -1294,7 +1294,7 @@ pub const TTY = struct {
         self.render();
     }
 
-    fn insertLines(self: *TTY, n: u32) void {
+    fn insertLines(self: *TTY, n: usize) void {
         const y = self.curr_page.cursor.y;
         const lines = @min(n, self.height - y);
         if (lines == 0)
@@ -1303,7 +1303,7 @@ pub const TTY = struct {
         // Move lines down
         var row = self.height - 1;
         while (row >= y + lines) : (row -= 1) {
-            var x: u32 = 0;
+            var x: usize = 0;
             while (x < self.width) : (x += 1) {
                 self.curr_page.getCell(x, row).* = self.curr_page.getCell(
                     x, row - lines
@@ -1316,7 +1316,7 @@ pub const TTY = struct {
         // Clear inserted lines
         var clear_row = y;
         while (clear_row < y + lines and clear_row < self.height) : (clear_row += 1) {
-            var x: u32 = 0;
+            var x: usize = 0;
             while (x < self.width) : (x += 1) {
                 self.curr_page.getCell(x, clear_row).makeEmpty();
             }
@@ -1328,7 +1328,7 @@ pub const TTY = struct {
         self.render();
     }
 
-    fn deleteLines(self: *TTY, n: u32) void {
+    fn deleteLines(self: *TTY, n: usize) void {
         const y = self.curr_page.cursor.y;
         const lines = @min(n, self.height - y);
         if (lines == 0) return;
@@ -1336,7 +1336,7 @@ pub const TTY = struct {
         // Move lines up
         var row = y;
         while (row < self.height - lines) : (row += 1) {
-            var x: u32 = 0;
+            var x: usize = 0;
             while (x < self.width) : (x += 1) {
                 self.curr_page.getCell(x, row).* = self.curr_page.getCell(
                     x, row + lines
@@ -1346,7 +1346,7 @@ pub const TTY = struct {
         
         // Clear bottom lines
         while (row < self.height) : (row += 1) {
-            var x: u32 = 0;
+            var x: usize = 0;
             while (x < self.width) : (x += 1) {
                 self.curr_page.getCell(x, row).makeEmpty();
             }
@@ -1357,7 +1357,7 @@ pub const TTY = struct {
         self.render();
     }
 
-    fn deleteChars(self: *TTY, n: u32) void {
+    fn deleteChars(self: *TTY, n: usize) void {
         const x = self.curr_page.cursor.x;
         const y = self.curr_page.cursor.y;
         const chars = @min(n, self.width - x);
@@ -1383,7 +1383,7 @@ pub const TTY = struct {
         self.render();
     }
 
-    fn insertChars(self: *TTY, n: u32) void {
+    fn insertChars(self: *TTY, n: usize) void {
         const x = self.curr_page.cursor.x;
         const y = self.curr_page.cursor.y;
         const chars = @min(n, self.width - x);
@@ -1410,14 +1410,14 @@ pub const TTY = struct {
         self.render();
     }
 
-    fn scrollDown(self: *TTY, n: u32) void {
+    fn scrollDown(self: *TTY, n: usize) void {
         const lines = @min(n, self.height);
         if (lines == 0) return;
         
         // Move lines down
         var row = self.height - 1;
         while (row >= lines) : (row -= 1) {
-            var x: u32 = 0;
+            var x: usize = 0;
             while (x < self.width) : (x += 1) {
                 self.curr_page.getCell(x, row).* = self.curr_page.getCell(x, row - lines).*;
             }
@@ -1426,9 +1426,9 @@ pub const TTY = struct {
         }
         
         // Clear top lines
-        var clear_row: u32 = 0;
+        var clear_row: usize = 0;
         while (clear_row < lines) : (clear_row += 1) {
-            var x: u32 = 0;
+            var x: usize = 0;
             while (x < self.width) : (x += 1) {
                 self.curr_page.getCell(x, clear_row).makeEmpty();
             }

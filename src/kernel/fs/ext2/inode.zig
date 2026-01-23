@@ -67,14 +67,14 @@ pub const Ext2DirEntry = extern struct {
     }
 
     pub fn getName(self: *Ext2DirEntry) []const u8 {
-        const addr: u32 = @intFromPtr(self) + @sizeOf(Ext2DirEntry);
+        const addr: usize = @intFromPtr(self) + @sizeOf(Ext2DirEntry);
         const name: [*]const u8 = @ptrFromInt(addr);
         return name[0..self.name_len];
     }
 
     // FIXME: incorrect alignment in some cases.
     pub fn getNext(self: *Ext2DirEntry) *Ext2DirEntry {
-        const addr: u32 = @intFromPtr(self) + self.rec_len;
+        const addr: usize = @intFromPtr(self) + self.rec_len;
         if (addr % 4 != 0) {
             @panic("TODO: fix alignment with ext2\n");
         }
@@ -492,7 +492,7 @@ pub const Ext2Inode = struct {
 
         const block = try sb.getFreeBlock(bgdt_idx);
         self.data.i_blocks += sb.base.block_size / 512;
-        self.data.i_block[blk_idx] = block;
+        self.data.i_block[blk_idx] = @intCast(block);
         const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
         sb.data.s_wtime = curr_seconds;
         self.data.i_mtime = curr_seconds;
@@ -683,7 +683,7 @@ pub const Ext2Inode = struct {
         _ = try parent.new(name, target.dentry.inode);
     }
 
-    fn readlink(base: *fs.Inode, buf: [*]u8, size: usize) !u32 {
+    fn readlink(base: *fs.Inode, buf: [*]u8, size: u32) !u32 {
         const sb = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         const ext2_inode = base.getImpl(Ext2Inode, "base");
         const ext2_s = sb.getImpl(ext2_sb.Ext2Super, "base");
@@ -694,7 +694,7 @@ pub const Ext2Inode = struct {
 
             var to_write: u32 = size;
             if (span.len < size)
-                to_write = span.len;
+                to_write = @intCast(span.len);
             @memcpy(buf[0..to_write], span[0..to_write]);
             return to_write;
         } else {
@@ -702,8 +702,8 @@ pub const Ext2Inode = struct {
             const span: []u8 = std.mem.span(block);
 
             var to_write: u32 = size;
-            if (span.len < size)
-                to_write = span.len;
+            if (@as(u32, @intCast(span.len)) < size)
+                to_write = @intCast(span.len);
             @memcpy(buf[0..to_write], span[0..to_write]);
             return to_write;
         }

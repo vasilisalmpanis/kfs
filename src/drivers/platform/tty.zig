@@ -88,7 +88,7 @@ fn tty_close(base: *krn.fs.File) void {
     krn.logger.WARN("TTY {s} closed\n", .{base.path.?.dentry.name});
 }
 
-fn tty_read(file: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
+fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     var _tty = try getTTY(file);
     if (krn.task.current.pgid != _tty.fg_pgid) {
         _ = krn.kill(
@@ -130,7 +130,7 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
                 }
                 continue;
             }
-            const to_read = @min(@as(u32, avail), size);
+            const to_read = @min(avail, size);
             const n = _tty.file_buff.readInto(buf[0..to_read]);
             krn.logger.INFO("Read {any}\n", .{buf[0..n]});
             _tty.lock.unlock();
@@ -157,11 +157,11 @@ fn print_raw_input(msg: []const u8) void {
     krn.serial.print("|\n");
 }
 
-fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
+fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     var _tty = try getTTY(file);
     const msg = buf[0..size];
     print_raw_input(msg);
-    var i: u32 = 0;
+    var i: usize = 0;
     while (i < msg.len) : (i += 1) {
         const c = msg[i];
         if (c == '\n' and _tty.term.c_oflag.OPOST and _tty.term.c_oflag.ONLCR) {
@@ -221,7 +221,7 @@ fn tty_ioctl(
         TCFLSH => {
             // arg: 0=flush input, 1=flush output, 2=both
             if (data) |p| {
-                const arg: u32 = @intFromPtr(p);
+                const arg: usize = @intFromPtr(p);
                 krn.logger.DEBUG("tty_ioctl TCFLSH {}\n", .{arg});
                 switch (arg & 3) {
                     0 => {

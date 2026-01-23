@@ -28,7 +28,7 @@ fn mounts_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
 
     if (fs.mount.mountpoints == null)
         return ;
-    var size: u32 = 0;
+    var size: usize = 0;
 
     if (fs.mount.mountpoints) |head| {
         var it = head.list.iterator();
@@ -49,7 +49,7 @@ fn mounts_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
         };
         errdefer kernel.mm.kfree(content.ptr);
         it = head.list.iterator();
-        var offset: u32 = 0;
+        var offset: usize = 0;
         while (it.next()) |node| {
             const mnt = node.curr.entry(fs.Mount, "list");
             const mnt_path = mnt.getPath();
@@ -77,7 +77,7 @@ fn filesystems_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
     };
 
     var it = fs_head.list.iterator();
-    var size: u32 = 0;
+    var size: usize = 0;
     while (it.next()) |node| {
         const filesystem = node.curr.entry(fs.FileSystem, "list");
         size += std.fmt.count("{s}  {s}\n",
@@ -92,7 +92,7 @@ fn filesystems_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
     };
     errdefer kernel.mm.kfree(content.ptr);
     it = fs_head.list.iterator();
-    var offset: u32 = 0;
+    var offset: usize = 0;
     while (it.next()) |node| {
         const filesystem = node.curr.entry(fs.FileSystem, "list");
 

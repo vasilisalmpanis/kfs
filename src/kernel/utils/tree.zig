@@ -97,7 +97,7 @@ pub const TreeNode = struct {
     }
 
     pub fn entry(self: *TreeNode, comptime T: type, comptime member: []const u8) *T {
-        return @fieldParentPtr(member, self);
+        return @alignCast(@fieldParentPtr(member, self));
     }
 };
 

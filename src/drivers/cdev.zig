@@ -28,14 +28,14 @@ fn cdev_close(base: *krn.fs.File) void {
     _ = base;
 }
 
-fn cdev_write(base: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
+fn cdev_write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     _ = base;
     _ = buf;
     _ = size;
     return 0;
 }
 
-fn cdev_read(base: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
+fn cdev_read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     _ = base;
     _ = buf;
     _ = size;

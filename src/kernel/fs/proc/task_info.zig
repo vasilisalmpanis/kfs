@@ -55,13 +55,13 @@ fn close(file: *kernel.fs.File) void {
     task.refcount.unref();
 }
 
-fn write(_: *kernel.fs.File, _: [*]const u8, _: u32) !u32 {
+fn write(_: *kernel.fs.File, _: [*]const u8, _: usize) !usize {
     return kernel.errors.PosixError.ENOSYS;
 }
 
 // /proc/stat file
 
-fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
+fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
     const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
     const task = proc_inode.task orelse {
         @panic("Should not happen");
@@ -82,7 +82,7 @@ fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
             status,
         }
     );
-    var to_read: u32 = size;
+    var to_read: usize = size;
     if (file.pos >= string.len)
         return 0;
     if (file.pos + to_read >= string.len)
@@ -100,7 +100,7 @@ pub const stat_file_ops = kernel.fs.FileOps{
     .close = close,
 };
 
-fn cmdline_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
+fn cmdline_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
     const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
     const task = proc_inode.task orelse {
         @panic("Should not happen");

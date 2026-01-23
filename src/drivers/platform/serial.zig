@@ -36,11 +36,11 @@ fn serial_open(_: *kernel.fs.File, _: *kernel.fs.Inode) !void {
 fn serial_close(_: *kernel.fs.File) void {
 }
 
-fn serial_read(_: *kernel.fs.File, _: [*]u8, _: u32) !u32 {
+fn serial_read(_: *kernel.fs.File, _: [*]u8, _: usize) !usize {
     return 0;
 }
 
-fn serial_write(_: *kernel.fs.File, buf: [*]const u8, size: u32) !u32 {
+fn serial_write(_: *kernel.fs.File, buf: [*]const u8, size: usize) !usize {
     const msg_slice: []const u8 = buf[0..size];
     kernel.serial.print(msg_slice);
     return size;

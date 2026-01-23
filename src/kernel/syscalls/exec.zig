@@ -10,7 +10,7 @@ const AT_EXECVE_CHECK		        = 0x10000; // Only perform a check if execution
 
 pub fn freeSlices(
     slice: []const []const u8,
-    len: u32
+    len: usize
 ) void {
     for (0..len) |idx| {
         krn.mm.kfree(slice[idx].ptr);
@@ -38,7 +38,7 @@ pub fn doExecve(
         _slice 
     else
         return errors.ENOMEM;
-    var read: u32 = 0;
+    var read: usize = 0;
     krn.logger.INFO("Executing {s} {d}\n", .{filename, file.inode.size});
     arch.cpu.disableInterrupts();
     while (read < file.inode.size) {

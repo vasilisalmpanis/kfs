@@ -4,9 +4,9 @@ const dbg = @import("debug");
 const krn = @import("kernel");
 
 pub const Img = struct {
-    width: u32,
-    height: u32,
-    data: [] const u32,
+    width: usize,
+    height: usize,
+    data: [] const usize,
 };
 
 pub const Font = struct {
@@ -17,10 +17,10 @@ pub const Font = struct {
 
 pub const FrameBuffer = struct {
     fb_info: *multiboot.TagFrameBufferInfo,
-    fb_ptr: [*]u32,
-    cwidth: u32,
-    cheight: u32,
-    virtual_buffer: [*]u32,
+    fb_ptr: [*]usize,
+    cwidth: usize,
+    cheight: usize,
+    virtual_buffer: [*]usize,
     font: *const Font,
 
     pub fn init(
@@ -29,25 +29,25 @@ pub const FrameBuffer = struct {
     ) FrameBuffer {
         if (boot_info.getTag(multiboot.TagFrameBufferInfo)) |tag| {
             // const fb_info: ?multiboot.FramebufferInfo = multiboot.getFBInfo(boot_info);
-            const fb_size: u32 = tag.height * tag.pitch;
+            const fb_size: usize = tag.height * tag.pitch;
             const num_pages = (fb_size + 0xFFF) / mm.PAGE_SIZE;
-            var i: u32 = 0;
-            var addr: u32 = @truncate(tag.addr);
+            var i: usize = 0;
+            var addr: usize = @truncate(tag.addr);
             addr &= 0xFFFFF000;
             const offset = addr & 0xFFF;
-            var virt_addr: u32 = mm.virt_memory_manager.findFreeSpace(
+            var virt_addr: usize = mm.virt_memory_manager.findFreeSpace(
                 num_pages,
                 mm.PAGE_OFFSET,
                 0xFFFFF000,
                 false
             );
-            const first_addr: u32 = virt_addr;
+            const first_addr: usize = virt_addr;
             while (i < num_pages) : (i += 1) {
                 mm.virt_memory_manager.mapPage(virt_addr, addr, .{});
                 virt_addr += mm.PAGE_SIZE;
                 addr += mm.PAGE_SIZE;
             }
-            const buffer: ?[*]u32 = mm.kmallocArray(u32, tag.width * tag.height);
+            const buffer: ?[*]usize = mm.kmallocArray(usize, tag.width * tag.height);
             if (buffer) |_buffer| {
                 var fb = FrameBuffer{
                     .fb_info = tag,
@@ -78,7 +78,7 @@ pub const FrameBuffer = struct {
         @memset(self.virtual_buffer[0 .. self.fb_info.height * self.fb_info.width], bg);
     }
 
-    pub fn clearChar(self: *FrameBuffer, cx: u32, cy: u32, bg: u32) void {
+    pub fn clearChar(self: *FrameBuffer, cx: usize, cy: usize, bg: u32) void {
         const x = cx * self.font.width;
         const y = cy * self.font.height;
         const width = (self.fb_info.pitch / 4);
@@ -92,8 +92,8 @@ pub const FrameBuffer = struct {
     pub fn putchar(
         self: *FrameBuffer,
         c: u8,
-        cx: u32,
-        cy: u32,
+        cx: usize,
+        cy: usize,
         bg: u32,
         fg: u32,
     ) void {
@@ -120,8 +120,8 @@ pub const FrameBuffer = struct {
 
     pub fn cursor(
         self: *FrameBuffer,
-        cx: u32,
-        cy: u32,
+        cx: usize,
+        cy: usize,
         fg: u32,
     ) void {
         const x = cx * self.font.width;
@@ -135,8 +135,8 @@ pub const FrameBuffer = struct {
 
     pub fn putPixel(
         self: *FrameBuffer,
-        x: u32, 
-        y: u32,
+        x: usize,
+        y: usize,
         clr: u32
     ) void {
         if (x >= self.fb_info.width)
@@ -158,8 +158,8 @@ pub const FrameBuffer = struct {
 
     pub fn putImg(
         self: *FrameBuffer,
-        x: u32, 
-        y: u32,
+        x: usize,
+        y: usize,
         img: *const Img
     ) void {
         if (x >= self.fb_info.width)
@@ -168,7 +168,7 @@ pub const FrameBuffer = struct {
             return ;
         const max_dx = if (x + img.width < self.fb_info.width) img.width
             else self.fb_info.width - x;
-        var row: u32 = 0;
+        var row: usize = 0;
         while (row < img.height and y + row < self.fb_info.height): (row += 1) {
             const buf_pos = (y + row) * (self.fb_info.pitch / 4) + x;
             const img_pos = row * img.width;

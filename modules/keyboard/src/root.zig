@@ -41,7 +41,7 @@ fn kbd_open(_: *krn.fs.file.File, _: *krn.fs.Inode) !void {
 fn kbd_close(_: *krn.fs.file.File) void {
 }
 
-fn kbd_read(file: *krn.fs.file.File, buf: [*]u8, size: u32) !u32 {
+fn kbd_read(file: *krn.fs.file.File, buf: [*]u8, size: usize) !usize {
     var to_read: u32 = size;
     if (file.pos >= 256)
         return 0;
@@ -53,7 +53,7 @@ fn kbd_read(file: *krn.fs.file.File, buf: [*]u8, size: u32) !u32 {
     return to_read;
 }
 
-fn kbd_write(_: *krn.fs.file.File, _: [*]const u8, _: u32) !u32 {
+fn kbd_write(_: *krn.fs.file.File, _: [*]const u8, _: usize) !usize {
     return kfs.errors.convert(kfs.errors.PosixError.ENOSYS);
 }
 

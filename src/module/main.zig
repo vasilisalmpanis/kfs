@@ -81,11 +81,11 @@ fn modules_close(base: *kernel.fs.File) void {
     kernel.mm.kfree(base.data.?);
 }
 
-fn modules_write(_: *kernel.fs.File, _: [*]const u8, _: u32) anyerror!u32 {
+fn modules_write(_: *kernel.fs.File, _: [*]const u8, _: usize) anyerror!usize {
     return kernel.errors.PosixError.ENOSYS;
 }
 
-fn modules_read(base: *kernel.fs.File, buf: [*]u8, size: u32) anyerror!u32 {
+fn modules_read(base: *kernel.fs.File, buf: [*]u8, size: usize) anyerror!usize {
     if (base.data == null)
         return 0;
     const buffer: *[]const u8 = @ptrCast(@alignCast(base.data));

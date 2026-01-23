@@ -54,16 +54,16 @@ pub const MAP = packed struct(u32) {
 };
 
 pub const VMA = struct {
-    start: u32,
-    end: u32,
+    start: usize,
+    end: usize,
     mm: ?*MM,
     flags: MAP,
     prot: u32,
     file: ?*krn.fs.File,
-    offset: u32,
+    offset: usize,
     list: lst.ListHead,
 
-    pub fn setup(self: *VMA, start: u32, end: u32, owner: ?*MM, flags: MAP, prot: u32) !void {
+    pub fn setup(self: *VMA, start: usize, end: usize, owner: ?*MM, flags: MAP, prot: u32) !void {
         self.start = start;
         self.end = end;
         self.mm = owner;
@@ -83,10 +83,10 @@ pub const VMA = struct {
         other.prot = self.prot;
     }
 
-    pub fn allocatePages(self: *VMA, start: u32, end: u32) !void {
+    pub fn allocatePages(self: *VMA, start: usize, end: usize) !void {
         const num_of_pages = (end - start) / arch.PAGE_SIZE;
         for (0..num_of_pages) |index| {
-            const page: u32 = krn.mm.virt_memory_manager.pmm.allocPage();
+            const page: usize = krn.mm.virt_memory_manager.pmm.allocPage();
             if (page == 0) {
                 for (0..index) |idx| {
                     mm.virt_memory_manager.unmapPage(start + idx * arch.PAGE_SIZE, true);
@@ -98,12 +98,12 @@ pub const VMA = struct {
                 .user = true,
                 .present = true,
             };
-            const virt_addr: u32 = start + index * arch.PAGE_SIZE;
+            const virt_addr: usize = start + index * arch.PAGE_SIZE;
             krn.mm.virt_memory_manager.mapPage(virt_addr,
                 page,
                 flags
             );
-            const page_buf: [*]u32 = @ptrFromInt(virt_addr);
+            const page_buf: [*]usize = @ptrFromInt(virt_addr);
             @memset(page_buf[0..1024], 0);
         }
     }
@@ -113,13 +113,13 @@ pub const VMA = struct {
     }
 
     pub fn new(
-        addr: u32,
-        end: u32,
+        addr: usize,
+        end: usize,
         owner: *MM,
         flags: MAP,
         prot: u32,
         file: ?*krn.fs.File,
-        offset: u32,
+        offset: usize,
     ) ?*VMA {
         const vma: ?*VMA = mm.kmalloc(VMA);
         if (vma) |_vma| {
@@ -136,7 +136,7 @@ pub const VMA = struct {
                 _file.pos = offset;
                 const buffer: [*]u8 = @ptrFromInt(_vma.start);
 
-                var read: u32 = 0;
+                var read: usize = 0;
                 while (read < _vma.end - _vma.start) {
                     const ret = _file.ops.read(_file, @ptrCast(&buffer[read]), _vma.end - _vma.start - read) catch {
                         mm.virt_memory_manager.releaseArea(_vma.start, _vma.end, _vma.flags.TYPE);
@@ -167,7 +167,7 @@ pub const VMA = struct {
         return vma;
     }
 
-    pub fn mergable(self: *VMA, addr: u32, length: u32, prot: u32, flags: MAP) bool {
+    pub fn mergable(self: *VMA, addr: usize, length: usize, prot: u32, flags: MAP) bool {
         if (prot != self.prot)
             return false;
         if (self.flags.ANONYMOUS != flags.ANONYMOUS)
@@ -187,20 +187,20 @@ pub const VMA = struct {
 };
 
 pub const MM = struct {
-    stack_top: u32 = 0,     // Higher
-    stack_bottom: u32 = 0,  // Lower
-    code: u32 = 0,
-    data: u32 = 0,
-    arg_start: u32 = 0, // Addres to begin of args strings
-    arg_end: u32 = 0,
-    argc: u32 = 0, // address
-    env_start: u32 = 0,
-    env_end: u32 = 0,
-    bss: u32 = 0,
-    heap: u32 = 0,
-    brk_start: u32 = 0,
-    brk: u32 = 0,
-    vas: u32 = 0,
+    stack_top: usize = 0,     // Higher
+    stack_bottom: usize = 0,  // Lower
+    code: usize = 0,
+    data: usize = 0,
+    arg_start: usize = 0, // Addres to begin of args strings
+    arg_end: usize = 0,
+    argc: usize = 0, // address
+    env_start: usize = 0,
+    env_end: usize = 0,
+    bss: usize = 0,
+    heap: usize = 0,
+    brk_start: usize = 0,
+    brk: usize = 0,
+    vas: usize = 0,
     vmas: ?*VMA = null,
 
     pub fn init() MM {
@@ -224,12 +224,12 @@ pub const MM = struct {
     pub fn add_vma(
         self: *MM,
         curr: ?*lst.ListHead,
-        addr: u32,
-        length: u32,
+        addr: usize,
+        length: usize,
         prot: u32,
         flags: MAP,
         file: ?*krn.fs.File,
-        offset: u32,
+        offset: usize,
     ) !?*VMA {
         var new_vma: ?*VMA = null;
         if (file == null) {
@@ -288,19 +288,19 @@ pub const MM = struct {
 
     pub fn mmap_area(
         self: *MM,
-        addr: u32,
-        length: u32,
+        addr: usize,
+        length: usize,
         prot: u32,
         flags: MAP,
         file: ?*krn.fs.File,
-        offset: u32,
-    ) !u32
+        offset: usize,
+    ) !usize
     {
         // 1. check if this addr is taken.
         //  - if free or map fixed, create mappings or replace mappings
         //  - if not free and map fixed replace
         //  - if not free and not map fixed, select random address.
-        var hint: u32 = addr;
+        var hint: usize = addr;
         var end = hint + length;
         var new_vma: ?*VMA = null;
         if (self.vmas) |list| {
@@ -436,7 +436,7 @@ pub const MM = struct {
         return krn.task.current.mm.? == self;
     }
 
-    pub fn accessTaskVM(self: *MM, addr: u32, len: u32) ![]u8 {
+    pub fn accessTaskVM(self: *MM, addr: usize, len: usize) ![]u8 {
         if (krn.mm.kmallocSlice(u8, len)) |res| {
             const curr_vas = krn.task.current.mm.?.vas;
             if (!self.isCurrentMM())
