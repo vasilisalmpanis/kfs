@@ -30,14 +30,14 @@ fn bdev_close(base: *krn.fs.File) void {
     _ = base;
 }
 
-fn bdev_write(base: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
+fn bdev_write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     _ = base;
     _ = buf;
     _ = size;
     return 0;
 }
 
-fn bdev_read(base: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
+fn bdev_read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     _ = base;
     _ = buf;
     _ = size;

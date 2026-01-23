@@ -208,10 +208,10 @@ pub const ATADrive = struct {
     irq_enabled: bool = false,
 
     // DMA
-    prdt_phys: u32 = 0,
-    prdt_virt: u32 = 0,
-    dma_buff_phys: u32 = 0,
-    dma_buff_virt: u32 = 0,
+    prdt_phys: usize = 0,
+    prdt_virt: usize = 0,
+    dma_buff_phys: usize = 0,
+    dma_buff_virt: usize = 0,
     dma_initialized: bool = false,
 
     partitions: std.ArrayList(*part.Partition) = std.ArrayList(*part.Partition){},
@@ -255,7 +255,7 @@ pub const ATADrive = struct {
 
     fn initDMA(self: *ATADrive) void {
         const phys = kernel.mm.virt_memory_manager.pmm.allocPages(DMA_BUFFER_PAGES + 1);
-        const buff_phys = phys + kernel.mm.PAGE_SIZE;
+        const buff_phys: u32 = @intCast(phys + kernel.mm.PAGE_SIZE);
 
         kernel.logger.INFO("DMA PHYS: 0x{X:0>8} - 0x{X:0>8}", .{
             phys, phys + (DMA_BUFFER_PAGES + 1) * kernel.mm.PAGE_SIZE
@@ -298,7 +298,7 @@ pub const ATADrive = struct {
         arch.io.outb(self.bmide_base + BMIDE_STATUS, status | 0x06);
         arch.io.outb(self.bmide_base + BMIDE_COMMAND, 0x00);
 
-        arch.io.outl(self.bmide_base + BMIDE_PRDT_ADDR, phys);
+        arch.io.outl(self.bmide_base + BMIDE_PRDT_ADDR, @as(u32, @intCast(phys)));
         self.dma_initialized = true;
     }
 
@@ -806,7 +806,7 @@ fn ata_open(file: *kernel.fs.File, _: *kernel.fs.Inode) !void {
 fn ata_close(_: *kernel.fs.File) void {
 }
 
-fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
+fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
     if( file.inode.data.dev) |d| {
         const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
 
@@ -818,7 +818,7 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
             start_lba = partition.start_lba;
         }
         
-        const lba: u32 = start_lba + file.pos / ATADrive.SECTOR_SIZE;
+        const lba: u32 = start_lba + @as(u32, @intCast(file.pos)) / ATADrive.SECTOR_SIZE;
         if (part_idx != 0) {
             const partition = ata_dev.partitions.items[part_idx - 1];
             if (lba > partition.end_lba) {
@@ -830,15 +830,15 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
         }
         // ata_dev.selectChannel();
         
-        var _size: u32 = size;
+        var _size: u32 = @intCast(size);
         if (_size > 64 * ATADrive.SECTOR_SIZE)
             _size = ATADrive.SECTOR_SIZE * 64;
         var to_read: u32 = _size;
 
-        if ((file.pos + to_read) % ATADrive.SECTOR_SIZE != 0) {
-            to_read += (ATADrive.SECTOR_SIZE - (file.pos + to_read) % ATADrive.SECTOR_SIZE);
+        if ((@as(u32, @intCast(file.pos)) + to_read) % ATADrive.SECTOR_SIZE != 0) {
+            to_read += (ATADrive.SECTOR_SIZE - (@as(u32, @intCast(file.pos)) + to_read) % ATADrive.SECTOR_SIZE);
         }
-        const offset: u32 = file.pos % ATADrive.SECTOR_SIZE;
+        const offset: u32 = @as(u32, @intCast(file.pos)) % ATADrive.SECTOR_SIZE;
         const sectors_to_read: u8 = @intCast((to_read + offset) / ATADrive.SECTOR_SIZE);
         try ata_dev.readSectorsDMA(lba, sectors_to_read);
 
@@ -850,7 +850,7 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: u32) !u32 {
     return 0;
 }
 
-fn ata_write(file: *kernel.fs.File, buff: [*]const u8, size: u32) !u32 {
+fn ata_write(file: *kernel.fs.File, buff: [*]const u8, size: usize) !usize {
     if( file.inode.data.dev) |d| {
         const ata_dev: *ATADrive = @ptrCast(@alignCast(d.data));
         const part_idx = try part.getPartIdx(file.path.?.dentry.name);
@@ -860,7 +860,7 @@ fn ata_write(file: *kernel.fs.File, buff: [*]const u8, size: u32) !u32 {
             start_lba = partition.start_lba;
         }
 
-        const lba: u32 = start_lba + file.pos / ATADrive.SECTOR_SIZE;
+        const lba: u32 = start_lba + @as(u32, @intCast(file.pos)) / ATADrive.SECTOR_SIZE;
         if (part_idx != 0) {
             const partition = ata_dev.partitions.items[part_idx - 1];
             if (lba > partition.end_lba)
@@ -869,11 +869,11 @@ fn ata_write(file: *kernel.fs.File, buff: [*]const u8, size: u32) !u32 {
             if (lba > ata_dev.lba28)
                 return kernel.errors.PosixError.ENOSPC;
         }
-        const offset: u32 = file.pos % ATADrive.SECTOR_SIZE;
+        const offset: u32 = @as(u32, @intCast(file.pos)) % ATADrive.SECTOR_SIZE;
         var to_write = ATADrive.SECTOR_SIZE - offset;
 
         if (size < to_write)
-            to_write = size;
+            to_write = @intCast(size);
         try ata_dev.readSectorsDMA(lba, 1);
         const dma_buf: [*]u8 = @ptrFromInt(ata_dev.dma_buff_virt);
         @memcpy(dma_buf[offset..offset + to_write], buff[0..to_write]);

@@ -24,7 +24,7 @@ pub const Inode = struct {
         sock: ?*Socket,
         pipe: ?*fs.pipe.Pipe,
     },
-    size: u32 = 0,
+    size: usize = 0,
     links: u32 = 1,
     ops: *const InodeOps,
     fops: *const fs.FileOps,
@@ -156,7 +156,7 @@ pub const InodeOps = struct {
     get_link: ?*const fn(base: *Inode, resulting_link: *[]u8) anyerror!void,
     symlink: ?*const fn(parent: *fs.DEntry, name: []const u8, target: []const u8) anyerror!void = null,
     link: ?*const fn(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) anyerror!void = null,
-    readlink: ?*const fn(base: *fs.Inode, buf: [*]u8, size: usize) anyerror!u32 = null,
+    readlink: ?*const fn(base: *fs.Inode, buf: [*]u8, size: u32) anyerror!u32 = null,
     rename: ?*const fn(old_parent: *fs.DEntry, old: *fs.DEntry, new_parent: *fs.DEntry, new_name: []const u8) anyerror!void = null,
     setattr: ?*const fn(base: *fs.Inode, attr: *const InodeAttrs) anyerror!void = Inode.setattr,
 };

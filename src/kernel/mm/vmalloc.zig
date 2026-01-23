@@ -1,13 +1,13 @@
 const mm = @import("init.zig");
 
-pub fn vmalloc(size: u32) u32 {
+pub fn vmalloc(size: usize) usize {
     return mm.vheap.alloc(size, false, false) catch 0;
 }
 
-pub fn vfree(addr: u32) void {
+pub fn vfree(addr: usize) void {
     mm.vheap.free(addr);
 }
 
-pub fn vsize(addr: u32) u32 {
+pub fn vsize(addr: usize) usize {
     return mm.vheap.getSize(addr);
 }

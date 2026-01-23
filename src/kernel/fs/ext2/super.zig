@@ -167,7 +167,7 @@ pub const Ext2Super = struct {
                 continue;
             for (0..8) |shift| {
                 if ((byte & (@as(u8,1) << @intCast(shift))) == 0) {
-                    const block_in_group: u32 = idx * 8 + shift;
+                    const block_in_group: u32 = @intCast(idx * 8 + shift);
                     const absolute_block: u32 = bgdt_index * self.data.s_blocks_per_group + block_in_group;
                     byte |= (@as(u8,1) << @intCast(shift));
                     map[idx] = byte;
@@ -227,15 +227,15 @@ pub const Ext2Super = struct {
     }
 
 
-    pub fn readBlocks(sb: *Ext2Super, block: u32, count: u32) ![]u8 {
-        const alloc_size: u32 = sb.base.block_size * count;
+    pub fn readBlocks(sb: *Ext2Super, block: usize, count: usize) ![]u8 {
+        const alloc_size: usize = sb.base.block_size * count;
         if (kernel.mm.kmallocArray(u8, alloc_size)) |raw_buff| {
             errdefer kernel.mm.kfree(raw_buff);
             @memset(raw_buff[0..alloc_size], 0);
             sb.base.dev_file.?.pos = sb.base.block_size * block;
-            var read: u32 = 0;
+            var read: usize = 0;
             while (read < alloc_size) {
-                const single_read: u32 = try sb.base.dev_file.?.ops.read(
+                const single_read: usize = try sb.base.dev_file.?.ops.read(
                     sb.base.dev_file.?,
                     @ptrCast(&raw_buff[read]),
                     alloc_size - read
@@ -256,14 +256,14 @@ pub const Ext2Super = struct {
         sb: *Ext2Super,
         block: u32,
         buff: [*]const u8,
-        size: u32,
-        offset: u32
-    ) !u32 {
-        var to_write: u32 = size;
+        size: usize,
+        offset: usize
+    ) !usize {
+        var to_write: usize = size;
         sb.base.dev_file.?.pos = sb.base.block_size * block + offset;
-        var written: u32 = 0;
+        var written: usize = 0;
         while (written < size) {
-            const single_write: u32 = try sb.base.dev_file.?.ops.write(
+            const single_write: usize = try sb.base.dev_file.?.ops.write(
                 sb.base.dev_file.?,
                 @ptrCast(&buff[written]),
                 to_write
@@ -277,7 +277,7 @@ pub const Ext2Super = struct {
         return written;
     }
 
-    pub fn writeBuff(sb: *Ext2Super, block: u32, buff: [*]const u8, size: u32) !u32 {
+    pub fn writeBuff(sb: *Ext2Super, block: u32, buff: [*]const u8, size: usize) !usize {
         return try sb.writeBuffAtOffset(block, buff, size, 0);
     }
 
@@ -439,7 +439,7 @@ pub const Ext2Super = struct {
     fn commitBGDTEntries(self: *Ext2Super, bgdt_idxs: []bool) !void {
         for (bgdt_idxs, 0..) |used, gdt_idx| {
             if (used) {
-                try self.writeGDTEntry(gdt_idx);
+                try self.writeGDTEntry(@intCast(gdt_idx));
             }
         }
     }

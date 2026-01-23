@@ -20,15 +20,15 @@ fn threadWrapper() callconv(.c) noreturn {
     while (true) {}
 }
 
-pub fn kthreadStackAlloc(num_of_pages: u32) u32 {
-    const stack: u32 = mm.virt_memory_manager.findFreeSpace(
+pub fn kthreadStackAlloc(num_of_pages: usize) usize {
+    const stack: usize = mm.virt_memory_manager.findFreeSpace(
         num_of_pages,
         mm.PAGE_OFFSET,
         0xFFFFF000,
         false
     );
     for (0..num_of_pages) |index| {
-        const page: u32 = mm.virt_memory_manager.pmm.allocPage();
+        const page: usize = mm.virt_memory_manager.pmm.allocPage();
         if (page == 0) {
             for (0..index) |idx| {
                 mm.virt_memory_manager.unmapPage(stack + idx * PAGE_SIZE, true);
@@ -43,8 +43,8 @@ pub fn kthreadStackAlloc(num_of_pages: u32) u32 {
     return stack + PAGE_SIZE;
 }
 
-pub fn kthreadStackFree(addr: u32) void {
-    var page: u32 = addr - PAGE_SIZE; // RO page
+pub fn kthreadStackFree(addr: usize) void {
+    var page: usize = addr - PAGE_SIZE; // RO page
     mm.virt_memory_manager.unmapPage(page, true);
     page += PAGE_SIZE;
     mm.virt_memory_manager.unmapPage(page, true);
@@ -54,7 +54,7 @@ pub fn kthreadStackFree(addr: u32) void {
 }
 
 pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const u8) !*tsk.Task {
-    var stack: u32 = undefined;
+    var stack: usize = undefined;
     const new_task: ?*tsk.Task = km.kmalloc(tsk.Task);
     if (new_task) |task| {
         stack = kthreadStackAlloc(STACK_PAGES);
@@ -62,7 +62,7 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const 
             km.kfree(task);
             return error.MemoryAllocation;
         }
-        const stack_top: u32 = arch.setupStack(
+        const stack_top: usize = arch.setupStack(
             stack + STACK_SIZE,
             @intFromPtr(&threadWrapper),
             0,

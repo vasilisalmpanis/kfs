@@ -7,7 +7,7 @@ const SEEK_SET = 0;
 const SEEK_CUR = 1;
 const SEEK_END = 2;
 
-pub fn lseek(fd: u32, offset: i32, whence: u32) !u32 {
+pub fn lseek(fd: u32, offset: isize, whence: u32) !usize {
     if (krn.task.current.files.fds.get(fd)) |file| {
         if (file.ops.lseek) |_lseek| {
             return try _lseek(file, offset, whence);
@@ -26,7 +26,7 @@ pub fn lseek(fd: u32, offset: i32, whence: u32) !u32 {
     return errors.PosixError.ENOENT;
 }
 
-pub fn llseek(fd: u32, offset_high: u32, offset_low: u32, result: *u64, whence: u32) !u32 {
+pub fn llseek(fd: u32, offset_high: u32, offset_low: u32, result: *u64, whence: u32) !usize{
     const offset: i64 = @as(i64 , @intCast(offset_high)) << 32 | @as(i64, @intCast(offset_low));
     const res = try lseek(fd, @intCast(offset), whence);
     result.* = @intCast(res);

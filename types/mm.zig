@@ -7,14 +7,14 @@ pub fn kmalloc(comptime T: type) ?*T {
     return @ptrFromInt(addr);
 }
 
-pub fn kmallocArray(comptime T: type, count: u32) ?[*]T {
+pub fn kmallocArray(comptime T: type, count: usize) ?[*]T {
     const size = @sizeOf(T) * count;
     const addr = types.api.kheap_alloc(size, true, false);
     if (addr == 0) return null;
     return @ptrFromInt(addr);
 }
 
-pub fn kmallocSlice(comptime T: type, count: u32) ?[]T {
+pub fn kmallocSlice(comptime T: type, count: usize) ?[]T {
     const addr = types.api.kheap_alloc(count * @sizeOf(T), true, false);
     if (addr == 0) return null;
     const ptr: [*]T = @ptrFromInt(addr);

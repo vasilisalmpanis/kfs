@@ -29,11 +29,11 @@ pub const vmalloc = @import("./vmalloc.zig").vmalloc;
 pub const vfree = @import("./vmalloc.zig").vfree;
 pub const vsize = @import("./vmalloc.zig").vsize;
 
-pub const PAGE_OFFSET: u32 = 0xC0000000;
-pub const PAGE_SIZE: u32 = arch.PAGE_SIZE;
+pub const PAGE_OFFSET: usize = 0xC0000000;
+pub const PAGE_SIZE: usize = arch.PAGE_SIZE;
 
-extern const _kernel_end: u32;
-extern const _kernel_start: u32;
+extern const _kernel_end: usize;
+extern const _kernel_start: usize;
 
 pub fn virtToPhys(comptime T: type, addr: *T) *T {
     return @ptrFromInt(@intFromPtr(addr) - PAGE_OFFSET);
@@ -43,7 +43,7 @@ pub fn physToVirt(comptime T: type, addr: *T) *T {
     return @ptrFromInt(@intFromPtr(addr) + PAGE_OFFSET);
 }
 
-pub var base: u32 = undefined;
+pub var base: usize = undefined;
 pub var mem_size: u64 = 0;
 
 var phys_memory_manager: pmm.PMM = undefined;
@@ -98,17 +98,17 @@ pub const KernelAllocator = struct {
 pub fn mmInit(info: *multiboot.Multiboot) void {
     // var i: u32 = 0;
     if (info.getTag(multiboot.TagMemoryMap)) |tag| {
-        const num_entries: u32 = (tag.size - @sizeOf(multiboot.TagMemoryMap)) / tag.entry_size;
+        const num_entries: usize = (tag.size - @sizeOf(multiboot.TagMemoryMap)) / tag.entry_size;
         const entries = tag.getMemMapEntries();
         // Find the biggest memory region in memory map provided by multiboot
         for (0..num_entries) |idx| {
-            const len: u32 = @truncate(entries[idx].length);
+            const len: usize = @truncate(entries[idx].length);
             if (len > 0 and entries[idx].type == 1 and len > mem_size) {
                 mem_size = len;
                 base = @truncate(entries[idx].base_addr);
             }
         }
-        const kernel_end: u32 = @intFromPtr(&_kernel_end) - PAGE_OFFSET;
+        const kernel_end: usize = @intFromPtr(&_kernel_end) - PAGE_OFFSET;
         if (base < kernel_end) {
             mem_size -= kernel_end - base;
             base = kernel_end;

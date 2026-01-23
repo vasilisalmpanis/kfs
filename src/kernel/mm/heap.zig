@@ -7,22 +7,22 @@ const krn = @import("../main.zig");
 const PAGE_SIZE = @import("./init.zig").PAGE_SIZE;
 
 pub const FreeListNode = packed struct {
-    block_size: u32,
+    block_size: usize,
     next: ?*FreeListNode,
-    unused_1: u32 = 0,
-    unused_2: u32 = 0,
+    unused_1: usize = 0,
+    unused_2: usize = 0,
 };
 
 pub const AllocHeader = packed struct {
-    block_size: u32,
+    block_size: usize,
     head: ?*FreeList,
-    unused_1: u32 = 0,
-    unused_2: u32 = 0,
+    unused_1: usize = 0,
+    unused_2: usize = 0,
 };
 
 pub const FreeList = struct {
-    start_addr: u32,
-    end_addr: u32,
+    start_addr: usize,
+    end_addr: usize,
     head: ?*FreeListNode,
     vmm: *vmm,
     pmm: *pmm,
@@ -32,8 +32,8 @@ pub const FreeList = struct {
     pub fn init(
         phys_mm: *pmm,
         virt_mm: *vmm,
-        start_addr: u32,
-        end_addr: u32,
+        start_addr: usize,
+        end_addr: usize,
         alignement: u8,
     ) FreeList {
         return FreeList{
@@ -53,7 +53,7 @@ pub const FreeList = struct {
         old: *FreeListNode,
         prev: ?*FreeListNode
     ) void {
-        const end_addr: u32 = @intFromPtr(new) + new.block_size;
+        const end_addr: usize = @intFromPtr(new) + new.block_size;
         var real_prev: ?*FreeListNode = prev;
         // New node is before head of free nodes
         if (@intFromPtr(new) < @intFromPtr(old)) {
@@ -99,12 +99,12 @@ pub const FreeList = struct {
         node: ?*FreeListNode,
         prev: ?*FreeListNode
     ) void {
-        const block_start: u32 = @intFromPtr(node);
+        const block_start: usize = @intFromPtr(node);
         const node_after: ?*FreeListNode = node.?.next;
-        const block_end: u32 = @intFromPtr(node) + node.?.block_size;
-        var free_pages: u32 = 0;
-        var page_start: u32 = 0;
-        var remainder: u32 = 0;
+        const block_end: usize = @intFromPtr(node) + node.?.block_size;
+        var free_pages: usize = 0;
+        var page_start: usize = 0;
+        var remainder: usize = 0;
         var node_before: ?*FreeListNode = undefined;
         var new_node: ?*FreeListNode = undefined;
         var returned: bool = false;
@@ -157,7 +157,7 @@ pub const FreeList = struct {
         }
     }
 
-    fn getAllocHeader(self: *FreeList, addr: u32) ?*AllocHeader {
+    fn getAllocHeader(self: *FreeList, addr: usize) ?*AllocHeader {
         var header: ?*AllocHeader = undefined;
         if (addr - @sizeOf(AllocHeader) < 0)
             return null;
@@ -169,7 +169,7 @@ pub const FreeList = struct {
         return header;
     }
 
-    pub fn free(self: *FreeList, addr: u32) void {
+    pub fn free(self: *FreeList, addr: usize) void {
         var prev: ?*FreeListNode = undefined;
         self.mtx.lock();
         defer self.mtx.unlock();
@@ -204,10 +204,10 @@ pub const FreeList = struct {
 
     pub fn alloc(
         self: *FreeList,
-        size: u32,
+        size: usize,
         contig: bool,
         user: bool
-    ) !u32 {
+    ) !usize {
         // Total size of the block to allocate (including header)
         const total_size = self.alignToPtr(size + @sizeOf(AllocHeader));
 
@@ -233,7 +233,7 @@ pub const FreeList = struct {
         );
     }
 
-    fn alignToPtr(self: *FreeList, value: u32) u32 {
+    fn alignToPtr(self: *FreeList, value: usize) usize {
         return
             if (value % self.alignement != 0)
                 value + (self.alignement - value % self.alignement)
@@ -245,8 +245,8 @@ pub const FreeList = struct {
         self: *FreeList,
         prev: *FreeListNode,
         curr: *FreeListNode,
-        total_size: u32
-    ) u32 {
+        total_size: usize
+    ) usize {
         const is_head: bool = (@intFromPtr(self.head.?) == @intFromPtr(curr));
         const addr = @intFromPtr(curr);
         const free_block_size = curr.block_size;
@@ -273,7 +273,7 @@ pub const FreeList = struct {
         return addr + @sizeOf(AllocHeader);
     }
 
-    fn initAllocHeader(self: *FreeList, addr: u32, size: u32) void {
+    fn initAllocHeader(self: *FreeList, addr: usize, size: usize) void {
         var header: *AllocHeader = @ptrFromInt(addr);
         header.block_size = size;
         header.head = self;
@@ -281,11 +281,11 @@ pub const FreeList = struct {
 
     fn allocateNewBlock(
         self: *FreeList,
-        total_size: u32,
+        total_size: usize,
         last_block: ?*FreeListNode,
         contig: bool,
         user: bool
-    ) !u32 {
+    ) !usize {
         var num_pages = total_size / PAGE_SIZE;
         var block_size = total_size;
         if (total_size % PAGE_SIZE != 0)
@@ -318,12 +318,12 @@ pub const FreeList = struct {
         return begin + @sizeOf(AllocHeader);
     }
 
-    fn expandMemoryContig(self: *FreeList, num_pages: u32, virtual: u32, user: bool) !u32 {
+    fn expandMemoryContig(self: *FreeList, num_pages: usize, virtual: usize, user: bool) !usize {
         var physical = self.pmm.allocPages(num_pages);
         if (physical == 0) {
             return krn.errors.PosixError.ENOMEM;
         }
-        var idx: u32 = 0;
+        var idx: usize = 0;
         var virt_addr = virtual;
         while (idx < num_pages) : (idx += 1) {
             self.vmm.mapPage(virt_addr, physical, .{.user = user});
@@ -333,8 +333,8 @@ pub const FreeList = struct {
         return num_pages * PAGE_SIZE;
     }
 
-    fn expandMemory(self: *FreeList, num_pages: u32, virtual: u32, user: bool) !u32 {
-        var idx: u32 = 0;
+    fn expandMemory(self: *FreeList, num_pages: usize, virtual: usize, user: bool) !usize {
+        var idx: usize = 0;
         var virt_addr = virtual;
         while (idx < num_pages) : (idx += 1) {
             const physical = self.pmm.allocPage();
@@ -354,8 +354,8 @@ pub const FreeList = struct {
 
     fn addFreeNode(
         self: *FreeList,
-        addr: u32,
-        size: u32,
+        addr: usize,
+        size: usize,
         prev: ?*FreeListNode,
         next: ?*FreeListNode
     ) void {
@@ -369,7 +369,7 @@ pub const FreeList = struct {
         }
     }
 
-    pub fn getSize(self: *FreeList, addr: u32) u32 {
+    pub fn getSize(self: *FreeList, addr: usize) usize {
         const header: ?*AllocHeader = self.getAllocHeader(addr);
         if (header == null)
             return 0;

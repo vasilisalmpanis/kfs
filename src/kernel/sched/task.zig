@@ -87,7 +87,7 @@ pub const Task = struct {
     uid:            u16,
     gid:            u16,
     pgid:           u16             = 1,
-    stack_bottom:   u32,
+    stack_bottom:   usize,
     state:          TaskState       = TaskState.RUNNING,
     regs:           Regs            = Regs.init(),
     tls:            u32             = 0,
@@ -130,11 +130,11 @@ pub const Task = struct {
         };
     }
 
-    pub fn setup(self: *Task, virt: u32, task_stack_top: u32, task_stack_bottom: u32, name: []const u8) void {
+    pub fn setup(self: *Task, virt: usize, task_stack_top: usize, task_stack_bottom: usize, name: []const u8) void {
         self.pid = pid;
         self.uid = 0;
         pid += 1;
-        self.regs.esp = task_stack_top;
+        self.regs.setStackPointer(task_stack_top);
         self.stack_bottom = task_stack_bottom;
         self.list.setup();
         self.tree.setup();
@@ -169,8 +169,8 @@ pub const Task = struct {
 
     pub fn initSelf(
         self: *Task,
-        task_stack_top: u32,
-        stack_btm: u32,
+        task_stack_top: usize,
+        stack_btm: usize,
         uid: u16,
         gid: u16,
         pgid: u16,
@@ -190,7 +190,7 @@ pub const Task = struct {
         self.regs = Regs.init();
         self.tree = tree.TreeNode.init();
         self.list = lst.ListHead.init();
-        self.regs.esp = task_stack_top;
+        self.regs.setStackPointer(task_stack_top);
         self.stack_bottom = stack_btm;
         self.pid = pid;
         pid += 1;

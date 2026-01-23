@@ -7,7 +7,7 @@ const std = @import("std");
 
 const Slice = struct {
     ptr: *anyopaque,
-    len: u32,
+    len: usize,
 };
 
 pub fn generic_close(base: *kernel.fs.File) void {
@@ -18,16 +18,16 @@ pub fn generic_close(base: *kernel.fs.File) void {
     kernel.mm.kfree(base.data.?);
 }
 
-pub fn generic_write(_: *kernel.fs.File, _: [*]const u8, _: u32) anyerror!u32 {
+pub fn generic_write(_: *kernel.fs.File, _: [*]const u8, _: usize) anyerror!usize {
     return kernel.errors.PosixError.ENOSYS;
 }
 
-pub fn generic_read(base: *kernel.fs.File, buf: [*]u8, size: u32) anyerror!u32 {
+pub fn generic_read(base: *kernel.fs.File, buf: [*]u8, size: usize) anyerror!usize {
     if (base.data == null)
         return 0;
 
     const content: *[]const u8 = @ptrCast(@alignCast(base.data));
-    var to_read: u32 = size;
+    var to_read: usize = size;
     if (base.pos >= content.len)
         return 0;
     if (base.pos + to_read > content.len) {

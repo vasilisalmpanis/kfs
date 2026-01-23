@@ -31,8 +31,8 @@ pub const envp_init: []const []const u8 = &[_][]const u8{
 };
 
 const AuxEntry = struct {
-    key: u32,
-    val: u32,
+    key: usize,
+    val: usize,
 };
 
 const auxv: [2]AuxEntry = .{
@@ -118,21 +118,21 @@ fn checkStaticLinking32(userspace: []const u8, ehdr: *const std.elf.Elf32_Ehdr) 
     return !has_interp and !has_dynamic;
 }
 
-pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const u8, envp: []const []const u8) void {
+pub fn setEnvironment(stack_bottom: usize, stack_size: usize, argv: []const []const u8, envp: []const []const u8) void {
     // Auxiliary vector
-    var argv_str_size: u32 = 0;
+    var argv_str_size: usize = 0;
     for (argv) |arg| {
         argv_str_size += arg.len + 1;
     }
-    var envp_str_size: u32 = 0;
+    var envp_str_size: usize = 0;
     for (envp) |env| {
         envp_str_size += env.len + 1;
     }
-    const argv_ptr_size = @sizeOf(u32) * (argv.len + 1);
-    const envp_ptr_size = @sizeOf(u32) * (envp.len + 1);
+    const argv_ptr_size = @sizeOf(usize) * (argv.len + 1);
+    const envp_ptr_size = @sizeOf(usize) * (envp.len + 1);
     const auxv_size = @sizeOf(AuxEntry) * auxv.len;
-    const argc_size = @sizeOf(u32);
-    const end_marker_size = @sizeOf(u32);
+    const argc_size = @sizeOf(usize);
+    const end_marker_size = @sizeOf(usize);
 
     const size = argv_ptr_size + argv_str_size + envp_ptr_size +
                         envp_str_size + auxv_size + argc_size + end_marker_size;
@@ -140,11 +140,11 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
     if (aligned_size % 16 != 0)
         aligned_size += 16 - (aligned_size % 16);
     
-    const stack_ptr_addr: u32 = stack_bottom + stack_size - aligned_size;
+    const stack_ptr_addr: usize = stack_bottom + stack_size - aligned_size;
     var strings: [*]u8 = @ptrFromInt(stack_bottom + stack_size - end_marker_size - argv_str_size - envp_str_size);
-    var pointers: [*]u32 = @ptrFromInt(stack_ptr_addr);
-    var str_off: u32 = 0;
-    var ptr_off: u32 = 0;
+    var pointers: [*]usize = @ptrFromInt(stack_ptr_addr);
+    var str_off: usize = 0;
+    var ptr_off: usize = 0;
     
     // Set argc
     krn.task.current.mm.?.argc = stack_ptr_addr;
@@ -191,7 +191,7 @@ pub fn setEnvironment(stack_bottom: u32, stack_size: u32, argv: []const []const 
 pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) !void {
 
     const stack_pages: u32 = 10;
-    var heap_start: u32 = 0;
+    var heap_start: usize = 0;
 
     const prot: u32 = krn.mm.PROT_RW;
     const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
@@ -234,8 +234,8 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
         if (p_hdr.p_vaddr + p_hdr.p_memsz > heap_start)
             heap_start = p_hdr.p_vaddr + p_hdr.p_memsz;
     }
-    const stack_size: u32 = stack_pages * arch.PAGE_SIZE;
-    var stack_bottom: u32 = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE;
+    const stack_size: usize = stack_pages * arch.PAGE_SIZE;
+    var stack_bottom: usize = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE;
     stack_bottom = krn.task.current.mm.?.mmap_area(
         stack_bottom,
         stack_size,
@@ -255,7 +255,6 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
     krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{ehdr.e_entry});
 
     // Also arch specific
-    arch.gdt.tss.esp0 = krn.task.current.regs.esp;
     heap_start = arch.pageAlign(heap_start, false);
     krn.logger.INFO("heap_start 0x{X:0>8}\n", .{heap_start});
     krn.task.current.mm.?.brk_start = heap_start;

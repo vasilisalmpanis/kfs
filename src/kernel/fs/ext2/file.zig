@@ -20,7 +20,7 @@ pub const Ext2File = struct {
     //     base.pos += to_write;
     //     return to_write;
     // }
-    fn write(base: *fs.File, buf: [*]const u8, size: u32) !u32 {
+    fn write(base: *fs.File, buf: [*]const u8, size: usize) !usize {
         const sb: *fs.SuperBlock = if (base.inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
         const ino = base.inode.getImpl(Ext2Inode, "base");
         const ext2_sb = sb.getImpl(Ext2Super, "base");
@@ -29,7 +29,7 @@ pub const Ext2File = struct {
             return krn.errors.PosixError.EISDIR;
         }
 
-        var to_write: u32 = size;
+        var to_write: usize = size;
         // if (to_write > ino.base.size -| base.pos) {
         //     to_write = ino.base.size -| base.pos;
         // }
@@ -54,7 +54,7 @@ pub const Ext2File = struct {
         const buff = try ext2_sb.readBlocks(pbn, 1);
         defer krn.mm.kfree(buff.ptr);
 
-        const off: u32 = base.pos % bs;
+        const off: usize = base.pos % bs;
         if (off + to_write > bs) {
             to_write = bs - off;
         }
@@ -64,13 +64,13 @@ pub const Ext2File = struct {
         base.pos += to_write;
         if (base.pos > ino.base.size) {
             ino.base.size = base.pos;
-            ino.data.i_size = ino.base.size;
+            ino.data.i_size = @intCast(ino.base.size);
             try ino.iput();
         }
         return to_write;
     }
 
-    fn read(base: *fs.File, buf: [*]u8, size: u32) !u32 {
+    fn read(base: *fs.File, buf: [*]u8, size: usize) !usize {
         const sb: *fs.SuperBlock = if (base.inode.sb) |_s| _s else
             return krn.errors.PosixError.EINVAL;
         const ino = base.inode.getImpl(Ext2Inode, "base");
@@ -80,7 +80,7 @@ pub const Ext2File = struct {
             return krn.errors.PosixError.EISDIR;
         }
 
-        var to_read: u32 = size;
+        var to_read: usize = size;
         if (to_read > ino.base.size -| base.pos) {
             to_read = ino.base.size -| base.pos;
         }
@@ -88,17 +88,17 @@ pub const Ext2File = struct {
             return 0;
 
         const bs = ext2_sb.base.block_size;
-        const read_offset: u32 = base.pos % bs;
+        const read_offset: usize = base.pos % bs;
 
         const fisrt_lbn = base.pos / bs;
         var last_lbn = (base.pos + to_read) / bs;
         if ((base.pos + to_read) % bs != 0)
             last_lbn += 1;
-        var last_contig_lbn: u32 = fisrt_lbn;
+        var last_contig_lbn: usize = fisrt_lbn;
 
-        var first_pbn: u32 = 0;
-        var contig_pbn_count: u32 = 0;
-        var prev_pbn: u32 = 0;
+        var first_pbn: usize = 0;
+        var contig_pbn_count: usize = 0;
+        var prev_pbn: usize = 0;
 
         for (fisrt_lbn..last_lbn) |_lbn| {
             const pbn = try ext2_sb.resolveLbn(ino, _lbn);
@@ -107,7 +107,7 @@ pub const Ext2File = struct {
             }
             // if pbn == 0 => sparse hole: return zeroed bytes up to block boundary
             if (pbn == 0 and _lbn == fisrt_lbn) {
-                var zeros_to_copy: u32 = @intCast(to_read);
+                var zeros_to_copy: usize = @intCast(to_read);
                 if (read_offset + zeros_to_copy > bs) {
                     zeros_to_copy = bs - read_offset;
                 }
@@ -130,7 +130,7 @@ pub const Ext2File = struct {
         const file_buf = try ext2_sb.readBlocks(first_pbn, contig_pbn_count);
         defer krn.mm.kfree(file_buf.ptr);
 
-        var bytes_read: u32 = file_buf.len - read_offset;
+        var bytes_read: usize = file_buf.len - read_offset;
         if (bytes_read > to_read) {
             bytes_read = to_read;
         }
@@ -143,7 +143,7 @@ pub const Ext2File = struct {
     fn close(_: *fs.File) void {
     }
 
-    fn readdir(base: *fs.File, buf: []u8) !u32 {
+    fn readdir(base: *fs.File, buf: []u8) !usize {
         const sb: *fs.SuperBlock = if (base.inode.sb) |_s| _s else return krn.errors.PosixError.EINVAL;
         if (base.path == null) return krn.errors.PosixError.EINVAL;
 
@@ -160,18 +160,18 @@ pub const Ext2File = struct {
             return 0;
         }
 
-        const blk_index: u32 = @intCast(pos / block_size);
-        var offset: u32 = @intCast(pos % block_size);
+        const blk_index: usize = @intCast(pos / block_size);
+        var offset: usize = @intCast(pos % block_size);
 
         if (blk_index >= ext2_dir_inode.maxBlockIdx()) {
             krn.logger.INFO("invalid blk index {d}\n", .{blk_index});
             return krn.errors.PosixError.ENOENT;
         }
 
-        const block: u32 = ext2_dir_inode.data.i_block[blk_index];
+        const block: usize = ext2_dir_inode.data.i_block[blk_index];
         const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
         defer krn.mm.kfree(block_slice.ptr);
-        var bytes_written: u32 = 0;
+        var bytes_written: usize = 0;
 
         while (bytes_written < buf.len and offset < block_size) {
             var ext_dir: *Ext2DirEntry = @ptrFromInt(@intFromPtr(block_slice.ptr) + offset);
@@ -181,7 +181,7 @@ pub const Ext2File = struct {
                 return krn.errors.PosixError.ENOENT;
             }
 
-            const entry_size: u32 = @sizeOf(fs.LinuxDirent) + ext_dir.getName().len + 1; // For null termination
+            const entry_size: usize = @sizeOf(fs.LinuxDirent) + ext_dir.getName().len + 1; // For null termination
             if (entry_size > buf.len - bytes_written)
                 return krn.errors.PosixError.EINVAL;
             const dirent: *fs.LinuxDirent = @ptrFromInt(@intFromPtr(buf.ptr) + bytes_written);

@@ -6,7 +6,7 @@ pub const ProcFile = struct {
     fn open(_: *fs.File, _: *fs.Inode) !void {
     }
 
-    fn write(base: *fs.File, buf: [*]const u8, size: u32) !u32 {
+    fn write(base: *fs.File, buf: [*]const u8, size: usize) !usize {
         const ino = base.inode.getImpl(ProcInode, "base");
         var to_write = size;
         if (to_write > ino.buff.len - base.pos)
@@ -16,7 +16,7 @@ pub const ProcFile = struct {
         return to_write;
     }
 
-    fn read(base: *fs.File, buf: [*]u8, size: u32) !u32 {
+    fn read(base: *fs.File, buf: [*]u8, size: usize) !usize {
         const ino = base.inode.getImpl(ProcInode, "base");
         var to_read = size;
         if (to_read > ino.buff.len - base.pos)

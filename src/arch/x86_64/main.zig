@@ -1,4 +1,5 @@
 const std = @import("std");
+const krn = @import("kernel");
 
 pub const io = struct {
     pub export fn inb(_: u16) u8 {
@@ -19,13 +20,16 @@ pub const io = struct {
     pub export fn outw(_: u16, _: u16) void {
     }
 
-    pub export fn outl(_: u16, _: u32) void {
+    pub export fn outl(_: u16, _: usize) void {
     }
 };
 
 pub const system = struct {
     pub fn halt() noreturn {
         while (true) {}
+    }
+
+    pub fn enableWriteProtect() void {
     }
 };
 
@@ -88,12 +92,12 @@ pub const multiboot = struct {
     };
 
     pub const Multiboot = struct {
-        addr: u32,
+        addr: usize,
         header: *Header,
         curr_tag: ?*Tag = null,
         tag_addresses: [22]u32 = .{0} ** 22,
         
-        pub fn init(addr: u32) Multiboot {
+        pub fn init(addr: usize) Multiboot {
             return Multiboot{
                 .addr = addr,
                 .header = @ptrFromInt(addr),
@@ -106,6 +110,9 @@ pub const multiboot = struct {
 
         pub fn getTag(_: *Multiboot, comptime T: type) ?*T {
             return null;
+        }
+        pub fn relocate(_: *Multiboot, _: usize) usize{
+            return 0;
         }
     };
 };
@@ -124,7 +131,8 @@ pub const vmm = struct {
         available: u3       = 0x000, // available for us to use
     };
     pub const VMM = struct {
-        pub fn findFreeSpace(self: *VMM, num_pages: u32, from_addr: u32, to_addr: u32, user: bool) u32 {
+        pmm: *pmm.PMM,
+        pub fn findFreeSpace(self: *VMM, num_pages: usize, from_addr: usize, to_addr: usize, user: bool) usize {
             _ = self;
             _ = num_pages;
             _ = from_addr;
@@ -134,33 +142,55 @@ pub const vmm = struct {
         }
 
         pub fn mapPage(_: *VMM, _: usize, _: usize, _: PagingFlags) void {}
+        pub fn unmapPage(_: *VMM, _: usize, _: bool) void {}
+        pub fn releaseArea(_: *VMM, _: usize, _: usize, _: krn.mm.MAP_TYPE) void {}
+        pub fn init(_pmm: *pmm.PMM) VMM{
+            return VMM{
+                .pmm = _pmm
+            };
+        }
     };
+
+    pub const initial_page_dir: usize = 1000;
 };
 
 pub const pmm = struct {
     pub const PMM = struct {
-        pub fn init(_: u32, _: u32) PMM {
+        pub fn init(_: usize, _: usize) PMM {
             return PMM{};
         }
-        pub fn allocPage(_: *PMM) u32 {
+        pub fn allocPage(_: *PMM) usize {
             return 0;
         }
-        pub fn freePage(_: *PMM, _: u32) void {}
+        pub fn allocPages(_: *PMM, _: usize) usize {
+            return 0;
+        }
+        pub fn freePage(_: *PMM, _: usize) void {}
     };
 };
 
 pub const idt = struct {
     pub fn idtInit() void {}
     pub const KERNEL_CODE_SEGMENT = 0;
+    pub const KERNEL_DATA_SEGMENT = 0;
+    pub fn switchTo(_: *krn.task.Task, _: *krn.task.Task, _: *Regs) *Regs{
+        return &krn.task.initial_task.regs;
+    }
+    pub fn goUserspace() void {}
 };
 
 pub const Regs = struct {
     pub fn init() Regs {
         return Regs{};
     }
+    pub fn setStackPointer(_: *Regs, _: usize) void {
+    }
 };
 
-pub const cpu = struct {};
+pub const cpu = struct {
+    pub fn disableInterrupts() void {}
+    pub fn enableInterrupts() void {}
+};
 
 pub const syscalls = struct {
     pub fn initSyscalls() void {}

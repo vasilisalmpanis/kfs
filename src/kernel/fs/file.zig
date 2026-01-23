@@ -104,8 +104,8 @@ pub const FileOps = struct {
     close: *const fn(base: *File) void,
     write: *const fn (base: *File, buf: [*]const u8, size: usize) anyerror!usize,
     read: *const fn (base: *File, buf: [*]u8, size: usize) anyerror!usize,
-    lseek: ?*const fn (base: *File, offset: i32, origin: u32) anyerror!u32 = null,
-    readdir: ?*const fn (base: *File, buf: []u8) anyerror!u32 = readdirVFS,
+    lseek: ?*const fn (base: *File, offset: i32, origin: usize) anyerror!usize = null,
+    readdir: ?*const fn (base: *File, buf: []u8) anyerror!usize = readdirVFS,
     ioctl: ?*const fn (base: *File, op: u32, data: ?*anyopaque) anyerror!u32 = null,
     poll: ?*const fn (base: *File, pollfd: *kernel.poll.PollFd) anyerror!u32 = pollVFS,
 };
@@ -113,7 +113,7 @@ pub const FileOps = struct {
 pub const TaskFiles = struct {
     map: std.DynamicBitSet,
     closexec: std.DynamicBitSet,
-    fds: std.AutoHashMap(u32, *File),
+    fds: std.AutoHashMap(usize, *File),
 
     pub fn new() ?*TaskFiles {
         if (kernel.mm.kmalloc(TaskFiles)) |files| {
@@ -125,7 +125,7 @@ pub const TaskFiles = struct {
                 kernel.mm.kfree(files);
                 return null;
             }; 
-            files.fds = std.AutoHashMap(u32, *File).init(kernel.mm.kernel_allocator.allocator());
+            files.fds = std.AutoHashMap(usize, *File).init(kernel.mm.kernel_allocator.allocator());
             return files;
         }
         return null;
@@ -159,7 +159,7 @@ pub const TaskFiles = struct {
         }
     }
 
-    pub fn releaseFD(self: *TaskFiles, fd: u32) bool {
+    pub fn releaseFD(self: *TaskFiles, fd: usize) bool {
         self.unsetFD(fd);
         if (self.fds.get(fd)) |file| {
             _ = self.fds.remove(fd);
@@ -169,7 +169,7 @@ pub const TaskFiles = struct {
         return false;
     }
 
-    pub fn getNextFD(self: *TaskFiles) anyerror!u32 {
+    pub fn getNextFD(self: *TaskFiles) anyerror!usize {
         var it = self.map.iterator(.{
             .kind = .unset,
             .direction = .forward,
@@ -185,7 +185,7 @@ pub const TaskFiles = struct {
         return result;
     }
 
-    pub fn getNextFromFD(self: *TaskFiles, from_fd: u32) !u32 {
+    pub fn getNextFromFD(self: *TaskFiles, from_fd: usize) !usize {
         if (from_fd >= self.map.capacity()) {
             self.map.resize(from_fd + 1, false) catch |err| {
                 kernel.logger.ERROR(
@@ -215,14 +215,14 @@ pub const TaskFiles = struct {
         }
     }
 
-    pub fn unsetFD(self: *TaskFiles, fd: u32) void {
+    pub fn unsetFD(self: *TaskFiles, fd: usize) void {
         if (fd < self.map.capacity()) {
             self.map.unset(fd);
             self.closexec.unset(fd);
         }
     }
 
-    pub fn setFD(self: *TaskFiles, fd: u32, file: *File) !void {
+    pub fn setFD(self: *TaskFiles, fd: usize, file: *File) !void {
         if (fd >= self.map.capacity()) {
             self.map.resize(fd + 1, false) catch |err| {
                 kernel.logger.ERROR(
@@ -251,7 +251,7 @@ pub const TaskFiles = struct {
     }
 };
 
-pub fn readdirVFS(base: *fs.File, buf: []u8) !u32 {
+pub fn readdirVFS(base: *fs.File, buf: []u8) !usize {
     if (!base.path.?.dentry.inode.mode.isDir()) {
         return errors.ENOTDIR;
     }
