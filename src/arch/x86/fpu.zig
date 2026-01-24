@@ -63,11 +63,8 @@ pub fn clearTaskSwitched() void {
 
 pub fn initFPU() void {
     if (!isFPUPresent()) {
-        krn.logger.ERROR("FPU not present on this CPU\n", .{});
         return;
     }
-
-    krn.logger.INFO("Initializing i486 FPU\n", .{});
 
     asm volatile ("fninit");
 
@@ -85,7 +82,7 @@ pub fn initFPU() void {
     // Clear any pending exceptions
     asm volatile ("fnclex");
 
-    krn.logger.INFO("FPU initialized successfully\n", .{});
+    krn.serial.print("FPU initialized successfully\n");
 }
 
 /// Save FPU state to memory
