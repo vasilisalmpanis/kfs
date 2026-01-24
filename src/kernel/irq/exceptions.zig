@@ -4,6 +4,7 @@ const dbg = @import("debug");
 const registerExceptionHandler = @import("./manage.zig").registerExceptionHandler;
 const kernel = @import("../main.zig");
 const arch = @import("arch");
+const Signal = kernel.signals.Signal;
 
 pub const Exceptions = enum {
     DivisionError,
@@ -42,77 +43,153 @@ pub const Exceptions = enum {
     // FPUErrorInterrupt,
 };
 
-fn hDivisionError(regs: *Regs) void {
-    _ = regs;
-    @panic("Division by zero");
+fn hDivisionError(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGFPE)
+        ) catch {};
+        return regs;
+    }
+    if (true) @panic("Division by zero");
 }
 
-fn hDebug(regs: *Regs) void {
-    _ = regs;
-    @panic("Debug");
+fn hDebug(regs: *Regs) *Regs {
+    return regs;
 }
 
-pub fn hNonMaskableInterrupt(regs: *Regs) void {
-    _ = regs;
-    @panic("hNonMaskableInterrupt");
+pub fn hNonMaskableInterrupt(regs: *Regs) *Regs {
+    if (true) @panic("hNonMaskableInterrupt");
+    return regs;
 }
 
-pub fn hBreakpoint(regs: *Regs) void {
-    _ = regs;
+pub fn hBreakpoint(regs: *Regs) *Regs {
+    return regs;
 }
 
-pub fn hOverflow(regs: *Regs) void {
-    _ = regs;
+pub fn hOverflow(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGSEGV)
+        ) catch {};
+        return regs;
+    }
+    return regs;
 }
 
-pub fn hBoundRangeExceeded(regs: *Regs) void {
-    _ = regs;
-    @panic("hBoundRangeExceeded");
+pub fn hBoundRangeExceeded(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGSEGV)
+        ) catch {};
+        return regs;
+    }
+    if (true) @panic("hBoundRangeExceeded");
+    return regs;
 }
 
-pub fn hInvalidOpcode(regs: *Regs) void {
+pub fn hInvalidOpcode(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGILL)
+        ) catch {};
+        return regs;
+    }
     regs.dump();
-    @panic("hInvalidOpcode");
+    if (true) @panic("hInvalidOpcode");
+    return regs;
 }
 
-pub fn hDeviceNotAvailable(regs: *Regs) void {
-    _ = regs;
-    @panic("hDeviceNotAvailable");
+pub fn hDeviceNotAvailable(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGSEGV)
+        ) catch {};
+        return regs;
+    }
+    if (true) @panic("hDeviceNotAvailable");
+    return regs;
 }
 
-pub fn hDoubleFault(regs: *Regs) void {
-    _ = regs;
-    @panic("hDoubleFault");
+pub fn hDoubleFault(regs: *Regs) *Regs {
+    if (true) @panic("hDoubleFault");
+    return regs;
 }
 
-pub fn hCoprocessorSegmentOverrun(regs: *Regs) void {
-    _ = regs;
-    @panic("hCoprocessorSegmentOverrun");
+pub fn hCoprocessorSegmentOverrun(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGFPE)
+        ) catch {};
+        return regs;
+    }
+    if (true) @panic("hCoprocessorSegmentOverrun");
+    return regs;
 }
 
-pub fn hInvalidTSS(regs: *Regs) void {
-    _ = regs;
-    @panic("hInvalidTSS");
+pub fn hInvalidTSS(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGSEGV)
+        ) catch {};
+        return regs;
+    }
+    if (true) @panic("hInvalidTSS");
+    return regs;
 }
 
-pub fn hSegmentNotPresent(regs: *Regs) void {
-    _ = regs;
-    @panic("hSegmentNotPresent");
+pub fn hSegmentNotPresent(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGBUS)
+        ) catch {};
+        return regs;
+    }
+    if (true) @panic("hSegmentNotPresent");
+    return regs;
 }
 
-pub fn hStackSegmentFault(regs: *Regs) void {
-    _ = regs;
-    @panic("hStackSegmentFault");
+pub fn hStackSegmentFault(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGBUS)
+        ) catch {};
+        return regs;
+    }
+    if (true) @panic("hStackSegmentFault");
+    return regs;
 }
 
-pub fn hGeneralProtectionFault(regs: *Regs) void {
+pub fn hGeneralProtectionFault(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGSEGV)
+        ) catch {};
+        return regs;
+    }
     kernel.logger.ERROR("PID {d}\n", .{kernel.task.current.pid});
     regs.dump();
     dbg.traceStackTrace(20);
-    @panic("hGeneralProtectionFault");
+    if (true) @panic("hGeneralProtectionFault");
 }
 
-pub fn hPageFault(regs: *Regs) void {
+pub fn hPageFault(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGSEGV)
+        ) catch {};
+        return regs;
+    }
     var addr: u32 = 0;
     addr = arch.vmm.getCR2();
     arch.cpu.disableInterrupts();
@@ -137,97 +214,111 @@ pub fn hPageFault(regs: *Regs) void {
     regs.dump();
     dbg.traceStackTrace(20);
     while (true) {}
-    @panic("hPageFault");
+    if (true) @panic("hPageFault");
 }
 
-pub fn hReserved_1(regs: *Regs) void {
-    _ = regs;
-    @panic("hReserved_1");
+pub fn hReserved_1(regs: *Regs) *Regs {
+    if (true) @panic("hReserved_1");
+    return regs;
 }
 
-pub fn hx87FloatingPointException(regs: *Regs) void {
-    _ = regs;
-    @panic("hx87FloatingPointException");
+pub fn hx87FloatingPointException(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGFPE)
+        ) catch {};
+        return regs;
+    }
+    if (true) @panic("hx87FloatingPointException");
+    return regs;
 }
 
-pub fn hAlignmentCheck(regs: *Regs) void {
-    _ = regs;
-    @panic("hAlignmentCheck");
+pub fn hAlignmentCheck(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGBUS)
+        ) catch {};
+        return regs;
+    }
+    if (true) @panic("hAlignmentCheck");
+    return regs;
 }
 
-pub fn hMachineCheck(regs: *Regs) void {
-    _ = regs;
-    @panic("hMachineCheck");
+pub fn hMachineCheck(regs: *Regs) *Regs {
+    if (true) @panic("hMachineCheck");
+    return regs;
 }
 
-pub fn hSIMDFloatingPointException(regs: *Regs) void {
-    _ = regs;
-    @panic("hSIMDFloatingPointException");
+pub fn hSIMDFloatingPointException(regs: *Regs) *Regs {
+    if (true) @panic("hSIMDFloatingPointException");
+    return regs;
 }
 
-pub fn hVirtualizationException(regs: *Regs) void {
-    _ = regs;
-    @panic("hVirtualizationException");
+pub fn hVirtualizationException(regs: *Regs) *Regs {
+    if (true) @panic("hVirtualizationException");
+    return regs;
 }
 
-pub fn hControlProtectionException(regs: *Regs) void {
-    _ = regs;
-    @panic("hControlProtectionException");
+pub fn hControlProtectionException(regs: *Regs) *Regs {
+    if (true) @panic("hControlProtectionException");
+    return regs;
 }
 
-pub fn hReserved_2(regs: *Regs) void {
-    _ = regs;
-    @panic("hReserved_2");
+pub fn hReserved_2(regs: *Regs) *Regs {
+    if (true) @panic("hReserved_2");
+    return regs;
 }
 
-pub fn hReserved_3(regs: *Regs) void {
-    _ = regs;
-    @panic("hReserved_3");
+pub fn hReserved_3(regs: *Regs) *Regs {
+    if (true) @panic("hReserved_3");
+    return regs;
 }
 
-pub fn hReserved_4(regs: *Regs) void {
-    _ = regs;
-    @panic("hReserved_4");
+pub fn hReserved_4(regs: *Regs) *Regs {
+    if (true) @panic("hReserved_4");
+    return regs;
 }
 
-pub fn hReserved_5(regs: *Regs) void {
-    _ = regs;
-    @panic("hReserved_5");
+pub fn hReserved_5(regs: *Regs) *Regs {
+    if (true) @panic("hReserved_5");
+    return regs;
 }
 
-pub fn hReserved_6(regs: *Regs) void {
-    _ = regs;
-    @panic("hReserved_6");
+pub fn hReserved_6(regs: *Regs) *Regs {
+    if (true) @panic("hReserved_6");
+    return regs;
 }
 
-pub fn hReserved_7(regs: *Regs) void {
-    _ = regs;
-    @panic("hReserved_7");
+pub fn hReserved_7(regs: *Regs) *Regs {
+    if (true) @panic("hReserved_7");
+    return regs;
 }
 
-pub fn hHypervisorInjectionException(regs: *Regs) void {
-    _ = regs;
-    @panic("hHypervisorInjectionException");
+pub fn hHypervisorInjectionException(regs: *Regs) *Regs {
+    if (true) @panic("hHypervisorInjectionException");
+    return regs;
 }
 
-pub fn hVMMCommunicationException(regs: *Regs) void {
-    _ = regs;
-    @panic("hVMMCommunicationException");
+pub fn hVMMCommunicationException(regs: *Regs) *Regs {
+    if (true) @panic("hVMMCommunicationException");
+    return regs;
 }
 
-pub fn hSecurityException(regs: *Regs) void {
-    _ = regs;
-    @panic("hSecurityException");
+pub fn hSecurityException(regs: *Regs) *Regs {
+    if (true) @panic("hSecurityException");
+    return regs;
 }
 
-pub fn hReserved_8(regs: *Regs) void {
-    _ = regs;
-    @panic("hReserved_8");
+pub fn hReserved_8(regs: *Regs) *Regs {
+    if (true) @panic("hReserved_8");
+    return regs;
 }
 
 const ExceptionHandlers = std.EnumMap(
     Exceptions,
-    *const fn (regs: *Regs) void
+    *const fn (regs: *Regs) *Regs
 ).init(.{
     .DivisionError                  = &hDivisionError,
     .Debug                          = &hDebug,

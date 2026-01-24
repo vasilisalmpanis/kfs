@@ -322,7 +322,7 @@ pub const arch = struct {
     };
 
     pub const idt = struct {
-        pub extern fn exceptionHandler(*arch.Regs)void;
+        pub extern fn exceptionHandler(*arch.Regs)*arch.Regs;
         pub extern fn irqHandler(*arch.Regs)*arch.Regs;
     };
 
@@ -858,7 +858,7 @@ pub const kernel = struct {
             pub const TaskFiles = struct {
                 map : std.bit_set.DynamicBitSet,
                 closexec : std.bit_set.DynamicBitSet,
-                fds : std.hash_map.HashMap(u32, *kernel.fs.file.File, std.hash_map.AutoContext(u32), 80),
+                fds : std.hash_map.HashMap(usize, *kernel.fs.file.File, std.hash_map.AutoContext(usize), 80),
             };
 
         };
