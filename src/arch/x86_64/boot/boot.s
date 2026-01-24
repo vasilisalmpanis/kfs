@@ -87,8 +87,8 @@ _start:
 	# TODO: I recall seeing some assembly that used a macro to do the
 	#       conversions to and from physical. Maybe this should be done in this
 	#       code as well?
-	movl $(initial_page_dir - 0xC0000000), %ecx
-	movl %ecx, %cr3
+	// movl $(initial_page_dir - 0xC0000000), %ecx
+	// movl %ecx, %cr3
 
 	mov %cr4, %ecx
 	orl $0x10, %ecx
@@ -118,23 +118,23 @@ higher_half:
 1:	hlt
 	jmp 1b
 
-.section .data
-.align 4096
+// .section .data
+// .align 4096
 
-.global initial_page_dir
-initial_page_dir:
-    .long 0b10000011           # First entry in the page directory
-    .long 0b10000011           # First entry in the page directory
-    .long 0b10000011           # First entry in the page directory
-    .long 0b10000011           # First entry in the page directory
-    .rept 768-4
-    .long 0                    # Fill remaining entries with 0s
-    .endr
+// .global initial_page_dir
+// initial_page_dir:
+//     .long 0b10000011           # First entry in the page directory
+//     .long 0b10000011           # First entry in the page directory
+//     .long 0b10000011           # First entry in the page directory
+//     .long 0b10000011           # First entry in the page directory
+//     .rept 768-4
+//     .long 0                    # Fill remaining entries with 0s
+//     .endr
 
-    .long (0 << 22) | 0b10000011   # Map page 0
-    .long (1 << 22) | 0b10000011   # Map page 0
-    .long (2 << 22) | 0b10000011   # Map page 0
-    .long (3 << 22) | 0b10000011   # Map page 0
-    .rept 256-4
-    .long 0                    # Fill remaining entries with 0s
-    .endr
+//     .long (0 << 22) | 0b10000011   # Map page 0
+//     .long (1 << 22) | 0b10000011   # Map page 0
+//     .long (2 << 22) | 0b10000011   # Map page 0
+//     .long (3 << 22) | 0b10000011   # Map page 0
+//     .rept 256-4
+//     .long 0                    # Fill remaining entries with 0s
+//     .endr

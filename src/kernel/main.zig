@@ -14,7 +14,6 @@ const Serial = @import("drivers").Serial;
 const Logger = @import("debug").Logger;
 pub const irq = @import("./irq/manage.zig");
 pub const exceptions = @import("./irq/exceptions.zig");
-// pub const syscalls = @import("./irq/syscalls.zig");
 pub const list = @import("./utils/list.zig");
 pub const tree = @import("./utils/tree.zig");
 pub const ringbuf = @import("./utils/ringbuf.zig");

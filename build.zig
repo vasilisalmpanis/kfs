@@ -2,7 +2,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const name = "kfs.bin";
-const linker = "linker.ld";
 const kernel_src = "src/main.zig";
 
 const userspace_name = "userspace.bin";
@@ -112,10 +111,11 @@ pub fn build(b: *std.Build) !void {
     kernel.root_module.addImport("kernel", kernel_mod);
     kernel.root_module.addImport("modules", modules_mod);
 
-    kernel.setLinkerScript(b.path(linker));
     if (arch == .x86) {
+        kernel.setLinkerScript(b.path("./src/arch/x86/linker.ld"));
         kernel.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));
     } else if (arch == .x86_64) {
+        kernel.setLinkerScript(b.path("./src/arch/x86_64/linker.ld"));
         kernel.addAssemblyFile(b.path("./src/arch/x86_64/boot/boot.s"));
     }
 
@@ -144,7 +144,7 @@ pub fn build(b: *std.Build) !void {
     codegen_step.dependOn(&gen_output_file.step);
 
     const kernel_step = b.step(name, "Build the kernel");
-    // kernel.step.dependOn(codegen_step);
+    kernel.step.dependOn(codegen_step);
     kernel_step.dependOn(&kernel.step);
 
     // Add userspace binary
