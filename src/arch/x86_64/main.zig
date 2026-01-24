@@ -190,6 +190,9 @@ pub const Regs = struct {
 pub const cpu = struct {
     pub fn disableInterrupts() void {}
     pub fn enableInterrupts() void {}
+    pub fn getStackFrameAddr() usize {
+        return 0;
+    }
 };
 
 pub const syscalls = struct {

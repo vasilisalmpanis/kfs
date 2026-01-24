@@ -260,3 +260,10 @@ pub fn enableInterrupts() void {
 pub fn disableInterrupts() void {
     asm volatile ("cli");
 }
+
+pub fn getStackFrameAddr() usize {
+    return asm volatile (
+        \\ movl %ebp, %[value]
+        : [value] "={eax}" (-> usize),
+    );
+}
