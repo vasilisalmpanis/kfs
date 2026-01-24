@@ -21,7 +21,7 @@ pub const KERNEL_DATA_SEGMENT   = 0x10;
 pub const USER_CODE_SEGMENT   = 0x18;
 pub const USER_DATA_SEGMENT   = 0x20;
 
-const ExceptionHandler  = fn (regs: *Regs) void;
+const ExceptionHandler  = fn (regs: *Regs) *Regs;
 const SyscallHandler    = fn (regs: *Regs) void;
 const ISRHandler        = fn () callconv(.c) void;
 
@@ -90,12 +90,13 @@ pub fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     return @ptrFromInt(to.regs.getStackPointer());
 }
 
-pub export fn exceptionHandler(state: *Regs) callconv(.c) void {
+pub export fn exceptionHandler(state: *Regs) callconv(.c) *Regs {
     krn.logger.DEBUG("EXC {d}", .{state.int_no});
     if (krn.irq.handlers[state.int_no] != null) {
         const handler: *const ExceptionHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
-        handler(state);
+        return handler(state);
     }
+    return state;
 }
 
 pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
