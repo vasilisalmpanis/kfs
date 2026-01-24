@@ -56,7 +56,7 @@ pub fn close(base: *krn.fs.File) void {
     }
 }
 
-pub fn read(base: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
+pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     const pipe = base.inode.data.pipe
         orelse return krn.errors.PosixError.EFAULT;
     while (pipe.rb.isEmpty()) {
@@ -66,11 +66,11 @@ pub fn read(base: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
 
     pipe.lock.lock();
     defer pipe.lock.unlock();
-    const ret_size: u32 = pipe.rb.readInto(buf[0..size]);
+    const ret_size: usize = pipe.rb.readInto(buf[0..size]);
     return ret_size;
 }
 
-pub fn write(base: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
+pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     const pipe = base.inode.data.pipe
         orelse return krn.errors.PosixError.EFAULT;
     if (pipe.readers == 0) {

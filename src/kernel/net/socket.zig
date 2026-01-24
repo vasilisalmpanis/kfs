@@ -39,7 +39,7 @@ pub const Socket = struct {
     }
 };
 
-pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
+pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     var sock: *krn.socket.Socket = undefined;
     if (base.inode.data.sock == null) return krn.errors.PosixError.EBADF;
     sock = base.inode.data.sock.?;
@@ -51,7 +51,7 @@ pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: u32) !u32 {
     return 0;
 }
 
-pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: u32) !u32 {
+pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     var sock: *krn.socket.Socket = undefined;
     if (base.inode.data.sock == null) return krn.errors.PosixError.EBADF;
     sock = base.inode.data.sock.?;
@@ -75,10 +75,10 @@ pub fn open(base: *krn.fs.File, inode: *krn.fs.Inode) !void{
 pub fn close(base: *krn.fs.File) void{
     _ = base;
 }
-pub fn read(base: *krn.fs.File, buf: [*]u8, size: u32) !u32{
+pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize{
     return try do_recvfrom(base, buf, size);
 }
-pub fn write(base: *krn.fs.File, buf: [*]const u8, size: u32) !u32{
+pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize{
     return try do_sendto(base, buf, size);
 }
 

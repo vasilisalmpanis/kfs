@@ -118,6 +118,10 @@ pub const multiboot = struct {
 };
 
 pub const vmm = struct {
+    pub const VASpair = struct {
+        virt: usize = 0,
+        phys: usize = 0,
+    };
     pub const PagingFlags = packed struct {
         present: bool       = true,
         writable: bool      = true,

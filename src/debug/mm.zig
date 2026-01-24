@@ -5,20 +5,6 @@ const krn = @import("kernel");
 
 const initial_page_dir: [*]u32 = @ptrFromInt(0xFFFFF000);
 
-pub fn printMmap(info: *multiboot.MultibootInfo1) void {
-    var i: u32 = 0;
-    printf("type\tmem region\t\tsize\n", .{});
-    while (i < info.mmap_length) : (i += @sizeOf(multiboot.MultibootMemoryMap)) {
-        const mmap: *multiboot.MultibootMemoryMap = @ptrFromInt(info.mmap_addr + i);
-        printf("{d}\t{x:0>8} {x:0>8}\t{d}\n", .{
-            mmap.type,
-            mmap.addr[0],
-            mmap.addr[0] + (mmap.len[0] - 1),
-            mmap.len[0]
-        });
-    }
-}
-
 pub fn printPageDir() void {
     var index: u32 = 0;
     printf(
