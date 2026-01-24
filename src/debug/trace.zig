@@ -5,7 +5,7 @@ const arch = @import("arch");
 
 const StackFrame = struct {
     ebp : ?*StackFrame = null,
-    eip : u32,
+    eip : usize,
 
     pub fn init() StackFrame {
         return StackFrame{
@@ -20,11 +20,7 @@ const StackFrame = struct {
 /// register stake and print it.
 /// @param maxFrames: maximum amount of frames to trace.
 pub inline fn traceStackTrace(maxFrames : u32 ) void {
-    var stk : ?*StackFrame = 
-     asm ("movl %ebp, %[result]"
-        : [result] "={eax}" (-> *StackFrame),
-        : : .{}
-    );
+    var stk : ?*StackFrame = @ptrFromInt(arch.cpu.getStackFrameAddr());
     krn.logger.INFO("Stack Trace:\n",.{});
     var frame : u32 = 0;
     // unwind the stack
@@ -38,4 +34,3 @@ pub inline fn traceStackTrace(maxFrames : u32 ) void {
         stk = stk.?.ebp;
     }
 }
-

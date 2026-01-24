@@ -75,7 +75,11 @@ pub fn build(b: *std.Build) !void {
     modules_mod.addImport("debug", debug_mod);
     modules_mod.addImport("drivers", drivers_mod);
 
-    var target: std.Target.Query = .{ .cpu_arch = arch, .os_tag = .freestanding, .abi = .none };
+    var target: std.Target.Query = .{ 
+        .cpu_arch = arch,
+        .os_tag = .freestanding,
+        .abi = .none
+    };
     const Features = std.Target.x86.Feature;
     target.cpu_features_sub.addFeature(@intFromEnum(Features.mmx));
     target.cpu_features_sub.addFeature(@intFromEnum(Features.sse));
@@ -99,6 +103,7 @@ pub fn build(b: *std.Build) !void {
     kernel.root_module.stack_protector = false;
     kernel.root_module.stack_check = false;
     kernel.root_module.red_zone = false;
+    kernel.root_module.pic = false;
     kernel.entry = std.Build.Step.Compile.Entry.disabled;
 
     kernel.root_module.addImport("arch", arch_mod);
@@ -108,8 +113,11 @@ pub fn build(b: *std.Build) !void {
     kernel.root_module.addImport("modules", modules_mod);
 
     kernel.setLinkerScript(b.path(linker));
-    if (arch == .x86)
+    if (arch == .x86) {
         kernel.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));
+    } else if (arch == .x86_64) {
+        kernel.addAssemblyFile(b.path("./src/arch/x86_64/boot/boot.s"));
+    }
 
     // kernel.setVerboseLink(true);
     b.installArtifact(kernel);
@@ -136,12 +144,10 @@ pub fn build(b: *std.Build) !void {
     codegen_step.dependOn(&gen_output_file.step);
 
     const kernel_step = b.step(name, "Build the kernel");
-    kernel.step.dependOn(codegen_step);
+    // kernel.step.dependOn(codegen_step);
     kernel_step.dependOn(&kernel.step);
 
     // Add userspace binary
-    // const userspace_bin_path = b.path("./userspace_c/userspace.bin");
-    // const userspace_bin_path = b.path("./zig-out/bin/userspace.bin");
     const userspace = b.addExecutable(.{
         .name = userspace_name,
         .root_module = b.createModule(.{
@@ -158,10 +164,6 @@ pub fn build(b: *std.Build) !void {
     });
     userspace.setLinkerScript(b.path("./userspace/linker.ld"));
 
-    // kernel.root_module.addAnonymousImport("userspace", .{
-    //     .root_source_file = userspace_bin_path,
-    // });
-    // kernel.step.dependOn(&userspace.step);
     const userspace_step = b.step(userspace_name, "Compile userspace init binary");
     userspace_step.dependOn(&userspace.step);
     userspace_step.dependOn(&b.addInstallArtifact(userspace, .{}).step);
