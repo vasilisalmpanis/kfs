@@ -14,9 +14,13 @@ const Serial = @import("drivers").Serial;
 const Logger = @import("debug").Logger;
 pub const irq = @import("./irq/manage.zig");
 pub const exceptions = @import("./irq/exceptions.zig");
+
+// Utils
 pub const list = @import("./utils/list.zig");
 pub const tree = @import("./utils/tree.zig");
 pub const ringbuf = @import("./utils/ringbuf.zig");
+pub const wq = @import("./utils/waitqueue.zig");
+
 pub const kthreadCreate = @import("./sched/kthread.zig").kthreadCreate;
 pub const kthreadStop = @import("./sched/kthread.zig").kthreadStop;
 pub const STACK_SIZE = @import("sched/kthread.zig").STACK_SIZE;

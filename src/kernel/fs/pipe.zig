@@ -9,6 +9,8 @@ pub const Pipe = struct {
     rb: krn.ringbuf.RingBuf,
     readers: u32 = 1,
     writers: u32 = 1,
+    read_queue: krn.wq.WaitQueueHead,
+    write_queue: krn.wq.WaitQueueHead,
     lock: mutex.Mutex = mutex.Mutex.init(),
 
     pub fn setup(self: *Pipe) void {
@@ -20,6 +22,8 @@ pub const Pipe = struct {
             .mask = BUFFER_SIZE - 1,
         };
         self.lock = mutex.Mutex.init();
+        self.read_queue.setup();
+        self.write_queue.setup();
     }
 
     pub fn delete(self: *Pipe) void {
@@ -48,11 +52,19 @@ pub fn close(base: *krn.fs.File) void {
         orelse return ;
     if (base.flags & krn.fs.file.O_WRONLY != 0) {
         pipe.writers -|= 1;
+        if (pipe.writers == 0)
+            pipe.read_queue.wakeUpAll();
     } else if (base.flags & krn.fs.file.O_RDONLY != 0) {
         pipe.readers -|= 1;
+        if (pipe.readers == 0)
+            pipe.write_queue.wakeUpOne();
     } else if (base.flags & krn.fs.file.O_RDWR != 0) {
         pipe.writers -|= 1;
         pipe.readers -|= 1;
+        if (pipe.writers == 0)
+            pipe.read_queue.wakeUpAll();
+        if (pipe.readers == 0)
+            pipe.write_queue.wakeUpAll();
     }
 }
 
@@ -62,11 +74,13 @@ pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     while (pipe.rb.isEmpty()) {
         if (pipe.writers == 0)
             return 0;
+        pipe.read_queue.wait(true, 0);
     }
 
     pipe.lock.lock();
     defer pipe.lock.unlock();
     const ret_size: usize = pipe.rb.readInto(buf[0..size]);
+    pipe.write_queue.wakeUpOne();
     return ret_size;
 }
 
@@ -77,9 +91,14 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
         return krn.errors.PosixError.EPIPE;
     }
     while (pipe.rb.isFull()) {
+        pipe.write_queue.wait(true, 0);
+        if (pipe.readers == 0) {
+            return krn.errors.PosixError.EPIPE;
+        }
     }
     pipe.lock.lock();
     defer pipe.lock.unlock();
+    defer pipe.read_queue.wakeUpOne();
     for (buf[0..size], 0..) |ch, idx| {
         if (!pipe.rb.push(ch)) {
             return idx;

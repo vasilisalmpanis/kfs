@@ -7,6 +7,14 @@ pub fn pipe(pipefd: ?*[2]i32) !u32 {
     return try pipe2(pipefd, 0);
 }
 
+fn releasePipeInode(ref: *krn.task.RefCount) void {
+    const inode: *krn.fs.Inode = @fieldParentPtr("ref", ref);
+    if (inode.data.pipe) |_pipe| {
+        krn.mm.kfree(_pipe);
+    }
+    krn.mm.kfree(inode);
+} 
+
 pub fn pipe2(pipefd: ?*[2]i32, flags: i32) !u32 {
     const fds = pipefd
         orelse return errors.EFAULT;
@@ -25,6 +33,7 @@ pub fn pipe2(pipefd: ?*[2]i32, flags: i32) !u32 {
         errdefer krn.mm.kfree(pipe_data);
         const pipe_inode = try krn.fs.Inode.allocEmpty();
         errdefer krn.mm.kfree(pipe_inode);
+        pipe_inode.ref.dropFn = releasePipeInode;
         pipe_inode.fops = &krn.fs.pipe.PipeFileOps;
         pipe_inode.ref.ref();
         pipe_inode.mode = fs.UMode.fifo();
