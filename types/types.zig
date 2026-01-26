@@ -577,6 +577,14 @@ pub const kernel = struct {
 
     };
 
+    pub const wq = struct {
+        pub const WaitQueueHead = struct {
+            list : kernel.list.ListHead,
+            lock : kernel.Mutex,
+        };
+
+    };
+
     pub const task = struct {
         pub const TaskState = enum(u8) {
             RUNNING = 0,
@@ -894,6 +902,8 @@ pub const kernel = struct {
                 rb : kernel.ringbuf.RingBuf,
                 readers : u32= 1,
                 writers : u32= 1,
+                read_queue : kernel.wq.WaitQueueHead,
+                write_queue : kernel.wq.WaitQueueHead,
                 lock : kernel.Mutex,
             };
 
