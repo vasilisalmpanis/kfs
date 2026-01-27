@@ -421,13 +421,15 @@ pub const MM = struct {
             return ;
 
         if (self.vmas) |head| {
-            var it = head.list.iterator();
-            while (it.next()) |node| {
-                const vma: *VMA = node.curr.entry(VMA, "list");
+            while (!head.list.isEmpty()) {
+                const vma: *VMA = head.list.next.?.entry(VMA, "list");
+                vma.list.del();
+
                 mm.virt_memory_manager.releaseArea(vma.start, vma.end, vma.flags.TYPE);
-                // Free the VMA structure itself
                 krn.mm.kfree(vma);
             }
+            mm.virt_memory_manager.releaseArea(head.start, head.end, head.flags.TYPE);
+            krn.mm.kfree(head);
         }
         self.vmas = null;
     }

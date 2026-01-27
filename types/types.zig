@@ -580,7 +580,7 @@ pub const kernel = struct {
     pub const wq = struct {
         pub const WaitQueueHead = struct {
             list : kernel.list.ListHead,
-            lock : kernel.Mutex,
+            lock : kernel.Spinlock,
         };
 
     };
@@ -643,6 +643,10 @@ pub const kernel = struct {
     };
 
     pub const Mutex = struct {
+        locked : std.atomic.Value(bool),
+    };
+
+    pub const Spinlock = struct {
         locked : std.atomic.Value(bool),
     };
 
