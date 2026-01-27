@@ -20,7 +20,7 @@ pub const FPUState = extern struct {
 
 /// Check if FPU is present by testing CR0.EM bit
 /// Returns true if FPU is present
-pub fn isFPUPresent() bool {
+pub inline fn isFPUPresent() bool {
     // Read CR0
     const cr0 = asm volatile (
         \\ mov %%cr0, %[result]
@@ -31,20 +31,8 @@ pub fn isFPUPresent() bool {
     return (cr0 & (1 << 2)) == 0;
 }
 
-/// Check if FPU is available for use (TS bit in CR0)
-/// Returns true if FPU is available
-pub fn isFPUAvailable() bool {
-    const cr0 = asm volatile (
-        \\ mov %%cr0, %[result]
-        : [result] "={eax}" (-> u32),
-    );
-
-    // Check TS (Task Switched) bit - if set, FPU context needs to be loaded
-    return (cr0 & (1 << 3)) == 0;
-}
-
 /// Set TS (Task Switched) bit in CR0 to indicate FPU context switch needed
-pub fn setTaskSwitched() void {
+pub inline fn setTaskSwitched() void {
     asm volatile (
         \\ mov %%cr0, %%eax
         \\ or $0x8, %%eax
@@ -53,12 +41,10 @@ pub fn setTaskSwitched() void {
 }
 
 /// Clear TS (Task Switched) bit in CR0
-pub fn clearTaskSwitched() void {
+pub inline fn clearTaskSwitched() void {
     asm volatile (
-        \\ mov %%cr0, %%eax
-        \\ and $0xFFFFFFF7, %%eax
-        \\ mov %%eax, %%cr0
-        ::: .{ .eax = true, .memory = true });
+        \\ clts
+    );
 }
 
 pub fn initFPU() void {
@@ -82,11 +68,18 @@ pub fn initFPU() void {
     // Clear any pending exceptions
     asm volatile ("fnclex");
 
+    setTaskSwitched();
     krn.serial.print("FPU initialized successfully\n");
 }
 
+pub inline fn initFPUState() void {
+    asm volatile (
+        \\ fninit
+    );
+}
+
 /// Save FPU state to memory
-pub fn saveFPUState(state: *FPUState) void {
+pub inline fn saveFPUState(state: *FPUState) void {
     asm volatile (
         \\ fnsave (%[ptr])
         :
@@ -95,7 +88,7 @@ pub fn saveFPUState(state: *FPUState) void {
 }
 
 /// Restore FPU state from memory
-pub fn restoreFPUState(state: *const FPUState) void {
+pub inline fn restoreFPUState(state: *const FPUState) void {
     asm volatile (
         \\ frstor (%[ptr])
         :
@@ -105,39 +98,16 @@ pub fn restoreFPUState(state: *const FPUState) void {
 
 /// Handle Device Not Available exception (FPU context switch)
 pub fn handleDeviceNotAvailable() void {
-    // Import kernel here to avoid circular imports
+    clearTaskSwitched();
+    asm volatile ("fnclex");
+    const current_task = krn.task.current;
 
-    // Check if this is due to FPU being used
-    if (!isFPUAvailable()) {
-        const current_task = krn.task.current;
-
-        // If this task hasn't used FPU before, initialize it
-        if (!current_task.fpu_used) {
-            clearTaskSwitched();
-            initFPU();
-            current_task.fpu_used = true;
-        } else {
-            // Restore the task's FPU context
-            clearTaskSwitched();
-            restoreFPUState(&current_task.fpu_state);
-        }
-    }
-}
-
-/// Save FPU context for task switching
-pub fn saveTaskFPUContext(task: anytype) void {
-    if (task.fpu_used) {
-        saveFPUState(&task.fpu_state);
-    }
-}
-
-/// Restore FPU context for task switching
-pub fn restoreTaskFPUContext(task: anytype) void {
-    if (task.fpu_used) {
-        restoreFPUState(&task.fpu_state);
-        clearTaskSwitched();
+    if (current_task.fpu_used) {
+        restoreFPUState(&current_task.fpu_state);
     } else {
-        // Task hasn't used FPU yet, set TS bit to cause #NM on first use
-        setTaskSwitched();
+        // If this task hasn't used FPU before, initialize it
+        initFPUState();
+        current_task.fpu_used = true;
     }
+    current_task.save_fpu_state = true;
 }

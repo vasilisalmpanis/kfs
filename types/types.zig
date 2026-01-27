@@ -612,6 +612,7 @@ pub const kernel = struct {
             limit : u32= 0,
             fpu_state : arch.fpu.FPUState,
             fpu_used : bool= false,
+            save_fpu_state : bool= false,
             tree : kernel.tree.TreeNode,
             list : kernel.list.ListHead,
             refcount : kernel.task.RefCount,

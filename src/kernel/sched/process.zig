@@ -44,6 +44,17 @@ pub fn doFork() !u32 {
     }
     errdefer km.kfree(child.files);
 
+    child.fpu_used = tsk.current.fpu_used;
+    child.save_fpu_state = false;
+    if (tsk.current.fpu_used) {
+        if (tsk.current.save_fpu_state) {
+            arch.fpu.saveFPUState(&tsk.current.fpu_state);
+            tsk.current.save_fpu_state = false;
+            arch.fpu.setTaskSwitched();
+        }
+        child.fpu_state = tsk.current.fpu_state;
+    }
+
     const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
     const parent_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
     var child_regs: *arch.Regs = @ptrFromInt(stack_top);

@@ -76,6 +76,11 @@ pub fn doExecve(
     while (it.next()) |_fd| {
         _ = krn.task.current.files.releaseFD(_fd);
     }
+
+    krn.task.current.fpu_used = false;
+    krn.task.current.save_fpu_state = false;
+    arch.fpu.setTaskSwitched();
+
     krn.userspace.goUserspace();
     return 0;
 }
