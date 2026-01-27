@@ -58,7 +58,11 @@ pub fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     @setRuntimeSafety(false);
     from.regs = state.*;
     from.regs.setStackPointer(@intFromPtr(state));
-    fpu.saveFPUState(&from.fpu_state);
+    if (from.save_fpu_state) {
+        fpu.saveFPUState(&from.fpu_state);
+        from.save_fpu_state = false;
+        fpu.setTaskSwitched();
+    }
     tsk.current = to;
     if (to == &tsk.initial_task) {
         gdt.tss.esp0 = @intFromPtr(&stack_top);
@@ -89,12 +93,10 @@ pub fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
         :: [_sel]"r"(sel)
         : .{ .memory = true}
     );
-    fpu.restoreFPUState(&to.fpu_state);
     return @ptrFromInt(to.regs.getStackPointer());
 }
 
 pub export fn exceptionHandler(state: *Regs) callconv(.c) *Regs {
-    krn.logger.DEBUG("EXC {d}", .{state.int_no});
     if (krn.irq.handlers[state.int_no] != null) {
         const handler: *const ExceptionHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
         return handler(state);
@@ -123,11 +125,6 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     }
     if (state.int_no == TIMER_INTERRUPT) {
         new_state = krn.sched.schedule(state);
-        if (!tsk.current.fpu_used) {
-            fpu.setTaskSwitched();
-        } else {
-            fpu.clearTaskSwitched();
-        }
     }
     if (tsk.current.tsktype != .KTHREAD) {
         var ucontext = signals.Ucontext{};

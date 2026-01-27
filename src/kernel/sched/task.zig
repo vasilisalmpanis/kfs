@@ -97,6 +97,7 @@ pub const Task = struct {
     // FPU state for context switching
     fpu_state:      fpu.FPUState    = undefined,
     fpu_used:       bool            = false,
+    save_fpu_state: bool            = false,
 
     tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
@@ -144,6 +145,8 @@ pub const Task = struct {
         self.list.setup();
         self.tree.setup();
         self.refcount = RefCount.init();
+        self.fpu_used = false;
+        self.save_fpu_state = false;
         self.mm = &mm.proc_mm.init_mm;
         self.setName(name);
         mm.proc_mm.init_mm.vas = virt;
@@ -191,6 +194,8 @@ pub const Task = struct {
         self.wakeup_time = tmp.wakeup_time;
         self.stack_bottom = tmp.stack_bottom;
         self.tsktype = tmp.tsktype;
+        self.save_fpu_state = tmp.save_fpu_state;
+        self.fpu_used = tmp.fpu_used;
 
         self.regs = Regs.init();
         self.tree = tree.TreeNode.init();
