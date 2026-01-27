@@ -19,17 +19,17 @@ const WaitQueueNode = struct {
 
 pub const WaitQueueHead = struct {
     list: lst.ListHead,
-    lock: krn.Mutex,
+    lock: krn.Spinlock,
 
     pub fn init() WaitQueueHead {
         return WaitQueueHead{
             .list = lst.ListHead.init(),
-            .lock = krn.Mutex.init(),
+            .lock = krn.Spinlock.init(),
         };
     }
 
     pub fn setup(self: *WaitQueueHead) void {
-        self.lock = krn.Mutex.init();
+        self.lock = krn.Spinlock.init();
         self.list.setup();
     }
 
@@ -41,9 +41,8 @@ pub const WaitQueueHead = struct {
         const tsk = krn.task.current;
         var node = WaitQueueNode.init(tsk);
         node.setup();
-        self.lock.lock();
+        self.lock.lock_irq_disable();
         self.list.addTail(&node.list);
-        self.lock.unlock();
 
         if (timeout != 0) {
             tsk.wakeup_time = krn.currentMs() + timeout;
@@ -55,12 +54,20 @@ pub const WaitQueueHead = struct {
         } else {
             tsk.state = .UNINTERRUPTIBLE_SLEEP;
         }
+        self.lock.unlock_irq_enable();
+
         krn.sched.reschedule();
+
+        self.lock.lock_irq_disable();
+        if (!node.list.isEmpty()) {
+            node.list.del();
+        }
+        self.lock.unlock_irq_enable();
     }
 
     pub fn wakeUpOne(self: *WaitQueueHead) void {
-        self.lock.lock();
-        defer self.lock.unlock();
+        self.lock.lock_irq_disable();
+        defer self.lock.unlock_irq_enable();
 
         if (self.list.isEmpty())
             return;
@@ -70,8 +77,8 @@ pub const WaitQueueHead = struct {
     }
 
     pub fn wakeUpAll(self: *WaitQueueHead) void {
-        self.lock.lock();
-        defer self.lock.unlock();
+        self.lock.lock_irq_disable();
+        defer self.lock.unlock_irq_enable();
 
         while (!self.list.isEmpty()) {
             const curr_node = self.list.next.?.entry(WaitQueueNode, "list");
