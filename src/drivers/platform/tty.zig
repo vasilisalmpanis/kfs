@@ -106,6 +106,8 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
                 return @intCast(_tty.file_buff.readLineInto(buf[0..size]));
             }
             _tty.lock.unlock();
+            _tty.read_queue.wait(true, 0);
+
         }
     } else {
         const vmin: u8 = _tty.term.c_cc[t.VMIN];
@@ -121,13 +123,15 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
                 _tty.lock.unlock();
                 if (vmin == 0 or _tty.nonblock)
                     return 0;
+                var elapsed: usize = 0;
                 // Check timeout if VTIME is set
                 if (vtime > 0) {
-                    const elapsed = krn.currentMs() - start_time;
+                    elapsed = krn.currentMs() - start_time;
                     if (elapsed >= timeout_ms) {
                         return 0; // Timeout expired
                     }
                 }
+                _tty.read_queue.wait(true, elapsed);
                 continue;
             }
             const to_read = @min(avail, size);
@@ -160,7 +164,7 @@ fn print_raw_input(msg: []const u8) void {
 fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     var _tty = try getTTY(file);
     const msg = buf[0..size];
-    print_raw_input(msg);
+    // print_raw_input(msg);
     var i: usize = 0;
     while (i < msg.len) : (i += 1) {
         const c = msg[i];
@@ -453,6 +457,7 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
         if (kbd.global_keyboard.getInput()) |input| {
             scr.current_tty.?.input(input);
         }
+        kbd.wait_queue.wait(false, 0);
     }
     return 0;
 }

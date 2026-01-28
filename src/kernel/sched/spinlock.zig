@@ -26,17 +26,21 @@ pub const Spinlock = struct {
 
     // Disables interrupts before taking the lock
     // Can be take in process context.
-    pub fn lock_irq_disable(self: *Spinlock) void {
-        arch.cpu.disableInterrupts();
+    pub fn lock_irq_disable(self: *Spinlock) bool {
+        const lock_state = arch.cpu.areIntEnabled();
+        if (lock_state)
+            arch.cpu.disableInterrupts();
         while (self.locked.swap(true, .acquire)) {
             std.atomic.spinLoopHint();
         }
+        return lock_state;
     }
 
     // Enables interrupts after releasing the lock
     // Can be take in process context.
-    pub fn unlock_irq_enable(self: *Spinlock) void {
+    pub fn unlock_irq_enable(self: *Spinlock, lock_state: bool) void {
         self.locked.store(false, .release);
-        arch.cpu.enableInterrupts();
+        if (lock_state)
+            arch.cpu.enableInterrupts();
     }
 };

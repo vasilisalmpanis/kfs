@@ -127,6 +127,7 @@ pub const Keyboard = struct {
         if (self.buffer[self.write_pos] != 0) {
             self.read_pos = self.write_pos;
         }
+        wait_queue.wakeUpOne();
     }
 
     fn getScancode(self: *Keyboard) u8 {
@@ -227,6 +228,7 @@ pub const Keyboard = struct {
 
 pub var keyboard = Keyboard.init(&keymap_us);
 pub var global_keyboard = &keyboard;
+pub var wait_queue: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init();
 
 pub fn keyboardInterrupt() void {
     var scancode: u8 = undefined;
@@ -247,5 +249,6 @@ pub fn keyboardInterrupt() void {
 
 pub fn init() void {
     global_keyboard = &keyboard;
+    wait_queue.setup();
     krn.irq.registerHandler(1, &keyboardInterrupt);
 }
