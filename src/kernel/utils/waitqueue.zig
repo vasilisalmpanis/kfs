@@ -1,5 +1,6 @@
 const krn = @import("../main.zig");
 const lst = @import("./list.zig");
+const arch = @import("arch");
 
 const WaitQueueNode = struct {
     task: *krn.task.Task,
@@ -41,7 +42,7 @@ pub const WaitQueueHead = struct {
         const tsk = krn.task.current;
         var node = WaitQueueNode.init(tsk);
         node.setup();
-        self.lock.lock_irq_disable();
+        var lock_state = self.lock.lock_irq_disable();
         self.list.addTail(&node.list);
 
         if (timeout != 0) {
@@ -54,20 +55,20 @@ pub const WaitQueueHead = struct {
         } else {
             tsk.state = .UNINTERRUPTIBLE_SLEEP;
         }
-        self.lock.unlock_irq_enable();
+        self.lock.unlock_irq_enable(lock_state);
 
         krn.sched.reschedule();
 
-        self.lock.lock_irq_disable();
+        lock_state = self.lock.lock_irq_disable();
         if (!node.list.isEmpty()) {
             node.list.del();
         }
-        self.lock.unlock_irq_enable();
+        self.lock.unlock_irq_enable(lock_state);
     }
 
     pub fn wakeUpOne(self: *WaitQueueHead) void {
-        self.lock.lock_irq_disable();
-        defer self.lock.unlock_irq_enable();
+        const lock_state = self.lock.lock_irq_disable();
+        defer self.lock.unlock_irq_enable(lock_state);
 
         if (self.list.isEmpty())
             return;
@@ -77,8 +78,8 @@ pub const WaitQueueHead = struct {
     }
 
     pub fn wakeUpAll(self: *WaitQueueHead) void {
-        self.lock.lock_irq_disable();
-        defer self.lock.unlock_irq_enable();
+        const lock_state = self.lock.lock_irq_disable();
+        defer self.lock.unlock_irq_enable(lock_state);
 
         while (!self.list.isEmpty()) {
             const curr_node = self.list.next.?.entry(WaitQueueNode, "list");

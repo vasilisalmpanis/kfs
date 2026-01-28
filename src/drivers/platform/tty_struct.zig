@@ -494,6 +494,7 @@ pub const TTY = struct {
     file_buff: krn.ringbuf.RingBuf = undefined,
     lock: krn.Mutex = krn.Mutex.init(),
     nonblock: bool = false,
+    read_queue: krn.wq.WaitQueueHead = undefined,
 
     // job control
     session_id: i32 = 1,
@@ -531,6 +532,7 @@ pub const TTY = struct {
 
             .file_buff = rb,
             .lock = krn.Mutex.init(),
+            .read_queue = krn.wq.WaitQueueHead.init(),
             .tab_len = 8,
             .winsz = WinSize{
                 .ws_row = @intCast(h),
@@ -545,6 +547,7 @@ pub const TTY = struct {
     pub fn setup(self: *TTY) void {
         self.curr_page = &self.main_page;
         self.curr_page.clear();
+        self.read_queue.setup();
     }
 
     fn default_termios() t.Termios {
@@ -771,12 +774,14 @@ pub const TTY = struct {
         self.lock.lock();
         _ = self.file_buff.push(b);
         self.lock.unlock();
+        self.read_queue.wakeUpOne();
     }
 
     fn pushSeq(self: *TTY, s: []const u8) void {
         self.lock.lock();
         _ = self.file_buff.pushSlice(s);
         self.lock.unlock();
+        self.read_queue.wakeUpOne();
     }
 
     fn handleISIG(self: *TTY, b: u8) bool {
@@ -804,6 +809,7 @@ pub const TTY = struct {
         self.lock.lock();
         _ = self.file_buff.push('\n');
         self.lock.unlock();
+        self.read_queue.wakeUpOne();
     }
 
     pub fn input(self: *TTY, data: []const kbd.KeyEvent) void {
@@ -826,6 +832,7 @@ pub const TTY = struct {
                         self.lock.lock();
                         _ = self.file_buff.push('\n');
                         self.lock.unlock();
+                        self.read_queue.wakeUpOne();
                         continue;
                     }
                     if (b == self.term.c_cc[t.VKILL] and b != 0) {

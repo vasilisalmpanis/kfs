@@ -1582,6 +1582,7 @@ pub const drivers = struct {
                 file_buff : kernel.ringbuf.RingBuf,
                 lock : kernel.Mutex,
                 nonblock : bool= false,
+                read_queue : kernel.wq.WaitQueueHead,
                 session_id : i32= 1,
                 fg_pgid : i32= 1,
                 is_controlling : bool= true,
