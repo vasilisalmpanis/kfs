@@ -445,6 +445,7 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
             // }
             task.wakeup_time = 0;
             task.state = .INTERRUPTIBLE_SLEEP;
+            task.wakeupParent();
             return krn.sched.schedule(regs);
         },
         .SIGCONT => {},
@@ -454,6 +455,7 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         else => {
             task.state = .ZOMBIE;
             task.result = 128 + @intFromEnum(signal);
+            task.wakeupParent();
             // krn.sched.reschedule();
             return krn.sched.schedule(regs);
         }

@@ -113,6 +113,7 @@ pub const Task = struct {
     // signals
     sighand:        signal.SigHand       = signal.SigHand.init(),
     sigmask:        signal.sigset_t      = signal.sigset_t.init(),
+    wait_wq:        krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
 
     // only for kthreads
     threadfn:       ?ThreadHandler       = null,
@@ -150,6 +151,7 @@ pub const Task = struct {
         self.mm = &mm.proc_mm.init_mm;
         self.setName(name);
         mm.proc_mm.init_mm.vas = virt;
+        self.wait_wq.setup();
     }
 
     pub fn setName(self: *Task, name: []const u8) void {
@@ -211,6 +213,8 @@ pub const Task = struct {
         self.sighand = current.sighand;
         self.sigmask = current.sigmask;
         self.sighand.pending = std.StaticBitSet(32).initEmpty();
+        self.wait_wq = krn.wq.WaitQueueHead.init();
+        self.wait_wq.setup();
 
         tasks_mutex.lock();
         current.tree.addChild(&self.tree);
@@ -299,6 +303,18 @@ pub const Task = struct {
         tasks_mutex.unlock();
         if (self == current)
             reschedule();
+    }
+
+    pub fn wakeupParent(self: *Task) void {
+        tasks_mutex.lock();
+        defer tasks_mutex.unlock();
+
+        if (self.tree.parent) |_p| {
+            const parent = _p.entry(Task, "tree");
+            parent.refcount.ref();
+            parent.wait_wq.wakeUpOne();
+            parent.refcount.unref();
+        }
     }
 };
 

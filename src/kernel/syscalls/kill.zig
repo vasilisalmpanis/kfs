@@ -8,8 +8,16 @@ fn send_signal(task: *tsk.Task, signal: signals.Signal) !u32 {
         return errors.EPERM;
     if (signal != .EMPTY) {
         task.sighand.setSignal(signal);
-        if (task.state != .ZOMBIE and task.state != .STOPPED and task.state != .UNINTERRUPTIBLE_SLEEP)
+        if (
+            task.state != .ZOMBIE
+            and task.state != .STOPPED
+            and task.state != .UNINTERRUPTIBLE_SLEEP
+        ) {
+            // TODO:
+            // if (signal == .SIGCONT and task.state == .INTERRUPTIBLE_SLEEP)
+            //     task.wakeupParent();
             task.state = .RUNNING;
+        }
     }
     return 0;
 }
