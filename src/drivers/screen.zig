@@ -13,7 +13,11 @@ pub const Screen = struct {
     frmb: fb.FrameBuffer,
     
     pub fn init(boot_info: *multiboot.Multiboot) Screen {
-        const frm = fb.FrameBuffer.init(boot_info, &fonts.VGA16x32);
+        const frm = fb.FrameBuffer.init(
+            boot_info,
+            &fonts.VGA16x32,
+            .zero_copy
+        );
         const scr = Screen{
             .frmb = frm,
         };

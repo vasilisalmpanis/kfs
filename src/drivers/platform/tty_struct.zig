@@ -3,6 +3,7 @@ const krn = @import("kernel");
 
 const scr = @import("../screen.zig");
 const kbd = @import("../kbd.zig");
+const fb = @import("../framebuffer.zig");
 
 const t = @import("./termios.zig");
 const tty_drv = @import("tty.zig");
@@ -380,7 +381,11 @@ const Page = struct {
         self.markDirty(DirtyRect.singleChar(x, y));
     }
 
-    pub fn scroll(self: *Page, lines: usize) void {
+    pub fn scroll(
+        self: *Page,
+        lines: usize,
+        direction: fb.ScrollDirection
+    ) void {
         if (lines == 0)
             return;
         if (lines >= self.height) {
@@ -389,19 +394,96 @@ const Page = struct {
         }
         const pos = self.width * lines;
         const end = self.width * self.height;
-        const buff_end = end - pos;
+        const kept_size = end - pos;
+        const empty_cell = Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 };
 
-        @memmove(
-            self.buff[0..buff_end],
-            self.buff[pos..end]
+        switch (direction) {
+            .up => {
+                @memmove(self.buff[0..kept_size], self.buff[pos..end]);
+                @memset(self.buff[kept_size..end], empty_cell);
+                @memmove(self.prev[0..kept_size], self.prev[pos..end]);
+                @memset(self.prev[kept_size..end], empty_cell);
+            },
+            .down => {
+                @memmove(self.buff[pos..end], self.buff[0..kept_size]);
+                @memset(self.buff[0..pos], empty_cell);
+                @memmove(self.prev[pos..end], self.prev[0..kept_size]);
+                @memset(self.prev[0..pos], empty_cell);
+            },
+        }
+
+        // Scroll the pixel buffer
+        const pixel_lines = lines * scr.framebuffer.font.height;
+        scr.framebuffer.scrollPixels(
+            pixel_lines,
+            direction,
+            self.curr_bg.toU32()
         );
-        @memset(
-            self.buff[buff_end..end],
-            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+
+        if (self.cursor.drawn) {
+            self.cleanupScrolledCursor(lines, direction);
+        }
+        self.cursor.drawn = false;
+
+        const dirty_rect = switch (direction) {
+            .up => DirtyRect.init(
+                0,
+                self.height - lines,
+                self.width - 1,
+                self.height - 1
+            ),
+            .down => DirtyRect.init(
+                0,
+                0,
+                self.width - 1,
+                lines - 1
+            ),
+        };
+        self.markDirty(dirty_rect);
+    }
+
+    fn cleanupScrolledCursor(
+        self: *Page,
+        lines: usize,
+        direction: fb.ScrollDirection
+    ) void {
+        switch (direction) {
+            .up => {
+                if (self.cursor.prev_y >= lines) {
+                    const scrolled_y = self.cursor.prev_y - lines;
+                    self.redrawCell(self.cursor.prev_x, scrolled_y);
+                }
+                if (self.cursor.y >= lines) {
+                    const scrolled_y = self.cursor.y - lines;
+                    self.redrawCell(self.cursor.x, scrolled_y);
+                }
+            },
+            .down => {
+                if (self.cursor.prev_y + lines < self.height) {
+                    const scrolled_y = self.cursor.prev_y + lines;
+                    self.redrawCell(self.cursor.prev_x, scrolled_y);
+                }
+                if (self.cursor.y + lines < self.height) {
+                    const scrolled_y = self.cursor.y + lines;
+                    self.redrawCell(self.cursor.x, scrolled_y);
+                }
+            },
+        }
+    }
+
+    fn redrawCell(self: *Page, x: usize, y: usize) void {
+        const cell = self.getCell(x, y);
+        scr.framebuffer.putchar(
+            cell.ch, x, y, cell.bg.toU32(), cell.fg.toU32()
         );
-        self.markDirty(
-            DirtyRect.fullScreen(self.width, self.height)
-        );
+    }
+
+    pub fn scrollUp(self: *Page, lines: usize) void {
+        self.scroll(lines, .up);
+    }
+
+    pub fn scrollDown(self: *Page, lines: usize) void {
+        self.scroll(lines, .down);
     }
 
     pub fn reRenderAll(self: *Page) void {
@@ -447,7 +529,7 @@ const Page = struct {
     fn wrapLine(self: *Page) void {
         const new_y = self.cursor.y + 1;
         if (new_y >= self.height) {
-            self.scroll(1);
+            self.scrollUp(1);
             self.setCursor(0, self.height - 1);
         } else {
             self.setCursor(0, new_y);
@@ -1114,7 +1196,7 @@ pub const TTY = struct {
             },
             'S' => { // Scroll Up (SU)
                 const n = self.param(0, 1);
-                self.curr_page.scroll(@intCast(n));
+                self.curr_page.scrollUp(@intCast(n));
                 self.render();
             },
             'T' => { // Scroll Down (SD)
@@ -1418,32 +1500,7 @@ pub const TTY = struct {
     }
 
     fn scrollDown(self: *TTY, n: usize) void {
-        const lines = @min(n, self.height);
-        if (lines == 0) return;
-        
-        // Move lines down
-        var row = self.height - 1;
-        while (row >= lines) : (row -= 1) {
-            var x: usize = 0;
-            while (x < self.width) : (x += 1) {
-                self.curr_page.getCell(x, row).* = self.curr_page.getCell(x, row - lines).*;
-            }
-            if (row == 0)
-                break;
-        }
-        
-        // Clear top lines
-        var clear_row: usize = 0;
-        while (clear_row < lines) : (clear_row += 1) {
-            var x: usize = 0;
-            while (x < self.width) : (x += 1) {
-                self.curr_page.getCell(x, clear_row).makeEmpty();
-            }
-        }
-        
-        self.curr_page.markDirty(
-            DirtyRect.fullScreen(self.width, self.height)
-        );
+        self.curr_page.scrollDown(n);
         self.render();
     }
 
