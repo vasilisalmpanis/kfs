@@ -630,6 +630,7 @@ pub const kernel = struct {
             files : *kernel.fs.file.TaskFiles,
             sighand : kernel.signals.SigHand,
             sigmask : kernel.signals.sigset_t,
+            wait_wq : kernel.wq.WaitQueueHead,
             threadfn : ?*const fn(?*const anyopaque) i32= null,
             arg : ?*const anyopaque= null,
             result : i32= 0,

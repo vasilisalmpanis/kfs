@@ -30,7 +30,7 @@ pub fn exit(error_code: i32) !u32 {
         const act = parent.sighand.actions.get(.SIGCHLD);
         if (act.handler.handler != signals.sigIGN and (act.flags & signals.SA_NOCLDSTOP == 0)) {
             parent.sighand.setSignal(.SIGCHLD);
-            parent.state = .RUNNING;
+            tsk.current.wakeupParent();
         }
     }
     tsk.current.state = .ZOMBIE;

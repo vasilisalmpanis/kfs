@@ -74,7 +74,8 @@ pub const WaitQueueHead = struct {
             return;
         const first_node = self.list.next.?.entry(WaitQueueNode, "list");
         self.list.next.?.del();
-        first_node.task.state = .RUNNING;
+        if (first_node.task.state != .STOPPED and first_node.task.state != .ZOMBIE)
+            first_node.task.state = .RUNNING;
     }
 
     pub fn wakeUpAll(self: *WaitQueueHead) void {
@@ -84,7 +85,8 @@ pub const WaitQueueHead = struct {
         while (!self.list.isEmpty()) {
             const curr_node = self.list.next.?.entry(WaitQueueNode, "list");
             self.list.next.?.del();
-            curr_node.task.state = .RUNNING;
+            if (curr_node.task.state != .STOPPED and curr_node.task.state != .ZOMBIE)
+                curr_node.task.state = .RUNNING;
         }
     }
 };

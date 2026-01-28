@@ -83,11 +83,11 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
     if (pid > 0) {
         if (tsk.current.findChildByPid(@intCast(pid))) |task| {
             while (!wait_opts.isSet(task.state)) {
-                sched.reschedule();
                 if (tsk.current.sighand.hasPending())
                     return errors.EINTR;
                 if (options & WNOHANG > 0)
                     return 0;
+                tsk.current.wait_wq.wait(true, 0);
             }
             if (stat_addr != null) {
                 stat_addr.?.* = wait_opts.status(task);
@@ -121,7 +121,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 }
                 if (options & WNOHANG > 0)
                     break;
-                sched.reschedule();
+                tsk.current.wait_wq.wait(true, 0);
                 if (tsk.current.sighand.hasPending())
                     return errors.EINTR;
             }
@@ -146,7 +146,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 }
                 if (options & WNOHANG > 0)
                     break;
-                sched.reschedule();
+                tsk.current.wait_wq.wait(true, 0);
                 if (tsk.current.sighand.hasPending())
                     return errors.EINTR;
             }
@@ -172,7 +172,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 }
                 if (options & WNOHANG > 0)
                     break;
-                sched.reschedule();
+                tsk.current.wait_wq.wait(true, 0);
                 if (tsk.current.sighand.hasPending())
                     return errors.EINTR;
             }
