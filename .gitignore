@@ -12,3 +12,4 @@ disk/*.img
 .DS_Store
 ext2_dir/modules/
 ext2_dir/bin/init
+.venv
