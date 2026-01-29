@@ -16,7 +16,7 @@ pub const Screen = struct {
         const frm = fb.FrameBuffer.init(
             boot_info,
             &fonts.VGA16x32,
-            .zero_copy
+            .double_buffered
         );
         const scr = Screen{
             .frmb = frm,
@@ -37,4 +37,10 @@ pub const Screen = struct {
 pub fn initScreen(scr: *Screen, boot_info: *multiboot.Multiboot) void {
     scr.* = Screen.init(boot_info);
     current_tty = null;
+    if (scr.frmb.mode == .double_buffered)
+        _ = krn.kthreadCreate(
+            &fb.render_thread,
+            null,
+            "render_thread"    
+        ) catch null;
 }
