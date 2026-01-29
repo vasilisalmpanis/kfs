@@ -75,7 +75,7 @@ pub const RefCount = struct {
 
 // Task is the basic unit of scheduling
 // both threads and processes are tasks
-// and threads share 
+// and threads share
 //
 
 // Task
@@ -287,12 +287,11 @@ pub const Task = struct {
     }
 
     pub fn finish(self: *Task) void {
-        if (self.state != .ZOMBIE)
+        if (self.state != .ZOMBIE and self.state != .STOPPED)
             return ;
         self.state = .STOPPED;
         tasks_mutex.lock();
         self.list.del();
-        self.tree.del();
         self.refcount.unref();
         if (stopped_tasks == null) {
             stopped_tasks = &self.list;
@@ -301,8 +300,6 @@ pub const Task = struct {
             stopped_tasks.?.addTail(&self.list);
         }
         tasks_mutex.unlock();
-        if (self == current)
-            reschedule();
     }
 
     pub fn wakeupParent(self: *Task) void {
