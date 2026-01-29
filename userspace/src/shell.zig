@@ -20,6 +20,10 @@ pub const Shell = struct {
     commands: std.StringHashMap(ShellCommand) = undefined,
     running: u32 = 0,
 
+    pub fn child_handler(sig: i32) callconv(.c) void {
+        _ = sig;
+    }
+
     pub fn init() Shell {
         var file = std.fs.File.stdout();
         var shell = Shell{
@@ -33,6 +37,12 @@ pub const Shell = struct {
             arena.allocator(),
         );
         shell.registerBuiltins();
+        const action: std.posix.Sigaction = .{
+            .handler = .{ .handler = &child_handler },
+            .mask = .{0} ** 2,
+            .flags = 0,
+        };
+        _ = std.os.linux.sigaction(std.c.SIG.CHLD, &action, null);
         return shell;
     }
 
@@ -95,7 +105,7 @@ pub const Shell = struct {
             }
         }
         if (arg_count == 0) return;
-        
+
         const cmd_name = self.arg_buf[0];
         const cmd_args = self.arg_buf[1..arg_count];
         if (self.commands.get(cmd_name)) |cmd| {

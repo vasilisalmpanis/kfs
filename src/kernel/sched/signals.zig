@@ -275,7 +275,7 @@ pub const SigHand = struct {
             .SIGPWR     = default_sigaction,
             .SIGSYS     = default_sigaction,
         }),
-    
+
     pub fn init() SigHand {
         return SigHand{};
     }
