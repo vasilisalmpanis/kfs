@@ -3,6 +3,16 @@ const mm = @import("kernel").mm;
 const dbg = @import("debug");
 const krn = @import("kernel");
 
+pub var render_queue = krn.wq.WaitQueueHead.init();
+
+pub fn render_thread(_: ?*const anyopaque) i32 {
+    while (true) {
+        krn.screen.framebuffer.render();
+        render_queue.wait(false, 0);
+    }
+    return 0;
+}
+
 pub const Img = struct {
     width: usize,
     height: usize,
@@ -147,6 +157,7 @@ pub const FrameBuffer = struct {
                 .has_dirty = true,
             };
             fb.clear(0);
+            render_queue.setup();
             return fb;
         } else {
             @panic("no framebuffer info provided!");

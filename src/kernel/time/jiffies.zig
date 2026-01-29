@@ -9,6 +9,8 @@ pub fn timerHandler() void {
         // Every second
         krn.cmos.incSec(krn.cmos);
     }
+    if (jiffies % 30 == 0 and krn.screen.framebuffer.has_dirty)
+        drivers.framebuffer.render_queue.wakeUpOne();
 }
 
 pub fn getSecondsFromStart() u32 {

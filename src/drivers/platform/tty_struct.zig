@@ -363,7 +363,6 @@ const Page = struct {
             }
         }
         self.renderCursor();
-        scr.framebuffer.render();
         self.has_dirty = false;
         self.dirty.reset();
     }

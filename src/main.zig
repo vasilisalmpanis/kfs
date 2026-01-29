@@ -133,9 +133,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     // Initialize FPU early
     fpu.initFPU();
 
-    screen.initScreen(&krn.scr, &krn.boot_info);
     krn.pit = PIT.init(1000);
     krn.task.initMultitasking();
+    screen.initScreen(&krn.scr, &krn.boot_info);
     idt.idtInit();
     krn.logger.INFO("IDT initialized", .{});
 
