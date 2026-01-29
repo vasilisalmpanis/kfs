@@ -35,7 +35,7 @@ pub fn doExecve(
     const file = try krn.fs.File.new(path);
     errdefer file.ref.unref();
     const slice = if (krn.mm.kmallocSlice(u8, file.inode.size)) |_slice|
-        _slice 
+        _slice
     else
         return errors.ENOMEM;
     var read: usize = 0;
@@ -68,7 +68,7 @@ pub fn doExecve(
         freeSlices(argv, argv.len);
         freeSlices(envp, envp.len);
     }
-    
+
     krn.task.current.sighand = krn.signals.SigHand.init();
     var it = krn.task.current.files.closexec.iterator(
         .{.direction = .forward, .kind = .set}

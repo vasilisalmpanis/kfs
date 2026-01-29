@@ -8,7 +8,7 @@ pub const TreeNode = struct {
     pub fn init() TreeNode {
         return .{};
     }
-    
+
     pub fn setup(self: *TreeNode) void {
         self.parent = null;
         self.child = null;

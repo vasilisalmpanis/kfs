@@ -25,15 +25,23 @@ pub fn exit(error_code: i32) !u32 {
     }
 
     tsk.current.result = error_code;
+
     if (tsk.current.tree.parent) |p| {
         const parent = p.entry(tsk.Task, "tree");
         const act = parent.sighand.actions.get(.SIGCHLD);
-        if (act.handler.handler != signals.sigIGN and (act.flags & signals.SA_NOCLDSTOP == 0)) {
+        tsk.current.state = .ZOMBIE;
+
+        if (act.flags & signals.SA_NOCLDWAIT != 0)
+            tsk.current.state = .STOPPED;
+
+        if (act.handler.handler != signals.sigIGN)
             parent.sighand.setSignal(.SIGCHLD);
-            tsk.current.wakeupParent();
-        }
+
+        tsk.current.wakeupParent();
+
+        if (act.flags & signals.SA_NOCLDWAIT != 0)
+            tsk.current.finish();
     }
-    tsk.current.state = .ZOMBIE;
     sched.reschedule();
     return 0;
 }
