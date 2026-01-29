@@ -4,7 +4,7 @@ const reschedule = @import("./scheduler.zig").reschedule;
 
 pub const Mutex = struct {
     locked: atomic.Value(bool) = atomic.Value(bool).init(false),
-    
+
     pub fn init() Mutex {
         return Mutex{};
     }

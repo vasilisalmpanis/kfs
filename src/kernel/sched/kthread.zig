@@ -17,6 +17,7 @@ fn threadWrapper() callconv(.c) noreturn {
     tsk.current.refcount.ref();
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
     tsk.current.finish();
+    krn.sched.reschedule();
     while (true) {}
 }
 
