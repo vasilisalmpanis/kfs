@@ -21,9 +21,17 @@ theme:
     - bash
   features:
     - navigation.indexes
+    - content.code.copy
 
 markdown_extensions:
   - pymdownx.tasklist
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
   - admonition
   - codehilite
   - toc:
