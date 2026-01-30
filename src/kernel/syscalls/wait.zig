@@ -82,6 +82,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
     const wait_opts = WaitStates.init(options);
     if (pid > 0) {
         if (tsk.current.findChildByPid(@intCast(pid))) |task| {
+            errdefer task.refcount.unref();
             while (!wait_opts.isSet(task.state)) {
                 if (tsk.current.sighand.hasPending())
                     return errors.EINTR;
@@ -94,7 +95,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
             if (stat_addr != null) {
                 stat_addr.?.* = wait_opts.status(task);
             }
-            task.finish();
+            task.finish(false);
             return @intCast(pid);
         } else {
             krn.logger.INFO("ERROR\n", .{});
@@ -119,7 +120,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                         }
                         if (res.state == .STOPPED)
                             return errors.ECHILD;
-                        res.finish();
+                        res.finish(false);
                         return child_pid;
                     }
                 }
@@ -146,7 +147,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                         }
                         if (res.state == .STOPPED)
                             return errors.ECHILD;
-                        res.finish();
+                        res.finish(false);
                         return child_pid;
                     }
                 }
@@ -174,7 +175,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                         }
                         if (res.state == .STOPPED)
                             return errors.ECHILD;
-                        res.finish();
+                        res.finish(false);
                         return child_pid;
                     }
                 }

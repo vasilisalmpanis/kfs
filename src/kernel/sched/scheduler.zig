@@ -15,9 +15,9 @@ const arch = @import("arch");
 fn processTasks() void {
     if (tsk.stopped_tasks == null)
         return;
-    if (!tsk.tasks_mutex.trylock())
-        return;
-    defer tsk.tasks_mutex.unlock();
+    tsk.tasks_lock.lock();
+    defer tsk.tasks_lock.unlock();
+
     var it = tsk.stopped_tasks.?.iterator();
     while (it.next()) |i| {
         var end: bool = false;
@@ -58,9 +58,8 @@ fn processTasks() void {
 fn findNextTask() *tsk.Task {
     if (tsk.current.list.isEmpty())
         return &tsk.initial_task;
-    if (!tsk.tasks_mutex.trylock())
-        return tsk.current;
-    defer tsk.tasks_mutex.unlock();
+    tsk.tasks_lock.lock();
+    defer tsk.tasks_lock.unlock();
 
     var it = tsk.current.list.iterator();
     _ = it.next();

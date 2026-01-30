@@ -190,7 +190,7 @@ pub fn setEnvironment(stack_bottom: usize, stack_size: usize, argv: []const []co
 
 pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) !void {
 
-    const stack_pages: u32 = 10;
+    const stack_pages: u32 = 30;
     var heap_start: usize = 0;
 
     const prot: u32 = krn.mm.PROT_RW;

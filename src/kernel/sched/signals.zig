@@ -214,20 +214,6 @@ fn sigHandler(signum: u8) void {
     krn.logger.WARN("Default signal handler\n", .{});
 }
 
-fn sigHup(_: u8) void {
-    // Terminating.
-    tsk.tasks_mutex.lock();
-    tsk.current.state = .STOPPED;
-    tsk.current.list.del();
-    if (tsk.stopped_tasks == null) {
-        tsk.stopped_tasks = &tsk.current.list;
-        tsk.stopped_tasks.?.setup();
-    } else {
-        tsk.stopped_tasks.?.addTail(&tsk.current.list);
-    }
-    tsk.tasks_mutex.unlock();
-}
-
 fn sigIgn(_: u8) void {
     return;
 }
@@ -445,7 +431,7 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
             // }
             task.wakeup_time = 0;
             task.state = .INTERRUPTIBLE_SLEEP;
-            task.wakeupParent();
+            task.wakeupParent(false);
             return krn.sched.schedule(regs);
         },
         .SIGCONT => {},
@@ -455,7 +441,7 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         else => {
             task.state = .ZOMBIE;
             task.result = 128 + @intFromEnum(signal);
-            task.wakeupParent();
+            task.wakeupParent(false);
             // krn.sched.reschedule();
             return krn.sched.schedule(regs);
         }
