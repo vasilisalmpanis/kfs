@@ -15,7 +15,7 @@ fn send_signal(task: *tsk.Task, signal: signals.Signal) !u32 {
         ) {
             // TODO:
             // if (signal == .SIGCONT and task.state == .INTERRUPTIBLE_SLEEP)
-            //     task.wakeupParent();
+            //     task.wakeupParent(false);
             task.state = .RUNNING;
         }
     }
@@ -25,7 +25,7 @@ fn send_signal(task: *tsk.Task, signal: signals.Signal) !u32 {
 pub fn kill(pid: i32, sig: u32) !u32 {
     const signal: signals.Signal = @enumFromInt(sig);
     if (pid == 0 or pid < -1) {
-        tsk.tasks_mutex.lock();
+        const lock_state = tsk.tasks_lock.lock_irq_disable();
         var it = tsk.initial_task.list.iterator();
         var count: i32 = 0;
         const pgroup: u32 = if (pid < -1) @intCast(-pid) else tsk.current.pgid;
@@ -36,10 +36,10 @@ pub fn kill(pid: i32, sig: u32) !u32 {
             }
             count += 1;
         }
-        tsk.tasks_mutex.unlock();
+        defer tsk.tasks_lock.unlock_irq_enable(lock_state);
         return if (count == 0) errors.ESRCH else 0;
     } else if (pid == -1) {
-        tsk.tasks_mutex.lock();
+        const lock_state = tsk.tasks_lock.lock_irq_disable();
         var it = tsk.initial_task.list.iterator();
         var count: i32 = 0;
         while (it.next()) |i| {
@@ -49,7 +49,7 @@ pub fn kill(pid: i32, sig: u32) !u32 {
             _ = send_signal(task, signal) catch {};
             count += 1;
         }
-        tsk.tasks_mutex.unlock();
+        defer tsk.tasks_lock.unlock_irq_enable(lock_state);
         return if (count == 0) errors.ESRCH else 0;
     } else if (tsk.initial_task.findByPid(@intCast(pid))) |task| {
         defer task.refcount.unref();

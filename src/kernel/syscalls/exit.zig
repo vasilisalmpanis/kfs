@@ -26,22 +26,20 @@ pub fn exit(error_code: i32) !u32 {
 
     tsk.current.result = error_code;
 
+    const lock_state = kernel.task.tasks_lock.lock_irq_disable();
     if (tsk.current.tree.parent) |p| {
         const parent = p.entry(tsk.Task, "tree");
         const act = parent.sighand.actions.get(.SIGCHLD);
+        
         tsk.current.state = .ZOMBIE;
-
         if (act.flags & signals.SA_NOCLDWAIT != 0)
-            tsk.current.state = .STOPPED;
-
+            tsk.current.finish(true);
+        
+        tsk.current.wakeupParent(true);
         if (act.handler.handler != signals.sigIGN)
             parent.sighand.setSignal(.SIGCHLD);
-
-        tsk.current.wakeupParent();
-
-        if (act.flags & signals.SA_NOCLDWAIT != 0)
-            tsk.current.finish();
     }
+    kernel.task.tasks_lock.unlock_irq_enable(lock_state);
     sched.reschedule();
     return 0;
 }

@@ -92,6 +92,7 @@ pub fn hBoundRangeExceeded(regs: *Regs) *Regs {
 }
 
 pub fn hInvalidOpcode(regs: *Regs) *Regs {
+    regs.dump();
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
@@ -99,7 +100,6 @@ pub fn hInvalidOpcode(regs: *Regs) *Regs {
         ) catch {};
         return regs;
     }
-    regs.dump();
     if (true) @panic("hInvalidOpcode");
     return regs;
 }
