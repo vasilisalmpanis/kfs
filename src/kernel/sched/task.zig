@@ -216,10 +216,11 @@ pub const Task = struct {
         self.wait_wq = krn.wq.WaitQueueHead.init();
         self.wait_wq.setup();
 
-        tasks_mutex.lock();
+        const lock_state = tasks_lock.lock_irq_disable();
+        defer tasks_lock.unlock_irq_enable(lock_state);
+
         current.tree.addChild(&self.tree);
         current.list.addTail(&self.list);
-        tasks_mutex.unlock();
     }
 
     fn zombifyChildren(self: *Task) void {
@@ -261,10 +262,12 @@ pub const Task = struct {
                 const res = i.curr.entry(Task, "tree");
                 if ((pgid > 0 and res.pgid == pgid) or pgid == 0) {
                     result = true;
-                    if (ref) {
-                        res.refcount.ref();
-                    } else {
-                        res.refcount.unref();
+                    if (res.state != .STOPPED) {
+                        if (ref) {
+                            res.refcount.ref();
+                        } else {
+                            res.refcount.unref();
+                        }
                     }
                 }
             }
@@ -286,11 +289,14 @@ pub const Task = struct {
         return null;
     }
 
-    pub fn finish(self: *Task) void {
+    /// tasks_locked defines if tasks_lock is already locked
+    pub fn finish(self: *Task, tasks_locked: bool) void {
         if (self.state != .ZOMBIE and self.state != .STOPPED)
             return ;
         self.state = .STOPPED;
-        tasks_mutex.lock();
+        const lock_state = if (!tasks_locked) tasks_lock.lock_irq_disable() else false;
+        defer if (!tasks_locked) tasks_lock.unlock_irq_enable(lock_state);
+
         self.list.del();
         self.refcount.unref();
         if (stopped_tasks == null) {
@@ -299,12 +305,11 @@ pub const Task = struct {
         } else {
             stopped_tasks.?.addTail(&self.list);
         }
-        tasks_mutex.unlock();
     }
 
-    pub fn wakeupParent(self: *Task) void {
-        tasks_mutex.lock();
-        defer tasks_mutex.unlock();
+    pub fn wakeupParent(self: *Task, tasks_locked: bool) void {
+        const lock_state = if (!tasks_locked) tasks_lock.lock_irq_disable() else false;
+        defer if (!tasks_locked) tasks_lock.unlock_irq_enable(lock_state);
 
         if (self.tree.parent) |_p| {
             const parent = _p.entry(Task, "tree");
@@ -325,7 +330,7 @@ pub fn sleep(millis: usize) void {
 
 pub var initial_task = Task.init(0, 0, 1, .KTHREAD);
 pub var current = &initial_task;
-pub var tasks_mutex: mutex = mutex.init();
+pub var tasks_lock: krn.Spinlock = krn.Spinlock.init();
 pub var stopped_tasks: ?*lst.ListHead = null;
 
 extern const stack_top: u32;
