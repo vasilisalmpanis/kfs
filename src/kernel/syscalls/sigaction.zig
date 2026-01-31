@@ -271,7 +271,7 @@ pub fn sigaltstack(
         oss.ss_flags = SS_DISABLE;
         oss.ss_size = 0;
     }
-    
+
     if (ss) |_| {
         // TODO: Actually implement alternate signal stack
     }
