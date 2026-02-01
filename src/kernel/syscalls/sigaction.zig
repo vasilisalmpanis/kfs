@@ -265,7 +265,15 @@ pub fn sigaltstack(
     ss: ?*StackT,
     old_ss: ?*StackT
 ) !u32 {
-    _ = ss;
-    _ = old_ss;
-    return errors.EINVAL;
+    if (old_ss) |oss| {
+        // Report no alternate signal stack configured
+        oss.ss_sp = null;
+        oss.ss_flags = SS_DISABLE;
+        oss.ss_size = 0;
+    }
+    
+    if (ss) |_| {
+        // TODO: Actually implement alternate signal stack
+    }
+    return 0;
 }

@@ -303,11 +303,35 @@ pub const MM = struct {
         var hint: usize = addr;
         var end = hint + length;
         var new_vma: ?*VMA = null;
+        
+        if (flags.FIXED) {            
+            _ = krn.do_munmap(
+                self, @intCast(hint),
+                @intCast(end)
+            ) catch {};
+            
+            new_vma = try self.add_vma(
+                if (self.vmas == null) null else self.findInsertPoint(hint),
+                hint,
+                length,
+                prot,
+                flags,
+                file,
+                offset
+            );
+            if (self.vmas == null or hint < self.vmas.?.start)
+                self.vmas = new_vma;
+            krn.logger.DEBUG(
+                "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+                .{krn.task.current.pid, hint, end}
+            );
+            return @intCast(hint);
+        }
         if (self.vmas) |list| {
             var it = list.list.iterator();
             while (it.next()) |node| {
                 const vma: *VMA = node.curr.entry(VMA, "list");
-                if (vma.end < hint)
+                if (vma.end <= hint)
                     continue;
                 if (vma.start >= hint + length) {
                     new_vma = self.add_vma(
@@ -329,11 +353,8 @@ pub const MM = struct {
                     );
                     return @intCast(hint);
                 }
-                if (flags.FIXED == false) {
-                    hint = vma.end;
-                    end = hint + length;
-                    continue;
-                }
+                hint = vma.end;
+                end = hint + length;
                 // 1. begin before, end inside
                 // 2. begin before, end after
                 // 3. begin inside, end inside
@@ -361,6 +382,19 @@ pub const MM = struct {
             .{krn.task.current.pid, hint, end}
         );
         return @intCast(hint);
+    }
+    
+    fn findInsertPoint(self: *MM, addr: usize) ?*krn.list.ListHead {
+        if (self.vmas) |list| {
+            var it = list.list.iterator();
+            while (it.next()) |node| {
+                const vma: *VMA = node.curr.entry(VMA, "list");
+                if (vma.start > addr)
+                    return node.curr;
+            }
+            return self.vmas.?.list.prev;
+        }
+        return null;
     }
 
     pub fn dup(self: *MM) ?*MM {
