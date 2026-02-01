@@ -31,7 +31,7 @@ pub const envp_init: []const []const u8 = &[_][]const u8{
     "HOME=/root",
     "TERM=xterm-256color",
     "TERMINFO=/usr/share/terminfo",
-    "VIM=/usr/share/vim/vim91",
+    "VIM=/usr/share/vim",
 };
 
 const AuxEntry = struct {
