@@ -22,6 +22,8 @@ const PT_TYPE = enum (u32) {
     _,
 };
 
+pub const HEAP_MMAP_GAP: usize = 4 * 1024 * 1024;
+
 pub const argv_init: []const []const u8 = &[_][]const u8{
     "init",
 };
@@ -29,7 +31,7 @@ pub const envp_init: []const []const u8 = &[_][]const u8{
     "HOME=/root",
     "TERM=xterm-256color",
     "TERMINFO=/usr/share/terminfo",
-    "VIM=/usr/share/vim/vim91",
+    "VIM=/usr/share/vim",
 };
 
 const AuxEntry = struct {
@@ -261,7 +263,7 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
     krn.logger.INFO("heap_start 0x{X:0>8}\n", .{heap_start});
     krn.task.current.mm.?.brk_start = heap_start;
     krn.task.current.mm.?.brk = heap_start;
-    krn.task.current.mm.?.heap = heap_start + 32 * 1024 * 1024;
+    krn.task.current.mm.?.heap = heap_start + HEAP_MMAP_GAP;
     krn.task.current.mm.?.stack_bottom = stack_bottom;
     krn.task.current.mm.?.stack_top = stack_bottom + stack_size;
     krn.task.current.mm.?.code = ehdr.e_entry;
