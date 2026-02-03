@@ -118,8 +118,11 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                         if (stat_addr != null) {
                             stat_addr.?.* =  wait_opts.status(res);
                         }
-                        if (res.state == .STOPPED)
+                        if (res.state == .STOPPED) {
+                            if (i.curr.hasSiblings())
+                                continue ;
                             return errors.ECHILD;
+                        }
                         res.finish(false);
                         return child_pid;
                     }
@@ -145,8 +148,11 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                         if (stat_addr != null) {
                             stat_addr.?.* = wait_opts.status(res);
                         }
-                        if (res.state == .STOPPED)
+                        if (res.state == .STOPPED) {
+                            if (i.curr.hasSiblings())
+                                continue ;
                             return errors.ECHILD;
+                        }
                         res.finish(false);
                         return child_pid;
                     }
@@ -173,8 +179,11 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                         if (stat_addr != null) {
                             stat_addr.?.* = wait_opts.status(res);
                         }
-                        if (res.state == .STOPPED)
+                        if (res.state == .STOPPED) {
+                            if (i.curr.hasSiblings())
+                                continue ;
                             return errors.ECHILD;
+                        }
                         res.finish(false);
                         return child_pid;
                     }
