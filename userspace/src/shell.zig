@@ -610,20 +610,24 @@ fn execve(self: *Shell, args: [][]const u8) void {
         };
     }
     var status: u32 = 0;
-    const res = std.os.linux.waitpid(@intCast(pid), &status, 0);
-    if (res != 0) {
-        if (std.os.linux.W.IFSIGNALED(status)) {
-            std.debug.print("Killed\n", .{});
+    while (true) {
+        const res = std.os.linux.waitpid(-1, &status, 0);
+        if (res != 0) {
+            if (std.os.linux.W.IFSIGNALED(status)) {
+                std.debug.print("Killed\n", .{});
+            }
+            switch (std.posix.errno(res)) {
+                .SUCCESS => {},
+                .INTR => continue,
+                else => |_err| {
+                    std.debug.print(
+                        "Wait finished with: {t}\n",
+                        .{_err}
+                    );
+                },
+            }
         }
-        switch (std.posix.errno(res)) {
-            .SUCCESS => {},
-            else => |_err| {
-                std.debug.print(
-                    "Wait finished with: {t}\n",
-                    .{_err}
-                );
-            },
-        }
+        break ;
     }
 }
 

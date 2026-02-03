@@ -261,8 +261,8 @@ pub const Task = struct {
             while (it.next()) |i| {
                 const res = i.curr.entry(Task, "tree");
                 if ((pgid > 0 and res.pgid == pgid) or pgid == 0) {
-                    result = true;
                     if (res.state != .STOPPED) {
+                        result = true;
                         if (ref) {
                             res.refcount.ref();
                         } else {
