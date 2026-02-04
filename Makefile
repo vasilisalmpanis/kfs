@@ -8,7 +8,7 @@ USERSPACE_DIR = userspace
 
 IMG 		= ext2.img
 IMG_DIR		= ext2_dir
-IMG_SIZE	= 32M
+IMG_SIZE	= 64M
 
 FILESYSTEM_TAR	= filesystem.tar.gz
 FILESYSTEM_TAR_LINK = https://github.com/vasilisalmpanis/kfs/releases/download/filesystem/filesystem.tar.gz

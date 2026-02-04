@@ -7,7 +7,6 @@ pub var render_queue = krn.wq.WaitQueueHead.init();
 
 pub fn render_thread(_: ?*const anyopaque) i32 {
     while (!krn.task.current.should_stop) {
-        krn.serial.print("here\n");
         krn.screen.framebuffer.render();
         render_queue.wait(false, 0);
     }

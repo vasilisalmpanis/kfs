@@ -49,6 +49,14 @@ pub const SyscallTable = brk: {
         .SYS_umount                     = @ptrCast(&krn.syscalls.mount.umount),
         .SYS_setuid                     = @ptrCast(&krn.syscalls.id.setUID),
         .SYS_getuid                     = @ptrCast(&krn.syscalls.id.getUID),
+        .SYS_setresuid32                = @ptrCast(&krn.syscalls.id.setresuid),
+        .SYS_getresuid32                = @ptrCast(&krn.syscalls.id.getresuid),
+        .SYS_setresgid32                = @ptrCast(&krn.syscalls.id.setresuid),
+        .SYS_getresgid32                = @ptrCast(&krn.syscalls.id.getresuid),
+        .SYS_setresuid                  = @ptrCast(&krn.syscalls.id.setresuid),
+        .SYS_getresuid                  = @ptrCast(&krn.syscalls.id.getresuid),
+        .SYS_setresgid                  = @ptrCast(&krn.syscalls.id.setresuid),
+        .SYS_getresgid                  = @ptrCast(&krn.syscalls.id.getresuid),
         .SYS_stime                      = &notImpl,
         .SYS_ptrace                     = &notImpl,
         .SYS_alarm                      = &notImpl,
@@ -176,7 +184,8 @@ pub const SyscallTable = brk: {
         .SYS_setfsgid                   = &notImpl,
         .SYS__llseek                    = @ptrCast(&krn.syscalls.lseek.llseek),
         .SYS_getdents                   = @ptrCast(&krn.syscalls.getdents.getdents),
-        .SYS__newselect                 = @ptrCast(&krn.syscalls.poll.newselect),
+        .SYS_newselect                  = @ptrCast(&krn.syscalls.poll.newselect),
+        .SYS_pselect6                   = @ptrCast(&krn.syscalls.poll.newselect),
         .SYS_flock                      = &notImpl,
         .SYS_msync                      = &notImpl,
         .SYS_readv                      = @ptrCast(&krn.syscalls.read.readv),
@@ -198,14 +207,10 @@ pub const SyscallTable = brk: {
         .SYS_sched_rr_get_interval      = &notImpl,
         .SYS_nanosleep                  = @ptrCast(&krn.syscalls.sleep.nanosleep),
         .SYS_mremap                     = &notImpl,
-        .SYS_setresuid                  = &notImpl,
-        .SYS_getresuid                  = &notImpl,
         .SYS_vm86                       = &notImpl,
         .SYS_query_module               = &notImpl,
         .SYS_poll                       = @ptrCast(&krn.syscalls.poll.poll),
         .SYS_nfsservctl                 = &notImpl,
-        .SYS_setresgid                  = &notImpl,
-        .SYS_getresgid                  = &notImpl,
         .SYS_prctl                      = &notImpl,
         .SYS_rt_sigreturn               = @ptrCast(&krn.syscalls.sigaction.rt_sigreturn),
         .SYS_rt_sigaction               = @ptrCast(&krn.syscalls.sigaction.sigaction),
@@ -398,7 +403,7 @@ pub const Syscall = enum(u10) {
     SYS_setfsgid,                   // 139
     SYS__llseek,                    // 140
     SYS_getdents,                   // 141
-    SYS__newselect,                 // 142
+    SYS_newselect,                  // 142
     SYS_flock,                      // 143
     SYS_msync,                      // 144
     SYS_readv,                      // 145
