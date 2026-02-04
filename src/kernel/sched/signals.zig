@@ -439,10 +439,9 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         .SIGURG,
         .SIGWINCH => {},
         else => {
-            task.state = .ZOMBIE;
-            task.result = 128 + @intFromEnum(signal);
-            task.wakeupParent(false);
-            // krn.sched.reschedule();
+            arch.cpu.enableInterrupts();
+            _ = krn.exit.exit(128 + @intFromEnum(signal)) catch {};
+            unreachable();
             return krn.sched.schedule(regs);
         }
     }

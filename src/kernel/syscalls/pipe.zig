@@ -13,7 +13,7 @@ fn releasePipeInode(ref: *krn.task.RefCount) void {
         krn.mm.kfree(_pipe);
     }
     krn.mm.kfree(inode);
-} 
+}
 
 pub fn pipe2(pipefd: ?*[2]i32, flags: i32) !u32 {
     const fds = pipefd
@@ -38,7 +38,7 @@ pub fn pipe2(pipefd: ?*[2]i32, flags: i32) !u32 {
         pipe_inode.ref.ref();
         pipe_inode.mode = fs.UMode.fifo();
         pipe_inode.data.pipe = pipe_data;
-        
+
         write_file = try krn.fs.File.pseudo(pipe_inode);
         errdefer write_file.ref.unref();
         write_file.mode = fs.UMode.fifo();
@@ -51,7 +51,7 @@ pub fn pipe2(pipefd: ?*[2]i32, flags: i32) !u32 {
 
         try krn.task.current.files.setFD(read_fd, read_file);
         try krn.task.current.files.setFD(write_fd, write_file);
-        krn.logger.INFO("pipe: write file refcount: {d}", .{write_file.ref.count.raw});
+
         fds[0] = @intCast(read_fd);
         fds[1] = @intCast(write_fd);
     } else {

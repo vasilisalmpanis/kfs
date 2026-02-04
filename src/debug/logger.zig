@@ -1,5 +1,6 @@
 const std = @import("std");
 const krn = @import("kernel");
+const arch = @import("arch");
 
 pub const LogLevel = enum {
     DEBUG,
@@ -34,9 +35,9 @@ pub const Logger = struct {
     }
 
     pub fn log(
-        self: *Logger, 
-        level: LogLevel, 
-        comptime format: []const u8, 
+        self: *Logger,
+        level: LogLevel,
+        comptime format: []const u8,
         args: anytype
     ) !void {
         if (@intFromEnum(level) < @intFromEnum(self.log_level)) return;
@@ -47,23 +48,38 @@ pub const Logger = struct {
             .WARN => YELLOW,
             .ERROR => RED
         };
-        const formatted_log = try std.fmt.allocPrint(krn.mm.kernel_allocator.allocator(),
-            "{s}[{t}]: " ++
+        if (arch.cpu.areIntEnabled()) {
+            const formatted_log = try std.fmt.allocPrint(krn.mm.kernel_allocator.allocator(),
+                "{s}[{t}]: " ++
                 format ++
                 DEFAULT ++
                 if (format[format.len - 1] == '\n') "" else "\n",
-            .{
-                color,
-                level,
-            } ++ args
-        );
-        krn.serial.print(formatted_log);
-        krn.mm.kfree(formatted_log.ptr);
+                .{
+                    color,
+                    level,
+                } ++ args
+            );
+            krn.serial.print(formatted_log);
+            krn.mm.kfree(formatted_log.ptr);
+        } else {
+            var buf: [512]u8 = undefined;
+            const formatted_log = std.fmt.bufPrint(buf[0..512],
+                "{s}[{t}]: " ++
+                format ++
+                DEFAULT ++
+                if (format[format.len - 1] == '\n') "" else "\n",
+                .{
+                    color,
+                    level,
+                } ++ args
+            ) catch "";
+            krn.serial.print(formatted_log);
+        }
     }
 
     pub fn DEBUG(
         self: *Logger,
-        comptime format: []const u8, 
+        comptime format: []const u8,
         args: anytype
     ) void {
         self.log(.DEBUG, format, args) catch {};
@@ -71,7 +87,7 @@ pub const Logger = struct {
 
     pub fn INFO(
         self: *Logger,
-        comptime format: []const u8, 
+        comptime format: []const u8,
         args: anytype
     ) void {
         self.log(.INFO, format, args) catch {};
@@ -79,7 +95,7 @@ pub const Logger = struct {
 
     pub fn WARN(
         self: *Logger,
-        comptime format: []const u8, 
+        comptime format: []const u8,
         args: anytype
     ) void {
         self.log(.WARN, format, args) catch {};
@@ -87,7 +103,7 @@ pub const Logger = struct {
 
     pub fn ERROR(
         self: *Logger,
-        comptime format: []const u8, 
+        comptime format: []const u8,
         args: anytype
     ) void {
         self.log(.ERROR, format, args) catch {};
