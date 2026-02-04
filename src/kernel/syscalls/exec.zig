@@ -40,12 +40,9 @@ pub fn doExecve(
         return errors.ENOMEM;
     var read: usize = 0;
     krn.logger.INFO("Executing {s} {d}\n", .{filename, file.inode.size});
-    arch.cpu.disableInterrupts();
     while (read < file.inode.size) {
-        errdefer arch.cpu.enableInterrupts();
         read += try file.ops.read(file, @ptrCast(&slice[read]), slice.len);
     }
-    arch.cpu.enableInterrupts();
 
     krn.task.current.setName(path.dentry.name); // TODO: make copy of filename and set name only if we will execute
 

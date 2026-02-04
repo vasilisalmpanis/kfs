@@ -30,11 +30,11 @@ pub fn exit(error_code: i32) !u32 {
     if (tsk.current.tree.parent) |p| {
         const parent = p.entry(tsk.Task, "tree");
         const act = parent.sighand.actions.get(.SIGCHLD);
-        
+
         tsk.current.state = .ZOMBIE;
         if (act.flags & signals.SA_NOCLDWAIT != 0)
             tsk.current.finish(true);
-        
+
         tsk.current.wakeupParent(true);
         if (act.handler.handler != signals.sigIGN)
             parent.sighand.setSignal(.SIGCHLD);

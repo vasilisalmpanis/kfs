@@ -6,6 +6,7 @@ const Ext2DirEntry = @import("inode.zig").Ext2DirEntry;
 const std = @import("std");
 const device = @import("drivers").device;
 const ext2_inode = @import("./inode.zig");
+const arch = @import("arch");
 
 const EXT2_MAGIC: u32 = 0xEF53;
 
@@ -226,12 +227,13 @@ pub const Ext2Super = struct {
         );
     }
 
-
     pub fn readBlocks(sb: *Ext2Super, block: usize, count: usize) ![]u8 {
         const alloc_size: usize = sb.base.block_size * count;
         if (kernel.mm.kmallocArray(u8, alloc_size)) |raw_buff| {
             errdefer kernel.mm.kfree(raw_buff);
             @memset(raw_buff[0..alloc_size], 0);
+            arch.cpu.disableInterrupts();
+            defer arch.cpu.enableInterrupts();
             sb.base.dev_file.?.pos = sb.base.block_size * block;
             var read: usize = 0;
             while (read < alloc_size) {

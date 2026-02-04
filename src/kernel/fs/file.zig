@@ -124,7 +124,7 @@ pub const TaskFiles = struct {
             files.closexec = std.DynamicBitSet.initEmpty(kernel.mm.kernel_allocator.allocator(), 64) catch {
                 kernel.mm.kfree(files);
                 return null;
-            }; 
+            };
             files.fds = std.AutoHashMap(usize, *File).init(kernel.mm.kernel_allocator.allocator());
             return files;
         }

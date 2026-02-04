@@ -50,15 +50,16 @@ pub fn close(base: *krn.fs.File) void {
     krn.logger.INFO("pipe close", .{});
     const pipe = base.inode.data.pipe
         orelse return ;
-    if (base.flags & krn.fs.file.O_WRONLY != 0) {
+    if ((base.flags & krn.fs.file.O_ACCMODE) == krn.fs.file.O_WRONLY) {
         pipe.writers -|= 1;
         if (pipe.writers == 0)
             pipe.read_queue.wakeUpAll();
-    } else if (base.flags & krn.fs.file.O_RDONLY != 0) {
+    } else if ((base.flags & krn.fs.file.O_ACCMODE) == krn.fs.file.O_RDONLY) {
         pipe.readers -|= 1;
-        if (pipe.readers == 0)
+        if (pipe.readers == 0) {
             pipe.write_queue.wakeUpOne();
-    } else if (base.flags & krn.fs.file.O_RDWR != 0) {
+        }
+    } else if ((base.flags & krn.fs.file.O_ACCMODE) == krn.fs.file.O_RDWR) {
         pipe.writers -|= 1;
         pipe.readers -|= 1;
         if (pipe.writers == 0)
@@ -88,11 +89,19 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     const pipe = base.inode.data.pipe
         orelse return krn.errors.PosixError.EFAULT;
     if (pipe.readers == 0) {
+        _ = try krn.kill(
+            @intCast(krn.task.current.pid),
+            @intFromEnum(krn.signals.Signal.SIGPIPE)
+        );
         return krn.errors.PosixError.EPIPE;
     }
     while (pipe.rb.isFull()) {
         pipe.write_queue.wait(true, 0);
         if (pipe.readers == 0) {
+            _ = try krn.kill(
+                @intCast(krn.task.current.pid),
+                @intFromEnum(krn.signals.Signal.SIGPIPE)
+            );
             return krn.errors.PosixError.EPIPE;
         }
     }

@@ -437,7 +437,7 @@ pub const ATADrive = struct {
 
         arch.io.outb(self.bmide_base + BMIDE_COMMAND, BMIDE_CMD_START);
         self.ataWriteReg(ATA_REG_COMMAND, ATA_CMD_READ_DMA);
-        
+
         self.delay();
         try self.waitDMA();
         return;
@@ -445,20 +445,20 @@ pub const ATADrive = struct {
 
     fn waitDMA(self: *const ATADrive) !void {
         var timeout: u32 = TIMEOUT_DMA;
-        
+
         while (timeout > 0) {
             const bmide_status = arch.io.inb(self.bmide_base + BMIDE_STATUS);
             const ata_status = self.ataReadReg(ATA_REG_STATUS);
-            
+
             if (bmide_status & BMIDE_STATUS_ERROR != 0 or ata_status & ATA_SR_ERR != 0) {
                 kernel.logger.ERROR("DMA transfer error. BMIDE: 0x{X}, ATA: 0x{X}", .{bmide_status, ata_status});
                 self.stopDMA();
                 return kernel.errors.PosixError.EIO;
             }
-            
+
             if (bmide_status & BMIDE_STATUS_INTERRUPT != 0 and ata_status & ATA_SR_BSY == 0) {
                 // kernel.logger.INFO("Read DMA finished successfully|", .{});
-                self.stopDMA();                
+                self.stopDMA();
                 arch.io.outb(self.bmide_base + BMIDE_STATUS, bmide_status | BMIDE_STATUS_INTERRUPT);
                 self.delay();
                 // const sector: []const u8 = @as([*]u8, @ptrFromInt(self.dma_buff_virt))[0..512];
@@ -469,7 +469,7 @@ pub const ATADrive = struct {
             }
             timeout -= 1;
         }
-        
+
         kernel.logger.ERROR("DMA transfer timeout", .{});
         self.stopDMA();
         return kernel.errors.PosixError.EIO;
@@ -817,7 +817,7 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
             const partition = ata_dev.partitions.items[part_idx - 1];
             start_lba = partition.start_lba;
         }
-        
+
         const lba: u32 = start_lba + @as(u32, @intCast(file.pos)) / ATADrive.SECTOR_SIZE;
         if (part_idx != 0) {
             const partition = ata_dev.partitions.items[part_idx - 1];
@@ -829,7 +829,7 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
                 return 0;
         }
         // ata_dev.selectChannel();
-        
+
         var _size: u32 = @intCast(size);
         if (_size > 64 * ATADrive.SECTOR_SIZE)
             _size = ATADrive.SECTOR_SIZE * 64;
@@ -844,6 +844,7 @@ fn ata_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
 
         const dma_buf: [*]u8 = @ptrFromInt(ata_dev.dma_buff_virt);
         @memcpy(buff[0.._size], dma_buf[offset..offset + _size]);
+
         file.pos += _size;
         return _size;
     }
