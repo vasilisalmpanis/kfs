@@ -77,3 +77,19 @@ pub fn getEUID32() !u32 {
 pub fn getEGID() !u32 {
     return krn.task.current.gid;
 }
+
+pub fn getresuid() !u32 {
+    return krn.task.current.uid;
+}
+
+pub fn setresuid() !u32 {
+    return 0;
+}
+
+pub fn getresgid() !u32 {
+    return krn.task.current.gid;
+}
+
+pub fn setresgid() !u32 {
+    return 0;
+}

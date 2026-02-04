@@ -117,11 +117,11 @@ pub const TaskFiles = struct {
 
     pub fn new() ?*TaskFiles {
         if (kernel.mm.kmalloc(TaskFiles)) |files| {
-            files.map = std.DynamicBitSet.initEmpty(kernel.mm.kernel_allocator.allocator(), 64) catch {
+            files.map = std.DynamicBitSet.initEmpty(kernel.mm.kernel_allocator.allocator(), 128) catch {
                 kernel.mm.kfree(files);
                 return null;
             }; // Bits per long
-            files.closexec = std.DynamicBitSet.initEmpty(kernel.mm.kernel_allocator.allocator(), 64) catch {
+            files.closexec = std.DynamicBitSet.initEmpty(kernel.mm.kernel_allocator.allocator(), 128) catch {
                 kernel.mm.kfree(files);
                 return null;
             };
