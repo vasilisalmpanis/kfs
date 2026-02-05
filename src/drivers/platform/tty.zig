@@ -187,7 +187,7 @@ fn print_raw_input(msg: []const u8) void {
 fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     var _tty = try getTTY(file);
     const msg = buf[0..size];
-    print_raw_input(msg);
+    // print_raw_input(msg);
     var i: usize = 0;
     while (i < msg.len) : (i += 1) {
         const c = msg[i];
