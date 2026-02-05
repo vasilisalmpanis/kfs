@@ -249,6 +249,7 @@ pub fn keyboardInterrupt() void {
 
 pub fn init() void {
     global_keyboard = &keyboard;
-    wait_queue.setup();
+    if (!wait_queue.isSetup())
+        wait_queue.setup();
     krn.irq.registerHandler(1, &keyboardInterrupt);
 }
