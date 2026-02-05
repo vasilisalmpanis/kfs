@@ -34,6 +34,10 @@ pub const WaitQueueHead = struct {
         self.list.setup();
     }
 
+    pub fn isSetup(self: *WaitQueueHead) bool {
+        return self.list.next != null;
+    }
+
     pub fn wait(
         self: *WaitQueueHead,
         interruptable: bool,
