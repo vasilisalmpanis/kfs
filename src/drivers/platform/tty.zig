@@ -119,26 +119,47 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
         while (true) {
             _tty.lock.lock();
             const avail = _tty.file_buff.available();
-            if (avail == 0) {
-                _tty.lock.unlock();
-                if (vmin == 0 or _tty.nonblock)
-                    return 0;
+            if (avail == 0 or avail < vmin) {
+                const to_read = @min(avail, size);
+                if (to_read == 0)
+                    _tty.lock.unlock();
+                var n: usize = 0;
+                if ((vmin == 0 and timeout_ms == 0) or _tty.nonblock) {
+                    if (to_read > 0) {
+                        n = _tty.file_buff.readInto(buf[0..to_read]);
+                        _tty.lock.unlock();
+                    }
+                    return @intCast(n);
+                }
                 var elapsed: usize = 0;
                 // Check timeout if VTIME is set
                 if (vtime > 0) {
                     elapsed = krn.currentMs() - start_time;
                     if (elapsed >= timeout_ms) {
-                        return 0; // Timeout expired
+                        if (to_read > 0) {
+                            n = _tty.file_buff.readInto(buf[0..to_read]);
+                            _tty.lock.unlock();
+                        }
+                        return @intCast(n);
                     }
                 }
-                _tty.read_queue.wait(true, elapsed);
+                const to_sleep = timeout_ms -| elapsed;
+                if (to_sleep == 0 and timeout_ms != 0) {
+                    if (to_read > 0) {
+                        n = _tty.file_buff.readInto(buf[0..to_read]);
+                        _tty.lock.unlock();
+                    }
+                    return @intCast(n);
+                }
+                if (to_read > 0)
+                    _tty.lock.unlock();
+                _tty.read_queue.wait(true, to_sleep);
                 if (krn.task.current.sighand.hasPending())
                     return krn.errors.PosixError.EINTR;
                 continue;
             }
             const to_read = @min(avail, size);
             const n = _tty.file_buff.readInto(buf[0..to_read]);
-            krn.logger.INFO("Read {any}\n", .{buf[0..n]});
             _tty.lock.unlock();
             return @intCast(n);
         }
