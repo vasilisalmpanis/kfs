@@ -57,7 +57,7 @@ pub fn close(base: *krn.fs.File) void {
     } else if ((base.flags & krn.fs.file.O_ACCMODE) == krn.fs.file.O_RDONLY) {
         pipe.readers -|= 1;
         if (pipe.readers == 0) {
-            pipe.write_queue.wakeUpOne();
+            pipe.write_queue.wakeUpAll();
         }
     } else if ((base.flags & krn.fs.file.O_ACCMODE) == krn.fs.file.O_RDWR) {
         pipe.writers -|= 1;
@@ -72,14 +72,17 @@ pub fn close(base: *krn.fs.File) void {
 pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     const pipe = base.inode.data.pipe
         orelse return krn.errors.PosixError.EFAULT;
+    pipe.lock.lock();
+    defer pipe.lock.unlock();
+
     while (pipe.rb.isEmpty()) {
         if (pipe.writers == 0)
             return 0;
+        pipe.lock.unlock();
         pipe.read_queue.wait(true, 0);
+        pipe.lock.lock();
     }
 
-    pipe.lock.lock();
-    defer pipe.lock.unlock();
     const ret_size: usize = pipe.rb.readInto(buf[0..size]);
     pipe.write_queue.wakeUpOne();
     return ret_size;
@@ -95,8 +98,13 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
         );
         return krn.errors.PosixError.EPIPE;
     }
+    pipe.lock.lock();
+    defer pipe.lock.unlock();
+    
     while (pipe.rb.isFull()) {
+        pipe.lock.unlock();
         pipe.write_queue.wait(true, 0);
+        pipe.lock.lock();
         if (pipe.readers == 0) {
             _ = try krn.kill(
                 @intCast(krn.task.current.pid),
@@ -105,8 +113,6 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
             return krn.errors.PosixError.EPIPE;
         }
     }
-    pipe.lock.lock();
-    defer pipe.lock.unlock();
     defer pipe.read_queue.wakeUpOne();
     for (buf[0..size], 0..) |ch, idx| {
         if (!pipe.rb.push(ch)) {
