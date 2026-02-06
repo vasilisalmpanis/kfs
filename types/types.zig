@@ -1260,13 +1260,42 @@ pub const drivers = struct {
             data : [256][]const u16,
         };
 
+        pub const ScrollDirection = enum(u1) {
+            up = 0,
+            down = 1,
+        };
+
+
+        pub const RenderMode = enum(u1) {
+            double_buffered = 0,
+            zero_copy = 1,
+        };
+
+
+        pub const DirtyRect = struct {
+            x1 : u32,
+            y1 : u32,
+            x2 : u32,
+            y2 : u32,
+        };
+
         pub const FrameBuffer = struct {
             fb_info : *arch.multiboot.TagFrameBufferInfo,
             fb_ptr : [*]u32,
+            virt_buffer : ?[*]u32,
+            font : *const drivers.framebuffer.Font,
+            mode : drivers.framebuffer.RenderMode,
+            stride : u32,
+            width : u32,
+            height : u32,
+            total_pixels : u32,
             cwidth : u32,
             cheight : u32,
-            virtual_buffer : [*]u32,
-            font : *const drivers.framebuffer.Font,
+            cell_w : u32,
+            cell_h : u32,
+            dirty : drivers.framebuffer.DirtyRect,
+            has_dirty : bool,
+            lock : kernel.Spinlock,
         };
 
     };
