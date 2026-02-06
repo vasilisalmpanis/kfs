@@ -1,0 +1,801 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../core/">
+      
+      
+        <link rel="next" href="../locking/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>KFS compatibility with LibC - KFS</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#kfs-compatibility-with-libc" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="KFS" class="md-header__button md-logo" aria-label="KFS" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            KFS
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              KFS compatibility with LibC
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="KFS" class="md-nav__button md-logo" aria-label="KFS" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    KFS
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Welcome to KFS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    KFS compatibility with LibC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../locking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Locking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../signals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="kfs-compatibility-with-libc">KFS compatibility with LibC<a class="headerlink" href="#kfs-compatibility-with-libc" title="Permanent link">&para;</a></h1>
+<p>In our attempt to support LibC these are
+the system calls that can be used.</p>
+<ul class="task-list">
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_accept</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_accept4</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_access</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_acct</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_adjtimex</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_arch_prctl</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_brk</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_cachectl</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_cacheflush</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_capget</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_capset</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_chdir</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_chmod</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_chown</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_chown32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_chroot</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_adjtime</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_adjtime64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_getres</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_getres_time32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_getres_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_gettime</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_gettime32</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_clock_gettime64</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_clock_nanosleep</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_nanosleep_time32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_nanosleep_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_settime</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clock_settime32</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_clock_settime64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_clone</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_close</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_copy_file_range</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_finit_module</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_delete_module</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_dup</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_dup2</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_dup3</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_epoll_create</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_epoll_create1</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_epoll_ctl</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_epoll_pwait</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_epoll_wait</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_eventfd</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_eventfd2</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_execve</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_execveat</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_exit</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_exit_group</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_faccessat</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_faccessat2</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fadvise</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fadvise64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fadvise64_64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fallocate</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fanotify_init</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fanotify_mark</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_fchdir</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fchmod</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fchmodat</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fchmodat2</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fchown</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fchown32</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_fchownat</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_fcntl</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_fcntl64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fdatasync</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fgetxattr</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_flistxattr</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_flock</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_fork</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fremovexattr</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fsetxattr</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_fstat</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_fstat64</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_fstatat</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_fstatat64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fstatfs</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_fstatfs64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_fsync</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_ftruncate</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_ftruncate64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_futex</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_futex_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_futimesat</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_get_robust_list</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getcpu</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_getcwd</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_getdents</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_getdents64</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_getegid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getegid32</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_geteuid</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_geteuid32</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_getgid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getgid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getgroups</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getgroups32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getitimer</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_getpgid</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_getpid</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_getppid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getpriority</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getrandom</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getresgid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getresgid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getresuid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getresuid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getrlimit</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getrusage</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getrusage_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getsid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_gettid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_gettimeofday</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_gettimeofday_time32</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_getuid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getuid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_getxattr</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_init_module</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_inotify_add_watch</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_inotify_init</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_inotify_init1</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_inotify_rm_watch</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_ioctl</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_ioperm</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_iopl</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_ipc</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_kill</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_lchown</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_lchown32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_lgetxattr</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_link</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_linkat</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_listxattr</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_llistxattr</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_lremovexattr</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_lseek</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_llseek</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_lsetxattr</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_lstat</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_lstat64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_madvise</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_membarrier</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_memfd_create</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mincore</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_mkdir</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_mkdirat</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_mknod</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mknodat</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mlock</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mlock2</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mlockall</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_mmap</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_mmap2</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_mount</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mprotect</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mq_getsetattr</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mq_notify</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mq_open</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mq_timedreceive</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mq_timedreceive_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mq_timedsend</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mq_timedsend_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mq_unlink</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_mremap</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_msgctl</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_msgget</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_msgrcv</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_msgsnd</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_msync</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_munlock</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_munlockall</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_munmap</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_name_to_handle_at</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_nanosleep</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_newfstatat</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_open</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_open_by_handle_at</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_openat</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_pause</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_personality</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_pipe</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_pipe2</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_pivot_root</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_poll</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_ppoll</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_ppoll_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_prctl</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_pread</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_pread64</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_preadv</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_preadv2</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_prlimit64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_process_vm_readv</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_process_vm_writev</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_pselect6</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_pselect6_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_ptrace</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_pwrite</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_pwrite64</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_pwritev</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_pwritev2</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_quotactl</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_read</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_readahead</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_readlink</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_readlinkat</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_readv</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_reboot</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_recvmmsg</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_recvmmsg_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_remap_file_pages</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_removexattr</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_rename</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_renameat</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_renameat2</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_rmdir</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_rt_sigaction</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_rt_sigpending</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_rt_sigprocmask</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_rt_sigqueueinfo</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_rt_sigreturn</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_rt_sigsuspend</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_rt_sigtimedwait</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_rt_sigtimedwait_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_get_priority_max</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_get_priority_min</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_getaffinity</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_getparam</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_getscheduler</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_rr_get_interval</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_rr_get_interval_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_setaffinity</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_setparam</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_setscheduler</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sched_yield</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_select</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_semctl</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_semget</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_semop</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_semtimedop</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_semtimedop_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_sendfile</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_sendfile64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sendmmsg</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_set_robust_list</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_set_thread_area</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_set_tid_address</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setdomainname</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setfsgid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setfsgid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setfsuid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setfsuid32</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_setgid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setgid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setgroups</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setgroups32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sethostname</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setitimer</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setns</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_setpgid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setpriority</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setregid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setregid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setresgid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setresgid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setresuid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setresuid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setreuid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setreuid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setrlimit</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setsid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_settimeofday</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_settimeofday_time32</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_setuid</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setuid32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_setxattr</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_shmat</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_shmctl</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_shmdt</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_shmget</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sigaltstack</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_signalfd</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_signalfd4</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_socketcall</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_splice</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_stat</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_stat64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_statfs</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_statfs64</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_statx</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_swapoff</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_swapon</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_symlink</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_symlinkat</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sync</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sync_file_range</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sync_file_range2</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_syncfs</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_sysinfo</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_syslog</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_tee</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timer_create</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timer_delete</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timer_getoverrun</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timer_gettime</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timer_gettime32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timer_gettime64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timer_settime</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timer_settime32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timer_settime64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timerfd_create</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timerfd_gettime</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timerfd_gettime32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timerfd_gettime64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timerfd_settime</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timerfd_settime32</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_timerfd_settime64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_times</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_tkill</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_truncate</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_truncate64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_ugetrlimit</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_umask</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_umount</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_umount2</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_uname</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_unlink</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_unlinkat</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_unshare</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_utimensat</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_utimensat_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_utimes</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_vfork</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_vhangup</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_vmsplice</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_wait4</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_wait4_time64</li>
+<li class="task-list-item"><input type="checkbox" disabled/> SYS_waitid</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_write</li>
+<li class="task-list-item"><input type="checkbox" disabled checked/> SYS_writev</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.indexes", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
