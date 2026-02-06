@@ -6,7 +6,7 @@ const krn = @import("kernel");
 pub var render_queue = krn.wq.WaitQueueHead.init();
 
 pub fn render_thread(_: ?*const anyopaque) i32 {
-    while (true) {
+    while (!krn.task.current.should_stop) {
         krn.screen.framebuffer.render();
         render_queue.wait(false, 0);
     }
