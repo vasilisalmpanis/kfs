@@ -85,7 +85,7 @@ pub fn mmap2(
             }
             hint = arch.pmm.pageAlign(hint, false);
         }
-        if (hint < krn.task.current.mm.?.heap)
+        if (!flags.FIXED and hint < krn.task.current.mm.?.heap)
             hint = krn.task.current.mm.?.heap;
     } else {
         // look through mappings and just give back one.

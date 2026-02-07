@@ -66,7 +66,9 @@ pub const DirtyRect = struct {
 const ParserState = enum {
     Normal,
     Esc,
-    Csi
+    Csi,
+    Osc,
+    OscString
 };
 
 const CursorType = enum {
@@ -144,6 +146,38 @@ const AnsiColor = enum(u4) {
     }
 };
 
+const DEFAULT_FG: u32 = 0x00BFBFBF;
+const DEFAULT_BG: u32 = 0x00000000;
+
+fn color256ToRgb(idx: u16) u32 {
+    if (idx < 16) {
+        // Standard 16 colors
+        return AnsiColor.fromAnsiCode(idx + 30).toU32();
+    } else if (idx < 232) {
+        // 216-color cube (16-231): 6x6x6 RGB
+        const cube_idx = idx - 16;
+        const r: u32 = @intCast(cube_idx / 36);
+        const g: u32 = @intCast((cube_idx % 36) / 6);
+        const b: u32 = @intCast(cube_idx % 6);
+        const r_val: u32 = if (r == 0) 0 else 55 + r * 40;
+        const g_val: u32 = if (g == 0) 0 else 55 + g * 40;
+        const b_val: u32 = if (b == 0) 0 else 55 + b * 40;
+        return (r_val << 16) | (g_val << 8) | b_val;
+    } else {
+        // Grayscale (232-255): 24 shades from 8 to 238
+        const gray: u32 = @intCast((idx - 232) * 10 + 8);
+        return (gray << 16) | (gray << 8) | gray;
+    }
+}
+
+/// Convert 24-bit RGB components to u32
+fn rgbToU32(r: u16, g: u16, b: u16) u32 {
+    const r_val: u32 = @intCast(@min(r, 255));
+    const g_val: u32 = @intCast(@min(g, 255));
+    const b_val: u32 = @intCast(@min(b, 255));
+    return (r_val << 16) | (g_val << 8) | b_val;
+}
+
 const Cursor = struct {
     kind: CursorType = .Block,
     x: usize = 0,
@@ -183,8 +217,8 @@ const Cursor = struct {
 
 const Cell = struct {
     ch: u8 = 0,
-    bg: AnsiColor,
-    fg: AnsiColor,
+    bg: u32,
+    fg: u32,
 
     pub fn eql(self: *const Cell, other: *const Cell) bool {
         return (
@@ -200,8 +234,14 @@ const Cell = struct {
 
     pub fn makeEmpty(self: *Cell) void {
         self.ch = 0;
-        self.bg = .BLACK;
-        self.fg = .WHITE;
+        self.bg = DEFAULT_BG;
+        self.fg = DEFAULT_FG;
+    }
+
+    pub fn clear(self: *Cell, bg: u32, fg: u32) void {
+        self.ch = 0;
+        self.bg = bg;
+        self.fg = fg;
     }
 
     pub fn invert(self: *Cell) void {
@@ -217,8 +257,8 @@ const Page = struct {
     buff: [*]Cell,
     prev: [*]Cell,
 
-    curr_fg: AnsiColor = .WHITE,
-    curr_bg: AnsiColor = .BLACK,
+    curr_fg: u32 = DEFAULT_FG,
+    curr_bg: u32 = DEFAULT_BG,
     inverse: bool = false,
 
     dirty: DirtyRect = DirtyRect.init(0, 0, 0, 0),
@@ -243,11 +283,11 @@ const Page = struct {
         };
         @memset(
             page.buff[0..w * h],
-            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+            Cell{ .bg = DEFAULT_BG, .fg = DEFAULT_FG, .ch = 0 }
         );
         @memset(
             page.prev[0..w * h],
-            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+            Cell{ .bg = DEFAULT_BG, .fg = DEFAULT_FG, .ch = 0 }
         );
         return page;
     }
@@ -295,8 +335,8 @@ const Page = struct {
             cell.ch,
             self.cursor.prev_x,
             self.cursor.prev_y,
-            cell.bg.toU32(),
-            cell.fg.toU32(),
+            cell.bg,
+            cell.fg,
         );
     }
 
@@ -314,7 +354,7 @@ const Page = struct {
             scr.framebuffer.cursor(
                 self.cursor.x,
                 self.cursor.y,
-                self.curr_fg.toU32(),
+                self.curr_fg,
             );
         } else if (self.cursor.kind == .Block) {
             const cell = self.getCell(self.cursor.x, self.cursor.y);
@@ -323,8 +363,8 @@ const Page = struct {
                 ch,
                 self.cursor.x,
                 self.cursor.y,
-                cell.fg.toU32(),
-                cell.bg.toU32(),
+                cell.fg,
+                cell.bg,
             );
         }
         self.cursor.drawn = true;
@@ -345,15 +385,15 @@ const Page = struct {
                             if (cell.isEmpty()) {
                                 scr.framebuffer.clearChar(
                                     col, row,
-                                    self.curr_bg.toU32()
+                                    cell.bg
                                 );
                             } else {
                                 scr.framebuffer.putchar(
                                     cell.ch,
                                     col,
                                     row,
-                                    cell.bg.toU32(),
-                                    cell.fg.toU32(),
+                                    cell.bg,
+                                    cell.fg,
                                 );
                             }
                             self.prev[off] = cell;
@@ -388,13 +428,13 @@ const Page = struct {
         if (lines == 0)
             return;
         if (lines >= self.height) {
-            self.clear();
+            self.clearScreen();
             return;
         }
         const pos = self.width * lines;
         const end = self.width * self.height;
         const kept_size = end - pos;
-        const empty_cell = Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 };
+        const empty_cell = Cell{ .bg = self.curr_bg, .fg = self.curr_fg, .ch = 0 };
 
         switch (direction) {
             .up => {
@@ -416,7 +456,7 @@ const Page = struct {
         scr.framebuffer.scrollPixels(
             pixel_lines,
             direction,
-            self.curr_bg.toU32()
+            self.curr_bg
         );
 
         if (self.cursor.drawn) {
@@ -473,7 +513,7 @@ const Page = struct {
     fn redrawCell(self: *Page, x: usize, y: usize) void {
         const cell = self.getCell(x, y);
         scr.framebuffer.putchar(
-            cell.ch, x, y, cell.bg.toU32(), cell.fg.toU32()
+            cell.ch, x, y, cell.bg, cell.fg
         );
     }
 
@@ -486,10 +526,10 @@ const Page = struct {
     }
 
     pub fn reRenderAll(self: *Page) void {
-        scr.framebuffer.clear(self.curr_bg.toU32());
+        scr.framebuffer.clear(self.curr_bg);
         @memset(
             self.prev[0..self.height * self.width],
-            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+            Cell{ .bg = self.curr_bg, .fg = self.curr_fg, .ch = 0 }
         );
         self.markDirty(
             DirtyRect.fullScreen(self.width, self.height)
@@ -497,7 +537,7 @@ const Page = struct {
         self.render();
     }
 
-    pub fn setColors(self: *Page, fg: AnsiColor, bg: AnsiColor) void {
+    pub fn setColors(self: *Page, fg: u32, bg: u32) void {
         self.curr_bg = bg;
         self.curr_fg = fg;
     }
@@ -505,7 +545,7 @@ const Page = struct {
     pub fn clear(self: *Page) void {
         @memset(
             self.buff[0..self.height * self.width],
-            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+            Cell{ .bg = self.curr_bg, .fg = self.curr_fg, .ch = 0 }
         );
         self.setCursor(0, 0);
         self.markDirty(
@@ -517,7 +557,7 @@ const Page = struct {
     pub fn clearScreen(self: *Page) void {
         @memset(
             self.buff[0..self.height * self.width],
-            Cell{ .bg = .BLACK, .fg = .WHITE, .ch = 0 }
+            Cell{ .bg = self.curr_bg, .fg = self.curr_fg, .ch = 0 }
         );
         self.markDirty(
             DirtyRect.fullScreen(self.width, self.height)
@@ -764,7 +804,10 @@ pub const TTY = struct {
             curr_cell.* = next_cell.*;
         }
         const last = @min(self._input_len - 1, self.width - 1);
-        self.curr_page.getCell(last, y).makeEmpty();
+        self.curr_page.getCell(last, y).clear(
+            self.curr_page.curr_bg,
+            self.curr_page.curr_fg
+        );
     }
 
     fn currentLineLen(self: *TTY) usize {
@@ -817,7 +860,10 @@ pub const TTY = struct {
                 if (self._input_len > 0) {
                     self._input_len -= 1;
                     const last = @min(self._input_len, self.width - 1);
-                    self.curr_page.getCell(last, y).makeEmpty();
+                    self.curr_page.getCell(last, y).clear(
+                        self.curr_page.curr_bg,
+                        self.curr_page.curr_fg
+                    );
                 }
             }
             const end = if (self._input_len == 0) x - 1
@@ -1221,8 +1267,8 @@ pub const TTY = struct {
             },
             'm' => { // SGR with full color support
                 if (self.csi_n == 0) {
-                    self.curr_page.curr_fg = .WHITE;
-                    self.curr_page.curr_bg = .BLACK;
+                    self.curr_page.curr_fg = DEFAULT_FG;
+                    self.curr_page.curr_bg = DEFAULT_BG;
                     self.curr_page.inverse = false;
                 }
                 var i: u8 = 0;
@@ -1230,37 +1276,88 @@ pub const TTY = struct {
                     const p = self.csi_params[i];
                     switch (p) {
                         0 => {
-                            self.curr_page.curr_fg = .WHITE;
-                            self.curr_page.curr_bg = .BLACK;
+                            self.curr_page.curr_fg = DEFAULT_FG;
+                            self.curr_page.curr_bg = DEFAULT_BG;
                             self.curr_page.inverse = false;
+                        },
+                        1, 2, 3, 4, 5, 6 => {
+                            // Bold, dim, italic, underline, blink, rapid blink
+                            // TODO
                         },
                         7 => {
                             self.curr_page.inverse = true;
+                        },
+                        8, 9 => {
+                            // Hidden, strikethrough
+                            // TODO
+                        },
+                        21, 22, 23, 24, 25, 28, 29 => {
+                            // Reset bold/dim, italic, underline, blink, hidden, strikethrough
+                            // TODO
                         },
                         27 => {
                             self.curr_page.inverse = false;
                         },
                         // Foreground colors
                         30...37 => {
-                            self.curr_page.curr_fg = AnsiColor.fromAnsiCode(p);
+                            self.curr_page.curr_fg = AnsiColor.fromAnsiCode(p).toU32();
+                        },
+                        38 => {
+                            // Extended foreground color: 38;5;N or 38;2;R;G;B
+                            if (i + 1 < self.csi_n) {
+                                const mode = self.csi_params[i + 1];
+                                if (mode == 5 and i + 2 < self.csi_n) {
+                                    // 256-color mode: 38;5;N
+                                    const color_idx = self.csi_params[i + 2];
+                                    self.curr_page.curr_fg = color256ToRgb(color_idx);
+                                    i += 2;
+                                } else if (mode == 2 and i + 4 < self.csi_n) {
+                                    // 24-bit color: 38;2;R;G;B
+                                    const r = self.csi_params[i + 2];
+                                    const g = self.csi_params[i + 3];
+                                    const b = self.csi_params[i + 4];
+                                    self.curr_page.curr_fg = rgbToU32(r, g, b);
+                                    i += 4;
+                                }
+                            }
                         },
                         39 => {
-                            self.curr_page.curr_fg = .WHITE;
+                            self.curr_page.curr_fg = DEFAULT_FG;
                         },
                         // Background colors
                         40...47 => {
-                            self.curr_page.curr_bg = AnsiColor.fromAnsiCode(p);
+                            const color = AnsiColor.fromAnsiCode(p).toU32();
+                            self.curr_page.curr_bg = color;
+                        },
+                        48 => {
+                            // Extended background color: 48;5;N or 48;2;R;G;B
+                            if (i + 1 < self.csi_n) {
+                                const mode = self.csi_params[i + 1];
+                                if (mode == 5 and i + 2 < self.csi_n) {
+                                    // 256-color mode: 48;5;N
+                                    const color_idx = self.csi_params[i + 2];
+                                    self.curr_page.curr_bg = color256ToRgb(color_idx);
+                                    i += 2;
+                                } else if (mode == 2 and i + 4 < self.csi_n) {
+                                    // 24-bit color: 48;2;R;G;B
+                                    const r = self.csi_params[i + 2];
+                                    const g = self.csi_params[i + 3];
+                                    const b = self.csi_params[i + 4];
+                                    self.curr_page.curr_bg = rgbToU32(r, g, b);
+                                    i += 4;
+                                }
+                            }
                         },
                         49 => {
-                            self.curr_page.curr_bg = .BLACK;
+                            self.curr_page.curr_bg = DEFAULT_BG;
                         },
                         // Bright foreground colors
                         90...97 => {
-                            self.curr_page.curr_fg = AnsiColor.fromAnsiCode(p);
+                            self.curr_page.curr_fg = AnsiColor.fromAnsiCode(p).toU32();
                         },
                         // Bright background colors
                         100...107 => {
-                            self.curr_page.curr_bg = AnsiColor.fromAnsiCode(p);
+                            self.curr_page.curr_bg = AnsiColor.fromAnsiCode(p).toU32();
                         },
                         else => {},
                     }
@@ -1273,18 +1370,43 @@ pub const TTY = struct {
                     if (self.csi_n > 0) {
                         const mode = self.csi_params[0];
                         switch (mode) {
+                            1 => {
+                                // DECCKM - Application cursor keys: TODO
+                            },
+                            7 => {
+                                // DECAWM - Auto-wrap mode: TODO
+                            },
+                            12 => {
+                                // Cursor blinking: TODO
+                            },
                             25 => {
                                 // Cursor visibility
                                 self.curr_page.cursor.on = (final == 'h');
                                 self.render();
                             },
-                            1049, 47 => {
+                            1000, 1002, 1003, 1006, 1015 => {
+                                // Mouse tracking modes: TODO
+                            },
+                            1049 => {
                                 // Alt screen buffer
+                                if (final == 'h') {
+                                    self.saveCursor();
+                                    self.switchToAltScreen();
+                                } else {
+                                    self.switchToMainScreen();
+                                    self.restoreCursor();
+                                }
+                            },
+                            47, 1047 => {
+                                // Alt screen buffer (without cursor save)
                                 if (final == 'h') {
                                     self.switchToAltScreen();
                                 } else {
                                     self.switchToMainScreen();
                                 }
+                            },
+                            2004 => {
+                                // Bracketed paste mode: TODO
                             },
                             else => {},
                         }
@@ -1301,7 +1423,10 @@ pub const TTY = struct {
         const y = self.curr_page.cursor.y;
         var x = self.curr_page.cursor.x;
         while (x < self.width) : (x += 1) {
-            self.curr_page.getCell(x, y).makeEmpty();
+            self.curr_page.getCell(x, y).clear(
+                self.curr_page.curr_bg,
+                self.curr_page.curr_fg
+            );
         }
         self.curr_page.markDirty(DirtyRect.init(
             self.curr_page.cursor.x,
@@ -1316,7 +1441,10 @@ pub const TTY = struct {
         const y = self.curr_page.cursor.y;
         var x: usize = 0;
         while (x <= self.curr_page.cursor.x) : (x += 1) {
-            self.curr_page.getCell(x, y).makeEmpty();
+            self.curr_page.getCell(x, y).clear(
+                self.curr_page.curr_bg,
+                self.curr_page.curr_fg
+            );
         }
         self.curr_page.markDirty(DirtyRect.init(
             0,
@@ -1331,7 +1459,10 @@ pub const TTY = struct {
         const y = self.curr_page.cursor.y;
         var x: usize = 0;
         while (x < self.width) : (x += 1) {
-            self.curr_page.getCell(x, y).makeEmpty();
+            self.curr_page.getCell(x, y).clear(
+                self.curr_page.curr_bg,
+                self.curr_page.curr_fg
+            );
         }
         self.curr_page.markDirty(DirtyRect.init(
             0,
@@ -1352,7 +1483,10 @@ pub const TTY = struct {
         while (row < self.height) : (row += 1) {
             var x: usize = 0;
             while (x < self.width) : (x += 1) {
-                self.curr_page.getCell(x, row).makeEmpty();
+                self.curr_page.getCell(x, row).clear(
+                    self.curr_page.curr_bg,
+                    self.curr_page.curr_fg
+                );
             }
         }
         self.curr_page.markDirty(DirtyRect.init(
@@ -1370,7 +1504,10 @@ pub const TTY = struct {
         while (row < self.curr_page.cursor.y) : (row += 1) {
             var x: usize = 0;
             while (x < self.width) : (x += 1) {
-                self.curr_page.getCell(x, row).makeEmpty();
+                self.curr_page.getCell(x, row).clear(
+                    self.curr_page.curr_bg,
+                    self.curr_page.curr_fg
+                );
             }
         }
         self.curr_page.markDirty(DirtyRect.init(
@@ -1406,7 +1543,10 @@ pub const TTY = struct {
         while (clear_row < y + lines and clear_row < self.height) : (clear_row += 1) {
             var x: usize = 0;
             while (x < self.width) : (x += 1) {
-                self.curr_page.getCell(x, clear_row).makeEmpty();
+                self.curr_page.getCell(x, clear_row).clear(
+                    self.curr_page.curr_bg,
+                    self.curr_page.curr_fg
+                );
             }
         }
         
@@ -1436,7 +1576,10 @@ pub const TTY = struct {
         while (row < self.height) : (row += 1) {
             var x: usize = 0;
             while (x < self.width) : (x += 1) {
-                self.curr_page.getCell(x, row).makeEmpty();
+                self.curr_page.getCell(x, row).clear(
+                    self.curr_page.curr_bg,
+                    self.curr_page.curr_fg
+                );
             }
         }
         
@@ -1462,7 +1605,10 @@ pub const TTY = struct {
         
         // Clear end of line
         while (col < self.width) : (col += 1) {
-            self.curr_page.getCell(col, y).makeEmpty();
+            self.curr_page.getCell(col, y).clear(
+                self.curr_page.curr_bg,
+                self.curr_page.curr_fg
+            );
         }
         
         self.curr_page.markDirty(
@@ -1489,7 +1635,10 @@ pub const TTY = struct {
         // Clear inserted space
         var clear_col = x;
         while (clear_col < x + chars and clear_col < self.width) : (clear_col += 1) {
-            self.curr_page.getCell(clear_col, y).makeEmpty();
+            self.curr_page.getCell(clear_col, y).clear(
+                self.curr_page.curr_bg,
+                self.curr_page.curr_fg
+            );
         }
         
         self.curr_page.markDirty(
@@ -1529,12 +1678,46 @@ pub const TTY = struct {
                     self.csiReset();
                     self.pstate = .Csi;
                 },
+                ']' => {
+                    self.pstate = .Osc;
+                },
+                '(' , ')' => {
+                    self.pstate = .Normal;
+                },
                 '7' => {
                     self.saveCursor();
                     self.pstate = .Normal;
                 },
                 '8' => {
                     self.restoreCursor();
+                    self.pstate = .Normal;
+                },
+                'M' => {
+                    // Reverse Index - move cursor up one line, scroll if needed
+                    if (self.curr_page.cursor.y > 0) {
+                        self.curr_page.setCursorY(self.curr_page.cursor.y - 1);
+                    } else {
+                        self.curr_page.scrollUp(1);
+                    }
+                    self.pstate = .Normal;
+                },
+                'D' => {
+                    // Index - move cursor down one line, scroll if needed
+                    if (self.curr_page.cursor.y < self.height - 1) {
+                        self.curr_page.setCursorY(self.curr_page.cursor.y + 1);
+                    } else {
+                        self.curr_page.scrollDown(1);
+                    }
+                    self.pstate = .Normal;
+                },
+                'E' => {
+                    // Next Line - move to start of next line
+                    self.curr_page.wrapLine();
+                    self.pstate = .Normal;
+                },
+                'c' => {
+                    // RIS - Reset to Initial State
+                    self.clear();
                     self.pstate = .Normal;
                 },
                 else => self.pstate = .Normal,
@@ -1548,11 +1731,28 @@ pub const TTY = struct {
                     self.csiAccumDigit(b);
                     return;
                 }
-                if (b == ';') {
+                if (b == ';' or b == ':') {
                     self.csiNextParam();
                     return;
                 }
                 self.csiAct(b);
+            },
+            .Osc => {
+                if (b >= '0' and b <= '9') {
+                    return;
+                }
+                if (b == ';') {
+                    self.pstate = .OscString;
+                    return;
+                }
+                self.pstate = .Normal;
+            },
+            .OscString => {
+                if (b == 0x07) {
+                    self.pstate = .Normal;
+                } else if (b == 0x1b) {
+                    self.pstate = .Normal;
+                }
             },
         }
     }

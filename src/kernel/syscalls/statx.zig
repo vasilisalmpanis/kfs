@@ -125,7 +125,7 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
     const path_s: []const u8 = std.mem.span(path.?);
     if (dirfd != fs.AT_FDCWD and dirfd < 0)
         return errors.EBADF;
-    krn.logger.DEBUG(
+    krn.logger.WARN(
         "statx {s} in {d} flags: {x}, mask: {x}, buf addr: {x}",
         .{path_s, dirfd, flags, mask, @intFromPtr(statxbuf)}
     );

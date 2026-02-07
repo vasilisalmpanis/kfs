@@ -1010,6 +1010,10 @@ pub const kernel = struct {
             revents : u16,
         };
 
+        pub const FDSet = extern struct {
+            fds_bits : [32]u32,
+        };
+
     };
 
     pub const syscalls = struct {
@@ -1029,6 +1033,9 @@ pub const kernel = struct {
         };
 
         pub const clock = struct {
+        };
+
+        pub const clone = struct {
         };
 
         pub const close = struct {
@@ -1113,6 +1120,12 @@ pub const kernel = struct {
         };
 
         pub const sigaction = struct {
+            pub const StackT = extern struct {
+                ss_sp : ?*anyopaque= null,
+                ss_flags : i32= 2,
+                ss_size : u32= 0,
+            };
+
         };
 
         pub const sleep = struct {
@@ -1179,6 +1192,26 @@ pub const kernel = struct {
         };
 
         pub const symlink = struct {
+        };
+
+        pub const sysinfo = struct {
+            pub const Sysinfo = extern struct {
+                uptime : i32= 0,
+                loads : [3]u32,
+                totalram : u32= 0,
+                freeram : u32= 0,
+                sharedram : u32= 0,
+                bufferram : u32= 0,
+                totalswap : u32= 0,
+                freeswap : u32= 0,
+                procs : u16= 0,
+                pad : u16= 0,
+                totalhigh : u32= 0,
+                freehigh : u32= 0,
+                mem_unit : u32= 1,
+                _padding : [8]u8,
+            };
+
         };
 
         pub const time = struct {
