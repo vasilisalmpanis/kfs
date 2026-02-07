@@ -10,6 +10,9 @@ IMG 		= ext2.img
 IMG_DIR		= ext2_dir
 IMG_SIZE	= 32M
 
+FILESYSTEM_TAR	= filesystem.tar.gz
+FILESYSTEM_TAR_LINK = https://github.com/vasilisalmpanis/kfs/releases/tag/name
+
 MOD_SRC_DIR		= modules
 MOD_TARGET_DIR	= $(IMG_DIR)/modules
 
@@ -98,18 +101,13 @@ $(IMG): $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:=.o)) \
 		$(IMG) \
 		$(IMG_SIZE)
 
-$(IMG_DIR): $(USERSPACE)
-	mkdir -p $(IMG_DIR)
-	mkdir -p $(IMG_DIR)/bin
-	mkdir -p $(IMG_DIR)/modules
-	mkdir -p $(IMG_DIR)/dev
-	mkdir -p $(IMG_DIR)/etc
-	mkdir -p $(IMG_DIR)/home
-	mkdir -p $(IMG_DIR)/sys
-	mkdir -p $(IMG_DIR)/tmp
-	mkdir -p $(IMG_DIR)/var
-	mkdir -p $(IMG_DIR)/proc
+$(IMG_DIR): $(USERSPACE) $(FILESYSTEM_TAR)
+	$(shell [ ! -d $(IMG_DIR) ] && \
+	tar -xf $(FILESYSTEM_TAR)
 	cp $(USERSPACE) $(IMG_DIR)/bin/init
+
+$(FILESYSTEM_TAR):
+	wget $(FILESYSTEM_TAR_LINK)
 
 modules: $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:=.o))
 

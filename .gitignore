@@ -13,3 +13,5 @@ disk/*.img
 ext2_dir/modules/
 ext2_dir/bin/init
 .venv
+ext2_dir
+filesystem.tar.gz
