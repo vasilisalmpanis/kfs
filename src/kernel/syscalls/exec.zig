@@ -18,6 +18,34 @@ pub fn freeSlices(
     krn.mm.kfree(@ptrCast(slice.ptr));
 }
 
+const FormatType = enum(u8) {
+    ELF,
+    Shbang,
+    Unkown,
+    Empty,
+};
+
+fn getFileType(file: []const u8) FormatType{
+    if (file.len == 0) {
+        return .Empty;
+    }
+
+    if (file.len >= 4 and
+        file[0] == 0x7f and
+        file[1] == 'E' and
+        file[2] == 'L' and
+        file[3] == 'F')
+    {
+        return .ELF;
+    }
+
+    if (file.len >= 2 and file[0] == '#' and file[1] == '!') {
+        return .Shbang;
+    }
+
+    return .Unkown;
+}
+
 pub fn doExecve(
     filename: []const u8,
     argv: []const []const u8,
@@ -44,12 +72,20 @@ pub fn doExecve(
         read += try file.ops.read(file, @ptrCast(&slice[read]), slice.len);
     }
 
-    krn.task.current.setName(path.dentry.name); // TODO: make copy of filename and set name only if we will execute
+    switch (getFileType(slice)) {
+        .ELF => {
+            krn.userspace.validateElfHeader(slice) catch |err| {
+                krn.logger.ERROR("ELF validation failed: {}\n", .{err});
+                return errors.ENOEXEC;
+            };
+        },
+        .Shbang => {
+        },
+        .Unkown,
+        .Empty => return errors.ENOEXEC,
+    }
 
-    krn.userspace.validateElfHeader(slice) catch |err| {
-        krn.logger.ERROR("ELF validation failed: {}\n", .{err});
-        return errors.ENOEXEC;
-    };
+    krn.task.current.setName(path.dentry.name); // TODO: make copy of filename and set name only if we will execute
 
     if (krn.task.current.mm) |_mm| {
         _mm.releaseMappings();
