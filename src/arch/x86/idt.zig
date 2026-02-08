@@ -29,7 +29,11 @@ const ISRHandler        = fn () callconv(.c) void;
 extern const stack_top: u32;
 
 pub fn goUserspace() void {
-    gdt.tss.esp0 = krn.task.current.regs.esp;
+    // TSS.esp0 represents the kernel stack pointer to switch to when the CPU enters
+    // ring 0 from a lower privilege level (ring 3).
+    // For a new task this should always be the top of the kernel stack that was
+    // allocated for this new task.
+    gdt.tss.esp0 = krn.task.current.stack_bottom + krn.STACK_SIZE;
     asm volatile(
         \\ cli
         \\ mov $((8 * 4) | 3), %%bx
