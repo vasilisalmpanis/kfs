@@ -26,6 +26,21 @@ pub fn kfree(addr: *const anyopaque) void {
     mm.kheap.free(@intFromPtr(addr));
 }
 
+pub fn kfreeSlice(slice: anytype) void {
+    const Slice = @TypeOf(slice);
+
+    comptime {
+        if (@typeInfo(Slice) != .pointer or
+            @typeInfo(Slice).pointer.size != .slice)
+        {
+            @compileError("kfreeSlice expects a slice");
+        }
+    }
+
+    const ptr = slice.ptr;
+    kfree(@ptrCast(ptr));
+}
+
 pub fn kmallocSlice(comptime T: type, count: usize) ?[]T {
     const addr = mm.kheap.alloc(count * @sizeOf(T), true, false) catch return null;
     if (addr == 0) return null;
