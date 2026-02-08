@@ -97,6 +97,12 @@ pub fn doExecve(
         envp,
     );
 
+    // Release the file content buffer since
+    // its already copied to the new tasks mappings.
+    // By unrefing the file we also release the path
+    krn.mm.kfree(slice.ptr);
+    file.ref.unref();
+
     if (free_arg_env) {
         freeSlices(argv, argv.len);
         freeSlices(envp, envp.len);

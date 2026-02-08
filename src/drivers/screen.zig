@@ -11,7 +11,7 @@ pub var framebuffer: fb.FrameBuffer = undefined;
 pub const Screen = struct {
     tty : [1] tty.TTY = undefined,
     frmb: fb.FrameBuffer,
-    
+
     pub fn init(boot_info: *multiboot.Multiboot) Screen {
         const frm = fb.FrameBuffer.init(
             boot_info,
@@ -41,6 +41,6 @@ pub fn initScreen(scr: *Screen, boot_info: *multiboot.Multiboot) void {
         _ = krn.kthreadCreate(
             &fb.render_thread,
             null,
-            "render_thread"    
+            "render_thread"
         ) catch null;
 }
