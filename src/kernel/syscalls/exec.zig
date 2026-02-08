@@ -13,9 +13,9 @@ pub fn freeSlices(
     len: usize
 ) void {
     for (0..len) |idx| {
-        krn.mm.kfree(slice[idx].ptr);
+        krn.mm.kfreeSlice(slice[idx]);
     }
-    krn.mm.kfree(@ptrCast(slice.ptr));
+    krn.mm.kfreeSlice(slice);
 }
 
 const FormatType = enum(u8) {
@@ -46,6 +46,64 @@ fn getFileType(file: []const u8) FormatType{
     return .Unkown;
 }
 
+fn handlerShbang(
+    binary: []u8,
+    argv: []const []const u8,
+    envp: []const []const u8,
+    free_arg_env: bool,
+    file: *krn.fs.File,
+) anyerror!u32 {
+    const new_line_idx = std.mem.indexOf(u8, binary, "\n") orelse binary.len;
+    const shebang_line = binary[2..new_line_idx];
+    const trimmed_shebang_line = std.mem.trim(u8, shebang_line, "\t\r");
+    if (trimmed_shebang_line.len == 0) {
+        return errors.ENOEXEC;
+    }
+
+    const space_idx = std.mem.indexOfAny(u8, shebang_line, " \t");
+    const interp_raw = if (space_idx) |idx| shebang_line[0..idx] else shebang_line;
+    const interp_arg = if (space_idx) |idx| std.mem.trim(u8, shebang_line[idx + 1 ..], "\t\r") else null;
+
+    const interp = dupString(interp_raw) orelse return errors.ENOMEM;
+    errdefer krn.mm.kfreeSlice(interp);
+
+    const extra_args: usize = if (interp_arg != null and interp_arg.?.len > 0) 2 else 1;
+    const new_argv = krn.mm.kmallocSlice([]const u8, argv.len + extra_args) orelse
+        return errors.ENOMEM;
+    errdefer krn.mm.kfreeSlice(new_argv);
+
+    var arg_idx: usize = 0;
+
+    new_argv[arg_idx] = interp;
+    arg_idx += 1;
+
+    if (interp_arg != null and interp_arg.?.len > 0) {
+        const arg_copy = dupString(interp_arg.?) orelse return errors.ENOMEM;
+        new_argv[arg_idx] = arg_copy;
+        arg_idx += 1;
+    }
+
+    for (argv) |arg| {
+        new_argv[arg_idx] = arg;
+        arg_idx += 1;
+    }
+
+    krn.mm.kfreeSlice(binary);
+    file.ref.unref();
+
+    if (free_arg_env) {
+        krn.mm.kfreeSlice(argv);
+        // envp is passed through, recursive call will free it
+    }
+
+    return doExecve(
+        interp,
+        new_argv,
+        envp,
+        true
+    );
+}
+
 pub fn doExecve(
     filename: []const u8,
     argv: []const []const u8,
@@ -66,6 +124,8 @@ pub fn doExecve(
         _slice
     else
         return errors.ENOMEM;
+    errdefer krn.mm.kfreeSlice(slice);
+
     var read: usize = 0;
     krn.logger.INFO("Executing {s} {d}\n", .{filename, file.inode.size});
     while (read < file.inode.size) {
@@ -80,6 +140,15 @@ pub fn doExecve(
             };
         },
         .Shbang => {
+            if (free_arg_env)
+                krn.mm.kfreeSlice(filename);
+            return try handlerShbang(
+                slice,
+                argv,
+                envp,
+                free_arg_env,
+                file
+            );
         },
         .Unkown,
         .Empty => return errors.ENOEXEC,
@@ -97,10 +166,12 @@ pub fn doExecve(
         envp,
     );
 
-    // Release the file content buffer since
+    // Release the file's content buffer since
     // its already copied to the new tasks mappings.
     // By unrefing the file we also release the path
-    krn.mm.kfree(slice.ptr);
+    krn.mm.kfreeSlice(slice);
+    if (free_arg_env)
+        krn.mm.kfreeSlice(filename);
     file.ref.unref();
 
     if (free_arg_env) {
@@ -124,6 +195,13 @@ pub fn doExecve(
     return 0;
 }
 
+fn dupString(src: []const u8) ?[]u8 {
+    const dst = krn.mm.kmallocSlice(u8, src.len) orelse return null;
+    @memcpy(dst, src);
+    return dst;
+}
+
+
 pub fn dupStrings(array: [*:null]?[*:0]u8) ![][]u8 {
     var len: u32 = 0;
     while (array[len] != null) {
@@ -131,16 +209,17 @@ pub fn dupStrings(array: [*:null]?[*:0]u8) ![][]u8 {
     }
     const slice = if (krn.mm.kmallocSlice([]u8, len)) |s| s
         else return errors.ENOMEM;
+    errdefer krn.mm.kfreeSlice(slice);
+
     for (0..len) |idx| {
         const s_span = std.mem.span(array[idx].?);
-        if (krn.mm.kmallocArray(u8, s_span.len)) |string| {
-            @memcpy(string[0..s_span.len], s_span);
-            slice[idx] = string[0..s_span.len];
-        } else {
-            if (idx - 1 >= 0)
-                freeSlices(slice, idx - 1);
+        const string = dupString(s_span) orelse {
+            for (0..idx) |i| {
+                krn.mm.kfreeSlice(slice[i]);
+            }
             return errors.ENOMEM;
-        }
+        };
+        slice[idx] = string;
     }
     return slice;
 }
@@ -154,7 +233,10 @@ pub fn execve(
         return errors.EFAULT;
     const argv: [*:null]?[*:0]u8 = u_argv.?;
     const envp: [*:null]?[*:0]u8 = u_envp.?;
-    const span = std.mem.span(filename.?);
+
+    const user_filename = std.mem.span(filename.?);
+    const filename_copy = dupString(user_filename) orelse return errors.ENOMEM;
+    errdefer krn.mm.kfreeSlice(filename_copy);
 
     // New argv
     const argv_slice = try dupStrings(argv);
@@ -164,10 +246,13 @@ pub fn execve(
     const envp_slice = try dupStrings(envp);
     errdefer freeSlices(envp_slice, envp_slice.len);
 
-    return try doExecve(
-        span,
+    const result = doExecve(
+        filename_copy,
         argv_slice,
         envp_slice,
         true,
     );
+
+    krn.mm.kfreeSlice(filename_copy);
+    return result;
 }
