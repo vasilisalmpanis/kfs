@@ -42,7 +42,7 @@ pub const SysInode = struct {
         if (fs.dcache.get(key)) |entry| {
             return entry;
         }
-        return error.InodeNotFound;
+        return kernel.errors.PosixError.ENOENT;
     }
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {

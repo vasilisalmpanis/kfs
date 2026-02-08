@@ -31,7 +31,7 @@ pub fn mknod(
         name
     ) catch |err| {
         switch (err) {
-            error.InodeNotFound => {
+            kernel.errors.PosixError.ENOENT => {
                 can_create_name = true;
             },
             else => return err
