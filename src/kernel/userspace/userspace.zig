@@ -139,13 +139,13 @@ pub fn setEnvironment(stack_bottom: usize, stack_size: usize, argv: []const []co
     var aligned_size = size;
     if (aligned_size % 16 != 0)
         aligned_size += 16 - (aligned_size % 16);
-    
+
     const stack_ptr_addr: usize = stack_bottom + stack_size - aligned_size;
     var strings: [*]u8 = @ptrFromInt(stack_bottom + stack_size - end_marker_size - argv_str_size - envp_str_size);
     var pointers: [*]usize = @ptrFromInt(stack_ptr_addr);
     var str_off: usize = 0;
     var ptr_off: usize = 0;
-    
+
     // Set argc
     krn.task.current.mm.?.argc = stack_ptr_addr;
     pointers[ptr_off] = argv.len;

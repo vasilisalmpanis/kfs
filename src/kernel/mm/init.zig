@@ -24,6 +24,7 @@ pub const kmallocArray = @import("./kmalloc.zig").kmallocArray;
 pub const kmallocSlice = @import("./kmalloc.zig").kmallocSlice;
 pub const dupSlice = @import("./kmalloc.zig").dupSlice;
 pub const kfree = @import("./kmalloc.zig").kfree;
+pub const kfreeSlice = @import("./kmalloc.zig").kfreeSlice;
 pub const ksize = @import("./kmalloc.zig").ksize;
 pub const vmalloc = @import("./vmalloc.zig").vmalloc;
 pub const vfree = @import("./vmalloc.zig").vfree;

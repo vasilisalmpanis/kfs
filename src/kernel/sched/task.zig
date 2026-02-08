@@ -134,6 +134,7 @@ pub const Task = struct {
             .tls = 0,
             .limit = 0,
             .name = .{0} ** 16,
+            .should_stop = false,
         };
     }
 
@@ -152,6 +153,7 @@ pub const Task = struct {
         self.setName(name);
         mm.proc_mm.init_mm.vas = virt;
         self.wait_wq.setup();
+        self.should_stop = false;
     }
 
     pub fn setName(self: *Task, name: []const u8) void {
@@ -198,6 +200,7 @@ pub const Task = struct {
         self.tsktype = tmp.tsktype;
         self.save_fpu_state = tmp.save_fpu_state;
         self.fpu_used = tmp.fpu_used;
+        self.should_stop = tmp.should_stop;
 
         self.regs = Regs.init();
         self.tree = tree.TreeNode.init();
