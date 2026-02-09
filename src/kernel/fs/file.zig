@@ -206,13 +206,13 @@ pub const TaskFiles = struct {
             .kind = .unset,
             .direction = .forward,
         });
-        it.bit_offset = from_fd;
-        if (it.next()) |index| {
-            self.map.set(index);
-            return index;
-        } else {
-            return errors.EMFILE;
+        while (it.next()) |index| {
+            if (index > from_fd) {
+                self.map.set(index);
+                return index;
+            }
         }
+        return errors.EMFILE;
     }
 
     pub fn unsetFD(self: *TaskFiles, fd: usize) void {
