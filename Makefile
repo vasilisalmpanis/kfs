@@ -103,7 +103,9 @@ $(IMG): $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:=.o)) \
 
 $(IMG_DIR): $(USERSPACE) $(FILESYSTEM_TAR)
 	$(shell [ ! -d $(IMG_DIR) ] && \
-	tar -xf $(FILESYSTEM_TAR))
+		tar -xf $(FILESYSTEM_TAR) \
+	)
+	touch $(IMG_DIR)
 	cp $(USERSPACE) $(IMG_DIR)/bin/init
 
 $(FILESYSTEM_TAR):
