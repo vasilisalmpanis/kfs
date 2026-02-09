@@ -5,7 +5,7 @@ const signals = @import("../sched/signals.zig");
 const kernel = @import("../main.zig");
 const errors = @import("./error-codes.zig").PosixError;
 
-pub fn exit(error_code: i32) !u32 {
+pub fn doExit(error_code: i32) !u32 {
     if (tsk.current == &tsk.initial_task) return errors.EINVAL;
     const files: *kernel.fs.TaskFiles = tsk.current.files;
     var it = files.map.iterator(.{.direction = .forward, .kind = .set});
@@ -42,4 +42,8 @@ pub fn exit(error_code: i32) !u32 {
     kernel.task.tasks_lock.unlock_irq_enable(lock_state);
     sched.reschedule();
     return 0;
+}
+
+pub fn exit(error_code: i32) !u32 {
+    return try doExit((error_code & 0xff) << 8);
 }

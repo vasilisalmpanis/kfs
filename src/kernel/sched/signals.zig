@@ -440,7 +440,7 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         .SIGWINCH => {},
         else => {
             arch.cpu.enableInterrupts();
-            _ = krn.exit.exit(128 + @intFromEnum(signal)) catch {};
+            _ = krn.exit.doExit((128 + @intFromEnum(signal)) & 0x7f) catch {};
             unreachable();
             return krn.sched.schedule(regs);
         }

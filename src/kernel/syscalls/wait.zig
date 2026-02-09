@@ -68,7 +68,7 @@ const WaitStates = struct {
         if (task.state == .ZOMBIE)
             return task.result;
         if (task.state == .INTERRUPTIBLE_SLEEP)
-            return (@as(i32, @intFromEnum(krn.signals.Signal.SIGSTOP)) << 8) | 0x7f;
+            return task.result;
         // TODO: other cases
         return 0xffff;
     }
