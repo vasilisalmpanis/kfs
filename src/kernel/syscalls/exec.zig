@@ -21,15 +21,10 @@ pub fn freeSlices(
 const FormatType = enum(u8) {
     ELF,
     Shbang,
-    Unkown,
-    Empty,
+    Unknown,
 };
 
 fn getFileType(file: []const u8) FormatType{
-    if (file.len == 0) {
-        return .Empty;
-    }
-
     if (file.len >= 4 and
         file[0] == 0x7f and
         file[1] == 'E' and
@@ -43,7 +38,7 @@ fn getFileType(file: []const u8) FormatType{
         return .Shbang;
     }
 
-    return .Unkown;
+    return .Unknown;
 }
 
 fn handlerShbang(
@@ -150,8 +145,7 @@ pub fn doExecve(
                 file
             );
         },
-        .Unkown,
-        .Empty => return errors.ENOEXEC,
+        .Unknown => return errors.ENOEXEC,
     }
 
     krn.task.current.setName(path.dentry.name); // TODO: make copy of filename and set name only if we will execute
