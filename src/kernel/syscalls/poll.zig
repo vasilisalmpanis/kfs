@@ -1,5 +1,6 @@
 const errors = @import("./error-codes.zig").PosixError;
 const krn = @import("../main.zig");
+const std = @import("std");
 
 pub const POLLIN:  u16      = 0x0001;
 pub const POLLPRI: u16      = 0x0002;
@@ -58,6 +59,15 @@ pub const FD_SETSIZE:   usize = 1024;
 pub const NFDBITS:      usize = @bitSizeOf(usize);
 pub const FD_WORDS:     usize = FD_SETSIZE / NFDBITS;
 
+const BitIdxType = @Type(
+    std.builtin.Type{
+        .int = .{
+            .bits = @ctz(@as(usize, 1)),
+            .signedness = .unsigned
+        }
+    }
+);
+
 pub const FDSet = extern struct {
     fds_bits: [FD_WORDS]usize,
 
@@ -65,7 +75,7 @@ pub const FDSet = extern struct {
         if (fd >= FD_SETSIZE)
             return false;
         const word_idx = fd / NFDBITS;
-        const bit_idx: u5 = @intCast(fd % NFDBITS);
+        const bit_idx: BitIdxType = @intCast(fd % NFDBITS);
         return (
             self.fds_bits[word_idx] & (@as(usize, 1) << bit_idx)
         ) != 0;
@@ -75,7 +85,7 @@ pub const FDSet = extern struct {
         if (fd >= FD_SETSIZE)
             return;
         const word_idx = fd / NFDBITS;
-        const bit_idx: u5 = @intCast(fd % NFDBITS);
+        const bit_idx: BitIdxType = @intCast(fd % NFDBITS);
         self.fds_bits[word_idx] |= (@as(usize, 1) << bit_idx);
     }
 
@@ -83,7 +93,7 @@ pub const FDSet = extern struct {
         if (fd >= FD_SETSIZE)
             return;
         const word_idx = fd / NFDBITS;
-        const bit_idx: u5 = @intCast(fd % NFDBITS);
+        const bit_idx: BitIdxType = @intCast(fd % NFDBITS);
         self.fds_bits[word_idx] &= ~(@as(usize, 1) << bit_idx);
     }
 
