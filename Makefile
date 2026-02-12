@@ -18,7 +18,7 @@ MOD_TARGET_DIR	= $(IMG_DIR)/modules
 
 MODULES = example keyboard time
 
-GPT_DISK = disk/disk.img
+BOOT_DISK = kfs.img
 
 OS = linux
 ifeq ($(shell uname -s),Darwin)
@@ -55,8 +55,11 @@ $(USERSPACE): $(USERSPACE_SRC)
 $(KERNEL): $(SRC) $(ASM_SRC)
 	zig build -freference-trace=20 # -Doptimize=ReleaseSafe
 
+$(BOOT_DISK): $(KERNEL) $(GRUB_CFG) $(IMG)
+	sh disk/create_boot_disk.sh $(BOOT_DISK)
+
 clean:
-	rm -f $(IMG)
+	rm -f $(IMG) $(BOOT_DISK)
 	rm -rf zig-out $(ISO_DIR)/boot/kfs.bin
 	rm -rf $(MOD_TARGET_DIR)/*
 
@@ -64,18 +67,15 @@ fclean: clean
 	rm -rf $(NAME)
 	rm -rf .zig-cache
 
-qemu: $(NAME) $(IMG)
+qemu: $(BOOT_DISK)
 	$(QEMU) $(KVM) \
-		-cdrom $(NAME) \
+		-drive file=$(BOOT_DISK),format=raw \
 		-serial stdio \
 		-m 4G \
-		-drive file=$(IMG),format=raw \
-		-drive file=$(GPT_DISK),format=raw
 
-debug: $(NAME) $(IMG)
-	$(QEMU) -cdrom $(NAME) \
+debug: $(BOOT_DISK)
+	$(QEMU) -drive file=$(BOOT_DISK),format=raw \
 	-m 1G \
-	-drive file=$(IMG),format=raw \
 	-s -S &
 	gdb $(KERNEL) -ex "target remote localhost:1234" \
 		-ex "layout split src asm" \
@@ -124,4 +124,4 @@ $(MOD_TARGET_DIR)/%.o: \
 
 $(MOD_TARGET_DIR): $(IMG_DIR)
 
-.PHONY: all clean qemu modules brew
+.PHONY: all clean qemu qemu-iso debug modules brew
