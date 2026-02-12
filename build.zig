@@ -141,6 +141,8 @@ pub fn build(b: *std.Build) !void {
     codegen_step.dependOn(&gen_output_file.step);
 
     const kernel_step = b.step(name, "Build the kernel");
-    kernel.step.dependOn(codegen_step);
+    if (builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
+        kernel_step.dependOn(&codegen_step);
+    }
     kernel_step.dependOn(&kernel.step);
 }
