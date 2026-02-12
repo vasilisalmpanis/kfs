@@ -115,7 +115,7 @@ pub fn clone(
     // }
     // errdefer if (!flags.VM) {
         errdefer if (child.mm) |mm|
-            krn.mm.kfree(mm);
+            mm.delete();
     // };
 
     if (flags.FS) {

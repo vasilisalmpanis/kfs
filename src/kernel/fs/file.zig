@@ -131,6 +131,22 @@ pub const TaskFiles = struct {
         return null;
     }
 
+    pub fn deinit(self: *TaskFiles) void {
+        var it = self.map.iterator(.{
+            .direction = .forward,
+            .kind = .set
+        });
+        while (it.next()) |idx| {
+            if (self.fds.fetchRemove(idx)) |kv| {
+                kv.value.ref.unref();
+            }
+        }
+        self.fds.deinit();
+        self.map.deinit();
+        self.closexec.deinit();
+        kernel.mm.kfree(self);
+    }
+
     pub fn dup(self: *TaskFiles, old: *TaskFiles) !void {
         var fd_it = old.map.iterator(.{});
         while (fd_it.next()) |id| {
