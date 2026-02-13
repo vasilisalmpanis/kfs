@@ -167,7 +167,6 @@ pub fn doExecve(
     if (free_arg_env)
         krn.mm.kfreeSlice(filename);
     file.ref.unref();
-    path.release();
 
     if (free_arg_env) {
         freeSlices(argv, argv.len);

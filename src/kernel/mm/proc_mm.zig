@@ -444,10 +444,11 @@ pub const MM = struct {
     }
 
     pub fn delete(self: *MM) void {
+        if (self == &init_mm)
+            return ;
         self.releaseMappings();
-        if (self != &init_mm and self.vas != 0) {
-            mm.virt_memory_manager.deleteVAS(self.vas);
-        }
+        if (self.vas != 0)
+            mm.virt_memory_manager.deleteVASTables(self.vas);
         krn.mm.kfree(self);
     }
 

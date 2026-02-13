@@ -299,8 +299,8 @@ pub const VMM = struct {
         self.unmapPage(pair.virt, false);
     }
 
-    /// Cleans up all the userspace pages in the given VAS.
-    pub fn deleteVAS(self: *VMM, vas: u32) void {
+    /// Cleans up all the userspace related page tables in the given VAS.
+    pub fn deleteVASTables(self: *VMM, vas: u32) void {
         const pair = self.mapVAS(vas);
         const pd: [*]u32 = @ptrFromInt(pair.virt);
         const kernel_pd: u32 = PAGE_OFFSET >> 22;

@@ -24,7 +24,7 @@ pub fn doFork() !u32 {
         krn.logger.ERROR("fork: failed to dup mm", .{});
         return errors.ENOMEM;
     };
-    errdefer child.mm.?.delete();
+    errdefer km.kfree(child.mm.?); // BUG: free mappings and then mm
     child.fs = tsk.current.fs.clone() catch {
         krn.logger.ERROR("fork: failed to clone fs", .{});
         return errors.ENOMEM;

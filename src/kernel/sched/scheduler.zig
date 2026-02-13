@@ -36,9 +36,6 @@ fn processTasks() void {
         krn.fs.procfs.deleteProcess(task);
         curr.del();
         task.delFromTree(); // Already done in task finish but safe
-        task.mm.?.delete();
-        task.files.deinit();
-        task.fs.deinit();
         kthreadStackFree(task.stack_bottom);
         km.kfree(task);
         if (end)
