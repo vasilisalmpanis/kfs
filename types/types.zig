@@ -625,6 +625,8 @@ pub const kernel = struct {
             list : kernel.list.ListHead,
             refcount : kernel.task.RefCount,
             wakeup_time : u32= 0,
+            utime : u32= 0,
+            stime : u32= 0,
             mm : ?*kernel.mm.proc_mm.MM= null,
             fs : *kernel.fs.FSInfo,
             files : *kernel.fs.file.TaskFiles,
@@ -726,6 +728,12 @@ pub const kernel = struct {
     };
 
     pub const jiffies = struct {
+        pub const CpuTicks = struct {
+            user : u64,
+            system : u64,
+            idle : u64,
+        };
+
     };
 
     pub const errors = struct {
@@ -1036,6 +1044,34 @@ pub const kernel = struct {
         };
 
         pub const clone = struct {
+            pub const CloneFlags = packed struct {
+                sigmask : u8= 0,
+                VM : bool= false,
+                FS : bool= false,
+                FILES : bool= false,
+                SIGHAND : bool= false,
+                PIDFD : bool= false,
+                PTRACE : bool= false,
+                VFORK : bool= false,
+                PARENT : bool= false,
+                THREAD : bool= false,
+                NEWNS : bool= false,
+                SYSVSEM : bool= false,
+                SETTLS : bool= false,
+                PARENT_SETTID : bool= false,
+                CHILD_CLEARTID : bool= false,
+                DETACHED : bool= false,
+                UNTRACED : bool= false,
+                CHILD_SETTID : bool= false,
+                NEWCGROUP : bool= false,
+                NEWUTS : bool= false,
+                NEWIPC : bool= false,
+                NEWUSER : bool= false,
+                NEWPID : bool= false,
+                NEWNET : bool= false,
+                IO : bool= false,
+            };
+
         };
 
         pub const close = struct {

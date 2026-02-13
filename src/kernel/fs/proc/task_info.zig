@@ -30,7 +30,9 @@ pub fn newProcess(task: *kernel.task.Task) !void {
 
 pub fn deleteProcess(task: *kernel.task.Task) void {
     var buff: [5]u8 = .{0} ** 5;
-    const slice = std.fmt.bufPrint(buff[0..5], "{d}", .{task.pid}) catch { return; };
+    const slice = std.fmt.bufPrint(buff[0..5], "{d}", .{task.pid}) catch {
+        return;
+    };
     const dentry = kernel.fs.procfs.root.inode.ops.lookup(kernel.fs.procfs.root, slice) catch {
         @panic("Not found? This shouldn't happen\n");
     };
@@ -59,6 +61,17 @@ fn write(_: *kernel.fs.File, _: [*]const u8, _: usize) !usize {
     return kernel.errors.PosixError.ENOSYS;
 }
 
+fn parentPid(task: *kernel.task.Task) u32 {
+    const lock_state = kernel.task.tasks_lock.lock_irq_disable();
+    defer kernel.task.tasks_lock.unlock_irq_enable(lock_state);
+
+    if (task.tree.parent) |parent_node| {
+        const parent = parent_node.entry(kernel.task.Task, "tree");
+        return parent.pid;
+    }
+    return 0;
+}
+
 // /proc/stat file
 
 fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
@@ -66,7 +79,7 @@ fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
     const task = proc_inode.task orelse {
         @panic("Should not happen");
     };
-    var buffer: [256]u8 = .{0} ** 256;
+    var buffer: [512]u8 = .{0} ** 512;
     const status: u8 = switch (task.state) {
         .RUNNING => 'R',
         .INTERRUPTIBLE_SLEEP => 'S',
@@ -74,12 +87,18 @@ fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
         .STOPPED => 'T',
         .ZOMBIE => 'Z',
     };
-    const string = try std.fmt.bufPrint(buffer[0..256],
-        "{d} ({s}) {c} 2 0 0 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 14 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+    const ppid = parentPid(task);
+    const string = try std.fmt.bufPrint(buffer[0..512],
+        "{d} ({s}) {c} {d} {d} 0 0 -1 0 0 0 0 0 {d} {d} 0 0 20 0 1 0 {d} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
         .{
             task.pid,
             std.mem.span(@as([*:0]u8, @ptrCast(&task.name))),
             status,
+            ppid,
+            task.pgid,
+            task.utime,
+            task.stime,
+            kernel.jiffies.jiffies,
         }
     );
     var to_read: usize = size;
