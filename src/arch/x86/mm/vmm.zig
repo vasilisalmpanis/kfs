@@ -207,7 +207,7 @@ pub const VMM = struct {
         const pd_index = virt >> 22;
         const pt_index = (virt >> 12) & 0x3FF;
         const pt: [*]PageEntry = first_page_table + (0x400 * pd_index);
-        const pfn: u32 = pt[pt_index].address << 12;
+        const pfn: u32 = @as(u32, pt[pt_index].address) << 12;
         if (free_pfn)
             self.pmm.freePage(pfn);
         pt[pt_index].erase();
@@ -297,6 +297,21 @@ pub const VMM = struct {
 
     pub fn unmapVAS(self: *VMM, pair: VASpair) void {
         self.unmapPage(pair.virt, false);
+    }
+
+    /// Cleans up all the userspace related page tables in the given VAS.
+    pub fn deleteVASTables(self: *VMM, vas: u32) void {
+        const pair = self.mapVAS(vas);
+        const pd: [*]u32 = @ptrFromInt(pair.virt);
+        const kernel_pd: u32 = PAGE_OFFSET >> 22;
+        for (0..kernel_pd) |pd_idx| {
+            if (pd[pd_idx] != 0) {
+                const pt_phys: u32 = (pd[pd_idx] >> 12) << 12;
+                self.pmm.freePage(pt_phys);
+            }
+        }
+        self.unmapPage(pair.virt, false);
+        self.pmm.freePage(vas);
     }
 
     pub fn dupPage(self: *VMM, old_pt: [*]u32, new_pt: [*]u32, pd_idx:u32, pt_idx: u32) !void {

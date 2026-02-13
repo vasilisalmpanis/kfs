@@ -104,7 +104,10 @@ pub const Task = struct {
     refcount:       RefCount        = RefCount.init(),
     wakeup_time:    usize           = 0,
 
-    mm:             ?*mm.MM              = null,
+    utime:          u32             = 0,
+    stime:          u32             = 0,
+
+    mm:             ?*mm.MM         = null,
     // Filesystem Info
     fs:             *krn.fs.FSInfo,
     // Open files info
@@ -135,6 +138,8 @@ pub const Task = struct {
             .limit = 0,
             .name = .{0} ** 16,
             .should_stop = false,
+            .utime = 0,
+            .stime = 0,
         };
     }
 
@@ -150,6 +155,8 @@ pub const Task = struct {
         self.fpu_used = false;
         self.save_fpu_state = false;
         self.mm = &mm.proc_mm.init_mm;
+        self.utime = 0;
+        self.stime = 0;
         self.setName(name);
         mm.proc_mm.init_mm.vas = virt;
         self.wait_wq.setup();
@@ -196,6 +203,8 @@ pub const Task = struct {
         self.state = tmp.state;
         self.refcount = tmp.refcount;
         self.wakeup_time = tmp.wakeup_time;
+        self.utime = tmp.utime;
+        self.stime = tmp.stime;
         self.stack_bottom = tmp.stack_bottom;
         self.tsktype = tmp.tsktype;
         self.save_fpu_state = tmp.save_fpu_state;
