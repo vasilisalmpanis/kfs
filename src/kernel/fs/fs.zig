@@ -136,7 +136,7 @@ pub const LinuxDirent = extern struct {
         }
     }
 
-    pub fn getName(self: *LinuxDirent) []u8 {
+    pub fn getName(self: *LinuxDirent) [:0]u8 {
         const name_addr: u32 = @intFromPtr(self) + @sizeOf(LinuxDirent);
         return std.mem.span(@as([*:0]u8, @ptrFromInt(name_addr)));
     }

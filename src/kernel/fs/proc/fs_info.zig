@@ -37,7 +37,7 @@ fn mounts_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
             const mnt_path = mnt.getPath();
             defer mnt_path.release();
 
-            var abs_path: []const u8 = try mnt_path.getAbsPath(path_buffer[0..256]);
+            var abs_path: [:0]const u8 = try mnt_path.getAbsPath(path_buffer[0..255 :0]);
             if (abs_path.len == 0) {
                 abs_path = "/";
             }
@@ -55,7 +55,7 @@ fn mounts_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
             const mnt_path = mnt.getPath();
             defer mnt_path.release();
 
-            var abs_path: []const u8 = try mnt_path.getAbsPath(path_buffer[0..256]);
+            var abs_path: [:0]const u8 = try mnt_path.getAbsPath(path_buffer[0..255 :0]);
             if (abs_path.len == 0) {
                 abs_path = "/";
             }

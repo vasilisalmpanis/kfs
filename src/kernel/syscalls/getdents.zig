@@ -23,7 +23,7 @@ pub fn getdents64(fd: u32, dirents: [*]u8, size: u32) !u32 {
                         const dirent: *krn.fs.LinuxDirent = @ptrCast(
                             @alignCast(&buf_slice[offset])
                         );
-                        const entry_name: []u8 = dirent.getName();                        
+                        const entry_name: [:0]u8 = dirent.getName();                        
                         var entry_size: u32 = header_size + @as(
                             u32, @intCast(entry_name.len)
                         ) + 1;

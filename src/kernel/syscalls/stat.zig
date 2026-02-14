@@ -220,7 +220,7 @@ pub fn stat64(path: ?[*:0]u8, buf: ?*StatLinux) !u32 {
     if (path == null or buf == null)
         return errors.EFAULT;
 
-    const path_slice: []const u8 = std.mem.span(path.?);
+    const path_slice: [:0]const u8 = std.mem.span(path.?);
     const stat_buf: *StatLinux = buf.?;
     const inode_path: fs.path.Path = try fs.path.resolve(path_slice);
     defer inode_path.release();
@@ -254,7 +254,7 @@ pub fn fstatat64(
     if (path == null) {
         return errors.ENOENT;
     }
-    const path_slice: []const u8 = std.mem.span(path.?);
+    const path_slice: [:0]const u8 = std.mem.span(path.?);
     if (path_slice.len == 0) {
         return errors.ENOENT;
     }

@@ -6,7 +6,7 @@ const std = @import("std");
 
 /// The device driver generic type
 pub const Driver = struct {
-    name: []const u8,
+    name: [:0]const u8,
     list: kern.list.ListHead,
     minor_set: std.StaticBitSet(256) = std.StaticBitSet(256).initEmpty(),
     minor_mutex: kern.Mutex = kern.Mutex.init(),

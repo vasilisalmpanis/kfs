@@ -436,14 +436,14 @@ pub const Ext2Inode = struct {
         kernel.mm.kfree(raw_buff.ptr);
     }
 
-    pub fn getLink(base: *fs.Inode, resulting_link: *[]u8) !void {
+    pub fn getLink(base: *fs.Inode, resulting_link: *[:0]u8) !void {
         const sb = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
         const ext2_inode = base.getImpl(Ext2Inode, "base");
         const ext2_s = sb.getImpl(ext2_sb.Ext2Super, "base");
         if (ext2_inode.data.i_blocks > 0) {
             const lbn = try ext2_s.resolveLbn(ext2_inode, 0);
             const block = try ext2_s.readBlocks(lbn, 1);
-            const span: []u8 = std.mem.span(@as([*:0]u8, @ptrCast(block.ptr)));
+            const span: [:0]u8 = std.mem.span(@as([*:0]u8, @ptrCast(block.ptr)));
             if (span.len > resulting_link.len)
                 return kernel.errors.PosixError.EINVAL;
             @memcpy(resulting_link.*[0..span.len], span);
@@ -451,7 +451,7 @@ pub const Ext2Inode = struct {
             return ;
         } else {
             const block: [*:0]u8 = @ptrCast(&ext2_inode.data.i_block);
-            const span: []u8 = std.mem.span(block);
+            const span: [:0]u8 = std.mem.span(block);
             if (span.len > resulting_link.len)
                 return kernel.errors.PosixError.EINVAL;
             @memcpy(resulting_link.*[0..span.len], span);
@@ -699,7 +699,7 @@ pub const Ext2Inode = struct {
             return to_write;
         } else {
             const block: [*:0]u8 = @ptrCast(&ext2_inode.data.i_block);
-            const span: []u8 = std.mem.span(block);
+            const span: [:0]u8 = std.mem.span(block);
 
             var to_write: u32 = size;
             if (@as(u32, @intCast(span.len)) < size)

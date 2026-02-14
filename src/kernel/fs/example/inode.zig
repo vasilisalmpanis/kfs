@@ -100,9 +100,9 @@ pub const ExampleInode = struct {
         return kernel.errors.PosixError.EEXIST;
     }
 
-    pub fn getLink(base: *fs.Inode, resulting_link: *[]u8) !void {
+    pub fn getLink(base: *fs.Inode, resulting_link: *[:0]u8) !void {
         const example_inode = base.getImpl(ExampleInode, "base");
-        const span: []const u8 = std.mem.span(@as([*:0]u8, @ptrCast(&example_inode.buff)));
+        const span: [:0]const u8 = std.mem.span(@as([*:0]u8, @ptrCast(&example_inode.buff)));
         if (span.len > resulting_link.len) {
             return kernel.errors.PosixError.EINVAL;
         }

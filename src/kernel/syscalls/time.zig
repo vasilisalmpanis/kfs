@@ -30,7 +30,7 @@ pub fn utimensat(
         return errors.EINVAL;
     if (!times[1].isValid())
         return errors.EINVAL;
-    const span = std.mem.span(path);
+    const span: [:0]const u8 = std.mem.span(path);
     var from = kernel.task.current.fs.pwd.clone();
     defer from.release();
     if (!fs.path.isRelative(span)) {

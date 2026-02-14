@@ -46,7 +46,7 @@ pub const Path = struct {
     pub fn followLink(self: *Path, prev_path: Path) anyerror!void {
         if (self.dentry.inode.ops.get_link) |getLink| {
             var path: [1024]u8 = .{0} ** 1024;
-            var path_slice: []u8 = path[0..1024];
+            var path_slice: [:0]u8 = path[0..1023 :0];
             try getLink(self.dentry.inode, &path_slice);
             const new_path = try resolveFrom(path_slice, prev_path, true);
             self.release();
@@ -99,15 +99,16 @@ pub const Path = struct {
         }
     }
 
-    pub fn getAbsPath(self: Path, buf: []u8) ![]u8 {
+    pub fn getAbsPath(self: Path, buf: [:0]u8) ![:0]u8 {
         if (
             self.isRoot() and self.mnt.isGlobalRoot() 
         ) {
-            return buf[0..0];
+            buf[0] = 0;
+            return buf[0..0 :0];
         }
         var curr = try resolveFrom("..", self, true);
+        defer curr.release();
         const res = try curr.getAbsPath(buf);
-        buf[res.len] = '/';
         var _d: *fs.DEntry = undefined;
         if (self.isRoot()) {
             _d = self.mnt.root;
@@ -115,13 +116,15 @@ pub const Path = struct {
             _d = self.dentry;
         }
         if (res.len + _d.name.len + 1  > buf.len) {
-            return krn.errors.PosixError.ENOMEM;
+            return krn.errors.PosixError.ERANGE;
         }
+        buf[res.len] = '/';
         @memcpy(
             buf[res.len + 1..res.len + _d.name.len + 1],
             _d.name
         );
-        return buf[0..res.len + _d.name.len + 1];
+        buf.ptr[res.len + _d.name.len + 1] = 0;
+        return buf[0..res.len + _d.name.len + 1 :0];
     }
 
     pub fn isSubPathOf(self: *const Path, other: *const Path) bool {

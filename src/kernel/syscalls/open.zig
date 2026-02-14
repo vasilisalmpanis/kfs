@@ -96,7 +96,7 @@ pub fn open(
     mode: fs.UMode,
 ) !u32 {
     if (filename) |f| {
-        const path: []const u8 = std.mem.span(f);
+        const path: [:0]const u8 = std.mem.span(f);
         kernel.logger.INFO("opening {s}\n", .{path});
         var file_segment: []const u8 = "";
         const parent_dir = try fs.path.dir_resolve(
@@ -124,7 +124,7 @@ pub fn openat(
         return errors.EFAULT;
     }
     // TODO: Handle absolute paths
-    const path_sl: []const u8 = std.mem.span(path.?);
+    const path_sl: [:0]const u8 = std.mem.span(path.?);
     kernel.logger.INFO("path {s} fd {d}\n", .{path_sl, dirfd});
     if (!kernel.fs.path.isRelative(path_sl)) {
         return try open(path, flags, mode);

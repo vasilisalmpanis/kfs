@@ -147,16 +147,16 @@ pub const InodeAttrs = struct {
 
 // TODO: define the Inode Ops struct with documentation.
 pub const InodeOps = struct {
-    create: *const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry) anyerror!*fs.DEntry,
-    mknod: ?*const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry, dev: drv.device.dev_t) anyerror!*fs.DEntry,
-    unlink: ?*const fn(parent: *fs.Inode, dentry: *fs.DEntry) anyerror!void = null,
-    lookup: *const fn (parent: *fs.DEntry, name: []const u8) anyerror!*fs.DEntry,
-    mkdir: *const fn (base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) anyerror!*fs.DEntry,
-    rmdir: ?*const fn (current: *fs.DEntry, parent: *fs.DEntry) anyerror!void = null,
-    get_link: ?*const fn(base: *Inode, resulting_link: *[]u8) anyerror!void,
-    symlink: ?*const fn(parent: *fs.DEntry, name: []const u8, target: []const u8) anyerror!void = null,
-    link: ?*const fn(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) anyerror!void = null,
-    readlink: ?*const fn(base: *fs.Inode, buf: [*]u8, size: u32) anyerror!u32 = null,
-    rename: ?*const fn(old_parent: *fs.DEntry, old: *fs.DEntry, new_parent: *fs.DEntry, new_name: []const u8) anyerror!void = null,
-    setattr: ?*const fn(base: *fs.Inode, attr: *const InodeAttrs) anyerror!void = Inode.setattr,
+    create:   *const  fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry)                         anyerror!*fs.DEntry,
+    mkdir:    *const  fn(base: *Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode)                         anyerror!*fs.DEntry,
+    lookup:   *const  fn(parent: *fs.DEntry, name: []const u8)                                                       anyerror!*fs.DEntry,
+    mknod:    ?*const fn(base: *Inode, name: []const u8, mode: fs.UMode, parent: *fs.DEntry, dev: drv.device.dev_t)  anyerror!*fs.DEntry,
+    get_link: ?*const fn(base: *Inode, res_link: *[:0]u8)                                                            anyerror!void,
+    unlink:   ?*const fn(parent: *fs.Inode, dentry: *fs.DEntry)                                                      anyerror!void  = null,
+    rmdir:    ?*const fn(current: *fs.DEntry, parent: *fs.DEntry)                                                    anyerror!void  = null,
+    symlink:  ?*const fn(parent: *fs.DEntry, name: []const u8, target: []const u8)                                   anyerror!void  = null,
+    link:     ?*const fn(parent: *fs.DEntry, name: []const u8, target: fs.path.Path)                                 anyerror!void  = null,
+    readlink: ?*const fn(base: *fs.Inode, buf: [*]u8, size: u32)                                                     anyerror!u32   = null,
+    rename:   ?*const fn(old_parent: *fs.DEntry, old: *fs.DEntry, new_parent: *fs.DEntry, new_name: []const u8)      anyerror!void  = null,
+    setattr:  ?*const fn(base: *fs.Inode, attr: *const InodeAttrs)                                                   anyerror!void  = Inode.setattr,
 };

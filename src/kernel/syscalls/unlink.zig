@@ -10,7 +10,7 @@ fn do_unlinkat(dirfd: i32, _path: ?[*:0]u8) !u32 {
         return errors.EINVAL;
     const path = _path orelse
         return errors.EINVAL;
-    const path_span = std.mem.span(path);
+    const path_span: [:0]const u8 = std.mem.span(path);
     var from: fs.path.Path = undefined;
     if (!fs.path.isRelative(path_span)) {
         from = krn.task.current.fs.pwd.clone();

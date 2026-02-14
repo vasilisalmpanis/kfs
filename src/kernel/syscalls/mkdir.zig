@@ -12,7 +12,7 @@ pub fn mkdir(
     if (path_name == null) {
         return errors.ENOENT;
     }
-    const user_path = std.mem.span(path_name.?);
+    const user_path: [:0]const u8 = std.mem.span(path_name.?);
     krn.logger.INFO("mkdir {s}\n", .{user_path});
     const stripped_path = fs.path.remove_trailing_slashes(user_path);
     var dir_name: []const u8 = "";
@@ -67,7 +67,7 @@ pub fn do_rmdir_at(path: []const u8, from: krn.fs.path.Path) !u32 {
 }
 
 pub fn rmdir(path: ?[*:0]u8) !u32 {
-    const _path: []const u8 = if (path) |p|
+    const _path: [:0]const u8 = if (path) |p|
         std.mem.span(p)
     else
         return errors.EFAULT;

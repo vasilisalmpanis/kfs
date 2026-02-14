@@ -96,7 +96,7 @@ pub fn do_relocations(
             // We have no dynamic linking
             // we find the symbol value and use it as S
             // in the formula
-            const name: []const u8 = std.mem.span(@as([*:0]u8, @ptrCast(@alignCast(&strtab[sym.st_name]))));
+            const name: [:0]const u8 = std.mem.span(@as([*:0]u8, @ptrCast(@alignCast(&strtab[sym.st_name]))));
             const symbol = debug.lookupSymbolByName(name) catch {
                 kernel.logger.ERROR("Symbol Not Found: {s}\n", .{name});
                 return kernel.errors.PosixError.ENOENT;
@@ -224,7 +224,7 @@ pub fn load_module(slice: []u8, name: []const u8) !*Module {
             sh_strtab = section_hdr;
         }
         const section_name: [*:0]u8 = @ptrCast(&section_strings[section_hdr.sh_name]);
-        const span = std.mem.span(section_name);
+        const span: [:0]const u8 = std.mem.span(section_name);
         if (std.mem.eql(u8, span, ".init")) {
             init = @ptrFromInt(section_hdr.sh_addr);
 

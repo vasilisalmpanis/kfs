@@ -76,7 +76,7 @@ const GPTEntry = extern struct {
     slba: u64,
     elba: u64,
     attrib: u64,
-    name: [72]u8,
+    name: [36]u16, // UNICODE16-LE encoded - each character is 2 bytes
 
     pub fn isEmpty(self: *GPTEntry) bool {
         return std.mem.allEqual(u8, self.PGUID[0..16], 0);
@@ -131,15 +131,15 @@ pub fn parsePartitionTable(drive: *ata.ATADrive) !void {
                     @memcpy(part.PGUID[0..16], part_entry.PGUID[0..16]);
                     @memcpy(part.GUID[0..16], part_entry.GUID[0..16]);
                     var len: u32 = 0;
-                    for (0..72) |idx| {
+                    for (0..36) |idx| {
                         if (part_entry.name[idx] != 0)
                             len += 1;
                     }
                     if (krn.mm.kmallocSlice(u8, len)) |name| {
                         var curr: u32 = 0;
-                        for (0..72) |idx| {
+                        for (0..36) |idx| {
                             if (part_entry.name[idx] != 0) {
-                                name[curr] = part_entry.name[idx];
+                                name[curr] = @truncate(part_entry.name[idx]);
                                 curr += 1;
                             }
                         }

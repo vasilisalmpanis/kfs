@@ -6,7 +6,7 @@ const errors = @import("error-codes.zig").PosixError;
 pub fn chmod(path: ?[*:0]const u8, mode: fs.UMode) !u32 {
     if (path == null)
         return errors.EFAULT;
-    const _path: []const u8 = std.mem.span(path.?);
+    const _path: [:0]const u8 = std.mem.span(path.?);
     var _mode = mode;
     const resolved = try fs.path.resolve(_path);
     if (

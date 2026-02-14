@@ -47,7 +47,7 @@ pub const SysInode = struct {
 
     fn mkdir(base: *fs.Inode, parent: *fs.DEntry, name: []const u8, mode: fs.UMode) !*fs.DEntry {
         const sb = if (base.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
-        if (kernel.mm.dupSlice(u8, name)) |_name| {
+        if (kernel.mm.dupSliceZ(u8, name)) |_name| {
             var cash_key = fs.DentryHash{
                 .sb = @intFromPtr(parent.sb),
                 .ino = base.i_no,

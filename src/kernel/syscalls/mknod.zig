@@ -12,7 +12,7 @@ pub fn mknod(
     if (kernel.task.current.uid != 0)
         return errors.EACCES;
     var name: []const u8 = undefined;
-    const path = std.mem.span(pathname);
+    const path: [:0]const u8 = std.mem.span(pathname);
     const parent_dir = try fs.path.dir_resolve(path, &name);
     if (!parent_dir.dentry.inode.mode.isDir()) {
         return errors.ENOENT;

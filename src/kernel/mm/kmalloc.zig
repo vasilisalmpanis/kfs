@@ -48,9 +48,27 @@ pub fn kmallocSlice(comptime T: type, count: usize) ?[]T {
     return ptr[0..count];
 }
 
+pub fn kmallocSliceZ(comptime T: type, count: usize) ?[:0]T {
+    const addr = mm.kheap.alloc(count * @sizeOf(T) + 1, true, false)
+        catch return null;
+    if (addr == 0)
+        return null;
+    const ptr: [*:0]T = @ptrFromInt(addr);
+    ptr[count] = 0;
+    return ptr[0..count :0];
+}
+
 pub fn dupSlice(comptime T: type, slice: []const T) ?[]T {
     if (kmallocSlice(T, slice.len)) |new| {
         @memcpy(new[0..], slice[0..]);
+        return new;
+    }
+    return null;
+}
+
+pub fn dupSliceZ(comptime T: type, slice: []const T) ?[:0]T {
+    if (kmallocSliceZ(T, slice.len)) |new| {
+        @memcpy(new[0..slice.len], slice[0..]);
         return new;
     }
     return null;

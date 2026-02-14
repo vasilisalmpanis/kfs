@@ -100,14 +100,14 @@ pub const File = struct {
 
 // TODO: define and document the file operations callbacks.
 pub const FileOps = struct {
-    open: *const fn (base: *File, inode: *fs.Inode) anyerror!void,
-    close: *const fn(base: *File) void,
-    write: *const fn (base: *File, buf: [*]const u8, size: usize) anyerror!usize,
-    read: *const fn (base: *File, buf: [*]u8, size: usize) anyerror!usize,
-    lseek: ?*const fn (base: *File, offset: i32, origin: usize) anyerror!usize = null,
-    readdir: ?*const fn (base: *File, buf: []u8) anyerror!usize = readdirVFS,
-    ioctl: ?*const fn (base: *File, op: u32, data: ?*anyopaque) anyerror!u32 = null,
-    poll: ?*const fn (base: *File, pollfd: *kernel.poll.PollFd) anyerror!u32 = pollVFS,
+    open:    *const  fn(base: *File, inode: *fs.Inode)              anyerror!void,
+    close:   *const  fn(base: *File)                                void,
+    write:   *const  fn(base: *File, buf: [*]const u8, size: usize) anyerror!usize,
+    read:    *const  fn(base: *File, buf: [*]u8, size: usize)       anyerror!usize,
+    lseek:   ?*const fn(base: *File, offset: i32, origin: usize)    anyerror!usize  = null,
+    ioctl:   ?*const fn(base: *File, op: u32, data: ?*anyopaque)    anyerror!u32    = null,
+    readdir: ?*const fn(base: *File, buf: []u8)                     anyerror!usize  = readdirVFS,
+    poll:    ?*const fn(base: *File, pollfd: *kernel.poll.PollFd)   anyerror!u32    = pollVFS,
 };
 
 pub const TaskFiles = struct {

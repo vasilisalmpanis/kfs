@@ -7,7 +7,7 @@ var bus_mutex: kern.Mutex = kern.Mutex.init();
 pub var sysfs_bus_dentry: ?*kern.fs.DEntry = null;
 
 pub const Bus = struct {
-    name: []const u8,
+    name: [:0]const u8,
     list: kern.list.ListHead = kern.list.ListHead.init(),
     drivers: ?*drv.Driver,
     drivers_mutex: kern.Mutex = kern.Mutex.init(),

@@ -49,8 +49,8 @@ fn scan(bus: *Bus) void {
                             // });
                             if (_dev.clone()) |_d| {
                                 var new_dev = _d;
-                                if (krn.mm.kmallocSlice(u8, 12)) |name| {
-                                    _ = std.fmt.bufPrint(
+                                if (krn.mm.kmallocSliceZ(u8, 12)) |name| {
+                                    _ = std.fmt.bufPrintZ(
                                         name,
                                         "0000:{x:0>2}:{x:0>2}:{x}",
                                         .{
@@ -72,8 +72,8 @@ fn scan(bus: *Bus) void {
                     // });
                     if (device.clone()) |_d| {
                         var new_dev = _d;
-                        if (krn.mm.kmallocSlice(u8, 12)) |name| {
-                            _ = std.fmt.bufPrint(
+                        if (krn.mm.kmallocSliceZ(u8, 12)) |name| {
+                            _ = std.fmt.bufPrintZ(
                                 name,
                                 "0000:{x:0>2}:{x:0>2}:{x}",
                                 .{
