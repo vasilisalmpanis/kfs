@@ -27,7 +27,7 @@ pub const DEntry = struct {
     sb: *SuperBlock,
     inode: *fs.Inode,
     ref: Refcount,
-    name: []u8,
+    name: [:0]const u8,
     tree: TreeNode,
 
     pub fn drop(self: *Refcount) void {
@@ -55,7 +55,7 @@ pub const DEntry = struct {
 
     pub fn alloc(name: []const u8, sb: *SuperBlock, ino: *fs.Inode) !*DEntry {
         if (kernel.mm.kmalloc(DEntry)) |entry| {
-            if (kernel.mm.dupSlice(u8, name)) |nm| {
+            if (kernel.mm.dupSliceZ(u8, name)) |nm| {
                 entry.name = nm;
             } else {
                 return error.OutOfMemory;

@@ -40,11 +40,11 @@ pub fn renameat2(
     flags: u32
 ) !u32 {
     _ = flags;
-    const _oldpath: []const u8 = if (oldpath) |_p|
+    const _oldpath: [:0]const u8 = if (oldpath) |_p|
         std.mem.span(_p)
     else
         return errors.EFAULT;
-    const _newpath: []const u8 = if (newpath) |_p|
+    const _newpath: [:0]const u8 = if (newpath) |_p|
         std.mem.span(_p)
     else
         return errors.EFAULT;

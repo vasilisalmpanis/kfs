@@ -60,7 +60,7 @@ pub const dev_t = packed struct {
 var device_mutex = kern.Mutex.init();
 
 pub const Device = struct {
-    name: []const u8,
+    name: [:0]const u8,
     bus: *bus.Bus,
     driver: ?*drv.Driver,
     id: dev_t,
@@ -69,11 +69,10 @@ pub const Device = struct {
     tree: kern.tree.TreeNode, // Global
     data: ?*anyopaque,
 
-    pub fn new(name: []u8, _bus: *bus.Bus) !*Device {
+    pub fn new(name: [:0]u8, _bus: *bus.Bus) !*Device {
         // Think about parent child relationship.
         if (kern.mm.kmalloc(Device)) |dev| {
-            if (kern.mm.kmallocSlice(u8,name.len)) |_name| {
-                @memcpy(_name[0..name.len],name[0..name.len]);
+            if (kern.mm.dupSliceZ(u8, name)) |_name| {
                 dev.name = _name;
                 dev.driver = null;
                 dev.id = dev_t{ .major = 0, .minor = 0};
@@ -87,17 +86,17 @@ pub const Device = struct {
         return kern.errors.PosixError.ENOMEM;
     }
 
-    pub fn setup(self: *Device, _name: [] const u8, _bus: *bus.Bus) void {
-                self.name = _name;
-                self.driver = null;
-                self.id = dev_t{ .major = 0, .minor = 0};
-                self.bus = _bus;
-                self.lock = kern.Mutex.init();
-                self.list = kern.list.ListHead.init();
-                self.tree = kern.tree.TreeNode.init();
-                self.list.setup();
-                self.tree.setup();
-                self.data = null;
+    pub fn setup(self: *Device, _name: [:0] const u8, _bus: *bus.Bus) void {
+        self.name = _name;
+        self.driver = null;
+        self.id = dev_t{ .major = 0, .minor = 0};
+        self.bus = _bus;
+        self.lock = kern.Mutex.init();
+        self.list = kern.list.ListHead.init();
+        self.tree = kern.tree.TreeNode.init();
+        self.list.setup();
+        self.tree.setup();
+        self.data = null;
     }
 
     pub fn dump(self: *Device) void {

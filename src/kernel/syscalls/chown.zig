@@ -46,14 +46,14 @@ pub fn do_chown(
 pub fn chown32(_path: ?[*:0] const u8, uid: u32, gid: u32) !u32 {
     const path = _path orelse
         return errors.EINVAL;
-    const span = std.mem.span(path);
+    const span: [:0]const u8 = std.mem.span(path);
     return try do_chown(fs.AT_FDCWD, span, uid, gid, fs.AT_SYMLINK_FOLLOW);
 }
 
 pub fn lchown(_path: ?[*:0] const u8, uid: u32, gid: u32) !u32 {
     const path = _path orelse
         return errors.EINVAL;
-    const span = std.mem.span(path);
+    const span: [:0]const u8 = std.mem.span(path);
     return try do_chown(fs.AT_FDCWD, span, uid, gid, fs.AT_SYMLINK_NOFOLLOW);
 }
 
@@ -66,6 +66,6 @@ pub fn fchownat(
 ) !u32 {
     const path = _path orelse
         return errors.EINVAL;
-    const span = std.mem.span(path);
+    const span: [:0]const u8 = std.mem.span(path);
     return try do_chown(fd, span, uid, gid, flags);
 }

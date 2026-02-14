@@ -7,8 +7,7 @@ pub const PlatformDevice = struct {
 
     pub fn alloc(name: []const u8) ?*PlatformDevice {
         if (kernel.mm.kmalloc(PlatformDevice)) |new_dev| {
-            if (kernel.mm.kmallocSlice(u8, name.len)) |dev_name| {
-                @memcpy(dev_name[0..], name[0..]);
+            if (kernel.mm.dupSliceZ(u8, name)) |dev_name| {
                 new_dev.dev.setup(dev_name, &bus.platform_bus);
                 return new_dev;
             }

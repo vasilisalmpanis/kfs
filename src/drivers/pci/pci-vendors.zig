@@ -1,4 +1,4 @@
-pub fn identifyClass(class: u8, subclass: u8) []const u8 {
+pub fn identifyClass(class: u8, subclass: u8) [:0]const u8 {
     switch (class) {
         0x00 => {
             switch (subclass) {
@@ -224,7 +224,7 @@ pub fn identifyClass(class: u8, subclass: u8) []const u8 {
 }
 
 
-pub fn identifyDevice(vendor_id: u16, device_id: u16) []const u8 {
+pub fn identifyDevice(vendor_id: u16, device_id: u16) [:0]const u8 {
     switch (vendor_id) {
         0x1234 => {
             switch (device_id) {

@@ -685,7 +685,7 @@ fn getDriveName() ?[] const u8 {
 
 fn releaseDriveName(name: []const u8) void {
     if (name.len < 3) return;
-    const idx: u8 = name[2];
+    const idx: u8 = name[2] - 'a';
 
     drive_names_lock.lock();
     drive_names.unset(idx);
@@ -729,7 +729,7 @@ pub fn ata_init(pci_device: *pci.PCIDevice) void {
                     createStorageDev(drive, name, manager) catch |err| {
                         kernel.logger.ERROR("Failed to create Storage Device: {any}", .{err});
                     };
-                    kernel.mm.kfree(name.ptr);
+                    kernel.mm.kfreeSlice(name);
                 } else kernel.logger.ERROR("Failed to alloc name for ATADrive", .{});
             }
         }

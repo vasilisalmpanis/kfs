@@ -30,7 +30,7 @@ pub fn newProcess(task: *kernel.task.Task) !void {
 
 pub fn deleteProcess(task: *kernel.task.Task) void {
     var buff: [5]u8 = .{0} ** 5;
-    const slice = std.fmt.bufPrint(buff[0..5], "{d}", .{task.pid}) catch { return; };
+    const slice = std.fmt.bufPrintZ(buff[0..5], "{d}", .{task.pid}) catch { return; };
     const dentry = kernel.fs.procfs.root.inode.ops.lookup(kernel.fs.procfs.root, slice) catch {
         @panic("Not found? This shouldn't happen\n");
     };
@@ -114,7 +114,7 @@ fn cmdline_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
     var args_off: usize = 0;
     while (args_off < args.len) {
         const arg_ptr: [*:0]const u8 = @ptrCast(&args.ptr[args_off]);
-        const arg: []const u8 = std.mem.span(arg_ptr);
+        const arg: [:0]const u8 = std.mem.span(arg_ptr);
         if (args_off + arg.len > file.pos) {
             const arg_pos = file.pos - args_off;
             var to_write = args_off + arg.len - file.pos;

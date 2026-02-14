@@ -13,7 +13,7 @@ pub fn readlink(_path: ?[*:0]u8, _buf: ?[*]u8, size: isize) !u32 {
         return errors.EINVAL;
     };
 
-    const path_span = std.mem.span(path);
+    const path_span: [:0]const u8 = std.mem.span(path);
     var last_segment: []const u8 = "";
     const parent = try fs.path.dir_resolve(path_span, &last_segment);
     defer parent.release();

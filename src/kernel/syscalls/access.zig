@@ -54,6 +54,6 @@ pub fn do_access(path: []const u8, mode: i32) !u32 {
 pub fn access(path: ?[*:0]const u8, mode: i32) !u32 {
     if (path == null)
         return errors.EINVAL;
-    const path_span = std.mem.span(path.?);
+    const path_span: [:0]const u8 = std.mem.span(path.?);
     return do_access(path_span, mode);
 }

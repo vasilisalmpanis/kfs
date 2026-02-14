@@ -10,7 +10,7 @@ pub fn mkdir(parent: *fs.DEntry, name: []const u8) !*fs.DEntry {
 
 pub fn createFile(
     parent: *fs.DEntry,
-    name: []const u8,
+    name: [:0]const u8,
     fops: *const fs.FileOps,
     mode: fs.UMode
 ) !*fs.DEntry {

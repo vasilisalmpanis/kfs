@@ -8,7 +8,7 @@ const krn = @import("../main.zig");
 const mod = @import("modules");
 
 pub fn init_module(image: [*]u8, size: u32, name: [*:0]u8) !u32 {
-    const name_span = std.mem.span(name);
+    const name_span: [:0]const u8 = std.mem.span(name);
     _ = try mod.load_module(image[0..size], name_span);
     return 0;
 }
@@ -50,7 +50,7 @@ pub fn delete_module(name: ?[*:0]const u8) !u32 {
     if (name == null) {
         return errors.ENOENT;
     }
-    const _name: []const u8 = std.mem.span(name.?);
+    const _name: [:0]const u8 = std.mem.span(name.?);
     if (_name.len == 0) {
         return errors.ENOENT;
     }

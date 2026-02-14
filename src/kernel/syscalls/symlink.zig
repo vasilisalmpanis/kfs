@@ -9,7 +9,7 @@ const kernel = @import("../main.zig");
 fn do_symlink(
     link_parent_dir: fs.path.Path,
     link_name: []const u8,
-    target: []const u8,
+    target: [:0]const u8,
 ) !u32 {
     const parent_inode = link_parent_dir.dentry.inode;
     if (parent_inode.ops.symlink) |_symlink| {
@@ -22,8 +22,8 @@ fn do_symlink(
 pub fn symlink(target: ?[*:0]u8, linkpath: ?[*:0]u8) !u32 {
     if (target == null or linkpath == null)
         return errors.EFAULT;
-    const _target: []const u8 = std.mem.span(target.?);
-    const _linkpath: []const u8 = std.mem.span(linkpath.?);
+    const _target: [:0]const u8 = std.mem.span(target.?);
+    const _linkpath: [:0]const u8 = std.mem.span(linkpath.?);
     if (_linkpath.len == 0 or _target.len == 0)
         return errors.ENOENT;
     var link_name: []const u8 = "";

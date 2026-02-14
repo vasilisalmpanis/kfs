@@ -794,7 +794,7 @@ pub const kernel = struct {
             sb : *kernel.fs.SuperBlock,
             inode : *kernel.fs.Inode,
             ref : kernel.task.RefCount,
-            name : []u8,
+            name : []const u8,
             tree : kernel.tree.TreeNode,
         };
 
@@ -835,12 +835,12 @@ pub const kernel = struct {
 
         pub const InodeOps = struct {
             create : *const fn(*kernel.fs.Inode, []const u8, kernel.fs.UMode, *kernel.fs.DEntry) anyerror!*kernel.fs.DEntry,
-            mknod : ?*const fn(*kernel.fs.Inode, []const u8, kernel.fs.UMode, *kernel.fs.DEntry, drivers.device.dev_t) anyerror!*kernel.fs.DEntry,
-            unlink : ?*const fn(*kernel.fs.Inode, *kernel.fs.DEntry) anyerror!void= null,
-            lookup : *const fn(*kernel.fs.DEntry, []const u8) anyerror!*kernel.fs.DEntry,
             mkdir : *const fn(*kernel.fs.Inode, *kernel.fs.DEntry, []const u8, kernel.fs.UMode) anyerror!*kernel.fs.DEntry,
-            rmdir : ?*const fn(*kernel.fs.DEntry, *kernel.fs.DEntry) anyerror!void= null,
+            lookup : *const fn(*kernel.fs.DEntry, []const u8) anyerror!*kernel.fs.DEntry,
+            mknod : ?*const fn(*kernel.fs.Inode, []const u8, kernel.fs.UMode, *kernel.fs.DEntry, drivers.device.dev_t) anyerror!*kernel.fs.DEntry,
             get_link : ?*const fn(*kernel.fs.Inode, *[]u8) anyerror!void,
+            unlink : ?*const fn(*kernel.fs.Inode, *kernel.fs.DEntry) anyerror!void= null,
+            rmdir : ?*const fn(*kernel.fs.DEntry, *kernel.fs.DEntry) anyerror!void= null,
             symlink : ?*const fn(*kernel.fs.DEntry, []const u8, []const u8) anyerror!void= null,
             link : ?*const fn(*kernel.fs.DEntry, []const u8, kernel.fs.path.Path) anyerror!void= null,
             readlink : ?*const fn(*kernel.fs.Inode, [*]u8, u32) anyerror!u32= null,
@@ -885,8 +885,8 @@ pub const kernel = struct {
                 write : *const fn(*kernel.fs.file.File, [*]const u8, u32) anyerror!u32,
                 read : *const fn(*kernel.fs.file.File, [*]u8, u32) anyerror!u32,
                 lseek : ?*const fn(*kernel.fs.file.File, i32, u32) anyerror!u32= null,
-                readdir : ?*const fn(*kernel.fs.file.File, []u8) anyerror!u32= null,
                 ioctl : ?*const fn(*kernel.fs.file.File, u32, ?*anyopaque) anyerror!u32= null,
+                readdir : ?*const fn(*kernel.fs.file.File, []u8) anyerror!u32= null,
                 poll : ?*const fn(*kernel.fs.file.File, *kernel.poll.PollFd) anyerror!u32= null,
             };
 
@@ -1036,6 +1036,34 @@ pub const kernel = struct {
         };
 
         pub const clone = struct {
+            pub const CloneFlags = packed struct {
+                sigmask : u8= 0,
+                VM : bool= false,
+                FS : bool= false,
+                FILES : bool= false,
+                SIGHAND : bool= false,
+                PIDFD : bool= false,
+                PTRACE : bool= false,
+                VFORK : bool= false,
+                PARENT : bool= false,
+                THREAD : bool= false,
+                NEWNS : bool= false,
+                SYSVSEM : bool= false,
+                SETTLS : bool= false,
+                PARENT_SETTID : bool= false,
+                CHILD_CLEARTID : bool= false,
+                DETACHED : bool= false,
+                UNTRACED : bool= false,
+                CHILD_SETTID : bool= false,
+                NEWCGROUP : bool= false,
+                NEWUTS : bool= false,
+                NEWIPC : bool= false,
+                NEWUSER : bool= false,
+                NEWPID : bool= false,
+                NEWNET : bool= false,
+                IO : bool= false,
+            };
+
         };
 
         pub const close = struct {

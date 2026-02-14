@@ -122,7 +122,7 @@ pub fn do_statx(inode: *fs.Inode, buf: *Statx) !u32 {
 pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Statx) !u32 {
     if (path == null or statxbuf == null)
         return errors.EFAULT;
-    const path_s: []const u8 = std.mem.span(path.?);
+    const path_s: [:0]const u8 = std.mem.span(path.?);
     if (dirfd != fs.AT_FDCWD and dirfd < 0)
         return errors.EBADF;
     krn.logger.WARN(
