@@ -10,6 +10,7 @@ const drv = @import("drivers");
 const builtin = @import("std").builtin;
 const idt = @import("arch").idt;
 const fpu = @import("arch").fpu;
+const cpuid = @import("arch").cpuid;
 const Serial = @import("drivers").Serial;
 const Logger = @import("debug").Logger;
 pub const mm = @import("kernel").mm;
@@ -119,7 +120,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     krn.serial = Serial.init(0x3F8);
     krn.serial.setup();
-    krn.logger = Logger.init(.WARN);
+    krn.logger = Logger.init(.DEBUG);
+    cpuid.init();
     const boot_info = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
     krn.boot_info = boot_info;
 
