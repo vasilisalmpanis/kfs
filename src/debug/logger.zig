@@ -15,15 +15,15 @@ pub const LogDestination = enum {
 };
 
 
-const BLACK = "\x1b[1;30m";
-const RED = "\x1b[1;31m";
-const GREEN = "\x1b[1;32m";
-const YELLOW = "\x1b[1;33m";
-const BLUE = "\x1b[1;34m";
-const MAGENTA = "\x1b[1;35m";
-const CYAN = "\x1b[1;36m";
-const WHITE = "\x1b[1;37m";
-const DEFAULT = "\x1b[1;39m";
+pub const BLACK = "\x1b[1;30m";
+pub const RED = "\x1b[1;31m";
+pub const GREEN = "\x1b[1;32m";
+pub const YELLOW = "\x1b[1;33m";
+pub const BLUE = "\x1b[1;34m";
+pub const MAGENTA = "\x1b[1;35m";
+pub const CYAN = "\x1b[1;36m";
+pub const WHITE = "\x1b[1;37m";
+pub const DEFAULT = "\x1b[1;39m";
 
 pub const Logger = struct {
     log_level: LogLevel,
