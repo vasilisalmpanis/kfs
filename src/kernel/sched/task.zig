@@ -95,7 +95,7 @@ pub const Task = struct {
     limit:          u32             = 0,
 
     // FPU state for context switching
-    fpu_state:      fpu.FPUState    = undefined,
+    fpu_state:      ?*fpu.FPUState  = null,
     fpu_used:       bool            = false,
     save_fpu_state: bool            = false,
 
@@ -154,6 +154,7 @@ pub const Task = struct {
         self.refcount = RefCount.init();
         self.fpu_used = false;
         self.save_fpu_state = false;
+        self.fpu_state = null;
         self.mm = &mm.proc_mm.init_mm;
         self.utime = 0;
         self.stime = 0;
@@ -209,6 +210,7 @@ pub const Task = struct {
         self.tsktype = tmp.tsktype;
         self.save_fpu_state = tmp.save_fpu_state;
         self.fpu_used = tmp.fpu_used;
+        self.fpu_state = tmp.fpu_state;
         self.should_stop = tmp.should_stop;
 
         self.regs = Regs.init();
@@ -301,6 +303,20 @@ pub const Task = struct {
         return null;
     }
 
+    pub fn deinitAllocatedData(self: *Task) void {
+        self.files.deinit();
+        self.fs.deinit();
+        if (self.mm) |_mm| {
+            _mm.delete();
+            self.mm = null;
+        }
+        if (self.fpu_state) |state| {
+            self.fpu_used = false;
+            krn.mm.kfree(state);
+            self.fpu_state = null;
+        }
+    }
+
     /// tasks_locked defines if tasks_lock is already locked
     pub fn finish(self: *Task, tasks_locked: bool) void {
         if (self.state != .ZOMBIE and self.state != .STOPPED)
@@ -348,6 +364,8 @@ pub var stopped_tasks: ?*lst.ListHead = null;
 extern const stack_top: u32;
 extern const stack_bottom: u32;
 
+var inital_fpu_state = arch.fpu.FPUState{};
+
 pub fn initMultitasking() void {
     initial_task.setup(
         @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET,
@@ -355,6 +373,7 @@ pub fn initMultitasking() void {
         @intFromPtr(&stack_bottom),
         "swapper"
     );
+    initial_task.fpu_state = &inital_fpu_state;
     krn.irq.registerHandler(0, &krn.timerHandler);
     arch.system.enableWriteProtect();
 }

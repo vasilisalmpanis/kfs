@@ -10,12 +10,8 @@ pub fn build(b: *std.Build) void {
         .preferred_optimize_mode = .ReleaseFast,
     });
     const Features = std.Target.x86.Feature;
-    target.cpu_features_sub.addFeature(@intFromEnum(Features.mmx));
-    target.cpu_features_sub.addFeature(@intFromEnum(Features.sse));
-    target.cpu_features_sub.addFeature(@intFromEnum(Features.sse2));
     target.cpu_features_sub.addFeature(@intFromEnum(Features.avx));
     target.cpu_features_sub.addFeature(@intFromEnum(Features.avx2));
-    target.cpu_features_add.addFeature(@intFromEnum(Features.soft_float));
 
     const example_mod = b.addObject(.{
         .name = "keyboard",

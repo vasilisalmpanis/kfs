@@ -8,6 +8,7 @@ pub const idt = @import("idt.zig");
 pub const fpu = @import("fpu.zig");
 pub const Regs = @import("system/cpu.zig").Regs;
 pub const cpu = @import("system/cpu.zig");
+pub const cpuid = @import("system/cpuid.zig");
 pub const archReschedule = @import("system/cpu.zig").archReschedule;
 pub const setupStack = @import("system/cpu.zig").setupStack;
 pub const syscalls = @import("syscalls/syscalls.zig");

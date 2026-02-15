@@ -24,11 +24,7 @@ pub fn doExit(error_code: i32) !u32 {
         if (act.handler.handler != signals.sigIGN)
             parent.sighand.setSignal(.SIGCHLD);
     }
-    if (tsk.current.mm) |_mm| {
-        _mm.delete();
-    }
-    tsk.current.files.deinit();
-    tsk.current.fs.deinit();
+    tsk.current.deinitAllocatedData();
     kernel.task.tasks_lock.unlock_irq_enable(lock_state);
     sched.reschedule();
     return 0;

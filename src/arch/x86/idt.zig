@@ -63,9 +63,11 @@ pub fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs = state.*;
     from.regs.setStackPointer(@intFromPtr(state));
     if (from.save_fpu_state) {
-        fpu.saveFPUState(&from.fpu_state);
+        if (from.fpu_state) |fpu_state| {
+            fpu.saveFPUState(fpu_state);
+            fpu.setTaskSwitched();
+        }
         from.save_fpu_state = false;
-        fpu.setTaskSwitched();
     }
     tsk.current = to;
     if (to == &tsk.initial_task) {
@@ -365,5 +367,4 @@ pub fn idtInit() void {
     );
     PICRemap();
     krn.exceptions.registerExceptionHandlers();
-    asm volatile ("sti"); // set the interrupt flag
 }

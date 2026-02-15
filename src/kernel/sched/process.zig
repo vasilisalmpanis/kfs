@@ -44,16 +44,23 @@ pub fn doFork() !u32 {
     }
     errdefer km.kfree(child.files);
 
-    child.fpu_used = tsk.current.fpu_used;
-    child.save_fpu_state = false;
-    if (tsk.current.fpu_used) {
+    var child_fpu_state: ?*arch.fpu.FPUState = null;
+    var child_fpu_used = tsk.current.fpu_used;
+    if (tsk.current.fpu_used and tsk.current.fpu_state != null) {
         if (tsk.current.save_fpu_state) {
-            arch.fpu.saveFPUState(&tsk.current.fpu_state);
+            arch.fpu.saveFPUState(tsk.current.fpu_state.?);
             tsk.current.save_fpu_state = false;
             arch.fpu.setTaskSwitched();
         }
-        child.fpu_state = tsk.current.fpu_state;
+        child_fpu_state = km.kmalloc(arch.fpu.FPUState) orelse {
+            krn.logger.ERROR("fork: failed to alloc child fpu state", .{});
+            return errors.ENOMEM;
+        };
+        child_fpu_state.?.* = tsk.current.fpu_state.?.*;
+    } else {
+        child_fpu_used = false;
     }
+    errdefer if (child_fpu_state) |state| km.kfree(state);
 
     const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
     const parent_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
@@ -76,6 +83,9 @@ pub fn doFork() !u32 {
         krn.logger.ERROR("fork: failed to init child task: {any}", .{err});
         return errors.ENOMEM;
     };
+    child.fpu_state = child_fpu_state;
+    child.fpu_used = child_fpu_used;
+    child.save_fpu_state = false;
     try procfs.newProcess(child);
     return @intCast(child.pid);
 }

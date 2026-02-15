@@ -105,6 +105,16 @@ pub fn hInvalidOpcode(regs: *Regs) *Regs {
 }
 
 pub fn hDeviceNotAvailable(regs: *Regs) *Regs {
+    if (!fpu.supportsTaskState()) {
+        if (regs.isRing3()) {
+            _ = kernel.kill(
+                @intCast(kernel.task.current.pid),
+                @intFromEnum(Signal.SIGILL)
+            ) catch {};
+            return regs;
+        }
+        @panic("DeviceNotAvailable without MMX/SSE support");
+    }
     // Handle FPU context switching
     fpu.handleDeviceNotAvailable();
     return regs;
@@ -247,6 +257,13 @@ pub fn hMachineCheck(regs: *Regs) *Regs {
 }
 
 pub fn hSIMDFloatingPointException(regs: *Regs) *Regs {
+    if (regs.isRing3()) {
+        _ = kernel.kill(
+            @intCast(kernel.task.current.pid),
+            @intFromEnum(Signal.SIGFPE)
+        ) catch {};
+        return regs;
+    }
     if (true) @panic("hSIMDFloatingPointException");
     return regs;
 }
