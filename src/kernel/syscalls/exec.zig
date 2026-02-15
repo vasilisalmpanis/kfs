@@ -181,6 +181,10 @@ pub fn doExecve(
         _ = krn.task.current.files.releaseFD(_fd);
     }
 
+    if (krn.task.current.fpu_state) |state| {
+        krn.mm.kfree(state);
+        krn.task.current.fpu_state = null;
+    }
     krn.task.current.fpu_used = false;
     krn.task.current.save_fpu_state = false;
     arch.fpu.setTaskSwitched();

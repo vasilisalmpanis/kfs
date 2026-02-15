@@ -145,16 +145,23 @@ pub fn clone(
     }
     errdefer if (!flags.FILES) krn.mm.kfree(child.files);
 
-    child.fpu_used = krn.task.current.fpu_used;
-    child.save_fpu_state = false;
-    if (krn.task.current.fpu_used) {
+    var child_fpu_state: ?*arch.fpu.FPUState = null;
+    var child_fpu_used = krn.task.current.fpu_used;
+    if (krn.task.current.fpu_used and krn.task.current.fpu_state != null) {
         if (krn.task.current.save_fpu_state) {
-            arch.fpu.saveFPUState(&krn.task.current.fpu_state);
+            arch.fpu.saveFPUState(krn.task.current.fpu_state.?);
             krn.task.current.save_fpu_state = false;
             arch.fpu.setTaskSwitched();
         }
-        child.fpu_state = krn.task.current.fpu_state;
+        child_fpu_state = krn.mm.kmalloc(arch.fpu.FPUState) orelse {
+            krn.logger.ERROR("clone: failed to alloc child fpu state", .{});
+            return errors.ENOMEM;
+        };
+        child_fpu_state.?.* = krn.task.current.fpu_state.?.*;
+    } else {
+        child_fpu_used = false;
     }
+    errdefer if (child_fpu_state) |state| krn.mm.kfree(state);
 
     const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
     const parent_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
@@ -188,6 +195,9 @@ pub fn clone(
         krn.logger.ERROR("clone: failed to init child task: {t}", .{err});
         return errors.ENOMEM;
     };
+    child.fpu_state = child_fpu_state;
+    child.fpu_used = child_fpu_used;
+    child.save_fpu_state = false;
 
     if (flags.PARENT_SETTID) {
         if (parent_tid) |ptid| {

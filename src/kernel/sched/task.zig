@@ -95,7 +95,7 @@ pub const Task = struct {
     limit:          u32             = 0,
 
     // FPU state for context switching
-    fpu_state:      fpu.FPUState    = undefined,
+    fpu_state:      ?*fpu.FPUState  = null,
     fpu_used:       bool            = false,
     save_fpu_state: bool            = false,
 
@@ -154,6 +154,7 @@ pub const Task = struct {
         self.refcount = RefCount.init();
         self.fpu_used = false;
         self.save_fpu_state = false;
+        self.fpu_state = null;
         self.mm = &mm.proc_mm.init_mm;
         self.utime = 0;
         self.stime = 0;
@@ -209,6 +210,7 @@ pub const Task = struct {
         self.tsktype = tmp.tsktype;
         self.save_fpu_state = tmp.save_fpu_state;
         self.fpu_used = tmp.fpu_used;
+        self.fpu_state = tmp.fpu_state;
         self.should_stop = tmp.should_stop;
 
         self.regs = Regs.init();
