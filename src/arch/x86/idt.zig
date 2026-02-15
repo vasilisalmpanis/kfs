@@ -65,9 +65,9 @@ pub fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     if (from.save_fpu_state) {
         if (from.fpu_state) |fpu_state| {
             fpu.saveFPUState(fpu_state);
+            fpu.setTaskSwitched();
         }
         from.save_fpu_state = false;
-        fpu.setTaskSwitched();
     }
     tsk.current = to;
     if (to == &tsk.initial_task) {

@@ -303,6 +303,20 @@ pub const Task = struct {
         return null;
     }
 
+    pub fn deinitAllocatedData(self: *Task) void {
+        self.files.deinit();
+        self.fs.deinit();
+        if (self.mm) |_mm| {
+            _mm.delete();
+            self.mm = null;
+        }
+        if (self.fpu_state) |state| {
+            self.fpu_used = false;
+            krn.mm.kfree(state);
+            self.fpu_state = null;
+        }
+    }
+
     /// tasks_locked defines if tasks_lock is already locked
     pub fn finish(self: *Task, tasks_locked: bool) void {
         if (self.state != .ZOMBIE and self.state != .STOPPED)
