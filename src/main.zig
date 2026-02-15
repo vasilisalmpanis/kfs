@@ -93,12 +93,14 @@ fn move_root() void {
 }
 
 fn user_thread(_: ?*const anyopaque) i32 {
+    krn.serial.print("[INIT]: user_thread: waiting for kernel ready\n");
     while (kernel_ready == false)
         krn.sched.reschedule();
 
     krn.task.current.mm = krn.task.initial_task.mm;
     krn.task.current.fs = krn.task.initial_task.fs;
     krn.task.current.files = krn.task.initial_task.files;
+    krn.serial.print("[INIT]: user_thread: executing /bin/init\n");
     _ = krn.doExecve(
         "/bin/init",
         krn.userspace.argv_init,
@@ -120,46 +122,59 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     krn.serial = Serial.init(0x3F8);
     krn.serial.setup();
+    krn.serial.print("[INIT]: Serial done\n");
     krn.logger = Logger.init(.DEBUG);
-    cpuid.init();
+    krn.serial.print("[INIT]: Logger done\n");
     const boot_info = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
     krn.boot_info = boot_info;
-
+    krn.serial.print("[INIT]: Multiboot done\n");
 
     gdt.gdtInit();
-    mm.mmInit(&krn.boot_info);
-    dbg.initSymbolTable(&krn.boot_info);
-    krn.logger.INFO("GDT initialized", .{});
-    krn.logger.INFO("Memory initialized", .{});
-
-    // Initialize FPU early
+    krn.serial.print("[INIT]: GDT done\n");
+    cpuid.init();
+    krn.serial.print("[INIT]: CPUID done\n");
     fpu.initFPU();
-
+    krn.serial.print("[INIT]: FPU done\n");
     krn.pit = PIT.init(1000);
-    krn.task.initMultitasking();
-    screen.initScreen(&krn.scr, &krn.boot_info);
+    krn.serial.print("[INIT]: PIT done\n");
     idt.idtInit();
-    krn.logger.INFO("IDT initialized", .{});
-
+    krn.serial.print("[INIT]: IDT done\n");
+    mm.mmInit(&krn.boot_info);
+    krn.serial.print("[INIT]: Memory done\n");
+    krn.task.initMultitasking();
+    krn.serial.print("[INIT]: Multitasking done\n");
+    fpu.setTaskSwitched();
+    cpu.enableInterrupts();
+    krn.serial.print("[INIT]: Interrupts are enabled\n");
+    dbg.initSymbolTable(&krn.boot_info);
+    krn.serial.print("[INIT]: Symbol Table done\n");
+    screen.initScreen(&krn.scr, &krn.boot_info);
+    krn.serial.print("[INIT]: Screen done\n");
     keyboard.init();
-
-    krn.logger.INFO("Keyboard handler added", .{});
+    krn.serial.print("[INIT]: Keyboard done\n");
     syscalls.initSyscalls();
+    krn.serial.print("[INIT]: Syscalls done\n");
     drv.cmos.init();
+    krn.serial.print("[INIT]: CMOS done\n");
 
     // FS
     krn.fs.init();
+    krn.serial.print("[INIT]: Filesystems done\n");
 
     // Get PID1
     _ = krn.kthreadCreate(&user_thread, null, "init") catch null;
 
     // Devices
     drv.init();
+    krn.serial.print("[INIT]: Drivers and Devices done\n");
     modules.init() catch {
         @panic("Modules file cannot be created\n");
     };
+    krn.serial.print("[INIT]: Modules done\n");
     move_root();
+    krn.serial.print("[INIT]: Moved /\n");
     kernel_ready = true;
+    krn.serial.print("[INIT]: == READY ==\n");
 
     while (true) {
         system.halt();

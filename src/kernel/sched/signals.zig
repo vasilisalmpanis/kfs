@@ -441,7 +441,6 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         else => {
             arch.cpu.enableInterrupts();
             _ = krn.exit.doExit((128 + @intFromEnum(signal)) & 0x7f) catch {};
-            unreachable();
             return krn.sched.schedule(regs);
         }
     }
