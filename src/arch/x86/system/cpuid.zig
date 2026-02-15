@@ -398,6 +398,5 @@ pub fn logAllFeatures(cpuid_info: Info) void {
 pub var info: Info = undefined;
 pub fn init() void {
     info = query();
-    logAllFeatures(info);
 }
 

@@ -108,10 +108,10 @@ pub fn initFPU() void {
     }
 
     backend = selectBackend();
-    krn.logger.WARN("fpu backend: {t}", .{backend});
+    // krn.logger.WARN("fpu backend: {t}", .{backend});
 
     if (backend == .NONE) {
-        krn.logger.WARN("fpu: disabling hardware fp", .{});
+        // krn.logger.WARN("fpu: disabling hardware fp", .{});
         asm volatile (
             \\ mov %%cr0, %%eax
             \\ or %[em], %%eax
@@ -166,9 +166,6 @@ pub fn initFPU() void {
 
     // Clear any pending exceptions
     asm volatile ("fnclex");
-
-    setTaskSwitched();
-    krn.serial.print("FPU initialized successfully\n");
 }
 
 pub inline fn initFPUState() void {
@@ -235,8 +232,7 @@ pub fn handleDeviceNotAvailable() void {
         }
     } else {
         arch.cpu.enableInterrupts();
-        const state = krn.mm.kmalloc(FPUState)
-            orelse {
+        const state = krn.mm.kmalloc(FPUState) orelse {
             arch.cpu.disableInterrupts();
             _ = krn.kill(
                 @intCast(krn.task.current.pid),

@@ -80,12 +80,8 @@ pub fn build(b: *std.Build) !void {
         .abi = .none
     };
     const Features = std.Target.x86.Feature;
-    target.cpu_features_sub.addFeature(@intFromEnum(Features.mmx));
-    target.cpu_features_sub.addFeature(@intFromEnum(Features.sse));
-    target.cpu_features_sub.addFeature(@intFromEnum(Features.sse2));
     target.cpu_features_sub.addFeature(@intFromEnum(Features.avx));
     target.cpu_features_sub.addFeature(@intFromEnum(Features.avx2));
-    target.cpu_features_add.addFeature(@intFromEnum(Features.soft_float));
     const kernel = b.addExecutable(.{
         .name = name,
         .root_module = b.createModule(.{
