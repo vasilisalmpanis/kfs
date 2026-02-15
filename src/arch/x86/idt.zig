@@ -63,7 +63,9 @@ pub fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
     from.regs = state.*;
     from.regs.setStackPointer(@intFromPtr(state));
     if (from.save_fpu_state) {
-        fpu.saveFPUState(&from.fpu_state);
+        if (from.fpu_state) |fpu_state| {
+            fpu.saveFPUState(fpu_state);
+        }
         from.save_fpu_state = false;
         fpu.setTaskSwitched();
     }

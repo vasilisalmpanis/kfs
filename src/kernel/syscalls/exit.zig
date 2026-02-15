@@ -27,6 +27,10 @@ pub fn doExit(error_code: i32) !u32 {
     if (tsk.current.mm) |_mm| {
         _mm.delete();
     }
+    if (tsk.current.fpu_state) |state| {
+        kernel.mm.kfree(state);
+        tsk.current.fpu_state = null;
+    }
     tsk.current.files.deinit();
     tsk.current.fs.deinit();
     kernel.task.tasks_lock.unlock_irq_enable(lock_state);
