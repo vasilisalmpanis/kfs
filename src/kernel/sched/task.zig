@@ -350,6 +350,8 @@ pub var stopped_tasks: ?*lst.ListHead = null;
 extern const stack_top: u32;
 extern const stack_bottom: u32;
 
+var inital_fpu_state = arch.fpu.FPUState{};
+
 pub fn initMultitasking() void {
     initial_task.setup(
         @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET,
@@ -357,6 +359,7 @@ pub fn initMultitasking() void {
         @intFromPtr(&stack_bottom),
         "swapper"
     );
+    initial_task.fpu_state = &inital_fpu_state;
     krn.irq.registerHandler(0, &krn.timerHandler);
     arch.system.enableWriteProtect();
 }

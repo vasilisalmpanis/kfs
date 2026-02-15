@@ -13,12 +13,8 @@ pub fn build(b: *std.Build) void {
     });
 
     const Features = std.Target.x86.Feature;
-    target.cpu_features_sub.addFeature(@intFromEnum(Features.mmx));
-    target.cpu_features_sub.addFeature(@intFromEnum(Features.sse));
-    target.cpu_features_sub.addFeature(@intFromEnum(Features.sse2));
     target.cpu_features_sub.addFeature(@intFromEnum(Features.avx));
     target.cpu_features_sub.addFeature(@intFromEnum(Features.avx2));
-    target.cpu_features_add.addFeature(@intFromEnum(Features.soft_float));
 
     const types_mod = b.addModule("types", .{
         .root_source_file = b.path("types.zig"),

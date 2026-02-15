@@ -7,7 +7,21 @@ const krn = @import("kernel");
 var symbol_table: [*]std.elf.Elf32_Sym = undefined;
 var symbol_count: usize = 0;
 var string_table: [*]u8 = undefined;
+var string_table_size: usize = 0;
 var offset_buffer: [256]u8 = undefined;
+
+fn symbolNameAt(off: usize) ?[]const u8 {
+    if (off >= string_table_size)
+        return null;
+    const strings = string_table[0..string_table_size];
+    var end = off;
+    while (end < strings.len and strings[end] != 0) {
+        end += 1;
+    }
+    if (end >= strings.len)
+        return null;
+    return strings[off..end];
+}
 
 pub fn initSymbolTable(boot_info: *multiboot.Multiboot) void {
     if (boot_info.getTag(multiboot.TagELFSymbols)) |tag| {
@@ -27,16 +41,16 @@ pub fn initSymbolTable(boot_info: *multiboot.Multiboot) void {
         symbol_table = @ptrFromInt(symtab_hdr.sh_addr + mm.PAGE_OFFSET);
         symbol_count = symtab_hdr.sh_size / symtab_hdr.sh_entsize;
         string_table = @ptrFromInt(strtab_hdr.sh_addr + mm.PAGE_OFFSET);
+        string_table_size = strtab_hdr.sh_size;
     }
 }
 pub fn lookupSymbolByName(name: []const u8) !std.elf.Elf32_Sym {
     for (0..symbol_count) |idx| {
         const current_symbol = symbol_table[idx];
-        const sym_name: []const u8 = std.mem.span(
-            @as([*:0]const u8, @ptrCast(&string_table[current_symbol.st_name]))
-        );
-        if (std.mem.eql(u8, sym_name, name)) {
-            return current_symbol;
+        if (symbolNameAt(current_symbol.st_name)) |sym_name| {
+            if (std.mem.eql(u8, sym_name, name)) {
+                return current_symbol;
+            }
         }
     }
     return krn.errors.PosixError.ENOENT;
@@ -51,8 +65,9 @@ pub fn lookupSymbol(addr: usize) ?[]const u8 {
         const sym = &symbol_table[i];
 
         if (addr >= sym.st_value and addr < sym.st_value + sym.st_size) {
-            const name: [*:0]const u8 = @ptrCast(@alignCast(&string_table[sym.st_name]));
-            return std.mem.span(name);
+            if (symbolNameAt(sym.st_name)) |name|
+                return name;
+            return null;
         }
         
         const distance = if (addr > sym.st_value) 
@@ -67,10 +82,10 @@ pub fn lookupSymbol(addr: usize) ?[]const u8 {
     }
 
     if (closest_symbol != null and closest_distance < 4096) {
-        const name: [*:0]const u8 = @ptrCast(@alignCast(&string_table[closest_symbol.?.st_name]));
+        const name = symbolNameAt(closest_symbol.?.st_name) orelse return null;
         // Add offset indicator to show it's not an exact match
         const offset_str = std.fmt.bufPrint(&offset_buffer, "{s}+0x{x}", .{
-            std.mem.span(name), 
+            name,
             closest_distance
         }) catch offset_buffer[0..];
         return offset_str;
