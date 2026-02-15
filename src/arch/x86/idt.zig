@@ -367,5 +367,4 @@ pub fn idtInit() void {
     );
     PICRemap();
     krn.exceptions.registerExceptionHandlers();
-    asm volatile ("sti"); // set the interrupt flag
 }

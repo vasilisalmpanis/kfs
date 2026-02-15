@@ -328,19 +328,7 @@ pub const arch = struct {
 
     pub const fpu = struct {
         pub const FPUState = extern struct {
-            control : u16,
-            _reserved1 : u16,
-            status : u16,
-            _reserved2 : u16,
-            tag : u16,
-            _reserved3 : u16,
-            fip : u32,
-            fcs : u16,
-            _reserved4 : u16,
-            fdp : u32,
-            fds : u16,
-            _reserved5 : u16,
-            st : [8][10]u8,
+            raw : [527]u8,
         };
 
     };
@@ -401,6 +389,212 @@ pub const arch = struct {
             ldt : u16,
             trace : u16,
             bitmap : u16,
+        };
+
+    };
+
+    pub const cpuid = struct {
+        pub const Result = struct {
+            eax : u32,
+            ebx : u32,
+            ecx : u32,
+            edx : u32,
+        };
+
+        pub const Leaf1EdxFeatures = packed struct {
+            fpu : bool= false,
+            vme : bool= false,
+            de : bool= false,
+            pse : bool= false,
+            tsc : bool= false,
+            msr : bool= false,
+            pae : bool= false,
+            mce : bool= false,
+            cx8 : bool= false,
+            apic : bool= false,
+            _edx_10 : bool= false,
+            sep : bool= false,
+            mtrr : bool= false,
+            pge : bool= false,
+            mca : bool= false,
+            cmov : bool= false,
+            pat : bool= false,
+            pse36 : bool= false,
+            psn : bool= false,
+            clfsh : bool= false,
+            _edx_20 : bool= false,
+            ds : bool= false,
+            acpi : bool= false,
+            mmx : bool= false,
+            fxsr : bool= false,
+            sse : bool= false,
+            sse2 : bool= false,
+            ss : bool= false,
+            htt : bool= false,
+            tm : bool= false,
+            ia64 : bool= false,
+            pbe : bool= false,
+        };
+
+        pub const Leaf1EcxFeatures = packed struct {
+            sse3 : bool= false,
+            pclmulqdq : bool= false,
+            dtes64 : bool= false,
+            monitor : bool= false,
+            ds_cpl : bool= false,
+            vmx : bool= false,
+            smx : bool= false,
+            est : bool= false,
+            tm2 : bool= false,
+            ssse3 : bool= false,
+            cnxt_id : bool= false,
+            sdbg : bool= false,
+            fma : bool= false,
+            cx16 : bool= false,
+            xtpr : bool= false,
+            pdcm : bool= false,
+            _ecx_16 : bool= false,
+            pcid : bool= false,
+            dca : bool= false,
+            sse4_1 : bool= false,
+            sse4_2 : bool= false,
+            x2apic : bool= false,
+            movbe : bool= false,
+            popcnt : bool= false,
+            tsc_deadline : bool= false,
+            aes : bool= false,
+            xsave : bool= false,
+            osxsave : bool= false,
+            avx : bool= false,
+            f16c : bool= false,
+            rdrand : bool= false,
+            hypervisor : bool= false,
+        };
+
+        pub const Leaf7EbxFeatures = packed struct {
+            fsgsbase : bool= false,
+            ia32_tsc_adjust : bool= false,
+            sgx : bool= false,
+            bmi1 : bool= false,
+            hle : bool= false,
+            avx2 : bool= false,
+            fdp_excptn_only : bool= false,
+            smep : bool= false,
+            bmi2 : bool= false,
+            erms : bool= false,
+            invpcid : bool= false,
+            rtm : bool= false,
+            pqm : bool= false,
+            fpucsds_deprec : bool= false,
+            mpx : bool= false,
+            pqe : bool= false,
+            avx512f : bool= false,
+            avx512dq : bool= false,
+            rdseed : bool= false,
+            adx : bool= false,
+            smap : bool= false,
+            avx512_ifma : bool= false,
+            pcommit : bool= false,
+            clflushopt : bool= false,
+            clwb : bool= false,
+            intel_pt : bool= false,
+            avx512pf : bool= false,
+            avx512er : bool= false,
+            avx512cd : bool= false,
+            sha : bool= false,
+            avx512bw : bool= false,
+            avx512vl : bool= false,
+        };
+
+        pub const Leaf7EcxFeatures = packed struct {
+            prefetchwt1 : bool= false,
+            avx512_vbmi : bool= false,
+            umip : bool= false,
+            pku : bool= false,
+            ospke : bool= false,
+            waitpkg : bool= false,
+            avx512_vbmi2 : bool= false,
+            cet_ss : bool= false,
+            gfni : bool= false,
+            vaes : bool= false,
+            vpclmulqdq : bool= false,
+            avx512_vnni : bool= false,
+            avx512_bitalg : bool= false,
+            tme_en : bool= false,
+            avx512_vpopcntdq : bool= false,
+            _ecx_15 : bool= false,
+            la57 : bool= false,
+            mawau0 : bool= false,
+            mawau1 : bool= false,
+            mawau2 : bool= false,
+            mawau3 : bool= false,
+            mawau4 : bool= false,
+            rdpid : bool= false,
+            kl : bool= false,
+            bus_lock_detect : bool= false,
+            cldemote : bool= false,
+            _ecx_26 : bool= false,
+            movdiri : bool= false,
+            movdir64b : bool= false,
+            enqcmd : bool= false,
+            sgx_lc : bool= false,
+            pks : bool= false,
+        };
+
+        pub const Leaf7EdxFeatures = packed struct {
+            _edx_0 : bool= false,
+            _edx_1 : bool= false,
+            avx512_4vnniw : bool= false,
+            avx512_4fmaps : bool= false,
+            fsrm : bool= false,
+            uintr : bool= false,
+            _edx_6 : bool= false,
+            _edx_7 : bool= false,
+            avx512_vp2inters : bool= false,
+            srbds_ctrl : bool= false,
+            md_clear : bool= false,
+            rtm_always_abort : bool= false,
+            _edx_12 : bool= false,
+            tsx_force_abort : bool= false,
+            serialize : bool= false,
+            hybrid : bool= false,
+            tsxldtrk : bool= false,
+            _edx_17 : bool= false,
+            pconfig : bool= false,
+            arch_lbr : bool= false,
+            cet_ibt : bool= false,
+            _edx_21 : bool= false,
+            amx_bf16 : bool= false,
+            avx512_fp16 : bool= false,
+            amx_tile : bool= false,
+            amx_int8 : bool= false,
+            ibrs_ibpb : bool= false,
+            stibp : bool= false,
+            l1d_flush : bool= false,
+            ia32_arch_cap : bool= false,
+            ia32_core_cap : bool= false,
+            ssbd : bool= false,
+        };
+
+        pub const Leaf1Features = struct {
+            edx : arch.cpuid.Leaf1EdxFeatures,
+            ecx : arch.cpuid.Leaf1EcxFeatures,
+        };
+
+        pub const Leaf7Features = struct {
+            ebx : arch.cpuid.Leaf7EbxFeatures,
+            ecx : arch.cpuid.Leaf7EcxFeatures,
+            edx : arch.cpuid.Leaf7EdxFeatures,
+        };
+
+        pub const Info = struct {
+            supported : bool= false,
+            max_basic_leaf : u32= 0,
+            max_extended_leaf : u32= 0,
+            vendor : [12]u8,
+            brand : [48]u8,
+            features : arch.cpuid.Leaf1Features,
+            ext_features : arch.cpuid.Leaf7Features,
         };
 
     };
@@ -618,7 +812,7 @@ pub const kernel = struct {
             regs : arch.Regs,
             tls : u32= 0,
             limit : u32= 0,
-            fpu_state : arch.fpu.FPUState,
+            fpu_state : ?*arch.fpu.FPUState= null,
             fpu_used : bool= false,
             save_fpu_state : bool= false,
             tree : kernel.tree.TreeNode,
@@ -1282,7 +1476,25 @@ pub const kernel = struct {
 
 pub const debug = struct {
     pub const Logger = struct {
-        log_level : std.logger.LogLevel,
+        log_level : debug.log.LogLevel,
+    };
+
+    pub const log = struct {
+        pub const LogLevel = enum(u2) {
+            DEBUG = 0,
+            INFO = 1,
+            WARN = 2,
+            ERROR = 3,
+        };
+
+
+        pub const LogDestination = enum(u1) {
+            SERIAL = 0,
+            SCREEN = 1,
+        };
+
+
+
     };
 
 };
