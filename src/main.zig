@@ -36,6 +36,21 @@ pub fn panic(
     while (true) {}
 }
 
+fn getRootDevice() []const u8 {
+    if (krn.boot_info.getTag(multiboot.TagBootCommandLine)) |tag| {
+        const _cmdline: [*:0]const u8 = @ptrFromInt(@intFromPtr(tag) + 8);
+        const cmdline: []const u8 = std.mem.span(_cmdline);
+        if (std.mem.indexOf(u8, cmdline, "root=")) |pos| {
+            const rest = cmdline[pos + 5..];
+            const end = std.mem.indexOfScalar(u8, rest, ' ') orelse rest.len;
+            const root_dev = rest[0..end];
+            krn.logger.INFO("Boot cmdline root device: {s}", .{root_dev});
+            return root_dev;
+        }
+    }
+    return "/dev/sda";
+}
+
 fn move_root() void {
     _ = krn.mkdir("/ext2", 0) catch {
             dbg.printf("Failed to create ext2 directory\n",.{});
@@ -43,7 +58,7 @@ fn move_root() void {
     };
     var root_mountpoint: ?*krn.fs.Mount = null;
     if (krn.fs.FileSystem.find("ext2")) |fs| {
-        root_mountpoint = krn.fs.Mount.mount("/dev/sda", "/ext2", fs) catch |err| {
+        root_mountpoint = krn.fs.Mount.mount(getRootDevice(), "/ext2", fs) catch |err| {
             krn.logger.ERROR("Failed to mount ext2 filesystem: {t}\n",.{err});
             @panic("Not able to mount\n");
         };
