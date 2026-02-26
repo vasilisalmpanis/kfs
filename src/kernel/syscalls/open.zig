@@ -117,23 +117,19 @@ pub fn open(
 pub fn openat(
     dirfd: i32,
     path: ?[*:0]const u8,
-    flags: u32,
+    flags: u16,
     mode: fs.UMode,
 ) !u32 {
     if (path == null) {
         return errors.EFAULT;
     }
+    // TODO: Handle absolute paths
     const path_sl: []const u8 = std.mem.span(path.?);
-    if (path_sl.len == 0)
-        return errors.ENOENT;
-    if (dirfd < 0 and dirfd != fs.AT_FDCWD)
-        return errors.EBADF;
-
     kernel.logger.INFO("path {s} fd {d}\n", .{path_sl, dirfd});
     if (!kernel.fs.path.isRelative(path_sl)) {
         return try open(path, flags, mode);
     }
-    if (dirfd == fs.AT_FDCWD) {
+    if (dirfd == fs.AT_FDCWD and kernel.fs.path.isRelative(path_sl)) {
         const cwd = kernel.task.current.fs.pwd.clone();
         defer cwd.release();
         var file_segment: []const u8 = "";
@@ -150,8 +146,6 @@ pub fn openat(
             mode
         );
     } else if (kernel.task.current.files.fds.get(@intCast(dirfd))) |dir| {
-        if (!dir.inode.mode.isDir())
-            return errors.ENOTDIR;
         if (dir.path == null)
             return errors.EBADF;
         var file_segment: []const u8 = "";

@@ -45,18 +45,6 @@ pub const R_X86_Type = enum(u8) {
     _
 };
 
-fn stringFromTable(table: []const u8, off: usize) ![]const u8 {
-    if (off >= table.len)
-        return kernel.errors.PosixError.EINVAL;
-    var end = off;
-    while (end < table.len and table[end] != 0) {
-        end += 1;
-    }
-    if (end >= table.len)
-        return kernel.errors.PosixError.EINVAL;
-    return table[off..end];
-}
-
 fn unpackU32(bytes: [*]u8) u32 {
     return (
         @as(u32, @intCast(bytes[0])) << 0
@@ -87,7 +75,6 @@ pub fn do_relocations(
     const strtab: [*]u8 = @ptrCast(@alignCast(
         &elf[sh_strtab.sh_offset]
     ));
-    const strtab_slice = strtab[0..sh_strtab.sh_size];
     const rel_entries: [*]std.elf.Elf32_Rel = @ptrCast(@alignCast(
         &elf[sh.sh_offset]
     ));
@@ -109,7 +96,7 @@ pub fn do_relocations(
             // We have no dynamic linking
             // we find the symbol value and use it as S
             // in the formula
-            const name = try stringFromTable(strtab_slice, sym.st_name);
+            const name: []const u8 = std.mem.span(@as([*:0]u8, @ptrCast(@alignCast(&strtab[sym.st_name]))));
             const symbol = debug.lookupSymbolByName(name) catch {
                 kernel.logger.ERROR("Symbol Not Found: {s}\n", .{name});
                 return kernel.errors.PosixError.ENOENT;
@@ -223,9 +210,8 @@ pub fn load_module(slice: []u8, name: []const u8) !*Module {
     try place_sections(module, slice, sh_arr[0..ehdr.e_shnum]);
     
     const section_strings: [*]u8 = @ptrCast(&slice[sh_hdr.sh_offset]);
-    const section_strings_slice = section_strings[0..sh_hdr.sh_size];
-    var sh_symtab: ?*std.elf.Elf32_Shdr = null;
-    var sh_strtab: ?*std.elf.Elf32_Shdr = null;
+    var sh_symtab: *std.elf.Elf32_Shdr = undefined;
+    var sh_strtab: *std.elf.Elf32_Shdr = undefined;
     var init: ?*const fn() callconv(.c) u32 = null;
     var exit: ?*const fn() callconv(.c) void = null;
     for (0..ehdr.e_shnum) |i| {
@@ -237,7 +223,8 @@ pub fn load_module(slice: []u8, name: []const u8) !*Module {
         } else if (section_hdr.sh_type == std.elf.SHT_STRTAB and i != ehdr.e_shstrndx) {
             sh_strtab = section_hdr;
         }
-        const span = try stringFromTable(section_strings_slice, section_hdr.sh_name);
+        const section_name: [*:0]u8 = @ptrCast(&section_strings[section_hdr.sh_name]);
+        const span = std.mem.span(section_name);
         if (std.mem.eql(u8, span, ".init")) {
             init = @ptrFromInt(section_hdr.sh_addr);
 
@@ -245,15 +232,12 @@ pub fn load_module(slice: []u8, name: []const u8) !*Module {
             exit = @ptrFromInt(section_hdr.sh_addr);
         }
     }
-    if (sh_symtab == null or sh_strtab == null)
-        return kernel.errors.PosixError.EINVAL;
-
     for (0..ehdr.e_shnum) |i| {
         const section_hdr: *std.elf.Elf32_Shdr = @ptrCast(
             @constCast(@alignCast(&slice[ehdr.e_shoff + (ehdr.e_shentsize * i)]))
         );
         if (section_hdr.sh_type == std.elf.SHT_REL) {
-            try do_relocations(section_hdr, slice, sh_arr, sh_strtab.?);
+            try do_relocations(section_hdr, slice, sh_arr, sh_strtab);
         }
     }
     const ret: u32 = init.?();
