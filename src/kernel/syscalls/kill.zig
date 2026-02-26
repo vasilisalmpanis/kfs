@@ -27,7 +27,7 @@ pub fn kill(pid: i32, sig: u32) !u32 {
     if (pid == 0 or pid < -1) {
         const lock_state = tsk.tasks_lock.lock_irq_disable();
         defer tsk.tasks_lock.unlock_irq_enable(lock_state);
-        
+
         var it = tsk.initial_task.list.iterator();
         var count: i32 = 0;
         const pgroup: u32 = if (pid < -1) @intCast(-pid) else tsk.current.pgid;
@@ -42,7 +42,7 @@ pub fn kill(pid: i32, sig: u32) !u32 {
     } else if (pid == -1) {
         const lock_state = tsk.tasks_lock.lock_irq_disable();
         defer tsk.tasks_lock.unlock_irq_enable(lock_state);
-        
+
         var it = tsk.initial_task.list.iterator();
         var count: i32 = 0;
         while (it.next()) |i| {

@@ -1,5 +1,6 @@
 const krn = @import("kernel");
 const cpuid = @import("system/cpuid.zig");
+const arch = @import("main.zig");
 
 const CR0_MP: u32 = 1 << 1;
 const CR0_EM: u32 = 1 << 2;
@@ -233,8 +234,17 @@ pub fn handleDeviceNotAvailable() void {
             current_task.fpu_used = true;
         }
     } else {
+        arch.cpu.enableInterrupts();
         const state = krn.mm.kmalloc(FPUState)
-            orelse @panic("Cannot allocate FPU state");
+            orelse {
+            arch.cpu.disableInterrupts();
+            _ = krn.kill(
+                @intCast(krn.task.current.pid),
+                @intFromEnum(krn.signals.Signal.SIGSEGV)
+            ) catch {};
+            return;
+        };
+        arch.cpu.disableInterrupts();
         current_task.fpu_state = state;
         initFPUState();
         current_task.fpu_used = true;
