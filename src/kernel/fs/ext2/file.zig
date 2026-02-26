@@ -217,6 +217,18 @@ pub const Ext2File = struct {
         return bytes_written;
     }
 
+    fn lseek(base: *fs.File, offset: i32, whence: usize) anyerror!usize {
+        var new_pos: i64 = @intCast(offset);
+        switch (whence) {
+            krn.fs.SEEK_CUR => new_pos = @as(i64, @intCast(base.pos)) + offset,
+            krn.fs.SEEK_END => new_pos = @as(i64, @intCast(base.inode.size)) + offset,
+            else => {}
+        }
+        if (new_pos < 0)
+            return krn.errors.PosixError.EINVAL;
+        base.pos = @intCast(new_pos);
+        return base.pos;
+    }
 };
 
 pub const Ext2FileOps: fs.FileOps = fs.FileOps {
@@ -224,6 +236,6 @@ pub const Ext2FileOps: fs.FileOps = fs.FileOps {
     .close = Ext2File.close,
     .write = Ext2File.write,
     .read = Ext2File.read,
-    .lseek = null,
+    .lseek = Ext2File.lseek,
     .readdir = Ext2File.readdir,
 };

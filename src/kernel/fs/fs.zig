@@ -57,6 +57,9 @@ pub const AT_SYMLINK_FOLLOW	= 0x400;   // Follow symbolic links.
 pub const AT_NO_AUTOMOUNT	= 0x800;   // Suppress terminal automount
 pub const AT_EMPTY_PATH		= 0x1000;  // Allow empty relative
 					   // pathname to operate on dirfd
+pub const SEEK_SET = 0;
+pub const SEEK_CUR = 1;
+pub const SEEK_END = 2;
 
 pub const InoNameContext = struct {
     pub fn hash(self: @This(), val: DentryHash) u64 {
