@@ -41,16 +41,13 @@ const AuxEntry = struct {
     val: usize,
 };
 
-const auxv: [2]AuxEntry = .{
-    AuxEntry{
-        .key = 6,
-        .val = krn.mm.PAGE_SIZE,
-    },
-    AuxEntry{
-        .key = 0,
-        .val = 0,
-    }
-};
+const AT_NULL = 0;
+const AT_PHDR = 3;  // address of program headers in memory
+const AT_PHENT = 4; // size of one program header
+const AT_PHNUM = 5; // number of program headers
+const AT_PAGESZ = 6;
+const AT_BASE = 7;  // load base for PIE
+const AT_ENTRY = 9; // entry point address
 
 pub const ElfValidationError = error {
     InvalidMagic,
@@ -126,7 +123,13 @@ fn checkKernelLoadable32(userspace: []const u8, ehdr: *const std.elf.Elf32_Ehdr)
     return !has_interp;
 }
 
-pub fn setEnvironment(stack_bottom: usize, stack_size: usize, argv: []const []const u8, envp: []const []const u8) void {
+pub fn setEnvironment(
+    stack_bottom: usize,
+    stack_size: usize,
+    argv: []const []const u8,
+    envp: []const []const u8,
+    aux_entries: []const AuxEntry,
+) void {
     // Auxiliary vector
     var argv_str_size: usize = 0;
     for (argv) |arg| {
@@ -138,7 +141,7 @@ pub fn setEnvironment(stack_bottom: usize, stack_size: usize, argv: []const []co
     }
     const argv_ptr_size = @sizeOf(usize) * (argv.len + 1);
     const envp_ptr_size = @sizeOf(usize) * (envp.len + 1);
-    const auxv_size = @sizeOf(AuxEntry) * auxv.len;
+    const auxv_size = @sizeOf(AuxEntry) * aux_entries.len;
     const argc_size = @sizeOf(usize);
     const end_marker_size = @sizeOf(usize);
 
@@ -190,7 +193,7 @@ pub fn setEnvironment(stack_bottom: usize, stack_size: usize, argv: []const []co
     // Set auxv
     var aux_ptr: [*]AuxEntry = @ptrCast(&pointers[ptr_off]);
     ptr_off = 0;
-    for (auxv) |aux| {
+    for (aux_entries) |aux| {
         aux_ptr[ptr_off] = aux;
         ptr_off += 1;
     }
@@ -261,7 +264,26 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
     const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
     @memset(stack_ptr[0..stack_size], 0);
 
-    setEnvironment(stack_bottom, stack_size, argv, envp);
+    var aux_buf: [8]AuxEntry = undefined;
+    var aux_count: usize = 0;
+    if (is_pie) {
+        aux_buf[aux_count] = .{ .key = AT_PHDR, .val = load_base + ehdr.e_phoff };
+        aux_count += 1;
+        aux_buf[aux_count] = .{ .key = AT_PHENT, .val = ehdr.e_phentsize };
+        aux_count += 1;
+        aux_buf[aux_count] = .{ .key = AT_PHNUM, .val = ehdr.e_phnum };
+        aux_count += 1;
+        aux_buf[aux_count] = .{ .key = AT_ENTRY, .val = load_base + ehdr.e_entry };
+        aux_count += 1;
+        aux_buf[aux_count] = .{ .key = AT_BASE, .val = load_base };
+        aux_count += 1;
+    }
+    aux_buf[aux_count] = .{ .key = AT_PAGESZ, .val = krn.mm.PAGE_SIZE };
+    aux_count += 1;
+    aux_buf[aux_count] = .{ .key = AT_NULL, .val = 0 };
+    aux_count += 1;
+
+    setEnvironment(stack_bottom, stack_size, argv, envp, aux_buf[0..aux_count]);
 
     krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack_bottom, stack_bottom + stack_size});
     const entry = load_base + ehdr.e_entry;
