@@ -29,6 +29,13 @@ var serial_file_ops = kernel.fs.FileOps{
     .readdir = null,
 };
 
+fn getSerial(file: *kernel.fs.File) !*Serial {
+    if (file.inode.data.dev) |_d| {
+        return @ptrCast(@alignCast(_d.data));
+    }
+    return kernel.errors.PosixError.EIO;
+}
+
 fn serial_open(_: *kernel.fs.File, _: *kernel.fs.Inode) !void {
     kernel.logger.WARN("8250 file opened\n", .{});
 }
@@ -36,13 +43,20 @@ fn serial_open(_: *kernel.fs.File, _: *kernel.fs.Inode) !void {
 fn serial_close(_: *kernel.fs.File) void {
 }
 
-fn serial_read(_: *kernel.fs.File, _: [*]u8, _: usize) !usize {
-    return 0;
+fn serial_read(file: *kernel.fs.File, buf: [*]u8, size: usize) !usize {
+    const serial = try getSerial(file);
+    var i: usize = 0;
+    while (i < size and serial.canRead()) {
+        buf[i] = serial.getchar();
+        i += 1;
+    }
+    return i;
 }
 
-fn serial_write(_: *kernel.fs.File, buf: [*]const u8, size: usize) !usize {
+fn serial_write(file: *kernel.fs.File, buf: [*]const u8, size: usize) !usize {
+    const serial = try getSerial(file);
     const msg_slice: []const u8 = buf[0..size];
-    kernel.serial.print(msg_slice);
+    serial.print(msg_slice);
     return size;
 }
 
@@ -105,6 +119,14 @@ pub const Serial = struct {
     pub fn putchar(self: *Serial, char: u8) void {
         while ((io.inb(self.addr + 5) & 0x20) == 0) {}
         io.outb(self.addr, char);
+    }
+
+    pub fn canRead(self: *Serial) bool {
+        return (io.inb(self.addr + 5) & 0x01) != 0;
+    }
+
+    pub fn getchar(self: *Serial) u8 {
+        return io.inb(self.addr);
     }
 
     pub fn print(self: *Serial, message: []const u8) void {

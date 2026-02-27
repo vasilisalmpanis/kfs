@@ -106,7 +106,7 @@ $(IMG_DIR): $(USERSPACE) $(FILESYSTEM_TAR)
 		tar -xf $(FILESYSTEM_TAR) \
 	)
 	touch $(IMG_DIR)
-	cp $(USERSPACE) $(IMG_DIR)/bin/init
+# 	cp $(USERSPACE) $(IMG_DIR)/bin/init
 
 $(FILESYSTEM_TAR):
 	wget $(FILESYSTEM_TAR_LINK)
