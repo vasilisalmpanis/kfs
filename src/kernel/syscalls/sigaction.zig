@@ -5,7 +5,11 @@ const arch = @import("arch");
 const krn = @import("../main.zig");
 
 pub fn sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) !u32 {
-    if (sig > 31)
+    return do_sigaction(sig, act, oact);
+}
+
+fn do_sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) !u32 {
+    if (sig == 0 or sig > @intFromEnum(signals.Signal.SIGSYS))
         return errors.EINVAL;
     const signal: signals.Signal = @enumFromInt(sig);
     if (signal == .SIGKILL or signal == .SIGSTOP)
@@ -17,6 +21,17 @@ pub fn sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) 
         tsk.current.sighand.actions.set(signal, _act.*);
     }
     return 0;
+}
+
+pub fn rt_sigaction(
+    sig: u32,
+    act: ?*signals.Sigaction,
+    oact: ?*signals.Sigaction,
+    sigsetsize: usize,
+) !u32 {
+    if (sigsetsize != @sizeOf(signals.sigset_t))
+        return errors.EINVAL;
+    return do_sigaction(sig, act, oact);
 }
 
 pub fn sigreturn() !u32 {

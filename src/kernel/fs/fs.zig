@@ -254,7 +254,7 @@ pub const UMode = packed struct {
             }
             return false;
         }
-        if (kernel.task.current.gid == gid) {
+        if (kernel.task.current.inGroup(gid)) {
             if (self.isGReadable()) {
                 return true;
             }
@@ -275,7 +275,7 @@ pub const UMode = packed struct {
             }
             return false;
         }
-        if (kernel.task.current.gid == gid) {
+        if (kernel.task.current.inGroup(gid)) {
             if (self.isGWriteable()) {
                 return true;
             }
@@ -296,7 +296,7 @@ pub const UMode = packed struct {
             }
             return false;
         }
-        if (kernel.task.current.gid == gid) {
+        if (kernel.task.current.inGroup(gid)) {
             if (self.isGExecutable()) {
                 return true;
             }

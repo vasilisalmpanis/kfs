@@ -7,6 +7,7 @@ pub const LogLevel = enum {
     INFO,
     WARN,
     ERROR,
+    OFF
 };
 
 pub const LogDestination = enum {
@@ -46,7 +47,8 @@ pub const Logger = struct {
             .DEBUG => BLUE,
             .INFO => GREEN,
             .WARN => YELLOW,
-            .ERROR => RED
+            .ERROR => RED,
+            .OFF => WHITE,
         };
         if (arch.cpu.areIntEnabled()) {
             const formatted_log = try std.fmt.allocPrint(krn.mm.kernel_allocator.allocator(),

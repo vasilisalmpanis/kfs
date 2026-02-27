@@ -73,6 +73,8 @@ pub const RefCount = struct {
 };
 
 
+pub const MAX_GROUPS: usize = 32;
+
 // Task is the basic unit of scheduling
 // both threads and processes are tasks
 // and threads share
@@ -82,12 +84,17 @@ pub const RefCount = struct {
 // Anyone using this struct must get refcount
 // and put it when no longer needed.
 pub const Task = struct {
+
     pid:            u32,
     tsktype:        TaskType,
     name:           [16] u8,
     uid:            u16,
     gid:            u16,
+    groups:         [MAX_GROUPS]u16 = .{0} ** MAX_GROUPS,
+    groups_count:   u8              = 0,
     pgid:           u16             = 1,
+    sid:            u16             = 1,
+    ctty:           ?*krn.fs.File   = null,
     stack_bottom:   usize,
     state:          TaskState       = TaskState.RUNNING,
     regs:           Regs            = Regs.init(),
@@ -129,7 +136,11 @@ pub const Task = struct {
             .pid = 0,
             .uid = uid,
             .gid = gid,
+            .groups = .{0} ** MAX_GROUPS,
+            .groups_count = 0,
             .pgid = pgid,
+            .sid = pgid,
+            .ctty = null,
             .stack_bottom = 0,
             .tsktype = tp,
             .fs = undefined,
@@ -141,6 +152,21 @@ pub const Task = struct {
             .utime = 0,
             .stime = 0,
         };
+    }
+
+    pub fn inGroup(self: *const Task, group_id: u32) bool {
+        if (group_id > std.math.maxInt(u16))
+            return false;
+        const gid16: u16 = @intCast(group_id);
+        if (self.gid == gid16)
+            return true;
+        const count: usize = self.groups_count;
+        var idx: usize = 0;
+        while (idx < count) : (idx += 1) {
+            if (self.groups[idx] == gid16)
+                return true;
+        }
+        return false;
     }
 
     pub fn setup(self: *Task, virt: usize, task_stack_top: usize, task_stack_bottom: usize, name: []const u8) void {
@@ -200,7 +226,17 @@ pub const Task = struct {
         const tmp = Task.init(uid, gid, pgid, tp);
         self.uid = tmp.uid;
         self.gid = tmp.gid;
+        self.groups_count = current.groups_count;
+        @memcpy(
+            self.groups[0..MAX_GROUPS],
+            current.groups[0..MAX_GROUPS]
+        );
         self.pgid = tmp.pgid;
+        self.sid = current.sid;
+        self.ctty = current.ctty;
+        if (self.ctty) |ctty| {
+            ctty.ref.ref();
+        }
         self.state = tmp.state;
         self.refcount = tmp.refcount;
         self.wakeup_time = tmp.wakeup_time;
@@ -303,7 +339,27 @@ pub const Task = struct {
         return null;
     }
 
+    pub fn setControllingTTY(self: *Task, file: *krn.fs.File) void {
+        if (self.ctty == file)
+            return;
+        self.clearControllingTTY();
+        file.ref.ref();
+        self.ctty = file;
+    }
+
+    pub fn clearControllingTTY(self: *Task) void {
+        if (self.ctty) |ctty| {
+            ctty.ref.unref();
+            self.ctty = null;
+        }
+    }
+
+    pub fn controllingTTY(self: *Task) ?*krn.fs.File {
+        return self.ctty;
+    }
+
     pub fn deinitAllocatedData(self: *Task) void {
+        self.clearControllingTTY();
         self.files.deinit();
         self.fs.deinit();
         if (self.mm) |_mm| {

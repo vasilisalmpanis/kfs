@@ -16,7 +16,7 @@ pub fn chmod(path: ?[*:0]const u8, mode: fs.UMode) !u32 {
         return errors.EPERM;
     if (
         krn.task.current.uid != 0 and
-        resolved.dentry.inode.gid != krn.task.current.gid
+        !krn.task.current.inGroup(resolved.dentry.inode.gid)
     )
         _mode.unSetSGID();
     const mask: u7 = fs.S_ISGID | fs.S_ISUID | fs.S_ISVTX;
@@ -28,4 +28,31 @@ pub fn chmod(path: ?[*:0]const u8, mode: fs.UMode) !u32 {
         try _setattr(resolved.dentry.inode, &attr);
     }
     return 0;
+}
+
+pub fn fchmod(fd: u32, mode: fs.UMode) !u32 {
+    if (krn.task.current.files.fds.get(fd)) |file| {
+        var _mode = mode;
+        if (
+            krn.task.current.uid != 0 and
+            file.inode.uid != krn.task.current.uid
+        )
+            return errors.EPERM;
+        if (
+            krn.task.current.uid != 0 and
+            !krn.task.current.inGroup(file.inode.gid)
+        )
+            _mode.unSetSGID();
+        const mask: u7 = fs.S_ISGID | fs.S_ISUID | fs.S_ISVTX;
+        _mode.type = (_mode.type & mask) | (file.inode.mode.type & ~mask);
+        if (file.inode.ops.setattr) |_setattr| {
+            const attr = fs.InodeAttrs{
+                .mode = &_mode,
+            };
+            try _setattr(file.inode, &attr);
+            return 0;
+        }
+        return errors.EINVAL;
+    }
+    return errors.EBADF;
 }

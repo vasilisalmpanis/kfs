@@ -14,7 +14,7 @@ pub fn write(fd: u32, buf: u32, size: u32) !u32 {
         return try file.ops.write(file, data, size);
     }
     krn.logger.INFO("Error {d}\n", .{krn.task.current.pid});
-    return errors.PosixError.ENOENT;
+    return errors.PosixError.EBADF;
 }
 
 pub const IoVec = extern struct {

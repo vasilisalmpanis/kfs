@@ -148,6 +148,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial.print("[INIT]: Interrupts are enabled\n");
     dbg.initSymbolTable(&krn.boot_info);
     krn.serial.print("[INIT]: Symbol Table done\n");
+    // Get PID1
+    _ = krn.kthreadCreate(&user_thread, null, "init") catch null;
     screen.initScreen(&krn.scr, &krn.boot_info);
     krn.serial.print("[INIT]: Screen done\n");
     keyboard.init();
@@ -161,8 +163,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.fs.init();
     krn.serial.print("[INIT]: Filesystems done\n");
 
-    // Get PID1
-    _ = krn.kthreadCreate(&user_thread, null, "init") catch null;
 
     // Devices
     drv.init();
