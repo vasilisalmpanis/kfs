@@ -41,20 +41,20 @@ pub fn socketcall(call: i32, args: [*]u32) !u32 {
             @ptrFromInt(args[3]),
         ),
         .SYS_RECVFROM => return try recvfrom(
-            @intCast(args[0]),
+            @bitCast(args[0]),
             @ptrFromInt(args[1]),
             args[2],
             args[3],
             args[4],
-            @intCast(args[5]),
+            @bitCast(args[5]),
         ),
         .SYS_SENDTO => return try sendto(
-            @intCast(args[0]),
+            @bitCast(args[0]),
             @ptrFromInt(args[1]),
             args[2],
             args[3],
             args[4],
-            @intCast(args[5]),
+            @bitCast(args[5]),
         ),
         else => {
             return errors.EINVAL;
@@ -117,6 +117,8 @@ pub fn recvfrom(
     if (ubuff == null) {
         return errors.EFAULT;
     }
+    if (fd < 0)
+        return errors.EBADF;
     if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
         return try krn.socket.do_recvfrom(file, @ptrCast(ubuff), size);
     } else {
@@ -135,6 +137,8 @@ pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, add
     if (len > 128) {
         return errors.EFAULT;
     }
+    if (fd < 0)
+        return errors.EBADF;
     if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
         return try krn.socket.do_sendto(file, @ptrCast(buff), len);
     } else {

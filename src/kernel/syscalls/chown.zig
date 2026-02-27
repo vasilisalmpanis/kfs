@@ -69,3 +69,18 @@ pub fn fchownat(
     const span = std.mem.span(path);
     return try do_chown(fd, span, uid, gid, flags);
 }
+
+pub fn fchown32(fd: u32, uid: u32, gid: u32) !u32 {
+    if (kernel.task.current.files.fds.get(fd)) |file| {
+        if (file.inode.ops.setattr) |_setattr| {
+            const attr = fs.InodeAttrs{
+                .uid = uid,
+                .gid = gid,
+            };
+            try _setattr(file.inode, &attr);
+            return 0;
+        }
+        return errors.EINVAL;
+    }
+    return errors.EBADF;
+}
