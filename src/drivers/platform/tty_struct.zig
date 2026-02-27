@@ -6,7 +6,8 @@ const kbd = @import("../kbd.zig");
 const fb = @import("../framebuffer.zig");
 
 const t = @import("./termios.zig");
-const tty_drv = @import("tty.zig");
+
+const KD_TEXT: u32 = 0x00;
 
 pub const DirtyRect = struct {
     x1: usize,
@@ -82,6 +83,15 @@ pub const WinSize = extern struct {
     ws_col: u16,
     ws_xpixel: u16 = 0,
     ws_ypixel: u16 = 0    
+};
+
+pub const Backend = enum {
+    screen,
+    serial,
+};
+
+pub const BackendOps = struct {
+    writeByte: ?*const fn (self: *TTY, b: u8) void = null,
 };
 
 const AnsiColor = enum(u4) {
@@ -625,7 +635,9 @@ pub const TTY = struct {
     // vt/kd
     vt_index: u16 = 1,
     vt_active: bool = true,
-    kd_mode: u32 = tty_drv.KD_TEXT,
+    kd_mode: u32 = KD_TEXT,
+    backend: Backend = .screen,
+    backend_ops: BackendOps = .{},
 
     // editing
     _input_len: usize = 0,
@@ -661,8 +673,20 @@ pub const TTY = struct {
             },
             .term = default_termios(),
             .vt_index = vt_idx,
+            .backend = .screen,
+            .backend_ops = .{},
         };
         return _tty;
+    }
+
+    pub fn initSerial() !TTY {
+        var _tty = try TTY.init(100, 30, 0);
+        _tty.backend = .serial;
+        return _tty;
+    }
+
+    pub fn setBackendOps(self: *TTY, ops: BackendOps) void {
+        self.backend_ops = ops;
     }
 
     pub fn setup(self: *TTY) void {
@@ -733,6 +757,8 @@ pub const TTY = struct {
     }
 
     pub fn render(self: *TTY) void {
+        if (self.backend == .serial)
+            return;
         if (scr.current_tty) |curr| {
             if (self != curr)
                 return ;
@@ -931,8 +957,14 @@ pub const TTY = struct {
 
     fn processEnter(self: *TTY) void {
         self._input_len = 0;
-        if (self.term.c_lflag.ECHONL or self.term.c_lflag.ECHO)
-            self.printChar('\n');
+        if (self.term.c_lflag.ECHONL or self.term.c_lflag.ECHO) {
+            if (self.backend == .serial) {
+                self.consume('\r');
+                self.consume('\n');
+            } else {
+                self.printChar('\n');
+            }
+        }
         self.lock.lock();
         _ = self.file_buff.push('\n');
         self.lock.unlock();
@@ -983,8 +1015,15 @@ pub const TTY = struct {
                         continue;
                     }
                     if (b == 8 or b == 127) { // backspace
-                        if (self.term.c_lflag.ECHO)
-                            self.removeAtCursor();
+                        if (self.term.c_lflag.ECHO) {
+                            if (self.backend == .serial) {
+                                self.consume(8);
+                                self.consume(' ');
+                                self.consume(8);
+                            } else {
+                                self.removeAtCursor();
+                            }
+                        }
                         self.lock.lock();
                         _ = self.file_buff.unwrite(1);
                         self.lock.unlock();
@@ -1002,19 +1041,36 @@ pub const TTY = struct {
                         continue;
                     }
                     // printable
-                    if (self.term.c_lflag.ECHO)
-                        self.insertAtCursor(b);
+                    if (self.term.c_lflag.ECHO) {
+                        if (self.backend == .serial) {
+                            self.consume(b);
+                        } else {
+                            self.insertAtCursor(b);
+                        }
+                    }
                     self.pushInput(b);
                 } else {
                     // raw mode
                     if (self.term.c_lflag.ECHO) {
-                        if (b == '\n'
-                            and self.term.c_oflag.OPOST
-                            and self.term.c_oflag.ONLCR
-                        ) {
-                            self.print("\r\n");
+                        if (self.backend == .serial) {
+                            if (b == '\n'
+                                and self.term.c_oflag.OPOST
+                                and self.term.c_oflag.ONLCR
+                            ) {
+                                self.consume('\r');
+                                self.consume('\n');
+                            } else {
+                                self.consume(b);
+                            }
                         } else {
-                            self.printChar(b);
+                            if (b == '\n'
+                                and self.term.c_oflag.OPOST
+                                and self.term.c_oflag.ONLCR
+                            ) {
+                                self.print("\r\n");
+                            } else {
+                                self.printChar(b);
+                            }
                         }
                     }
                     self.pushInput(b);
@@ -1049,6 +1105,11 @@ pub const TTY = struct {
                 }
             }
         }
+    }
+
+    pub fn inputByte(self: *TTY, b: u8) void {
+        var ev = [_]kbd.KeyEvent{.{ .ctl = false, .val = b }};
+        self.input(ev[0..]);
     }
 
     fn move(self: *TTY, dir: u8) void {
@@ -1668,6 +1729,12 @@ pub const TTY = struct {
 
     // consume one byte of OUTPUT
     pub fn consume(self: *TTY, b: u8) void {
+        if (self.backend == .serial) {
+            if (self.backend_ops.writeByte) |write_byte| {
+                write_byte(self, b);
+            }
+            return;
+        }
         switch (self.pstate) {
             .Normal => switch (b) {
                 0x1b => self.pstate = .Esc,

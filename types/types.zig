@@ -806,7 +806,11 @@ pub const kernel = struct {
             name : [16]u8,
             uid : u16,
             gid : u16,
+            groups : [32]u16,
+            groups_count : u8= 0,
             pgid : u16= 1,
+            sid : u16= 1,
+            ctty : ?*kernel.fs.file.File= null,
             stack_bottom : u32,
             state : kernel.task.TaskState,
             regs : arch.Regs,
@@ -1088,7 +1092,7 @@ pub const kernel = struct {
                 read : *const fn(*kernel.fs.file.File, [*]u8, u32) anyerror!u32,
                 lseek : ?*const fn(*kernel.fs.file.File, i32, u32) anyerror!u32= null,
                 readdir : ?*const fn(*kernel.fs.file.File, []u8) anyerror!u32= null,
-                ioctl : ?*const fn(*kernel.fs.file.File, u32, ?*anyopaque) anyerror!u32= null,
+                ioctl : ?*const fn(*kernel.fs.file.File, u32, u32) anyerror!u32= null,
                 poll : ?*const fn(*kernel.fs.file.File, *kernel.poll.PollFd) anyerror!u32= null,
             };
 
@@ -1480,11 +1484,12 @@ pub const debug = struct {
     };
 
     pub const log = struct {
-        pub const LogLevel = enum(u2) {
+        pub const LogLevel = enum(u3) {
             DEBUG = 0,
             INFO = 1,
             WARN = 2,
             ERROR = 3,
+            OFF = 4,
         };
 
 
@@ -1881,6 +1886,9 @@ pub const drivers = struct {
 
         };
 
+        pub const nulldev = struct {
+        };
+
         pub const tty = struct {
             pub const TTY = struct {
                 width : u32= 80,
@@ -1901,6 +1909,8 @@ pub const drivers = struct {
                 vt_index : u16= 1,
                 vt_active : bool= true,
                 kd_mode : u32= 0,
+                backend : std.platform.tty_struct.Backend,
+                backend_ops : std.platform.tty_struct.BackendOps,
                 _input_len : u32= 0,
                 tab_len : u32= 8,
                 saved_x : u32= 0,

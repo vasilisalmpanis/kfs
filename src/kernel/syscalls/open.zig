@@ -5,6 +5,22 @@ const sockets = @import("../net/socket.zig");
 const fs = @import("../fs/fs.zig");
 const std = @import("std");
 const kernel = @import("../main.zig");
+const drv = @import("drivers");
+
+fn openControllingTTY(flags: u32, mode: fs.UMode) !u32 {
+    const ctty_file = kernel.task.current.controllingTTY() orelse {
+        return errors.ENXIO;
+    };
+    if (ctty_file.path == null) {
+        return errors.ENXIO;
+    }
+    return do_open(
+        drv.devfs_path,
+        ctty_file.path.?.dentry.name,
+        flags,
+        mode
+    );
+}
 
 pub fn do_open(
     parent_dir: fs.path.Path,
@@ -97,6 +113,9 @@ pub fn open(
 ) !u32 {
     if (filename) |f| {
         const path: []const u8 = std.mem.span(f);
+        if (std.mem.eql(u8, path, "/dev/tty")) {
+            return openControllingTTY(flags, mode);
+        }
         kernel.logger.INFO("opening {s}\n", .{path});
         var file_segment: []const u8 = "";
         const parent_dir = try fs.path.dir_resolve(
