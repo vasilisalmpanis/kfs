@@ -76,6 +76,7 @@ var tty_file_ops = krn.fs.FileOps{
 const MAX_VTS: usize = 10;
 
 var vt_ttys: [MAX_VTS]?*TTY = [_]?*TTY{null} ** MAX_VTS;
+var serial_tty: ?*TTY = null;
 
 fn registerVT(vt_idx: u16, tty_dev: *TTY) void {
     if (vt_idx == 0 or vt_idx > MAX_VTS)
@@ -95,8 +96,24 @@ fn flushInputQueue(_tty: *TTY) void {
     _tty.lock.unlock();
 }
 
+fn isControllingTTY(file: *krn.fs.File) bool {
+    if (file.path) |path|
+        return std.mem.eql(u8, path.dentry.name, "tty");
+    return false;
+}
+
 // file ops
 fn getTTY(file: *krn.fs.File) !*TTY {
+    if (isControllingTTY(file)) {
+        const ctty_file = krn.task.current.controllingTTY() orelse
+            return krn.errors.PosixError.ENXIO;
+        if (ctty_file == file)
+            return krn.errors.PosixError.ENXIO;
+        if (ctty_file.inode.data.dev) |_d| {
+            return @ptrCast(@alignCast(_d.data));
+        }
+        return krn.errors.PosixError.EIO;
+    }
     if (file.inode.data.dev) |_d|
         return @ptrCast(@alignCast(_d.data));
     return krn.errors.PosixError.EIO;
@@ -514,10 +531,15 @@ fn tty_poll(base: *krn.fs.File, pollfd: *krn.poll.PollFd) !u32 {
 
 // probe / thread / init
 fn tty_probe(device: *pdev.PlatformDevice) !void {
-    if (device.dev.data == null)
+    if (
+        device.dev.data == null
+        and !std.mem.eql(u8, device.dev.name, "tty")
+    )
         return krn.errors.PosixError.EIO;
-    const cur_tty: *TTY = @ptrCast(@alignCast(device.dev.data));
-    cur_tty.clear();
+    if (device.dev.data) |data| {
+        const cur_tty: *TTY = @ptrCast(@alignCast(data));
+        cur_tty.clear();
+    }
     try cdev.addCdev(&device.dev, krn.fs.UMode.chardev());
 }
 
@@ -550,15 +572,31 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
         }
         did_work = did_work or pollSerialTTYInput();
         if (!did_work) {
-            kbd.wait_queue.wait(false, 0);
+            kbd.wait_queue.wait(false, 10);
         }
     }
     return 0;
 }
 
 fn pollSerialTTYInput() bool {
-    // TODO
-    return false;
+    const cur_tty = serial_tty orelse
+        return false;
+    const ser = serial.getDefault() orelse
+        return false;
+    var got_input = false;
+    var n: usize = 0;
+    while (n < 256 and ser.canRead()) {
+        cur_tty.inputByte(ser.getchar());
+        got_input = true;
+        n += 1;
+    }
+    return got_input;
+}
+
+fn serialTTYWriteByte(_: *TTY, b: u8) void {
+    if (serial.getDefault()) |ser| {
+        ser.putchar(b);
+    }
 }
 
 fn isVTControlKey(ctrl: kbd.CtrlType) bool {
@@ -571,6 +609,10 @@ fn isVTControlKey(ctrl: kbd.CtrlType) bool {
 
 fn addTTYDev(name: []const u8) !void {
     if (pdev.PlatformDevice.alloc(name)) |platform_tty| {
+        if (std.mem.eql(u8, name, "tty")) {
+            try platform_tty.register();
+            return;
+        }
         if (krn.mm.kmalloc(TTY)) |curr_tty| {
             const is_serial_tty = (
                 name.len > 4
@@ -578,6 +620,10 @@ fn addTTYDev(name: []const u8) !void {
             );
             if (is_serial_tty) {
                 curr_tty.* = try TTY.initSerial();
+                curr_tty.setBackendOps(.{
+                    .writeByte = serialTTYWriteByte,
+                });
+                serial_tty = curr_tty;
             } else {
                 var vt_idx: u16 = 0;
                 if (name.len > 3 and std.mem.eql(u8, name[0..3], "tty")) {
@@ -622,6 +668,8 @@ pub fn init() void {
         vt += 1;
     }
     addTTYDev("ttyS0")
+        catch return;
+    addTTYDev("tty")
         catch return;
 
     pdrv.platform_register_driver(&tty_driver.driver) catch |err| {
