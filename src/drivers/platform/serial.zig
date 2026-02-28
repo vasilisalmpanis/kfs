@@ -20,6 +20,8 @@ var serial_driver = pdrv.PlatformDriver {
     .remove = serial_remove,
 };
 
+var default_serial: ?*Serial = null;
+
 var serial_file_ops = kernel.fs.FileOps{
     .open = serial_open,
     .close = serial_close,
@@ -79,6 +81,7 @@ pub fn init() void {
     if (pdev.PlatformDevice.alloc("8250")) |serial| {
         if (kernel.mm.kmalloc(Serial)) |data| {
             data.* = Serial.init(COM1);
+            default_serial = data;
             serial.dev.data = @ptrCast(@alignCast(data));
         } else {
             return ;
@@ -95,6 +98,10 @@ pub fn init() void {
         return ;
     }
     kernel.logger.WARN("serial cannot be initialized", .{});
+}
+
+pub fn getDefault() ?*Serial {
+    return default_serial;
 }
 
 const COM1: u16 = 0x3F8;

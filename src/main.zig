@@ -123,7 +123,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial = Serial.init(0x3F8);
     krn.serial.setup();
     krn.serial.print("[INIT]: Serial done\n");
-    krn.logger = Logger.init(.DEBUG);
+    krn.logger = Logger.init(.OFF);
     krn.serial.print("[INIT]: Logger done\n");
     const boot_info = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
     krn.boot_info = boot_info;
