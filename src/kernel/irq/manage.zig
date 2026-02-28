@@ -8,17 +8,20 @@ pub const ISRHandler = anyopaque;
 pub const ExceptionHandler = anyopaque;
 
 pub var handlers: [arch.IDT_MAX_DESCRIPTORS] ?* const ISRHandler = .{null} ** arch.IDT_MAX_DESCRIPTORS;
+pub var args: [arch.IDT_MAX_DESCRIPTORS] ?*anyopaque = .{null} ** arch.IDT_MAX_DESCRIPTORS;
 
-pub fn registerHandler(irq_num: u32, hndl: *const ISRHandler) callconv(.c) void {
+pub fn registerHandler(irq_num: u32, hndl: *const ISRHandler, arg: ?*anyopaque) callconv(.c) void {
     if (irq_num >= arch.IDT_MAX_DESCRIPTORS - arch.CPU_EXCEPTION_COUNT)
         @panic("Wrong IRQ number provided");
     handlers[irq_num + arch.CPU_EXCEPTION_COUNT] = hndl;
+    args[irq_num + arch.CPU_EXCEPTION_COUNT] = arg;
 }
 
 pub fn unregisterHandler(irq_num: u32) callconv(.c) void {
     if (irq_num >= arch.IDT_MAX_DESCRIPTORS - arch.CPU_EXCEPTION_COUNT)
         @panic("Wrong IRQ number provided");
     handlers[irq_num + arch.CPU_EXCEPTION_COUNT] = null;
+    args[irq_num + arch.CPU_EXCEPTION_COUNT] = null;
 }
 
 pub fn registerExceptionHandler(int_num: u32, hndl: *const ExceptionHandler) void {

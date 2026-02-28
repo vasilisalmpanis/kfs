@@ -251,5 +251,5 @@ pub fn init() void {
     global_keyboard = &keyboard;
     if (!wait_queue.isSetup())
         wait_queue.setup();
-    krn.irq.registerHandler(1, &keyboardInterrupt);
+    krn.irq.registerHandler(1, &keyboardInterrupt, null);
 }

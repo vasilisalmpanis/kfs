@@ -430,6 +430,6 @@ pub fn initMultitasking() void {
         "swapper"
     );
     initial_task.fpu_state = &inital_fpu_state;
-    krn.irq.registerHandler(0, &krn.timerHandler);
+    krn.irq.registerHandler(0, &krn.timerHandler, null);
     arch.system.enableWriteProtect();
 }

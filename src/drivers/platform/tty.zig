@@ -548,7 +548,19 @@ fn tty_remove(device: *pdev.PlatformDevice) !void {
     krn.logger.WARN("tty cannot be initialized", .{});
 }
 
-pub fn tty_thread(_: ?*const anyopaque) i32 {
+pub fn tty_serial_thread(_: ?*const anyopaque) i32 {
+    while (krn.task.current.should_stop != true) {
+        _ = pollSerialTTYInput();
+        if (serial.getDefault()) |_serial| {
+            _serial.wait_queue.wait(false, 0);
+        } else {
+            break;
+        }
+    }
+    return 0;
+}
+
+pub fn tty_kbd_thread(_: ?*const anyopaque) i32 {
     while (krn.task.current.should_stop != true) {
         var did_work = false;
         if (kbd.global_keyboard.getInput()) |input| {
@@ -570,9 +582,8 @@ pub fn tty_thread(_: ?*const anyopaque) i32 {
                 did_work = true;
             }
         }
-        did_work = did_work or pollSerialTTYInput();
         if (!did_work) {
-            kbd.wait_queue.wait(false, 10);
+            kbd.wait_queue.wait(false, 0);
         }
     }
     return 0;
@@ -678,7 +689,8 @@ pub fn init() void {
     };
     krn.logger.WARN("Driver registered for tty", .{});
 
-    _ = krn.kthreadCreate(&tty_thread, null, "tty_thread") catch null;
+    _ = krn.kthreadCreate(&tty_kbd_thread, null, "tty_kbd_thread") catch null;
+    _ = krn.kthreadCreate(&tty_serial_thread, null, "tty_serial_thread") catch null;
     return ;
 }
 

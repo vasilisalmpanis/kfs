@@ -687,7 +687,7 @@ pub const kernel = struct {
     };
 
     pub const irq = struct {
-        pub extern fn registerHandler(u32, *const anyopaque)void;
+        pub extern fn registerHandler(u32, *const anyopaque, ?*anyopaque)void;
         pub extern fn unregisterHandler(u32)void;
     };
 
@@ -1882,6 +1882,7 @@ pub const drivers = struct {
         pub const serial = struct {
             pub const Serial = struct {
                 addr : u16,
+                wait_queue : kernel.wq.WaitQueueHead,
             };
 
         };
@@ -2031,7 +2032,7 @@ pub const api = struct {
     pub extern fn restoreKBD()void;
     pub extern fn setCMOS(*drivers.cmos.CMOS)void;
     pub extern fn restoreCMOS()void;
-    pub extern fn registerHandler(u32, *const anyopaque)void;
+    pub extern fn registerHandler(u32, *const anyopaque, ?*anyopaque)void;
     pub extern fn unregisterHandler(u32)void;
     pub extern fn module_panic([*]const u8, u32)void;
 };

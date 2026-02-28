@@ -126,7 +126,7 @@ export fn _init() linksection(".init") callconv(.c) u32 {
             if (res != 0)
                 return @intCast(res);
             kfs.api.setKBD(mod_kbd);
-            kfs.api.registerHandler(1, keyboardInterrupt);
+            kfs.api.registerHandler(1, keyboardInterrupt, null);
         }
     }
     return 0;
