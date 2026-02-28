@@ -24,7 +24,7 @@ pub const USER_DATA_SEGMENT   = 0x20;
 
 const ExceptionHandler  = fn (regs: *Regs) *Regs;
 const SyscallHandler    = fn (regs: *Regs) void;
-const ISRHandler        = fn () callconv(.c) void;
+const ISRHandler        = fn (arg: ?*anyopaque) callconv(.c) void;
 
 extern const stack_top: u32;
 
@@ -122,7 +122,8 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
             handler(state);
         } else {
             const handler: *const ISRHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
-            handler();
+            const arg: ?*anyopaque = krn.irq.args[state.int_no];
+            handler(arg);
         }
     }
     io.outb(0x20, 0x20);

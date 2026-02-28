@@ -120,6 +120,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
         system.halt();
     }
 
+    cpuid.init();
+    fpu.initFPU();
     krn.serial = Serial.init(0x3F8);
     krn.serial.setup();
     krn.serial.print("[INIT]: Serial done\n");
@@ -131,10 +133,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
     gdt.gdtInit();
     krn.serial.print("[INIT]: GDT done\n");
-    cpuid.init();
-    krn.serial.print("[INIT]: CPUID done\n");
-    fpu.initFPU();
-    krn.serial.print("[INIT]: FPU done\n");
     krn.pit = PIT.init(1000);
     krn.serial.print("[INIT]: PIT done\n");
     idt.idtInit();

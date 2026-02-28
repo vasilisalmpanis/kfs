@@ -103,7 +103,6 @@ fn selectBackend() Backend {
 pub fn initFPU() void {
     if (!isFPUPresent()) {
         backend = .NONE;
-        krn.logger.WARN("fpu: no x87 present", .{});
         return;
     }
 

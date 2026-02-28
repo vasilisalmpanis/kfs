@@ -105,12 +105,22 @@ pub fn getDefault() ?*Serial {
 }
 
 const COM1: u16 = 0x3F8;
+const COM2: u16 = 0x2F8;
 
 pub const Serial = struct {
     addr: u16, // COM1
+    wait_queue: kernel.wq.WaitQueueHead = kernel.wq.WaitQueueHead.init(),
+
     pub fn init(port: u16) Serial {
+        if (port != COM1 and port != COM2)
+            @panic("Pass correct serial I/O port");
         const serial = Serial{ .addr = port };
         return serial;
+    }
+
+    export fn serialInterrupt(arg: ?*anyopaque) void {
+        const self: *Serial = @ptrCast(@alignCast(arg));
+        self.wait_queue.wakeUpOne();
     }
 
     pub fn setup(self: *Serial) void {
@@ -121,6 +131,12 @@ pub const Serial = struct {
         io.outb(self.addr + 3, 0x03);
         io.outb(self.addr + 2, 0xC7);
         io.outb(self.addr + 1, 0x01);
+        self.wait_queue.setup();
+        if (self.addr == COM1) {
+            kernel.irq.registerHandler(4, &serialInterrupt, self);
+        } else {
+            kernel.irq.registerHandler(3, &serialInterrupt, self);
+        }
     }
 
     pub fn putchar(self: *Serial, char: u8) void {

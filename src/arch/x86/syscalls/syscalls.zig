@@ -49,6 +49,7 @@ pub fn syscallsManager(state: *arch.Regs) void {
 pub fn initSyscalls() void {
     registerHandler(
         arch.SYSCALL_INTERRUPT - arch.CPU_EXCEPTION_COUNT,
-        &syscallsManager
+        &syscallsManager,
+        null
     );
 }

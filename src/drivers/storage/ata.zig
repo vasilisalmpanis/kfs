@@ -576,7 +576,8 @@ fn ata_identify(ch_type: ChannelType) u8 {
     }
     irq.registerHandler(
         ch_type.getIRQ(),
-        if (ch_type.isPrimary()) ata_primary else ata_secondary
+        if (ch_type.isPrimary()) ata_primary else ata_secondary,
+        null
     );
     return 1;
 }
