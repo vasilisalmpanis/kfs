@@ -105,6 +105,10 @@ pub fn getEGID() !u32 {
     return krn.task.current.gid;
 }
 
+pub fn getEGID32() !u32 {
+    return krn.task.current.gid;
+}
+
 pub fn getresuid() !u32 {
     return krn.task.current.uid;
 }
@@ -135,8 +139,6 @@ pub fn setgroups32(size: u32, list: ?[*]const u32) !u32 {
         return errors.EFAULT;
     var idx: usize = 0;
     while (idx < groups_size) : (idx += 1) {
-        if (user_list[idx] > std.math.maxInt(u16))
-            return errors.EINVAL;
         tsk.current.groups[idx] = @intCast(user_list[idx]);
     }
     tsk.current.groups_count = @intCast(groups_size);
@@ -159,6 +161,8 @@ pub fn getgroups32(size: u32, list: ?[*]u32) !u32 {
 }
 
 pub fn setgroups(size: u32, list: ?[*]const u16) !u32 {
+    if (tsk.current.uid != 0)
+        return errors.EPERM;
     if (size == 0)
         return setgroups32(0, null);
     const user_list = list orelse
