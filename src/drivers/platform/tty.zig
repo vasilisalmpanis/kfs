@@ -76,7 +76,6 @@ var tty_file_ops = krn.fs.FileOps{
 const MAX_VTS: usize = 10;
 
 var vt_ttys: [MAX_VTS]?*TTY = [_]?*TTY{null} ** MAX_VTS;
-var serial_tty: ?*TTY = null;
 
 fn registerVT(vt_idx: u16, tty_dev: *TTY) void {
     if (vt_idx == 0 or vt_idx > MAX_VTS)
@@ -548,14 +547,18 @@ fn tty_remove(device: *pdev.PlatformDevice) !void {
     krn.logger.WARN("tty cannot be initialized", .{});
 }
 
-pub fn tty_serial_thread(_: ?*const anyopaque) i32 {
+pub fn tty_serial_thread(arg: ?*const anyopaque) i32 {
+    const cur_tty: *TTY = if (arg) |_arg|
+        @ptrCast(@alignCast(@constCast(_arg)))
+    else
+        return 0;
+    const data = cur_tty.backend_data orelse
+        return 0;
+    const ser: *serial.Serial = @ptrCast(@alignCast(data));
+
     while (krn.task.current.should_stop != true) {
-        _ = pollSerialTTYInput();
-        if (serial.getDefault()) |_serial| {
-            _serial.wait_queue.wait(false, 0);
-        } else {
-            break;
-        }
+        _ = pollSerialTTYInput(cur_tty);
+        ser.wait_queue.wait(false, 0);
     }
     return 0;
 }
@@ -589,11 +592,10 @@ pub fn tty_kbd_thread(_: ?*const anyopaque) i32 {
     return 0;
 }
 
-fn pollSerialTTYInput() bool {
-    const cur_tty = serial_tty orelse
+fn pollSerialTTYInput(cur_tty: *TTY) bool {
+    const data = cur_tty.backend_data orelse
         return false;
-    const ser = serial.getDefault() orelse
-        return false;
+    const ser: *serial.Serial = @ptrCast(@alignCast(data));
     var got_input = false;
     var n: usize = 0;
     while (n < 256 and ser.canRead()) {
@@ -604,8 +606,9 @@ fn pollSerialTTYInput() bool {
     return got_input;
 }
 
-fn serialTTYWriteByte(_: *TTY, b: u8) void {
-    if (serial.getDefault()) |ser| {
+fn serialTTYWriteByte(cur_tty: *TTY, b: u8) void {
+    if (cur_tty.backend_data) |data| {
+        const ser: *serial.Serial = @ptrCast(@alignCast(data));
         ser.putchar(b);
     }
 }
@@ -620,20 +623,26 @@ fn isVTControlKey(ctrl: kbd.CtrlType) bool {
 
 fn addTTYDev(name: []const u8) !void {
     if (pdev.PlatformDevice.alloc(name)) |platform_tty| {
+        var serial_tty: ?*TTY = null;
         if (std.mem.eql(u8, name, "tty")) {
             try platform_tty.register();
             return;
         }
+        const is_serial_tty = (
+            name.len > 4
+            and std.mem.eql(u8, name[0..4], "ttyS")
+        );
         if (krn.mm.kmalloc(TTY)) |curr_tty| {
-            const is_serial_tty = (
-                name.len > 4
-                and std.mem.eql(u8, name[0..4], "ttyS")
-            );
             if (is_serial_tty) {
+                const serial_idx = std.fmt.parseInt(u8, name[4..], 10)
+                    catch return krn.errors.PosixError.EINVAL;
+                const serial_dev = serial.getByIndex(serial_idx)
+                    orelse return krn.errors.PosixError.ENODEV;
                 curr_tty.* = try TTY.initSerial();
                 curr_tty.setBackendOps(.{
                     .writeByte = serialTTYWriteByte,
                 });
+                curr_tty.backend_data = @ptrCast(serial_dev);
                 serial_tty = curr_tty;
             } else {
                 var vt_idx: u16 = 0;
@@ -656,6 +665,13 @@ fn addTTYDev(name: []const u8) !void {
             return krn.errors.PosixError.ENOMEM;
         }
         try platform_tty.register();
+        if (is_serial_tty and serial_tty != null) {
+            _ = krn.kthreadCreate(
+                &tty_serial_thread,
+                @ptrCast(serial_tty.?),
+                "tty_serial_thread"
+            ) catch null;
+        }
         return ;
     } else {
         return krn.errors.PosixError.ENOMEM;
@@ -663,25 +679,23 @@ fn addTTYDev(name: []const u8) !void {
 }
 
 pub fn init() void {
-    // Create tty1 first so it becomes the current_tty (userspace shells use tty1-tty4)
-    addTTYDev("tty1") catch |err| {
-        krn.logger.ERROR("tty1 not added: {t}", .{err});
-        return;
-    };
-
-    var vt: u16 = 2;
-    while (vt <= MAX_VTS) {
+    for (1..MAX_VTS) |vt| {
         var name_buf: [8]u8 = undefined;
         const vt_name = std.fmt.bufPrint(name_buf[0..], "tty{d}", .{vt})
-            catch return;
+            catch continue;
         addTTYDev(vt_name)
-            catch return;
-        vt += 1;
+            catch continue;
     }
-    addTTYDev("ttyS0")
-        catch return;
-    addTTYDev("tty")
-        catch return;
+
+    for (1..serial.MAX_SERIAL_PORTS, 1..) |_, ser_id| {
+        if (serial.getByIndex(ser_id)) |_| {
+            var name_buf: [8]u8 = undefined;
+            const ser_name = std.fmt.bufPrint(name_buf[0..], "ttyS{d}", .{ser_id})
+                catch continue;            
+            addTTYDev(ser_name)
+                catch continue;
+        }
+    }
 
     pdrv.platform_register_driver(&tty_driver.driver) catch |err| {
         krn.logger.ERROR("Error registering platform driver: {any}", .{err});
@@ -690,7 +704,6 @@ pub fn init() void {
     krn.logger.WARN("Driver registered for tty", .{});
 
     _ = krn.kthreadCreate(&tty_kbd_thread, null, "tty_kbd_thread") catch null;
-    _ = krn.kthreadCreate(&tty_serial_thread, null, "tty_serial_thread") catch null;
     return ;
 }
 

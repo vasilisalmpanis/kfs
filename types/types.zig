@@ -1881,7 +1881,7 @@ pub const drivers = struct {
 
         pub const serial = struct {
             pub const Serial = struct {
-                addr : u16,
+                addr : u16= 0,
                 wait_queue : kernel.wq.WaitQueueHead,
             };
 
@@ -1912,6 +1912,7 @@ pub const drivers = struct {
                 kd_mode : u32= 0,
                 backend : std.platform.tty_struct.Backend,
                 backend_ops : std.platform.tty_struct.BackendOps,
+                backend_data : ?*anyopaque= null,
                 _input_len : u32= 0,
                 tab_len : u32= 8,
                 saved_x : u32= 0,

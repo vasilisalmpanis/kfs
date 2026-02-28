@@ -638,6 +638,7 @@ pub const TTY = struct {
     kd_mode: u32 = KD_TEXT,
     backend: Backend = .screen,
     backend_ops: BackendOps = .{},
+    backend_data: ?*anyopaque = null,
 
     // editing
     _input_len: usize = 0,
@@ -675,6 +676,7 @@ pub const TTY = struct {
             .vt_index = vt_idx,
             .backend = .screen,
             .backend_ops = .{},
+            .backend_data = null,
         };
         return _tty;
     }
