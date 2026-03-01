@@ -148,7 +148,8 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
                 return errors.ENOTDIR;
             if (file.path == null)
                 return errors.EINVAL;
-            from_path = file.path.?;
+            from_path.release();
+            from_path = file.path.?.clone();
         } else {
             return errors.EBADF;
         }

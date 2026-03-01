@@ -39,10 +39,10 @@ pub fn fchdir(fd: u32) !u32 {
         )) {
             return errors.EACCES;
         }
-        if (file.path != null)
+        if (file.path == null)
             return krn.errors.PosixError.ENOENT;
         const old = krn.task.current.fs.pwd;
-        krn.task.current.fs.pwd = file.path.?;
+        krn.task.current.fs.pwd = file.path.?.clone();
         old.release();
         return 0;
     }
