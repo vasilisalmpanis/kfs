@@ -623,7 +623,7 @@ pub const TTY = struct {
 
     // input queue
     file_buff: krn.ringbuf.RingBuf = undefined,
-    lock: krn.Mutex = krn.Mutex.init(),
+    lock: krn.Spinlock = krn.Spinlock.init(),
     nonblock: bool = false,
     read_queue: krn.wq.WaitQueueHead = undefined,
 
@@ -665,7 +665,7 @@ pub const TTY = struct {
             .curr_page = undefined,
 
             .file_buff = rb,
-            .lock = krn.Mutex.init(),
+            .lock = krn.Spinlock.init(),
             .read_queue = krn.wq.WaitQueueHead.init(),
             .tab_len = 8,
             .winsz = WinSize{
@@ -926,16 +926,16 @@ pub const TTY = struct {
     }
 
     fn pushInput(self: *TTY, b: u8) void {
-        self.lock.lock();
+        const lock_state = self.lock.lock_irq_disable();
         _ = self.file_buff.push(b);
-        self.lock.unlock();
+        self.lock.unlock_irq_enable(lock_state);
         self.read_queue.wakeUpOne();
     }
 
     fn pushSeq(self: *TTY, s: []const u8) void {
-        self.lock.lock();
+        const lock_state = self.lock.lock_irq_disable();
         _ = self.file_buff.pushSlice(s);
-        self.lock.unlock();
+        self.lock.unlock_irq_enable(lock_state);
         self.read_queue.wakeUpOne();
     }
 
@@ -967,9 +967,9 @@ pub const TTY = struct {
                 self.printChar('\n');
             }
         }
-        self.lock.lock();
+        const lock_state = self.lock.lock_irq_disable();
         _ = self.file_buff.push('\n');
-        self.lock.unlock();
+        self.lock.unlock_irq_enable(lock_state);
         self.read_queue.wakeUpOne();
     }
 
@@ -981,18 +981,18 @@ pub const TTY = struct {
                     continue;
                 if (self.handleISIG(b)) {
                     if (!self.term.c_lflag.NOFLSH) {
-                        self.lock.lock();
+                        const lock_state = self.lock.lock_irq_disable();
                         _ = self.file_buff.reset();
-                        self.lock.unlock();
+                        self.lock.unlock_irq_enable(lock_state);
                     }
                     continue;
                 }
                 if (self.term.c_lflag.ICANON) {
                     if (b == self.term.c_cc[t.VEOF] and b != 0) {
                         self._input_len = 0;
-                        self.lock.lock();
+                        const lock_state = self.lock.lock_irq_disable();
                         _ = self.file_buff.push('\n');
-                        self.lock.unlock();
+                        self.lock.unlock_irq_enable(lock_state);
                         self.read_queue.wakeUpOne();
                         continue;
                     }
@@ -1005,9 +1005,9 @@ pub const TTY = struct {
                                     self.removeAtCursor();
                                 }
                             }
-                            self.lock.lock();
+                            const lock_state = self.lock.lock_irq_disable();
                             _ = self.file_buff.unwrite(line_len);
-                            self.lock.unlock();
+                            self.lock.unlock_irq_enable(lock_state);
                             self._input_len = 0;
                         }
                         continue;
@@ -1026,9 +1026,9 @@ pub const TTY = struct {
                                 self.removeAtCursor();
                             }
                         }
-                        self.lock.lock();
+                        const lock_state = self.lock.lock_irq_disable();
                         _ = self.file_buff.unwrite(1);
-                        self.lock.unlock();
+                        self.lock.unlock_irq_enable(lock_state);
                         continue;
                     }
                     if (b == 12) { // Ctrl+L
