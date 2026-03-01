@@ -28,6 +28,7 @@ pub const DEFAULT = "\x1b[1;39m";
 
 pub const Logger = struct {
     log_level: LogLevel,
+    var log_lock: krn.Spinlock = krn.Spinlock.init();
 
     pub fn init(log_level: LogLevel) Logger {
         return Logger{
@@ -50,33 +51,22 @@ pub const Logger = struct {
             .ERROR => RED,
             .OFF => WHITE,
         };
-        if (arch.cpu.areIntEnabled()) {
-            const formatted_log = try std.fmt.allocPrint(krn.mm.kernel_allocator.allocator(),
-                "{s}[{t}]: " ++
+        var buf: [2048]u8 = undefined;
+        const formatted_log = std.fmt.bufPrint(
+            buf[0..],
+            "{s}[{t}]: " ++
                 format ++
                 DEFAULT ++
                 if (format[format.len - 1] == '\n') "" else "\n",
-                .{
-                    color,
-                    level,
-                } ++ args
-            );
-            krn.serial.print(formatted_log);
-            krn.mm.kfree(formatted_log.ptr);
-        } else {
-            var buf: [512]u8 = undefined;
-            const formatted_log = std.fmt.bufPrint(buf[0..512],
-                "{s}[{t}]: " ++
-                format ++
-                DEFAULT ++
-                if (format[format.len - 1] == '\n') "" else "\n",
-                .{
-                    color,
-                    level,
-                } ++ args
-            ) catch "";
-            krn.serial.print(formatted_log);
-        }
+            .{
+                color,
+                level,
+            } ++ args,
+        ) catch "[LOGGER]: format error\n";
+
+        const lock_state = log_lock.lock_irq_disable();
+        defer log_lock.unlock_irq_enable(lock_state);
+        krn.serial.print(formatted_log);
     }
 
     pub fn DEBUG(
