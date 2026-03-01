@@ -4,6 +4,7 @@ const tsk = krn.task;
 const registerHandler = krn.irq.registerHandler;
 const systable = @import("table.zig");
 const errors = krn.errors;
+pub const thread = @import("thread.zig");
 
 pub fn syscallsManager(state: *arch.Regs) void {
     tsk.current.regs = state.*;

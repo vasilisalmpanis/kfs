@@ -2,6 +2,7 @@ const arch = @import("arch");
 const krn = @import("../main.zig");
 const kthread = @import("../sched/kthread.zig");
 const errors = @import("error-codes.zig").PosixError;
+const UserDesc = arch.syscalls.thread.UserDesc;
 
 pub const CloneFlags = packed struct(u32) {
     sigmask:         u8 = 0,         // 0x00000000 - 0x000000ff: signal mask to be sent at exit
@@ -40,18 +41,6 @@ pub const CloneFlags = packed struct(u32) {
     pub fn isSupported(self: CloneFlags) bool {
         return @as(u32, @bitCast(self)) & ~@as(u32, @bitCast(supported)) == 0;
     }
-};
-
-const UserDesc = extern struct {
-    entry_number:       i32,
-    base_addr:          u32,
-    limit:              u32,
-    seg_32bit:          u32,
-    contents:           u32,
-    read_exec_only:     u32,
-    limit_in_pages:     u32,
-    seg_not_present:    u32,
-    useable:            u32,
 };
 
 pub fn clone(
@@ -176,7 +165,7 @@ pub fn clone(
     if (flags.SETTLS) {
         const user_desc: *const UserDesc = @ptrFromInt(tls);
         child.tls = user_desc.base_addr;
-        child.limit = if (user_desc.limit_in_pages != 0) user_desc.limit
+        child.limit = if (user_desc.bits.limit_in_pages != 0) user_desc.limit
             else 0xFFFFFFFF;
     } else {
         child.tls = krn.task.current.tls;
