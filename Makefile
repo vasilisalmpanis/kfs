@@ -1,10 +1,8 @@
 NAME = kfs.iso
 KERNEL = zig-out/bin/kfs.bin
-USERSPACE = zig-out/bin/userspace.bin
 
 ISO_DIR = iso
 SRC_DIR = src
-USERSPACE_DIR = userspace
 
 IMG 		= ext2.img
 IMG_DIR		= ext2_dir
@@ -26,7 +24,6 @@ ifeq ($(shell uname -s),Darwin)
 endif
 
 SRC = $(shell find $(SRC_DIR) -name '*.zig')
-USERSPACE_SRC = $(shell find $(USERSPACE_DIR) -name '*.zig')
 ASM_SRC = $(shell find $(SRC_DIR) -name '*.s')
 GRUB_CFG = $(ISO_DIR)/boot/grub/grub.cfg
 QEMU = qemu-system-i386
@@ -49,9 +46,6 @@ $(NAME): $(KERNEL) $(GRUB_CFG)
 	cp $(KERNEL) $(ISO_DIR)/boot/
 	$(MKRESCUE) --compress=xz -o $(NAME) $(ISO_DIR)
 
-$(USERSPACE): $(USERSPACE_SRC)
-	zig build userspace.bin
-
 $(KERNEL): $(SRC) $(ASM_SRC)
 	zig build -freference-trace=20 # -Doptimize=ReleaseSafe
 
@@ -68,6 +62,7 @@ qemu: $(NAME) $(IMG)
 	$(QEMU) $(KVM) \
 		-cdrom $(NAME) \
 		-serial stdio \
+		-serial pty \
 		-m 4G \
 		-drive file=$(IMG),format=raw \
 		-drive file=$(GPT_DISK),format=raw
@@ -101,12 +96,11 @@ $(IMG): $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:=.o)) \
 		$(IMG) \
 		$(IMG_SIZE)
 
-$(IMG_DIR): $(USERSPACE) $(FILESYSTEM_TAR)
+$(IMG_DIR): $(FILESYSTEM_TAR)
 	$(shell [ ! -d $(IMG_DIR) ] && \
 		tar -xf $(FILESYSTEM_TAR) \
 	)
 	touch $(IMG_DIR)
-# 	cp $(USERSPACE) $(IMG_DIR)/bin/init
 
 $(FILESYSTEM_TAR):
 	wget $(FILESYSTEM_TAR_LINK)
