@@ -600,6 +600,16 @@ pub const arch = struct {
     };
 
     pub const syscalls = struct {
+        pub const thread = struct {
+            pub const UserDesc = extern struct {
+                entry_number : i32,
+                base_addr : u32,
+                limit : u32,
+                bits : std.syscalls.thread.UserDescBits,
+            };
+
+        };
+
     };
 
 };
@@ -1901,7 +1911,7 @@ pub const drivers = struct {
                 term : std.platform.termios.Termios,
                 winsz : std.platform.tty_struct.WinSize,
                 file_buff : kernel.ringbuf.RingBuf,
-                lock : kernel.Mutex,
+                lock : kernel.Spinlock,
                 nonblock : bool= false,
                 read_queue : kernel.wq.WaitQueueHead,
                 session_id : i32= 1,
