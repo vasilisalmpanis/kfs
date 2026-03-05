@@ -171,8 +171,8 @@ pub const FreeList = struct {
 
     pub fn free(self: *FreeList, addr: usize) void {
         var prev: ?*FreeListNode = undefined;
-        const lock_state = self.mtx.lock_irq_disable();
-        defer self.mtx.unlock_irq_enable(lock_state);
+        const lock_state = krn.mm.mem_lock.lock_irq_disable();
+        defer krn.mm.mem_lock.unlock_irq_enable(lock_state);
         const header: ?*AllocHeader = self.getAllocHeader(addr);
         if (header == null)
             return;
@@ -211,8 +211,8 @@ pub const FreeList = struct {
         // Total size of the block to allocate (including header)
         const total_size = self.alignToPtr(size + @sizeOf(AllocHeader));
 
-        const lock_state = self.mtx.lock_irq_disable();
-        defer self.mtx.unlock_irq_enable(lock_state);
+        const lock_state = krn.mm.mem_lock.lock_irq_disable();
+        defer krn.mm.mem_lock.unlock_irq_enable(lock_state);
         // Try to find existing block (first fit)
         var buffer = self.head;
         var prev = self.head;

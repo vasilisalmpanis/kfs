@@ -109,6 +109,7 @@ pub const FrameBuffer = struct {
             var addr: usize = @truncate(tag.addr);
             const offset = addr & 0xFFF;
             addr &= ~@as(usize, 0xFFF);
+            const lock_state = krn.mm.mem_lock.lock_irq_disable();
             var virt_addr: usize = mm.virt_memory_manager.findFreeSpace(
                 num_pages,
                 mm.PAGE_OFFSET,
@@ -125,6 +126,7 @@ pub const FrameBuffer = struct {
                 virt_addr += mm.PAGE_SIZE;
                 addr += mm.PAGE_SIZE;
             }
+            krn.mm.mem_lock.unlock_irq_enable(lock_state);
 
             // Precompute all frequently used values
             const cell_w: usize = font.width;

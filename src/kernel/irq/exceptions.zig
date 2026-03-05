@@ -188,6 +188,7 @@ pub fn hGeneralProtectionFault(regs: *Regs) *Regs {
 }
 
 pub fn hPageFault(regs: *Regs) *Regs {
+    kernel.serial.print("========PAGE FAULT========\n");
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
