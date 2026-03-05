@@ -44,6 +44,8 @@ pub fn physToVirt(comptime T: type, addr: *T) *T {
     return @ptrFromInt(@intFromPtr(addr) + PAGE_OFFSET);
 }
 
+pub var mem_lock = krn.Spinlock.init();
+
 pub var base: usize = undefined;
 pub var mem_size: u64 = 0;
 

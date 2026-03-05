@@ -86,6 +86,7 @@ pub const VMA = struct {
     pub fn allocatePages(self: *VMA, start: usize, end: usize) !void {
         const num_of_pages = (end - start) / arch.PAGE_SIZE;
         for (0..num_of_pages) |index| {
+            const lock_state = krn.mm.mem_lock.lock_irq_disable();
             const page: usize = krn.mm.virt_memory_manager.pmm.allocPage();
             if (page == 0) {
                 for (0..index) |idx| {
@@ -103,6 +104,7 @@ pub const VMA = struct {
                 page,
                 flags
             );
+            krn.mm.mem_lock.unlock_irq_enable(lock_state);
             const page_buf: [*]usize = @ptrFromInt(virt_addr);
             @memset(page_buf[0..1024], 0);
         }

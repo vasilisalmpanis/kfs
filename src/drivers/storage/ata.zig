@@ -254,6 +254,7 @@ pub const ATADrive = struct {
     }
 
     fn initDMA(self: *ATADrive) void {
+        const lock_state = kernel.mm.mem_lock.lock_irq_disable();
         const phys = kernel.mm.virt_memory_manager.pmm.allocPages(DMA_BUFFER_PAGES + 1);
         const buff_phys: u32 = @intCast(phys + kernel.mm.PAGE_SIZE);
 
@@ -282,6 +283,7 @@ pub const ATADrive = struct {
             );
             @memset(@as([*]u8, @ptrFromInt(vrt))[0..4096], 0);
         }
+        kernel.mm.mem_lock.unlock_irq_enable(lock_state);
 
         self.prdt_phys = phys;
         self.prdt_virt = virt;

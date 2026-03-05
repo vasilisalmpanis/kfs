@@ -22,10 +22,8 @@ fn threadWrapper() callconv(.c) noreturn {
 }
 
 pub fn kthreadStackAlloc(num_of_pages: usize) usize {
-    const int_state = arch.cpu.areIntEnabled();
-    if (int_state)
-        arch.cpu.disableInterrupts();
-    defer if (int_state) arch.cpu.enableInterrupts();
+    const lock_state = krn.mm.mem_lock.lock_irq_disable();
+    defer krn.mm.mem_lock.unlock_irq_enable(lock_state);
 
     const stack: usize = mm.virt_memory_manager.findFreeSpace(
         num_of_pages,
@@ -53,10 +51,8 @@ pub fn kthreadStackAlloc(num_of_pages: usize) usize {
 }
 
 pub fn kthreadStackFree(addr: usize) void {
-    const int_state = arch.cpu.areIntEnabled();
-    if (int_state)
-        arch.cpu.disableInterrupts();
-    defer if (int_state) arch.cpu.enableInterrupts();
+    const lock_state = krn.mm.mem_lock.lock_irq_disable();
+    defer krn.mm.mem_lock.unlock_irq_enable(lock_state);
 
     var page: usize = addr - PAGE_SIZE; // RO page
     mm.virt_memory_manager.unmapPage(page, true);
