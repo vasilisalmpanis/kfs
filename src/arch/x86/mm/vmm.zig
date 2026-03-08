@@ -232,7 +232,9 @@ pub const VMM = struct {
             pd[pd_idx] = pt_pfn | @as(u12, @bitCast(flags)) | PAGE_WRITE;
             pt = @ptrCast(first_page_table);
             pt += (0x400 * pd_idx);
+            invalidatePage(@intFromPtr(pt));
             @memset(pt[0..1024], 0); // sets the whole PT to 0.
+            invalidatePage(@intFromPtr(pt));
         }
         pt = @ptrCast(first_page_table);
         pt += (0x400 * pd_idx);
@@ -393,6 +395,7 @@ pub const VMM = struct {
             }
             pt_start_idx = 0;
             pd[temp_idx] = 0;
+            invalidatePage(self.pageTableToAddr(temp_idx, 0));
         }
     }
 
@@ -407,7 +410,7 @@ pub const VMM = struct {
         // Calculate page-aligned boundaries for exclusive end
         // end is exclusive, so we need the last page that should be freed
         const last_addr = if (end > 0) end - 1 else 0;
-        
+
         const pd_start_idx: u32 = start >> 22;
         const pd_end_idx: u32 = last_addr >> 22;
 
@@ -454,5 +457,6 @@ pub const VMM = struct {
 
             pt_start_idx = 0;
         }
+        switchToVAS(krn.task.current.mm.?.vas);
     }
 };

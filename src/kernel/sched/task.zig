@@ -9,7 +9,6 @@ const Regs = @import("arch").Regs;
 const currentMs = @import("../time/jiffies.zig").currentMs;
 const reschedule = @import("./scheduler.zig").reschedule;
 const printf = @import("debug").printf;
-const mutex = @import("./mutex.zig").Mutex;
 const signal = @import("./signals.zig");
 const ThreadHandler = @import("./kthread.zig").ThreadHandler;
 const mm = @import("../mm/init.zig");

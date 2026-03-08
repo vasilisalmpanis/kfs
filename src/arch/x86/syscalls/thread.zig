@@ -4,16 +4,22 @@ const errors = krn.errors.PosixError;
 const arch = @import("../main.zig");
 const std = @import("std");
 
-const UserDesc = extern struct{
+const UserDescBits = packed struct(u8) {
+    seg_32bit: u1,
+    contents: u2,
+    read_exec_only: u1,
+    limit_in_pages: u1,
+    seg_not_present: u1,
+    useable: u1,
+    lm: u1,
+};
+
+// See https://elixir.bootlin.com/linux/v6.19.3/source/arch/x86/include/uapi/asm/ldt.h#L21
+pub const UserDesc = extern struct{
     entry_number: i32,
     base_addr: u32,
     limit: u32,
-    seg_32bit: u32,
-    contents: u32,
-    read_exec_only: u32,
-    limit_in_pages: u32,
-    seg_not_present: u32,
-    useable: u32,
+    bits: UserDescBits,
 };
 
 pub fn modify_ldt(func: u32, ptr: *UserDesc, size: u32) !u32 {
@@ -35,7 +41,7 @@ pub fn set_thread_area(ptr: *UserDesc) !u32 {
         return errors.EINVAL;
     }
 
-    const limit: u32 = if (ptr.limit_in_pages != 0)
+    const limit: u32 = if (ptr.bits.limit_in_pages != 0)
         ptr.limit
     else 0xFFFFFFFF;
 

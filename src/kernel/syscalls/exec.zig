@@ -124,7 +124,14 @@ pub fn doExecve(
     var read: usize = 0;
     krn.logger.INFO("Executing {s} {d}\n", .{filename, file.inode.size});
     while (read < file.inode.size) {
-        read += try file.ops.read(file, @ptrCast(&slice[read]), slice.len);
+        const single = try file.ops.read(
+            file,
+            @ptrCast(&slice[read]),
+            slice.len - read,
+        );
+        if (single == 0)
+            break;
+        read += single;
     }
 
     switch (getFileType(slice)) {
