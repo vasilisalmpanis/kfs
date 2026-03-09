@@ -26,6 +26,8 @@ pub const CYAN = "\x1b[1;36m";
 pub const WHITE = "\x1b[1;37m";
 pub const DEFAULT = "\x1b[1;39m";
 
+var buf: [4096]u8 = undefined;
+
 pub const Logger = struct {
     log_level: LogLevel,
     var log_lock: krn.Spinlock = krn.Spinlock.init();
@@ -51,7 +53,6 @@ pub const Logger = struct {
             .ERROR => RED,
             .OFF => WHITE,
         };
-        var buf: [2048]u8 = undefined;
         const formatted_log = std.fmt.bufPrint(
             buf[0..],
             "{s}[{t}]: " ++

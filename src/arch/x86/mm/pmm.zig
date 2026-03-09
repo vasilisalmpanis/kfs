@@ -28,6 +28,7 @@ pub const PMM = struct {
     size: u64, // might be incorrect after occupying for system.
     begin: u32,
     end: u32,
+    used_pages: u32,
 
     pub fn init(begin: u32, size: u64) PMM {
         const pageCount: usize = @intCast(size / PAGE_SIZE);
@@ -37,6 +38,7 @@ pub const PMM = struct {
             .size = size,
             .index = 0,
             .end = 0,
+            .used_pages = 0,
         };
         const memory_end = begin + size;
         var ph_addr = ((begin + pageCount * @sizeOf(usize)) & 0xfffff000) + PAGE_SIZE;
@@ -60,12 +62,14 @@ pub const PMM = struct {
         while (curr_pos >= 0 and self.free_area[self.index] != 0) {
             cont_size = 0;
             idx = curr_pos;
-            if (curr_pos < num)
+            if (curr_pos < num) {
                 return ret_addr;
+            }
             while (idx >= 0 and self.free_area[idx] != 0 and cont_size < num) {
                 cont_size += 1;
                 if (idx == 0) {
                     if (cont_size == num) {
+                        self.used_pages += num;
                         ret_addr = self.free_area[idx];
                         @memset(self.free_area[idx..curr_pos + 1], 0);
                         while(self.index > 0 and self.free_area[self.index] == 0) : (self.index -= 1) {}
@@ -76,13 +80,14 @@ pub const PMM = struct {
                 idx -= 1;
             }
             if (cont_size == num) {
+                self.used_pages += num;
                 ret_addr = self.free_area[idx + 1];
                 @memset(self.free_area[idx + 1..curr_pos + 1], 0);
                 while(self.index > 0 and self.free_area[self.index] == 0) : (self.index -= 1) {}
                 return ret_addr;
             }
             curr_pos = idx;
-            while(curr_pos > 0 and self.free_area[curr_pos] == 0) : (curr_pos -= 1) {} 
+            while(curr_pos > 0 and self.free_area[curr_pos] == 0) : (curr_pos -= 1) {}
         }
         return ret_addr;
     }
@@ -93,6 +98,8 @@ pub const PMM = struct {
     ///     physical address : u32
     pub fn allocPage(self: *PMM) u32 {
         const pf_addr = self.free_area[self.index];
+        if (pf_addr > 0)
+            self.used_pages += 1;
         self.free_area[self.index] = 0;
         while(self.index > 0 and self.free_area[self.index] == 0) : (self.index -= 1) {}
         return pf_addr;
@@ -116,8 +123,9 @@ pub const PMM = struct {
         // array and mark the physical address as free.
         const index: u32 = (pfn - self.begin) / PAGE_SIZE;
         self.free_area[index] = pfn;
+        self.used_pages -= 1;
         if (index > self.index)
-            self.index =index;
+            self.index = index;
     }
 };
 // TODO Map memory for the kernel to use in the PMM

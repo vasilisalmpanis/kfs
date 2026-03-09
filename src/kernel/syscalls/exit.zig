@@ -11,6 +11,10 @@ pub fn doExit(error_code: i32) !u32 {
 
     tsk.current.result = error_code;
 
+    kernel.fs.procfs.deleteProcess(kernel.task.current);
+    while (kernel.task.current.refcount.getValue() > 1)
+        arch.archReschedule();
+
     const lock_state = kernel.task.tasks_lock.lock_irq_disable();
     if (tsk.current.tree.parent) |p| {
         const parent = p.entry(tsk.Task, "tree");

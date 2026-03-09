@@ -458,6 +458,23 @@ pub const MM = struct {
         if (self == &init_mm)
             return ;
 
+        // TODO: use proper locking to avoid race conditions.
+        self.stack_bottom = 0;
+        self.stack_top = 0;
+        self.stack_top = 0;
+        self.stack_bottom = 0;
+        self.bss = 0;
+        self.code = 0;
+        self.data = 0;
+        self.heap = 0;
+        self.brk_start = 0;
+        self.brk = 0;
+        self.argc = 0;
+        self.arg_start = 0;
+        self.arg_end = 0;
+        self.env_start = 0;
+        self.env_end = 0;
+
         if (self.vmas) |head| {
             while (!head.list.isEmpty()) {
                 const vma: *VMA = head.list.next.?.entry(VMA, "list");

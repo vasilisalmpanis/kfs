@@ -126,6 +126,8 @@ fn cmdline_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
     };
     const mm = task.mm orelse
         return 0;
+    if (mm.arg_start == 0)
+        return 0;
     const args = try mm.accessTaskVM(mm.arg_start, mm.arg_end - mm.arg_start);
     defer kernel.mm.kfree(args.ptr);
 

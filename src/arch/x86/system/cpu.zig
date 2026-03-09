@@ -143,11 +143,11 @@ pub inline fn archReschedule() void {
         \\ pushf
         \\ pop %%eax            # Pop into EAX
         \\ test $0x200, %%eax   # Test bit 9 (IF)
-        \\ jz return_point      # Jump if interrupts are disabled
+        \\ jz 1f      # Jump if interrupts are disabled
         \\ pushf
         \\ cli
         \\ push %[code_seg]     # CS (kernel code segment)
-        \\ push $return_point
+        \\ push $1f
         \\ push $0
         \\ push $16
         \\ pusha
@@ -173,7 +173,7 @@ pub inline fn archReschedule() void {
         \\ popa
         \\ add $8, %%esp
         \\ iret
-        \\ return_point:
+        \\ 1:
         \\ nop
         \\
         :

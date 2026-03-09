@@ -50,7 +50,7 @@ fn countFreePages() usize {
 
 fn meminfo_open(file: *krn.fs.File, _: *krn.fs.Inode) !void {
     const total_kb: usize = @intCast(krn.mm.mem_size / 1024);
-    const free_kb: usize = (countFreePages() * krn.mm.PAGE_SIZE) / 1024;
+    const free_kb: usize = (total_kb - (krn.mm.virt_memory_manager.pmm.used_pages * krn.mm.PAGE_SIZE / 1024));
     const avail_kb: usize = free_kb;
 
     const meminfo_format: []const u8 =
