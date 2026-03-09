@@ -194,9 +194,9 @@ pub const FreeList = struct {
         while (
             @intFromPtr(current) < @intFromPtr(new_node)
         ) : (current = current.?.next) {
-            if (@intFromPtr(new_node) < @intFromPtr(current.?.next))
-                return self.insertNewFreeNode(new_node, current.?, prev);
             if (current.?.next == null)
+                return self.insertNewFreeNode(new_node, current.?, prev);
+            if (@intFromPtr(new_node) < @intFromPtr(current.?.next))
                 return self.insertNewFreeNode(new_node, current.?, prev);
             prev = current;
         }

@@ -317,6 +317,7 @@ pub const arch = struct {
             size : u64,
             begin : u32,
             end : u32,
+            used_pages : u32,
         };
 
     };
