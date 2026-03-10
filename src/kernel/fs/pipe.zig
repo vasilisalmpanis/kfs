@@ -50,6 +50,8 @@ pub fn close(base: *krn.fs.File) void {
     krn.logger.INFO("pipe close", .{});
     const pipe = base.inode.data.pipe
         orelse return ;
+    pipe.lock.lock();
+    defer pipe.lock.unlock();
     if ((base.flags & krn.fs.file.O_ACCMODE) == krn.fs.file.O_WRONLY) {
         pipe.writers -|= 1;
         if (pipe.writers == 0)
