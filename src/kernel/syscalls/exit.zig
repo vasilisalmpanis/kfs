@@ -15,6 +15,7 @@ pub fn doExit(error_code: i32) !u32 {
     while (kernel.task.current.refcount.getValue() > 1)
         arch.archReschedule();
 
+    tsk.current.deinitAllocatedData();
     const lock_state = kernel.task.tasks_lock.lock_irq_disable();
     if (tsk.current.tree.parent) |p| {
         const parent = p.entry(tsk.Task, "tree");
@@ -28,7 +29,6 @@ pub fn doExit(error_code: i32) !u32 {
         if (act.handler.handler != signals.sigIGN)
             parent.sighand.setSignal(.SIGCHLD);
     }
-    tsk.current.deinitAllocatedData();
     kernel.task.tasks_lock.unlock_irq_enable(lock_state);
     sched.reschedule();
     return 0;
