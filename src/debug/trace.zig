@@ -15,7 +15,7 @@ const StackFrame = struct {
     }
 };
 
-/// Print the currect stack frames up to a maxFrame 
+/// Print the currect stack frames up to a maxFrame
 /// number specified as argument. Save the current
 /// register stake and print it.
 /// @param maxFrames: maximum amount of frames to trace.
@@ -26,7 +26,7 @@ pub inline fn traceStackTrace(maxFrames : u32 ) void {
     // unwind the stack
     while (frame < maxFrames and stk != null) : (frame += 1) {
         if (stk != null) {
-            krn.logger.INFO("  0x{x}: {s}\n", .{
+            krn.logger.ERROR("  0x{x}: {s}\n", .{
                 stk.?.eip,
                 if(lookupSymbol(stk.?.eip)) |sym| sym else "?"
             });

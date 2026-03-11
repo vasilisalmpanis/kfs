@@ -69,6 +69,8 @@ pub fn doFork() !u32 {
     child_regs.eax = 0;
     child.tls = krn.task.current.tls;
     child.limit = krn.task.current.limit;
+    child.assignPID();
+    try procfs.newProcess(child);
     child.initSelf(
         stack_top,
         stack,
@@ -86,6 +88,5 @@ pub fn doFork() !u32 {
     child.fpu_state = child_fpu_state;
     child.fpu_used = child_fpu_used;
     child.save_fpu_state = false;
-    try procfs.newProcess(child);
     return @intCast(child.pid);
 }
