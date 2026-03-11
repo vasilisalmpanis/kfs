@@ -783,6 +783,11 @@ pub const kernel = struct {
     };
 
     pub const wq = struct {
+        pub const WaitQueueNode = struct {
+            task : *kernel.task.Task,
+            list : kernel.list.ListHead,
+        };
+
         pub const WaitQueueHead = struct {
             list : kernel.list.ListHead,
             lock : kernel.Spinlock,
