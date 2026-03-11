@@ -172,6 +172,8 @@ pub fn clone(
         child.limit = krn.task.current.limit;
     }
 
+    child.assignPID();
+    try krn.fs.procfs.newProcess(child);
     child.initSelf(
         stack_top,
         stack,
@@ -199,8 +201,6 @@ pub fn clone(
             ctid.* = child.pid;
         }
     }
-
-    try krn.fs.procfs.newProcess(child);
     return @intCast(child.pid);
 }
 

@@ -169,9 +169,8 @@ pub const Task = struct {
     }
 
     pub fn setup(self: *Task, virt: usize, task_stack_top: usize, task_stack_bottom: usize, name: []const u8) void {
-        self.pid = pid;
+        self.assignPID();
         self.uid = 0;
-        pid += 1;
         self.regs.setStackPointer(task_stack_top);
         self.stack_bottom = task_stack_bottom;
         self.list.setup();
@@ -206,6 +205,7 @@ pub const Task = struct {
     ) anyerror!*Task {
         if (krn.mm.kmalloc(Task)) |task| {
             errdefer krn.mm.kfree(task);
+            task.assignPID();
             try task.initSelf(task_stack_top, stack_btm, uid, gid, pgid, tp, name);
             return task;
         }
@@ -253,8 +253,6 @@ pub const Task = struct {
         self.list = lst.ListHead.init();
         self.regs.setStackPointer(task_stack_top);
         self.stack_bottom = stack_btm;
-        self.pid = pid;
-        pid += 1;
         self.list.setup();
         self.tree.setup();
 
@@ -284,6 +282,11 @@ pub const Task = struct {
     pub fn delFromTree(self: *Task) void {
         // self.zombifyChildren();
         self.tree.del();
+    }
+
+    pub fn assignPID(self: *Task) void{
+        self.pid = pid;
+        pid += 1;
     }
 
     pub fn findByPid(self: *Task, task_pid: u32) ?*Task {
