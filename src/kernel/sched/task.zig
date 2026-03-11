@@ -362,8 +362,7 @@ pub const Task = struct {
         self.files.deinit();
         self.fs.deinit();
         if (self.mm) |_mm| {
-            _mm.delete();
-            self.mm = null;
+            _mm.releaseMappings();
         }
         if (self.fpu_state) |state| {
             self.fpu_used = false;
