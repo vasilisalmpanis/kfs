@@ -80,8 +80,12 @@ pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     while (pipe.rb.isEmpty()) {
         if (pipe.writers == 0)
             return 0;
+        var wq_node = krn.wq.WaitQueueNode.init(krn.task.current);
+        wq_node.setup();
+
+        pipe.read_queue.addToQueue(&wq_node);
         pipe.lock.unlock();
-        pipe.read_queue.wait(true, 0);
+        pipe.read_queue.waitIfInQueue(&wq_node, true, 0);
         pipe.lock.lock();
     }
 
@@ -93,6 +97,8 @@ pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
 pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     const pipe = base.inode.data.pipe
         orelse return krn.errors.PosixError.EFAULT;
+    pipe.lock.lock();
+    defer pipe.lock.unlock();
     if (pipe.readers == 0) {
         _ = try krn.kill(
             @intCast(krn.task.current.pid),
@@ -100,12 +106,14 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
         );
         return krn.errors.PosixError.EPIPE;
     }
-    pipe.lock.lock();
-    defer pipe.lock.unlock();
-    
+
     while (pipe.rb.isFull()) {
+        var wq_node = krn.wq.WaitQueueNode.init(krn.task.current);
+        wq_node.setup();
+
+        pipe.write_queue.addToQueue(&wq_node);
         pipe.lock.unlock();
-        pipe.write_queue.wait(true, 0);
+        pipe.write_queue.waitIfInQueue(&wq_node, true, 0);
         pipe.lock.lock();
         if (pipe.readers == 0) {
             _ = try krn.kill(

@@ -2,7 +2,7 @@ const krn = @import("../main.zig");
 const lst = @import("./list.zig");
 const arch = @import("arch");
 
-const WaitQueueNode = struct {
+pub const WaitQueueNode = struct {
     task: *krn.task.Task,
     list: lst.ListHead,
 
@@ -70,6 +70,50 @@ pub const WaitQueueHead = struct {
         self.lock.unlock_irq_enable(lock_state);
     }
 
+    pub fn addToQueue(
+        self: *WaitQueueHead,
+        node: *WaitQueueNode,
+    ) void{
+        const lock_state = self.lock.lock_irq_disable();
+
+        self.list.addTail(&node.list);
+
+        self.lock.unlock_irq_enable(lock_state);
+    }
+
+    pub fn waitIfInQueue(
+        self: *WaitQueueHead,
+        node: *WaitQueueNode,
+        interruptable: bool,
+        timeout: u32
+    ) void{
+        var lock_state = self.lock.lock_irq_disable();
+        if (node.list.isEmpty()) {
+            self.lock.unlock_irq_enable(lock_state);
+            return;
+        }
+
+        if (timeout != 0) {
+            node.task.wakeup_time = krn.currentMs() + timeout;
+        } else {
+            node.task.wakeup_time = 0;
+        }
+        if (interruptable) {
+            node.task.state = .INTERRUPTIBLE_SLEEP;
+        } else {
+            node.task.state = .UNINTERRUPTIBLE_SLEEP;
+        }
+        self.lock.unlock_irq_enable(lock_state);
+
+        krn.sched.reschedule();
+
+        lock_state = self.lock.lock_irq_disable();
+        if (!node.list.isEmpty()) {
+            node.list.del();
+        }
+        self.lock.unlock_irq_enable(lock_state);
+    }
+
     pub fn wakeUpOne(self: *WaitQueueHead) void {
         const lock_state = self.lock.lock_irq_disable();
         defer self.lock.unlock_irq_enable(lock_state);
@@ -77,7 +121,9 @@ pub const WaitQueueHead = struct {
         if (self.list.isEmpty())
             return;
         const first_node = self.list.next.?.entry(WaitQueueNode, "list");
-        self.list.next.?.del();
+        const node = self.list.next.?;
+        node.del();
+        node.setup();
         if (first_node.task.state != .STOPPED and first_node.task.state != .ZOMBIE)
             first_node.task.state = .RUNNING;
     }
@@ -88,7 +134,8 @@ pub const WaitQueueHead = struct {
 
         while (!self.list.isEmpty()) {
             const curr_node = self.list.next.?.entry(WaitQueueNode, "list");
-            self.list.next.?.del();
+            curr_node.list.del();
+            curr_node.list.setup();
             if (curr_node.task.state != .STOPPED and curr_node.task.state != .ZOMBIE)
                 curr_node.task.state = .RUNNING;
         }
