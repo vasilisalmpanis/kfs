@@ -17,6 +17,7 @@ pub fn doExit(error_code: i32) !u32 {
 
     tsk.current.deinitAllocatedData();
     const lock_state = kernel.task.tasks_lock.lock_irq_disable();
+
     if (tsk.current.tree.parent) |p| {
         const parent = p.entry(tsk.Task, "tree");
         const act = parent.sighand.actions.get(.SIGCHLD);

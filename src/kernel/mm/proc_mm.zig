@@ -448,9 +448,14 @@ pub const MM = struct {
     pub fn delete(self: *MM) void {
         if (self == &init_mm)
             return ;
-        self.releaseMappings();
-        if (self.vas != 0)
+
+        if (self.vas != 0) {
+            arch.vmm.switchToVAS(self.vas);
             mm.virt_memory_manager.deleteVASTables(self.vas);
+            arch.vmm.switchToVAS(krn.task.current.mm.?.vas);
+            krn.mm.virt_memory_manager.pmm.freePage(self.vas);
+            self.vas = 0;
+        }
         krn.mm.kfree(self);
     }
 

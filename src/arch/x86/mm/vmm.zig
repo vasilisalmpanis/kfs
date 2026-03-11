@@ -313,7 +313,6 @@ pub const VMM = struct {
             }
         }
         self.unmapPage(pair.virt, false);
-        self.pmm.freePage(vas);
     }
 
     pub fn dupPage(self: *VMM, old_pt: [*]u32, new_pt: [*]u32, pd_idx:u32, pt_idx: u32) !void {
