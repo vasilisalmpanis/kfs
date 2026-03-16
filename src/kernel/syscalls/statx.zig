@@ -134,6 +134,8 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
             return errors.EFAULT;
         }
         if (krn.task.current.files.fds.get(@intCast(dirfd))) |file| {
+            file.ref.ref();
+            defer file.ref.unref();
             return try do_statx(file.inode, statxbuf.?);
         }
         return errors.EBADF;
@@ -144,6 +146,8 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
         if (dirfd == fs.AT_FDCWD) {
 
         } else if (krn.task.current.files.fds.get(@intCast(dirfd))) |file| {
+            file.ref.ref();
+            defer file.ref.unref();
             if (!file.inode.mode.isDir())
                 return errors.ENOTDIR;
             if (file.path == null)

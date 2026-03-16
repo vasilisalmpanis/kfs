@@ -23,6 +23,8 @@ pub fn do_chown(
     } else {
         from.release();
         if (kernel.task.current.files.fds.get(@intCast(fd))) |file| {
+            file.ref.ref();
+            defer file.ref.unref();
             if (file.path) |_path| {
                 from = _path.clone();
             }
@@ -72,6 +74,8 @@ pub fn fchownat(
 
 pub fn fchown32(fd: u32, uid: u32, gid: u32) !u32 {
     if (kernel.task.current.files.fds.get(fd)) |file| {
+        file.ref.ref();
+        defer file.ref.unref();
         if (file.inode.ops.setattr) |_setattr| {
             const attr = fs.InodeAttrs{
                 .uid = uid,

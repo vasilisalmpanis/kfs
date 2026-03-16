@@ -150,6 +150,8 @@ pub fn openat(
             mode
         );
     } else if (kernel.task.current.files.fds.get(@intCast(dirfd))) |dir| {
+        dir.ref.ref();
+        defer dir.ref.unref();
         if (!dir.inode.mode.isDir())
             return errors.ENOTDIR;
         if (dir.path == null)

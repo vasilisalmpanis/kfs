@@ -29,6 +29,8 @@ pub fn poll(user_fds: ?[*]PollFd, nfds: u32, timeout_ms: i32) !u32 {
             continue ;
         }
         if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
+            file.ref.ref();
+            defer file.ref.unref();
             if (file.ops.poll) |_poll| {
                 fd_count += try _poll(file, &user_fds.?[i]);
             } else {
@@ -118,7 +120,8 @@ fn pollOneFd(
 ) ?PollRes {
     const file = krn.task.current.files.fds.get(@intCast(fd))
         orelse return null;
-
+    file.ref.ref();
+    defer file.ref.unref();
     var events: u16 = 0;
     if (check_read)
         events |= POLLIN;
