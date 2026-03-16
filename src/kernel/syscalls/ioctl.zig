@@ -11,6 +11,8 @@ pub fn ioctl(fd: u32, op: u32, args: u32) !u32 {
         .{fd, op, args}
     );
     if (krn.task.current.files.fds.get(fd)) |file| {
+        file.ref.ref();
+        defer file.ref.unref();
         if (file.ops.ioctl) |_ioctl| {
             return try _ioctl(file, op, args);
         }

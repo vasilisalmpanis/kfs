@@ -6,6 +6,8 @@ const krn = @import("../main.zig");
 pub fn read(fd: u32, buf: u32, size: u32) !u32 {
     const data: [*]u8 = @ptrFromInt(buf);
     if (krn.task.current.files.fds.get(fd)) |file| {
+        file.ref.ref();
+        defer file.ref.unref();
         if (file.inode.mode.isDir()) {
             return errors.EISDIR;
         }
@@ -18,6 +20,8 @@ pub fn read(fd: u32, buf: u32, size: u32) !u32 {
 
 pub fn pread(fd: u32, buf: [*]u8, size: u32, offset: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
+        file.ref.ref();
+        defer file.ref.unref();
         if (file.inode.mode.isDir()) {
             return errors.EISDIR;
         }
@@ -56,6 +60,8 @@ pub fn readv(fd: u32, iov: [*]IoVec, iovcnt: u32) !u32 {
 
 pub fn preadv(fd: u32, iov: [*]IoVec, iovcnt: u32, offset: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
+        file.ref.ref();
+        defer file.ref.unref();
         const old_pos = file.pos;
         file.pos = offset;
         defer file.pos = old_pos;

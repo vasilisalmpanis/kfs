@@ -16,6 +16,8 @@ fn resolveat(dirfd: i32, path: []const u8, name: *[]const u8) !kernel.fs.path.Pa
     } else if (dirfd == fs.AT_FDCWD) {
     } else {
         if (kernel.task.current.files.fds.get(@intCast(dirfd))) |dir| {
+            dir.ref.ref();
+            defer dir.ref.unref();
             if (!dir.inode.mode.isDir())
                 return errors.ENOTDIR;
             if (dir.path == null)

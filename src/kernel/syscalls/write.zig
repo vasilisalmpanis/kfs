@@ -6,6 +6,8 @@ const krn = @import("../main.zig");
 pub fn write(fd: u32, buf: u32, size: u32) !u32 {
     const data: [*]u8 = @ptrFromInt(buf);
     if (krn.task.current.files.fds.get(fd)) |file| {
+        file.ref.ref();
+        defer file.ref.unref();
         if (!file.canWrite())
             return errors.PosixError.EACCES;
         if (file.flags & krn.fs.file.O_APPEND != 0) {

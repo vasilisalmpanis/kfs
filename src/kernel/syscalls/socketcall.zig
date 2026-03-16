@@ -120,6 +120,8 @@ pub fn recvfrom(
     if (fd < 0)
         return errors.EBADF;
     if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
+        file.ref.ref();
+        defer file.ref.unref();
         return try krn.socket.do_recvfrom(file, @ptrCast(ubuff), size);
     } else {
         return errors.EBADF;
@@ -140,6 +142,8 @@ pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, add
     if (fd < 0)
         return errors.EBADF;
     if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
+        file.ref.ref();
+        defer file.ref.unref();
         return try krn.socket.do_sendto(file, @ptrCast(buff), len);
     } else {
         return errors.EBADF;

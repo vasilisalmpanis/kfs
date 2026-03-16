@@ -44,6 +44,7 @@ pub fn statfs64(path: ?[*:0]const u8, size: u32, buf: ?*Statfs64) !u32 {
         return errors.EINVAL;
     const _path: []const u8 = std.mem.span(path.?);
     const resolved = try fs.path.resolve(_path);
+    defer resolved.release();
     if (resolved.dentry.sb.ops.statfs) |statfs| {
         const stat = try statfs(resolved.dentry.sb);
         buf.?.* = Statfs64.fromStatfs(stat);

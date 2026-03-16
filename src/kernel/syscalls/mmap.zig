@@ -55,6 +55,8 @@ pub fn mmap2(
 
     if (!flags.ANONYMOUS and fd >= 0) {
         if (krn.task.current.files.fds.get(@intCast(fd))) |_file| {
+            _file.ref.ref();
+            defer _file.ref.unref();
             if (!_file.inode.mode.isReg())
                 return errors.EACCES;
             if (!_file.mode.canRead(_file.inode.uid, _file.inode.gid))

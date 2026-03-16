@@ -14,6 +14,7 @@ pub fn mknod(
     var name: []const u8 = undefined;
     const path = std.mem.span(pathname);
     const parent_dir = try fs.path.dir_resolve(path, &name);
+    defer parent_dir.release();
     if (!parent_dir.dentry.inode.mode.isDir()) {
         return errors.ENOENT;
     }
