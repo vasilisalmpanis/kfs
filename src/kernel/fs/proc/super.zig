@@ -4,6 +4,7 @@ const ProcInode = @import("inode.zig").ProcInode;
 const std = @import("std");
 const device = @import("drivers").device;
 const filesystem = @import("filesystem.zig");
+const arch = @import("arch");
 
 const PROCFS_MAGIC = 0x9fa0;
 
@@ -35,12 +36,16 @@ pub const ProcSuper = struct {
         proc_super.base.list.setup();
         proc_super.base.ref = kernel.task.RefCount.init();
         proc_super.base.fs = _fs;
-        proc_super.base.ops = &proc_super_ops; 
+        proc_super.base.ops = &proc_super_ops;
         _fs.sbs.add(&proc_super.base.list);
         return &proc_super.base;
     }
 
     fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
+        base.ref.unref();
+        while (!base.ref.isFree()) {
+            arch.archReschedule();
+        }
         _ = self.inode_map.remove(base.i_no);
         const proc_inode = base.getImpl(ProcInode, "base");
         proc_inode.deinit();

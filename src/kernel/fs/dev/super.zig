@@ -3,6 +3,7 @@ const kernel = fs.kernel;
 const DevInode = @import("inode.zig").DevInode;
 const std = @import("std");
 const device = @import("drivers").device;
+const arch = @import("arch");
 
 const DEVFS_MAGIC = 0x1373;
 
@@ -48,6 +49,10 @@ pub const DevSuper = struct {
     }
 
     fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
+        base.ref.unref();
+        while (!base.ref.isFree()) {
+            arch.archReschedule();
+        }
         _ = self.inode_map.remove(base.i_no);
         const dev_inode = base.getImpl(DevInode, "base");
         dev_inode.deinit();

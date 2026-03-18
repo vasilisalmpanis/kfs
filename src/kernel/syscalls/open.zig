@@ -61,6 +61,8 @@ pub fn do_open(
     if (!target_path.dentry.inode.canAccess(flags)) {
         return errors.EACCES;
     }
+    target_path.dentry.inode.ref.ref();
+    errdefer target_path.dentry.inode.ref.unref();
     const new_file: *fs.File = fs.File.new(target_path) catch {
         target_path.dentry.tree.del();
         kernel.mm.kfree(target_path.dentry.inode);
