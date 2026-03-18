@@ -325,6 +325,7 @@ pub const arch = struct {
     pub const idt = struct {
         pub extern fn exceptionHandler(*arch.Regs)*arch.Regs;
         pub extern fn irqHandler(*arch.Regs)*arch.Regs;
+        pub extern fn processSignalsHelper(*arch.Regs, i32)*arch.Regs;
     };
 
     pub const fpu = struct {
