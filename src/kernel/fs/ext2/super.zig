@@ -47,7 +47,7 @@ const Ext2SuperData = extern struct {
 	s_checkinterval	                :u32,	// max. time between checks
 	s_creator_os			:u32,	// OS
 	s_rev_level			:u32,	// Revision level
-	s_def_resuid			:u16,	// Default uid for reserved blocks 
+	s_def_resuid			:u16,	// Default uid for reserved blocks
 	s_def_resgid			:u16,	// Default gid for reserved blocks
 
 	//
@@ -57,7 +57,7 @@ const Ext2SuperData = extern struct {
 	// the incompatible feature set is that if there is a bit set
 	// in the incompatible feature set that the kernel doesn't
 	// know about, it should refuse to mount the filesystem.
-	// 
+	//
 	// e2fsck's requirements are more strict; if it doesn't know
 	// about a feature in either the compatible or incompatible
 	// feature set, it must abort and not try to meddle with
@@ -76,7 +76,7 @@ pub const Ext2Super = struct {
     data: Ext2SuperData,
     bgdt: []BGDT,
     base: fs.SuperBlock,
-    
+
     pub fn allocInode(_: *fs.SuperBlock) !*fs.Inode {
         return error.NotImplemented;
     }
@@ -613,8 +613,8 @@ pub const Ext2Super = struct {
         current_byte = current_byte & mask;
         block_bitmap[bitmap_byte] = current_byte;
         _ = try self.writeBuff(
-            bgd.bg_block_bitmap, 
-            block_bitmap.ptr, 
+            bgd.bg_block_bitmap,
+            block_bitmap.ptr,
             block_bitmap.len
         );
         self.data.s_free_blocks_count += 1;
@@ -628,6 +628,11 @@ pub const Ext2Super = struct {
 
         if (base.links != 0) {
             return ;
+        }
+
+        base.ref.unref();
+        while (!base.ref.isFree()) {
+            arch.archReschedule();
         }
 
         // Inode Bitmap
