@@ -113,8 +113,6 @@ pub export fn exceptionHandler(state: *Regs) callconv(.c) *Regs {
 pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     @setRuntimeSafety(false);
     const orig_eax = state.eax;
-    if (@intFromPtr(state) % 4 != 0)
-        krn.logger.WARN("IRQ: Unaligned stack address {x}\n", .{@intFromPtr(state)});
     var new_state: *Regs = state;
     if (krn.irq.handlers[state.int_no] != null) {
         if (state.int_no == SYSCALL_INTERRUPT) {
@@ -133,13 +131,52 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     if (state.int_no == TIMER_INTERRUPT) {
         new_state = krn.sched.schedule(state);
     }
+
+    if (new_state != state) {
+        // schedule() switched to a different task. We're still on the old
+        // task's kernel stack, but tsk.current is the new task. Process
+        // signals on the new task's kernel stack so that any kernel-mode
+        // work (doExit, archReschedule, etc.) uses the correct stack.
+        new_state = processSignalsOnNewStack(new_state, orig_eax);
+    } else {
+        new_state = processSignalsHelper(new_state, orig_eax);
+    }
+
+    return new_state;
+}
+
+pub export fn processSignalsHelper(regs: *Regs, orig_eax: i32) callconv(.c) *Regs {
     if (tsk.current.tsktype != .KTHREAD) {
         var ucontext = signals.Ucontext{};
-        ucontext.setRegs(new_state, orig_eax);
+        ucontext.setRegs(regs, orig_eax);
         ucontext.mask = tsk.current.sigmask;
-        new_state = signals.processSignals(new_state, &ucontext);
+        return signals.processSignals(regs, &ucontext);
     }
-    return new_state;
+    return regs;
+}
+
+/// Switches ESP to the new task's kernel stack (at the saved Regs frame),
+/// calls processSignalsHelper there, then restores the original ESP.
+/// If processSignalsHelper never returns (doExit → reschedule), the old
+/// stack is abandoned — the old task resumes from its own saved state.
+noinline fn processSignalsOnNewStack(new_state: *Regs, orig_eax: i32) *Regs {
+    @setRuntimeSafety(false);
+    return @ptrFromInt(asm volatile (
+        \\ mov %%esp, %%ecx
+        \\ mov %%edi, %%esp
+        \\ push %%ecx
+        \\ push %%ebx
+        \\ push %%esi
+        \\ lea processSignalsHelper, %%eax
+        \\ call *%%eax
+        \\ add $8, %%esp
+        \\ pop %%esp
+        : [ret] "={eax}" (-> usize),
+        : [new_esp] "{edi}" (@intFromPtr(new_state)),
+          [regs] "{esi}" (@intFromPtr(new_state)),
+          [orig_eax] "{ebx}" (@as(u32, @bitCast(orig_eax))),
+        : .{ .memory = true }
+    ));
 }
 
 const ErrorCodes = std.EnumMap(krn.exceptions.Exceptions, bool).init(.{
@@ -360,7 +397,7 @@ pub fn idtInit() void {
             if (index < CPU_EXCEPTION_COUNT) 0x8E else 0xEE
         );
     }
-    
+
     asm volatile (
         \\lidt (%[idt_ptr])
         :
