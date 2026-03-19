@@ -66,6 +66,7 @@ pub const DevInode = struct {
             new_inode.links = 2;
             errdefer kernel.mm.kfree(new_inode);
             var new_dentry = try fs.DEntry.alloc(_name, sb, new_inode);
+            new_dentry.ref.ref();
             errdefer kernel.mm.kfree(new_dentry);
             parent.inode.links += 1;
             parent.tree.addChild(&new_dentry.tree);
