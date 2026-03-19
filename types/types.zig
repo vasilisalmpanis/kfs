@@ -1358,7 +1358,7 @@ pub const kernel = struct {
 
         pub const read = struct {
             pub const IoVec = extern struct {
-                base : [*]u8,
+                base : ?[*]u8,
                 len : u32,
             };
 
