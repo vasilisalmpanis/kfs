@@ -8,7 +8,7 @@ const std = @import("std");
 
 
 const PAGE_SIZE = @import("arch").PAGE_SIZE;
-pub const STACK_PAGES = 3;
+pub const STACK_PAGES = 5;
 pub const STACK_SIZE: u32 = (STACK_PAGES - 1) * PAGE_SIZE;
 
 pub const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
