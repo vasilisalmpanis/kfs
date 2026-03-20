@@ -318,7 +318,7 @@ pub const UMode = packed struct {
 
     pub fn unSetSUID(self: *UMode) void {
         const mask: u7 = S_ISUID;
-        self.type |= ~mask;
+        self.type &= ~mask;
     }
 
     pub fn setSGID(self: *UMode) void {
@@ -327,7 +327,7 @@ pub const UMode = packed struct {
 
     pub fn unSetSGID(self: *UMode) void {
         const mask: u7 = S_ISGID;
-        self.type |= ~mask;
+        self.type &= ~mask;
     }
 
     pub fn isSUID(self: *const UMode) bool {

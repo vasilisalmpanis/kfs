@@ -86,6 +86,8 @@ pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
         pipe.read_queue.addToQueue(&wq_node);
         pipe.lock.unlock();
         pipe.read_queue.waitIfInQueue(&wq_node, true, 0);
+        if (krn.task.current.sighand.hasPending())
+            return krn.errors.PosixError.EINTR;
         pipe.lock.lock();
     }
 
@@ -114,6 +116,8 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
         pipe.write_queue.addToQueue(&wq_node);
         pipe.lock.unlock();
         pipe.write_queue.waitIfInQueue(&wq_node, true, 0);
+        if (krn.task.current.sighand.hasPending())
+            return krn.errors.PosixError.EINTR;
         pipe.lock.lock();
         if (pipe.readers == 0) {
             _ = try krn.kill(

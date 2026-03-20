@@ -28,6 +28,7 @@ pub fn panic(
     stack: ?*builtin.StackTrace,
     first_trace_addr: ?usize
 ) noreturn {
+    cpu.disableInterrupts();
     krn.logger.ERROR(
         "\nPANIC: {s}\nfirst_trace_addr {?x}\nstack: {any}\n",
         .{msg, first_trace_addr, stack}

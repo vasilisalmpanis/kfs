@@ -13,6 +13,7 @@ pub fn chdir(path: ?[*:0]const u8) !u32 {
     const p = fs.path.resolve(user_path) catch {
         return errors.ENOENT;
     };
+    errdefer p.release();
     if (!p.dentry.inode.mode.isDir()) {
         return errors.ENOTDIR;
     }
