@@ -102,12 +102,26 @@ fn user_thread(_: ?*const anyopaque) i32 {
     krn.task.current.fs = krn.task.initial_task.fs;
     krn.task.current.files = krn.task.initial_task.files;
     krn.serial.print("[INIT]: user_thread: executing /bin/init\n");
+    const path = krn.fs.path.resolve("/bin/init") catch {
+        @panic("execve /bin/init");
+    };
+    
+    var file_was_unref: bool = false;
+    
+    const file = krn.fs.File.new(path) catch {
+        path.release();
+        @panic("execve /bin/init");
+    };
+
     _ = krn.doExecve(
-        "/bin/init",
+        file,
+        &file_was_unref,
         krn.userspace.argv_init,
         krn.userspace.envp_init,
         false
     ) catch |err| {
+        if (!file_was_unref)
+            file.ref.unref();
         krn.logger.ERROR("Failed execute init: {t}", .{err});
         @panic("execve /bin/init");
     };

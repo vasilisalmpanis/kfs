@@ -47,6 +47,7 @@ fn handlerShbang(
     envp: []const []const u8,
     free_arg_env: bool,
     file: *krn.fs.File,
+    resources_released: *bool,
 ) anyerror!u32 {
     const new_line_idx = std.mem.indexOf(u8, binary, "\n") orelse binary.len;
     const shebang_line = binary[2..new_line_idx];
@@ -59,70 +60,88 @@ fn handlerShbang(
     const interp_raw = if (space_idx) |idx| shebang_line[0..idx] else shebang_line;
     const interp_arg = if (space_idx) |idx| std.mem.trim(u8, shebang_line[idx + 1 ..], "\t\r") else null;
 
-    const interp = dupString(interp_raw) orelse return errors.ENOMEM;
-    errdefer krn.mm.kfreeSlice(interp);
+    const path = try krn.fs.path.resolve(interp_raw);
+    const inode = path.dentry.inode;
+    if (!inode.mode.canExecute(inode.uid, inode.gid) or !inode.mode.isReg()) {
+        path.release();
+        return errors.EACCES;
+    }
+    var new_resources_released: bool = false;
+    const intr_file = krn.fs.File.new(path) catch |err| {
+        path.release();
+        return err;
+    };
+    errdefer if (!new_resources_released) intr_file.ref.unref();
 
     const extra_args: usize = if (interp_arg != null and interp_arg.?.len > 0) 2 else 1;
     const new_argv = krn.mm.kmallocSlice([]const u8, argv.len + extra_args) orelse
         return errors.ENOMEM;
-    errdefer krn.mm.kfreeSlice(new_argv);
-
     var arg_idx: usize = 0;
+    errdefer if (!new_resources_released) freeSlices(new_argv, arg_idx);
 
-    new_argv[arg_idx] = interp;
+    new_argv[arg_idx] = dupString(interp_raw) orelse
+        return krn.errors.PosixError.ENOMEM;
     arg_idx += 1;
 
     if (interp_arg != null and interp_arg.?.len > 0) {
-        const arg_copy = dupString(interp_arg.?) orelse return errors.ENOMEM;
+        const arg_copy = dupString(interp_arg.?) orelse
+            return errors.ENOMEM;
         new_argv[arg_idx] = arg_copy;
         arg_idx += 1;
     }
 
     for (argv) |arg| {
-        new_argv[arg_idx] = arg;
+        new_argv[arg_idx] = dupString(arg) orelse {
+            return krn.errors.PosixError.ENOMEM;
+        };
         arg_idx += 1;
     }
 
+    const new_envp = krn.mm.dupSlice([] const u8, envp) orelse
+        return krn.errors.PosixError.ENOMEM;
+    for (0..envp.len) |idx| {
+        new_envp[idx] = krn.mm.dupSlice(u8, envp[idx]) orelse {
+            freeSlices(new_envp, idx);
+            return krn.errors.PosixError.ENOMEM;
+        };
+    }
+    errdefer if (!new_resources_released) freeSlices(new_envp, new_envp.len);
+
     krn.mm.kfreeSlice(binary);
     file.ref.unref();
+    resources_released.* = true;
 
     if (free_arg_env) {
-        krn.mm.kfreeSlice(argv);
-        // envp is passed through, recursive call will free it
+        freeSlices(argv, argv.len);
+        freeSlices(envp, envp.len);
     }
 
     return doExecve(
-        interp,
+        intr_file,
+        &new_resources_released,
         new_argv,
-        envp,
+        new_envp,
         true
     );
 }
 
 pub fn doExecve(
-    filename: []const u8,
+    file: *krn.fs.File,
+    resources_released: *bool,
     argv: []const []const u8,
     envp: []const []const u8,
     free_arg_env: bool,
 ) !u32 {
     // TODO:
     // - check suid / sgid and change euid / egid if needed
-    const path = try krn.fs.path.resolve(filename);
-    errdefer path.release();
-    const inode = path.dentry.inode;
-    if (!inode.mode.canExecute(inode.uid, inode.gid) or !inode.mode.isReg()) {
-        return errors.EACCES;
-    }
-    const file = try krn.fs.File.new(path);
-    errdefer file.ref.unref();
     const slice = if (krn.mm.kmallocSlice(u8, file.inode.size)) |_slice|
         _slice
     else
         return errors.ENOMEM;
-    errdefer krn.mm.kfreeSlice(slice);
+    errdefer if (!resources_released.*) krn.mm.kfreeSlice(slice);
 
     var read: usize = 0;
-    krn.logger.INFO("Executing {s} {d}\n", .{filename, file.inode.size});
+    krn.logger.INFO("Executing {s} {d}\n", .{file.path.?.dentry.name, file.inode.size});
     while (read < file.inode.size) {
         const single = try file.ops.read(
             file,
@@ -142,20 +161,19 @@ pub fn doExecve(
             };
         },
         .Shbang => {
-            if (free_arg_env)
-                krn.mm.kfreeSlice(filename);
             return try handlerShbang(
                 slice,
                 argv,
                 envp,
                 free_arg_env,
-                file
+                file,
+                resources_released
             );
         },
         .Unknown => return errors.ENOEXEC,
     }
 
-    krn.task.current.setName(path.dentry.name); // TODO: make copy of filename and set name only if we will execute
+    krn.task.current.setName(file.path.?.dentry.name); // TODO: make copy of filename and set name only if we will execute
 
     if (krn.task.current.mm) |_mm| {
         _mm.releaseMappings();
@@ -167,18 +185,6 @@ pub fn doExecve(
         envp,
     );
 
-    // Release the file's content buffer since
-    // its already copied to the new tasks mappings.
-    // By unrefing the file we also release the path
-    krn.mm.kfreeSlice(slice);
-    if (free_arg_env)
-        krn.mm.kfreeSlice(filename);
-    file.ref.unref();
-
-    if (free_arg_env) {
-        freeSlices(argv, argv.len);
-        freeSlices(envp, envp.len);
-    }
 
     krn.task.current.sighand = krn.signals.SigHand.init();
     var it = krn.task.current.files.closexec.iterator(
@@ -196,6 +202,16 @@ pub fn doExecve(
     krn.task.current.save_fpu_state = false;
     arch.fpu.setTaskSwitched();
 
+    // Release the file's content buffer since
+    // its already copied to the new tasks mappings.
+    // By unrefing the file we also release the path
+    krn.mm.kfreeSlice(slice);
+    if (free_arg_env) {
+        freeSlices(argv, argv.len);
+        freeSlices(envp, envp.len);
+    }
+    file.ref.unref();
+    resources_released.* = true;
     krn.userspace.goUserspace();
     return 0;
 }
@@ -239,25 +255,35 @@ pub fn execve(
     const argv: [*:null]?[*:0]u8 = u_argv.?;
     const envp: [*:null]?[*:0]u8 = u_envp.?;
 
-    const user_filename = std.mem.span(filename.?);
-    const filename_copy = dupString(user_filename) orelse return errors.ENOMEM;
-    errdefer krn.mm.kfreeSlice(filename_copy);
+    const user_filename: []const u8 = std.mem.span(filename.?);
 
+    var resources_released: bool = false;
     // New argv
     const argv_slice = try dupStrings(argv);
-    errdefer freeSlices(argv_slice, argv_slice.len);
+    errdefer if (!resources_released) freeSlices(argv_slice, argv_slice.len);
 
     // New envp
     const envp_slice = try dupStrings(envp);
-    errdefer freeSlices(envp_slice, envp_slice.len);
+    errdefer if (!resources_released) freeSlices(envp_slice, envp_slice.len);
 
-    const result = doExecve(
-        filename_copy,
+    const path = try krn.fs.path.resolve(user_filename);
+    const inode = path.dentry.inode;
+    if (!inode.mode.canExecute(inode.uid, inode.gid) or !inode.mode.isReg()) {
+        path.release();
+        return errors.EACCES;
+    }
+ 
+    const file = krn.fs.File.new(path) catch |err| {
+        path.release();
+        return err;
+    };
+    errdefer if (!resources_released) file.ref.unref();
+
+    return doExecve(
+        file,
+        &resources_released,
         argv_slice,
         envp_slice,
         true,
     );
-
-    krn.mm.kfreeSlice(filename_copy);
-    return result;
 }
