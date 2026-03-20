@@ -2,17 +2,15 @@ const krn = @import("../main.zig");
 const errors = @import("error-codes.zig").PosixError;
 
 pub fn sendfile(out_fd: i32, in_fd: i32, offset: ?*u32, count: u32) !u32 {
-    var u64_offset: ?*u64 = null;
+    var u64_offset: u64 = 0;
     if (offset) |off| {
-        u64_offset = @ptrCast(off);
+        u64_offset = @intCast(off.*);
     }
-
-    const result = try sendfile64(out_fd, in_fd, u64_offset, count);
+    const result = try sendfile64(out_fd, in_fd, &u64_offset, count);
 
     if (offset) |off| {
-        off.* = @intCast(u64_offset.?.*);
+        off.* = @intCast(u64_offset);
     }
-
     return result;
 }
 
@@ -40,7 +38,7 @@ pub fn sendfile64(out_fd: i32, in_fd: i32, offset: ?*u64, count: u32) !u32 {
     if (!in_file.mode.canRead(krn.task.current.uid, krn.task.current.gid)) {
         return errors.EACCES;
     }
-    if (!out_file.mode.canRead(krn.task.current.uid, krn.task.current.gid)) {
+    if (!out_file.mode.canWrite(krn.task.current.uid, krn.task.current.gid)) {
         return errors.EACCES;
     }
 
@@ -68,13 +66,7 @@ pub fn sendfile64(out_fd: i32, in_fd: i32, offset: ?*u64, count: u32) !u32 {
     }
 
     const original_in_pos = in_file.pos;
-    const original_out_pos = out_file.pos;
-    if (offset != null) {
-        defer {
-            in_file.pos = original_in_pos;
-            out_file.pos = original_out_pos;
-        }
-    }
+    defer if (offset != null) { in_file.pos = original_in_pos; };
 
     if (current_offset == 0 and in_file.pos >= in_file.inode.size) {
         return 0;

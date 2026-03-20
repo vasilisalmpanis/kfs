@@ -151,7 +151,8 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
             }
             _tty.lock.unlock();
             _tty.read_queue.wait(true, 0);
-
+            if (krn.task.current.sighand.hasPending())
+                return krn.errors.PosixError.EINTR;
         }
     } else {
         const vmin: u8 = _tty.term.c_cc[t.VMIN];

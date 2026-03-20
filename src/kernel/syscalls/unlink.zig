@@ -44,7 +44,7 @@ fn do_unlinkat(dirfd: i32, _path: ?[*:0]u8) !u32 {
         return errors.EISDIR;
     }
 
-    if (from.dentry.inode.ops.unlink) |_unlink| {
+    if (parent.dentry.inode.ops.unlink) |_unlink| {
         // Dentry handling
         const key = fs.DentryHash{
             .name = last_segment,
