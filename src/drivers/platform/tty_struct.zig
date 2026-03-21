@@ -799,7 +799,7 @@ pub const TTY = struct {
                 .{@intFromPtr(self), @tagName(sig), self.fg_pgid}
             );
             _ = krn.kill(
-                self.fg_pgid, 
+                -self.fg_pgid,
                 @intFromEnum(sig)
             ) catch 0;
         } else {

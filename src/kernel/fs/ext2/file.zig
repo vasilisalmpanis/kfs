@@ -52,7 +52,7 @@ pub const Ext2File = struct {
         }
 
         const buff = try ext2_sb.readBlocks(pbn, 1);
-        defer krn.mm.kfree(buff.ptr);
+        defer krn.mm.vfree(buff.ptr);
 
         const off: usize = base.pos % bs;
         if (off + to_write > bs) {
@@ -128,7 +128,7 @@ pub const Ext2File = struct {
 
         // read the actual data block
         const file_buf = try ext2_sb.readBlocks(first_pbn, contig_pbn_count);
-        defer krn.mm.kfree(file_buf.ptr);
+        defer krn.mm.vfree(file_buf.ptr);
 
         var bytes_read: usize = file_buf.len - read_offset;
         if (bytes_read > to_read) {
@@ -170,7 +170,7 @@ pub const Ext2File = struct {
 
         const block: usize = ext2_dir_inode.data.i_block[blk_index];
         const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
-        defer krn.mm.kfree(block_slice.ptr);
+        defer krn.mm.vfree(block_slice.ptr);
         var bytes_written: usize = 0;
 
         while (bytes_written < buf.len and offset < block_size) {

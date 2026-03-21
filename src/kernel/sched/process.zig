@@ -14,6 +14,8 @@ pub fn doFork() !u32 {
         return errors.ENOMEM;
     };
     errdefer km.kfree(child);
+    child.setup(0, 0, tsk.current.name[0..16]);
+
     const stack: u32 = kthread.kthreadStackAlloc(kthread.STACK_PAGES);
     if (stack == 0) {
         krn.logger.ERROR("fork: failed to alloc kthread stack", .{});
@@ -69,7 +71,6 @@ pub fn doFork() !u32 {
     child_regs.eax = 0;
     child.tls = krn.task.current.tls;
     child.limit = krn.task.current.limit;
-    child.assignPID();
     try procfs.newProcess(child);
     child.initSelf(
         stack_top,

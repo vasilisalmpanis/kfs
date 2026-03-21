@@ -36,6 +36,7 @@ pub fn pipe2(pipefd: ?*[2]i32, flags: i32) !u32 {
         pipe_inode.ref.dropFn = releasePipeInode;
         pipe_inode.fops = &krn.fs.pipe.PipeFileOps;
         pipe_inode.ref.ref();
+        pipe_inode.ref.ref();
         pipe_inode.mode = fs.UMode.fifo();
         pipe_inode.data.pipe = pipe_data;
 
