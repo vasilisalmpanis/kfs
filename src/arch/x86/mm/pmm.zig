@@ -48,7 +48,9 @@ pub const PMM = struct {
             pmm.free_area[pmm.index] = ph_addr;
             pmm.index += 1;
         }
-        pmm.index -= 1;
+        if (pmm.index > 0) {
+            pmm.index -= 1;
+        }
         return pmm;
     }
 
@@ -59,13 +61,13 @@ pub const PMM = struct {
         var curr_pos: u32 = self.index;
         var ret_addr: u32 = 0;
 
-        while (curr_pos >= 0 and self.free_area[self.index] != 0) {
+        while (self.free_area[self.index] != 0) {
             cont_size = 0;
             idx = curr_pos;
-            if (curr_pos < num) {
+            if (curr_pos + 1 < num) {
                 return ret_addr;
             }
-            while (idx >= 0 and self.free_area[idx] != 0 and cont_size < num) {
+            while (self.free_area[idx] != 0 and cont_size < num) {
                 cont_size += 1;
                 if (idx == 0) {
                     if (cont_size == num) {

@@ -27,6 +27,9 @@ pub const kfree = @import("./kmalloc.zig").kfree;
 pub const kfreeSlice = @import("./kmalloc.zig").kfreeSlice;
 pub const ksize = @import("./kmalloc.zig").ksize;
 pub const vmalloc = @import("./vmalloc.zig").vmalloc;
+pub const vmallocArray = @import("./vmalloc.zig").vmallocArray;
+pub const vmallocSlice = @import("./vmalloc.zig").vmallocSlice;
+pub const vfreeSlice = @import("./vmalloc.zig").vfreeSlice;
 pub const vfree = @import("./vmalloc.zig").vfree;
 pub const vsize = @import("./vmalloc.zig").vsize;
 
@@ -123,8 +126,9 @@ pub fn mmInit(info: *multiboot.Multiboot) void {
         mem_size -= offset;
 
         if ((base % PAGE_SIZE) > 0) {
-            mem_size = mem_size - (base & 0xfff);
-            base = (base & 0xfffff000) + PAGE_SIZE;
+            const new_base = (base & 0xfffff000) + PAGE_SIZE;
+            mem_size -= (new_base - base);
+            base = new_base;
         }
         // At this point we have page aligned
         // memory base and size.

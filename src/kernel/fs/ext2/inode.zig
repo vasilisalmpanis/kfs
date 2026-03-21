@@ -202,7 +202,7 @@ pub const Ext2Inode = struct {
             const block: u32 = ext2_dir_inode.data.i_block[idx];
             // TODO: read dir entries of other blocks too.
             const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
-            defer kernel.mm.kfree(block_slice.ptr);
+            defer kernel.mm.vfree(block_slice.ptr);
             const ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
             if (ext_dir) |first| {
                 var it = first.iterator(ext2_super.base.block_size);
@@ -275,7 +275,7 @@ pub const Ext2Inode = struct {
                 const bgdt_entry = &sb.bgdt[bgdt_idx];
 
                 const inode_bitmap = try sb.readBlocks(bgdt_entry.bg_inode_bitmap, 1);
-                defer kernel.mm.kfree(inode_bitmap.ptr);
+                defer kernel.mm.vfree(inode_bitmap.ptr);
 
                 // Find and reserve free inode number in bgdt
                 var inode_no = bgdt_idx * sb.data.s_inodes_per_group + 1;
@@ -433,7 +433,7 @@ pub const Ext2Inode = struct {
             raw_inode.i_gid | (@as(u32, raw_inode.osd2.linux2.l_i_gid_high) << 16),
             raw_inode.i_mode,
         );
-        kernel.mm.kfree(raw_buff.ptr);
+        kernel.mm.vfree(raw_buff.ptr);
     }
 
     pub fn getLink(base: *fs.Inode, resulting_link: *[]u8) !void {
@@ -443,6 +443,7 @@ pub const Ext2Inode = struct {
         if (ext2_inode.data.i_blocks > 0) {
             const lbn = try ext2_s.resolveLbn(ext2_inode, 0);
             const block = try ext2_s.readBlocks(lbn, 1);
+            defer kernel.mm.vfree(block.ptr);
             const span: []u8 = std.mem.span(@as([*:0]u8, @ptrCast(block.ptr)));
             if (span.len > resulting_link.len)
                 return kernel.errors.PosixError.EINVAL;
@@ -522,7 +523,7 @@ pub const Ext2Inode = struct {
                 blk_idx = 11; // to exit loop
             }
             const blk = try sb.readBlocks(pbn, 1);
-            defer kernel.mm.kfree(blk.ptr);
+            defer kernel.mm.vfree(blk.ptr);
 
             var off: u32 = 0;
             var new_entry_size = @sizeOf(Ext2DirEntry) + name.len;
@@ -586,7 +587,7 @@ pub const Ext2Inode = struct {
             const block: u32 = self.data.i_block[idx];
             // TODO: read dir entries of other blocks too.
             const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
-            defer kernel.mm.kfree(block_slice.ptr);
+            defer kernel.mm.vfree(block_slice.ptr);
             const ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
             if (ext_dir) |first| {
                 var it = first.iterator(ext2_super.base.block_size);
@@ -690,6 +691,7 @@ pub const Ext2Inode = struct {
         if (ext2_inode.data.i_blocks > 0) {
             const lbn = try ext2_s.resolveLbn(ext2_inode, 0);
             const block = try ext2_s.readBlocks(lbn, 1);
+            defer kernel.mm.vfree(block.ptr);
             const span: []u8 = std.mem.span(@as([*:0]u8, @ptrCast(block.ptr)));
 
             var to_write: u32 = size;
@@ -731,7 +733,7 @@ pub const Ext2Inode = struct {
             const block_slice: []u8 = ext2_super.readBlocks(block, 1) catch {
                 return false;
             };
-            defer kernel.mm.kfree(block_slice.ptr);
+            defer kernel.mm.vfree(block_slice.ptr);
             const ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
             if (ext_dir) |first| {
                 var it = first.iterator(ext2_super.base.block_size);
@@ -789,7 +791,7 @@ pub const Ext2Inode = struct {
                 break;
             const block: u32 = self.data.i_block[idx];
             const block_slice: []u8 = try ext2_super.readBlocks(block, 1);
-            defer kernel.mm.kfree(block_slice.ptr);
+            defer kernel.mm.vfree(block_slice.ptr);
             const ext_dir: ?*Ext2DirEntry = @ptrCast(@alignCast(block_slice.ptr));
             if (ext_dir) |first| {
                 var it = first.iterator(ext2_super.base.block_size);

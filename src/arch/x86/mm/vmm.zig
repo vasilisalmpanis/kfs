@@ -180,26 +180,13 @@ pub const VMM = struct {
                 return addr_to_ret;
             }
         }
-        return 0xFFFFFFFF;
-    }
-
-    pub fn findFreeAddr(self: *VMM) u32 {
-        var pd_idx = PAGE_OFFSET >> 22;
-        while (pd_idx < 1023) : (pd_idx += 1) {
-            var pt_idx: u32 = 0;
-            if (current_page_dir[pd_idx] == 0) {
-                return pd_idx << 22;
+        krn.logger.ERROR("Could not find free space for {d} pages from {x} to {x} for user {}\n", .{
+                num_pages,
+                from_addr,
+                to_addr,
+                user
             }
-            if ((current_page_dir[pd_idx].huge_page) == 0) {
-                const pt: [*]PageEntry = first_page_table + (0x400 * pd_idx);
-                while (pt_idx < 1023) {
-                    if (pt[pt_idx] == 0) {
-                        return self.pageTableToAddr(pd_idx, pt_idx);
-                    }
-                    pt_idx += 1;
-                }
-            }
-        }
+        );
         return 0xFFFFFFFF;
     }
 

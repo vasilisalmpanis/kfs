@@ -101,13 +101,16 @@ fn user_thread(_: ?*const anyopaque) i32 {
     krn.task.current.mm = krn.task.initial_task.mm;
     krn.task.current.fs = krn.task.initial_task.fs;
     krn.task.current.files = krn.task.initial_task.files;
+    krn.fs.procfs.newProcess(krn.task.current) catch {
+        @panic("Could not create PID 1 procfs entries\n");
+    };
     krn.serial.print("[INIT]: user_thread: executing /bin/init\n");
     const path = krn.fs.path.resolve("/bin/init") catch {
         @panic("execve /bin/init");
     };
-    
+
     var file_was_unref: bool = false;
-    
+
     const file = krn.fs.File.new(path) catch {
         path.release();
         @panic("execve /bin/init");

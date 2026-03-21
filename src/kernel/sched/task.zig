@@ -168,7 +168,7 @@ pub const Task = struct {
         return false;
     }
 
-    pub fn setup(self: *Task, virt: usize, task_stack_top: usize, task_stack_bottom: usize, name: []const u8) void {
+    pub fn setup(self: *Task, task_stack_top: usize, task_stack_bottom: usize, name: []const u8) void {
         self.assignPID();
         self.uid = 0;
         self.regs.setStackPointer(task_stack_top);
@@ -183,7 +183,6 @@ pub const Task = struct {
         self.utime = 0;
         self.stime = 0;
         self.setName(name);
-        mm.proc_mm.init_mm.vas = virt;
         self.wait_wq.setup();
         self.should_stop = false;
     }
@@ -425,11 +424,11 @@ var inital_fpu_state = arch.fpu.FPUState{};
 
 pub fn initMultitasking() void {
     initial_task.setup(
-        @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET,
         @intFromPtr(&stack_top),
         @intFromPtr(&stack_bottom),
         "swapper"
     );
+    initial_task.mm.?.vas = @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET;
     initial_task.fpu_state = &inital_fpu_state;
     krn.irq.registerHandler(0, &krn.timerHandler, null);
     arch.system.enableWriteProtect();

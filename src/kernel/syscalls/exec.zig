@@ -107,7 +107,7 @@ fn handlerShbang(
     }
     errdefer if (!new_resources_released) freeSlices(new_envp, new_envp.len);
 
-    krn.mm.kfreeSlice(binary);
+    krn.mm.vfreeSlice(binary);
     file.ref.unref();
     resources_released.* = true;
 
@@ -134,11 +134,11 @@ pub fn doExecve(
 ) !u32 {
     // TODO:
     // - check suid / sgid and change euid / egid if needed
-    const slice = if (krn.mm.kmallocSlice(u8, file.inode.size)) |_slice|
+    const slice = if (krn.mm.vmallocSlice(u8, file.inode.size)) |_slice|
         _slice
     else
         return errors.ENOMEM;
-    errdefer if (!resources_released.*) krn.mm.kfreeSlice(slice);
+    errdefer if (!resources_released.*) krn.mm.vfreeSlice(slice);
 
     var read: usize = 0;
     krn.logger.INFO("Executing {s} {d}\n", .{file.path.?.dentry.name, file.inode.size});
@@ -205,7 +205,7 @@ pub fn doExecve(
     // Release the file's content buffer since
     // its already copied to the new tasks mappings.
     // By unrefing the file we also release the path
-    krn.mm.kfreeSlice(slice);
+    krn.mm.vfreeSlice(slice);
     if (free_arg_env) {
         freeSlices(argv, argv.len);
         freeSlices(envp, envp.len);
@@ -229,7 +229,8 @@ pub fn dupStrings(array: [*:null]?[*:0]u8) ![][]u8 {
         len += 1;
     }
     const slice = if (krn.mm.kmallocSlice([]u8, len)) |s| s
-        else return errors.ENOMEM;
+        else
+            return errors.ENOMEM;
     errdefer krn.mm.kfreeSlice(slice);
 
     for (0..len) |idx| {
@@ -272,7 +273,7 @@ pub fn execve(
         path.release();
         return errors.EACCES;
     }
- 
+
     const file = krn.fs.File.new(path) catch |err| {
         path.release();
         return err;
