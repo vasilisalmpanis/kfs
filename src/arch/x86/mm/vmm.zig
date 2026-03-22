@@ -362,6 +362,12 @@ pub const VMM = struct {
                 );
             }
 
+            const temp_addr = self.pageTableToAddr(temp_idx, 0);
+            defer {
+                pd[temp_idx] = 0;
+                invalidatePage(temp_addr);
+            }
+
             // Copy the values of old page table to new
             var old_pt: [*]u32 = @ptrCast(first_page_table);
             old_pt += 0x400 * pd_idx;
@@ -380,8 +386,6 @@ pub const VMM = struct {
                 }
             }
             pt_start_idx = 0;
-            pd[temp_idx] = 0;
-            invalidatePage(self.pageTableToAddr(temp_idx, 0));
         }
     }
 

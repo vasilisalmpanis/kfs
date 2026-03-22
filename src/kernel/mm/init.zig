@@ -148,7 +148,7 @@ pub fn mmInit(info: *multiboot.Multiboot) void {
             &virt_memory_manager,
             0xD800_0000,
             0xFFFF_F000,
-            16
+            PAGE_SIZE
         );
     }
 

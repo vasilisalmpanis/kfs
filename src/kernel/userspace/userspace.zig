@@ -235,7 +235,10 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
             krn.mm.MAP.anonymous(),
             null,
             0
-        ) catch {return ;};
+        ) catch {
+            krn.task.current.mm.?.releaseMappings();
+            return krn.errors.PosixError.ENOMEM;
+        };
         const section_ptr: [*]u8 = @ptrFromInt(seg_start);
         if (p_hdr.p_filesz > 0) {
             @memcpy(
@@ -259,7 +262,8 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
         null,
         0
     ) catch {
-        @panic("Unable to go to userspace\n");
+        krn.task.current.mm.?.releaseMappings();
+        return krn.errors.PosixError.ENOMEM;
     };
     const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
     @memset(stack_ptr[0..stack_size], 0);
