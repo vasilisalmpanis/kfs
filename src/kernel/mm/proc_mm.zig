@@ -426,12 +426,6 @@ pub const MM = struct {
                             vma.dup(new_vma, vas_pair) catch {
                                 krn.mm.mem_lock.unlock_irq_enable(dup_lock);
                                 _mmap.delete();
-                                {
-                                    const free_lock = krn.mm.mem_lock.lock_irq_disable();
-                                    mm.virt_memory_manager.pmm.freePage(vas_pair.phys);
-                                    krn.mm.mem_lock.unlock_irq_enable(free_lock);
-                                }
-                                krn.mm.kfree(_mmap);
                                 return null;
                             };
                             krn.mm.mem_lock.unlock_irq_enable(dup_lock);
@@ -462,10 +456,12 @@ pub const MM = struct {
             return ;
 
         if (self.vas != 0) {
+            const curr_vas = krn.task.current.mm.?.vas;
+            self.releaseMappings();
             const lock_state = krn.mm.mem_lock.lock_irq_disable();
             arch.vmm.switchToVAS(self.vas);
             mm.virt_memory_manager.deleteVASTables(self.vas);
-            arch.vmm.switchToVAS(krn.task.current.mm.?.vas);
+            arch.vmm.switchToVAS(curr_vas);
             krn.mm.virt_memory_manager.pmm.freePage(self.vas);
             self.vas = 0;
             krn.mm.mem_lock.unlock_irq_enable(lock_state);
@@ -493,25 +489,35 @@ pub const MM = struct {
         self.env_start = 0;
         self.env_end = 0;
 
+        const curr_vas = krn.task.current.mm.?.vas;
+        const is_curr_vas = self.isCurrentMM();
         if (self.vmas) |head| {
             while (!head.list.isEmpty()) {
                 const vma: *VMA = head.list.next.?.entry(VMA, "list");
                 vma.list.del();
                 {
                     const lock_state = krn.mm.mem_lock.lock_irq_disable();
+                    if (!is_curr_vas)
+                        arch.vmm.switchToVAS(self.vas);
                     mm.virt_memory_manager.releaseArea(vma.start, vma.end, vma.flags.TYPE);
+                    if (!is_curr_vas)
+                        arch.vmm.switchToVAS(curr_vas);
                     krn.mm.mem_lock.unlock_irq_enable(lock_state);
                 }
                 krn.mm.kfree(vma);
             }
             {
                 const lock_state = krn.mm.mem_lock.lock_irq_disable();
+                if (!is_curr_vas)
+                    arch.vmm.switchToVAS(self.vas);
                 mm.virt_memory_manager.releaseArea(head.start, head.end, head.flags.TYPE);
+                if (!is_curr_vas)
+                    arch.vmm.switchToVAS(curr_vas);
                 krn.mm.mem_lock.unlock_irq_enable(lock_state);
             }
             krn.mm.kfree(head);
+            self.vmas = null;
         }
-        self.vmas = null;
     }
 
     pub inline fn isCurrentMM(self: *MM) bool {

@@ -26,7 +26,7 @@ pub const FreeList = struct {
     head: ?*FreeListNode,
     vmm: *vmm,
     pmm: *pmm,
-    alignement: u8 = 16,
+    alignement: usize = 16,
     mtx: krn.Spinlock,
 
     pub fn init(
@@ -34,7 +34,7 @@ pub const FreeList = struct {
         virt_mm: *vmm,
         start_addr: usize,
         end_addr: usize,
-        alignement: u8,
+        alignement: usize,
     ) FreeList {
         return FreeList{
             .start_addr = start_addr,
