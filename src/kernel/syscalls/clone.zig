@@ -85,6 +85,8 @@ pub fn clone(
         return errors.ENOMEM;
     };
     errdefer krn.mm.kfree(child);
+    child.* = krn.task.Task.init(0, 0, 0, .PROCESS);
+    child.assignPID();
 
     const stack: u32 = kthread.kthreadStackAlloc(kthread.STACK_PAGES);
     if (stack == 0) {
@@ -172,7 +174,6 @@ pub fn clone(
         child.limit = krn.task.current.limit;
     }
 
-    child.assignPID();
     try krn.fs.procfs.newProcess(child);
     child.initSelf(
         stack_top,

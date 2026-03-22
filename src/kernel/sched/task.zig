@@ -383,6 +383,10 @@ pub const Task = struct {
 
         self.list.del();
         self.refcount.unref();
+        if (self.refcount.getValue() > 0) {
+            krn.logger.ERROR("[PID: {d}] is exiting and is extra referenced", .{self.pid});
+            @panic("exiting task being used");
+        }
         if (stopped_tasks == null) {
             stopped_tasks = &self.list;
             stopped_tasks.?.setup();
@@ -401,6 +405,52 @@ pub const Task = struct {
             parent.wait_wq.wakeUpOne();
             parent.refcount.unref();
         }
+    }
+
+    pub fn dbgPrint(self: *Task) void {
+        krn.logger.ERROR(
+            \\ Task {d}
+            \\   name: {s}
+            \\   uid: {d}
+            \\   gid: {d}
+            \\   pgid: {d}
+            \\   sid: {d}
+            \\   tsktype: {t}
+            \\   state: {t}
+            \\   fpu_state: 0x{x:0>8}
+            \\   fpu_used: {any}
+            \\   mm: 0x{x:0>8}
+            \\   fs: 0x{x:0>8}
+            \\   files: 0x{x:0>8}
+            \\   stack_bottom: 0x{x:0>8}
+            \\   tls: 0x{x:0>8}
+            \\   limit: {d}
+            \\   list->next: {x}
+            \\   list->prev: {x}
+            \\   tree->parent: {x}
+            \\
+            , .{
+                self.pid,
+                self.name[0..16],
+                self.uid,
+                self.gid,
+                self.pgid,
+                self.sid,
+                self.tsktype,
+                self.state,
+                @intFromPtr(self.fpu_state),
+                self.fpu_used,
+                @intFromPtr(self.mm),
+                @intFromPtr(self.fs),
+                @intFromPtr(self.files),
+                self.stack_bottom,
+                self.tls,
+                self.limit,
+                @intFromPtr(self.list.next),
+                @intFromPtr(self.list.prev),
+                @intFromPtr(self.tree.parent)
+            }
+        );
     }
 };
 

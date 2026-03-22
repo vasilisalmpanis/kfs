@@ -33,6 +33,7 @@ pub fn panic(
         "\nPANIC: {s}\nfirst_trace_addr {?x}\nstack: {any}\n",
         .{msg, first_trace_addr, stack}
     );
+    krn.task.current.regs.dump();
     dbg.traceStackTrace(20);
     system.halt();
     while (true) {}

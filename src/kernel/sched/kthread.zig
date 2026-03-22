@@ -55,12 +55,10 @@ pub fn kthreadStackFree(addr: usize) void {
     defer krn.mm.mem_lock.unlock_irq_enable(lock_state);
 
     var page: usize = addr - PAGE_SIZE; // RO page
-    mm.virt_memory_manager.unmapPage(page, true);
-    page += PAGE_SIZE;
-    mm.virt_memory_manager.unmapPage(page, true);
-    page += PAGE_SIZE;
-    mm.virt_memory_manager.unmapPage(page, true);
-    page += PAGE_SIZE;
+    for (0..STACK_PAGES) |_| {
+        mm.virt_memory_manager.unmapPage(page, true);
+        page += PAGE_SIZE;
+    }
 }
 
 pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const u8) !*tsk.Task {
