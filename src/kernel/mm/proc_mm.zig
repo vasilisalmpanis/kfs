@@ -521,12 +521,16 @@ pub const MM = struct {
     pub fn accessTaskVM(self: *MM, addr: usize, len: usize) ![]u8 {
         if (krn.mm.kmallocSlice(u8, len)) |res| {
             const curr_vas = krn.task.current.mm.?.vas;
-            if (!self.isCurrentMM())
+            if (!self.isCurrentMM()) {
+                arch.cpu.disableInterrupts();
                 arch.vmm.switchToVAS(self.vas);
+            }
             const src: [*]u8 = @ptrFromInt(addr);
             @memcpy(res[0..len], src[0..len]);
-            if (!self.isCurrentMM())
+            if (!self.isCurrentMM()) {
                 arch.vmm.switchToVAS(curr_vas);
+                arch.cpu.enableInterrupts();
+            }
             return res;
         }
         return krn.errors.PosixError.ENOMEM;

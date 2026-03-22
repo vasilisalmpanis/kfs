@@ -1783,7 +1783,6 @@ pub const drivers = struct {
                 current_op : std.storage.ata.ATA_Operation,
                 status : std.storage.ata.ATA_Status,
                 device_cmd : u8= 0,
-                buffer : []u8,
                 lba28 : u32= 0,
                 lba48 : u64= 0,
                 drive : u8= 0,
