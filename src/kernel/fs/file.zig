@@ -50,6 +50,7 @@ pub const File = struct {
         self.ref.dropFn = File.release;
         self.ref.ref();
         self.inode = inode;
+        self.inode.ref.ref();
         self.data = null;
     }
 
@@ -57,9 +58,9 @@ pub const File = struct {
         const file: *File = kernel.list.containerOf(File, @intFromPtr(ref), "ref");
         const inode: *fs.Inode = file.inode;
         file.ops.close(file); //?
+        inode.ref.unref();
         if (file.path != null)
             file.path.?.release();
-        inode.ref.unref();
         kernel.mm.kfree(file);
     }
 
