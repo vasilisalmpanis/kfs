@@ -262,6 +262,8 @@ pub const Ext2Super = struct {
         offset: usize
     ) !usize {
         var to_write: usize = size;
+        arch.cpu.disableInterrupts();
+        defer arch.cpu.enableInterrupts();
         sb.base.dev_file.?.pos = sb.base.block_size * block + offset;
         var written: usize = 0;
         while (written < size) {
