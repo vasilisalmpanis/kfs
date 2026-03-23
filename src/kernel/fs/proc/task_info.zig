@@ -1,7 +1,13 @@
+const dbg = @import("debug");
+const generic_ops = @import("generic_ops.zig");
 const interface = @import("interface.zig");
 const kernel = @import("../../main.zig");
 const inode = @import("inode.zig");
+const arch = @import("arch");
 const std = @import("std");
+
+const kstack_snapshot_cap: usize = 4096;
+const kstack_max_frames: u32 = 64;
 
 // Create file for new task (used in doFork())
 pub fn newProcess(task: *kernel.task.Task) !void {
@@ -25,6 +31,14 @@ pub fn newProcess(task: *kernel.task.Task) !void {
     );
     const cmdline_inode = cmdline_dentry.inode.getImpl(inode.ProcInode, "base");
     cmdline_inode.task = task;
+
+    const kstack_dentry = try interface.createFile(parent,
+        "kernel_stack_trace",
+        &kernel_stack_trace_file_ops,
+        mode
+    );
+    const kstack_inode = kstack_dentry.inode.getImpl(inode.ProcInode, "base");
+    kstack_inode.task = task;
 }
 
 
@@ -80,6 +94,7 @@ fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
         @panic("Should not happen");
     };
     var buffer: [512]u8 = .{0} ** 512;
+    kernel.logger.INFO("TASK name {s}\n", .{task.name[0..16]});
     const status: u8 = switch (task.state) {
         .RUNNING => 'R',
         .INTERRUPTIBLE_SLEEP => 'S',
@@ -159,6 +174,32 @@ fn cmdline_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
 pub const cmdline_file_ops = kernel.fs.FileOps{
     .open = open,
     .read = cmdline_read,
+    .write = write,
+    .close = close,
+};
+
+fn kernel_stack_trace_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
+    if (file.data == null) {
+        const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
+        const task = proc_inode.task orelse {
+            @panic("Should not happen");
+        };
+        const kbuf = kernel.mm.kmallocSlice(u8, kstack_snapshot_cap) orelse
+            return kernel.errors.PosixError.ENOMEM;
+        errdefer kernel.mm.kfree(kbuf.ptr);
+
+        arch.cpu.disableInterrupts();
+        defer arch.cpu.enableInterrupts();
+        const n = dbg.formatKernelStackTraceForTask(kbuf, kstack_max_frames, task);
+
+        try generic_ops.assignSlice(file, kbuf[0..n]);
+    }
+    return generic_ops.generic_read(file, buff, size);
+}
+
+pub const kernel_stack_trace_file_ops = kernel.fs.FileOps{
+    .open = open,
+    .read = kernel_stack_trace_read,
     .write = write,
     .close = close,
 };

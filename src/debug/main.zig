@@ -1,5 +1,6 @@
 pub const printPageDir = @import("./mm.zig").printPageDir;
 pub const traceStackTrace = @import("./trace.zig").traceStackTrace;
+pub const formatKernelStackTraceForTask = @import("./trace.zig").formatKernelStackTraceForTask;
 pub const print = @import("./printf.zig").print;
 pub const printf = @import("./printf.zig").printf;
 pub const printfLen = @import("./printf.zig").printfLen;
