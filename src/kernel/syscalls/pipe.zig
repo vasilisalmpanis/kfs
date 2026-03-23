@@ -35,11 +35,11 @@ pub fn pipe2(pipefd: ?*[2]i32, flags: i32) !u32 {
         errdefer krn.mm.kfree(pipe_inode);
         pipe_inode.ref.dropFn = releasePipeInode;
         pipe_inode.fops = &krn.fs.pipe.PipeFileOps;
-        pipe_inode.ref.ref();
         pipe_inode.mode = fs.UMode.fifo();
         pipe_inode.data.pipe = pipe_data;
 
         write_file = try krn.fs.File.pseudo(pipe_inode);
+        pipe_inode.ref.unref();
         errdefer write_file.ref.unref();
         write_file.mode = fs.UMode.fifo();
         write_file.flags = fs.file.O_WRONLY | @as(u32, @intCast(flags));

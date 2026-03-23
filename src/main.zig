@@ -28,12 +28,17 @@ pub fn panic(
     stack: ?*builtin.StackTrace,
     first_trace_addr: ?usize
 ) noreturn {
+    _ = stack;
+    _ = first_trace_addr;
     cpu.disableInterrupts();
     krn.logger.ERROR(
-        "\nPANIC: {s}\nfirst_trace_addr {?x}\nstack: {any}\n",
-        .{msg, first_trace_addr, stack}
+        "\nPANIC: [PID {d}]: {s}",
+        .{
+            krn.task.current.pid,
+            msg
+        }
     );
-    krn.task.current.regs.dump();
+    cpu.Regs.state().dump();
     dbg.traceStackTrace(20);
     system.halt();
     while (true) {}
@@ -143,7 +148,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     fpu.initFPU();
     drv.platform.serial.init_ports();
     krn.serial.print("[INIT]: Serial done\n");
-    krn.logger = Logger.init(.ERROR);
+    krn.logger = Logger.init(.DEBUG);
     krn.serial.print("[INIT]: Logger done\n");
     const boot_info = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
     krn.boot_info = boot_info;

@@ -40,6 +40,8 @@ fn do_unlinkat(dirfd: i32, _path: ?[*:0]u8) !u32 {
         return errors.EPERM;
     }
     const target = try parent.dentry.inode.ops.lookup(parent.dentry, last_segment);
+    target.ref.ref();
+    defer target.release();
     if (target.inode.mode.isDir()) {
         return errors.EISDIR;
     }
@@ -58,7 +60,6 @@ fn do_unlinkat(dirfd: i32, _path: ?[*:0]u8) !u32 {
         parent.dentry.ref.unref();
         target.tree.del();
         target.tree.parent = null;
-        target.release();
         return 0;
     } else {
         return errors.EPERM;

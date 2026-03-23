@@ -48,6 +48,8 @@ pub const RefCount = struct {
     pub fn unref(rc: *RefCount) void {
         // release ensures code before unref() happens-before the
         // count is decremented as dropFn could be called by then.
+        if (rc.getValue() == 0)
+            @panic("Underflow\n");
         if (rc.count.fetchSub(1, .release) == 1) {
             // seeing 1 in the counter means that other unref()s have happened,
             // but it doesn't mean that uses before each unref() are visible.
