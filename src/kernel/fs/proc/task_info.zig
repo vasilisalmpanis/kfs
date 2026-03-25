@@ -22,6 +22,7 @@ pub fn newProcess(task: *kernel.task.Task) !void {
         mode
     );
     const stat_inode: *inode.ProcInode = stat_dentry.inode.getImpl(inode.ProcInode, "base");
+    task.refcount.ref();
     stat_inode.task = task;
 
     const cmdline_dentry = try interface.createFile(parent,
@@ -30,6 +31,7 @@ pub fn newProcess(task: *kernel.task.Task) !void {
         mode
     );
     const cmdline_inode = cmdline_dentry.inode.getImpl(inode.ProcInode, "base");
+    task.refcount.ref();
     cmdline_inode.task = task;
 
     const kstack_dentry = try interface.createFile(parent,
@@ -38,6 +40,7 @@ pub fn newProcess(task: *kernel.task.Task) !void {
         mode
     );
     const kstack_inode = kstack_dentry.inode.getImpl(inode.ProcInode, "base");
+    task.refcount.ref();
     kstack_inode.task = task;
 }
 
@@ -50,26 +53,22 @@ pub fn deleteProcess(task: *kernel.task.Task) void {
     const dentry = kernel.fs.procfs.root.inode.ops.lookup(kernel.fs.procfs.root, slice) catch {
         @panic("Not found? This shouldn't happen\n");
     };
-    _ = interface.deleteRecursive(dentry) catch {};
+    dentry.release();
+    while (true) {
+        _ = interface.deleteRecursive(dentry) catch |err| {
+            kernel.logger.ERROR("deleting proc files {s} failed: {t}. ref: {d}", .{slice, err, dentry.ref.getValue()});
+            continue ;
+            // @panic("proc deleteRecursive");
+        };
+        break;
+    }
 
 }
 
 
-fn open(_: *kernel.fs.File, base: *kernel.fs.Inode) !void {
-    const proc_inode = base.getImpl(inode.ProcInode, "base");
-    const task = proc_inode.task orelse {
-        return kernel.errors.PosixError.EINVAL;
-    };
-    task.refcount.ref();
-}
+fn open(_: *kernel.fs.File, _: *kernel.fs.Inode) !void {}
 
-fn close(file: *kernel.fs.File) void {
-    const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
-    const task = proc_inode.task orelse {
-        @panic("Should not happen");
-    };
-    task.refcount.unref();
-}
+fn close(_: *kernel.fs.File) void {}
 
 fn write(_: *kernel.fs.File, _: [*]const u8, _: usize) !usize {
     return kernel.errors.PosixError.ENOSYS;

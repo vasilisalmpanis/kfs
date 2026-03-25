@@ -42,7 +42,7 @@ pub fn link(target: ?[*:0]u8, linkpath: ?[*:0]u8) !u32 {
     if (target_path.mnt != link_parent_dir.mnt) {
         return errors.EXDEV;
     }
-    _ = parent_inode.ops.lookup(link_parent_dir.dentry, link_name) catch |err| {
+    const dent = parent_inode.ops.lookup(link_parent_dir.dentry, link_name) catch |err| {
         switch (err) {
             errors.ENOENT => {
                 return do_link(link_parent_dir, link_name, target_path);
@@ -50,5 +50,6 @@ pub fn link(target: ?[*:0]u8, linkpath: ?[*:0]u8) !u32 {
             else => return err,
         }
     };
+    dent.release();
     return errors.EEXIST;
 }

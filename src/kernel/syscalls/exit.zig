@@ -12,6 +12,7 @@ pub fn doExit(error_code: i32) !u32 {
     tsk.current.result = error_code;
 
     kernel.fs.procfs.deleteProcess(kernel.task.current);
+    kernel.task.current.refcount.unref();
     while (kernel.task.current.refcount.getValue() > 1)
         arch.archReschedule();
 
@@ -23,8 +24,10 @@ pub fn doExit(error_code: i32) !u32 {
         const act = parent.sighand.actions.get(.SIGCHLD);
 
         tsk.current.state = .ZOMBIE;
-        if (act.flags & signals.SA_NOCLDWAIT != 0)
+        if (act.flags & signals.SA_NOCLDWAIT != 0) {
+            tsk.current.refcount.ref();
             tsk.current.finish(true);
+        }
 
         tsk.current.wakeupParent(true);
         if (act.handler.handler != signals.sigIGN)

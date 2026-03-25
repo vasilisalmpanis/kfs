@@ -57,12 +57,16 @@ pub fn do_rmdir_at(path: []const u8, from: krn.fs.path.Path) !u32 {
     if (name.len == 0)
         return errors.ENOENT;
     const to_remove = try parent.dentry.inode.ops.lookup(parent.dentry, name);
-    if (!to_remove.inode.mode.isDir())
+    if (!to_remove.inode.mode.isDir()) {
+        to_remove.release();
         return errors.ENOTDIR;
+    }
     if (parent.dentry.inode.ops.rmdir) |_rmdir| {
+        to_remove.release();
         try _rmdir(to_remove, parent.dentry);
         return 0;
     }
+    to_remove.release();
     return errors.EPERM;
 }
 

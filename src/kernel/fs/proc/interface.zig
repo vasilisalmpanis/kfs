@@ -14,11 +14,12 @@ pub fn createFile(
     fops: *const fs.FileOps,
     mode: fs.UMode
 ) !*fs.DEntry {
-    _ = parent.inode.ops.lookup(parent, name) catch {
+    const dent = parent.inode.ops.lookup(parent, name) catch {
         const new_file = try parent.inode.ops.create(parent.inode, name, mode, parent);
         new_file.inode.fops = fops;
         return new_file;
     };
+    dent.release();
     return kernel.errors.PosixError.EEXIST;
 }
 

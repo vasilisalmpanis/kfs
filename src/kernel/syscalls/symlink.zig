@@ -34,7 +34,7 @@ pub fn symlink(target: ?[*:0]u8, linkpath: ?[*:0]u8) !u32 {
         return errors.EACCES;
     if (link_name.len == 0)
         return errors.EEXIST;
-    _ = parent_inode.ops.lookup(link_parent_dir.dentry, link_name) catch |err| {
+    const dent = parent_inode.ops.lookup(link_parent_dir.dentry, link_name) catch |err| {
         switch (err) {
             errors.ENOENT => {
                 return do_symlink(link_parent_dir, link_name, _target);
@@ -42,5 +42,6 @@ pub fn symlink(target: ?[*:0]u8, linkpath: ?[*:0]u8) !u32 {
             else => return err,
         }
     };
+    dent.release();
     return errors.EEXIST;
 }
