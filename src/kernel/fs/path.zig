@@ -70,8 +70,10 @@ pub const Path = struct {
                 }
                 if (self.mnt.root.tree.parent) |d| {
                     if (self.mnt.tree.parent) |p| {
+                        const mnt = p.entry(fs.Mount, "tree");
+                        mnt.count.ref();
                         self.mnt.count.unref();
-                        self.mnt = p.entry(fs.Mount, "tree");
+                        self.mnt = mnt;
                         self.setDentry(d.entry(fs.DEntry, "tree"));
                     } else {
                         return krn.errors.PosixError.EINVAL;
@@ -93,7 +95,8 @@ pub const Path = struct {
             ) catch |err| {
                 return err;
             };
-            self.setDentry(dentry);
+            self.dentry.ref.unref();
+            self.dentry = dentry;
         }
         self.resolveMount();
         if (self.dentry.inode.mode.isLink() and follow) {

@@ -39,7 +39,10 @@ pub const SysInode = struct {
             .ino = dir.inode.i_no,
             .name = name,
         };
+        fs.dcache_lock.lock();
+        defer fs.dcache_lock.unlock();
         if (fs.dcache.get(key)) |entry| {
+            entry.ref.ref();
             return entry;
         }
         return kernel.errors.PosixError.ENOENT;
@@ -72,6 +75,8 @@ pub const SysInode = struct {
             parent.tree.addChild(&new_dentry.tree);
             parent.ref.ref();
             cash_key.name = new_dentry.name;
+            fs.dcache_lock.lock();
+            defer fs.dcache_lock.unlock();
             try fs.dcache.put(cash_key, new_dentry);
             return new_dentry;
         } else {
@@ -87,7 +92,7 @@ pub const SysInode = struct {
             return error.Access;
 
         // Lookup if file already exists.
-        _ = base.ops.lookup(parent, name) catch {
+        const dent = base.ops.lookup(parent, name) catch {
             const new_inode = try SysInode.new(sb);
             errdefer kernel.mm.kfree(new_inode);
             new_inode.setCreds(
@@ -101,6 +106,7 @@ pub const SysInode = struct {
                 base.links += 1;
             return dent;
         };
+        dent.release();
         return error.Exists;
     }
 

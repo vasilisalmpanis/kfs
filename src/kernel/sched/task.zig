@@ -239,6 +239,7 @@ pub const Task = struct {
         }
         self.state = tmp.state;
         self.refcount = tmp.refcount;
+        self.refcount.ref();
         self.wakeup_time = tmp.wakeup_time;
         self.utime = tmp.utime;
         self.stime = tmp.stime;
@@ -264,6 +265,14 @@ pub const Task = struct {
         self.wait_wq = krn.wq.WaitQueueHead.init();
         self.wait_wq.setup();
 
+        // We should create proc files here because if we do before
+        // we could have the following sequence.
+        // - newProcess creates the files and refs the task
+        // - initSelf runs and sets task.refcount to 1.
+        // - proc destroyInode unrefs the task and we get underflow.
+        if (self.tsktype == .PROCESS) {
+            try krn.fs.procfs.newProcess(self);
+        }
         const lock_state = tasks_lock.lock_irq_disable();
         defer tasks_lock.unlock_irq_enable(lock_state);
 
@@ -290,16 +299,38 @@ pub const Task = struct {
         pid += 1;
     }
 
+    fn findByPidRec(self: *Task, task_pid: u32) ?*Task {
+        if (self.pid == task_pid) {
+            self.refcount.ref();
+            return self;
+        }
+
+        var res: ?*Task = null;
+        if (self.tree.hasChildren()) {
+            var it = self.tree.child.?.siblingsIterator();
+            while (it.next()) |i| {
+                res = i.curr.entry(Task, "tree").*.findByPidRec(task_pid);
+                if (res != null)
+                    break ;
+            }
+        }
+        return res;
+    }
+
     pub fn findByPid(self: *Task, task_pid: u32) ?*Task {
         if (self.pid == task_pid) {
             self.refcount.ref();
             return self;
         }
+
+        const lock_state = tasks_lock.lock_irq_disable();
+        defer tasks_lock.unlock_irq_enable(lock_state);
+
         var res: ?*Task = null;
         if (self.tree.hasChildren()) {
             var it = self.tree.child.?.siblingsIterator();
             while (it.next()) |i| {
-                res = i.curr.entry(Task, "tree").*.findByPid(task_pid);
+                res = i.curr.entry(Task, "tree").*.findByPidRec(task_pid);
                 if (res != null)
                     break ;
             }
@@ -309,6 +340,8 @@ pub const Task = struct {
 
     pub fn refcountChildren(self: *Task, pgid: u32, ref: bool) bool {
         var result: bool = false;
+        const lock_state = tasks_lock.lock_irq_disable();
+        defer tasks_lock.unlock_irq_enable(lock_state);
         if (self.tree.hasChildren()) {
             var it = self.tree.child.?.siblingsIterator();
             while (it.next()) |i| {
@@ -329,6 +362,8 @@ pub const Task = struct {
     }
 
     pub fn findChildByPid(self: *Task, task_pid: u32) ?*Task {
+        const lock_state = tasks_lock.lock_irq_disable();
+        defer tasks_lock.unlock_irq_enable(lock_state);
         if (self.tree.hasChildren()) {
             var it = self.tree.child.?.siblingsIterator();
             while (it.next()) |i| {
@@ -480,6 +515,7 @@ pub fn initMultitasking() void {
         @intFromPtr(&stack_bottom),
         "swapper"
     );
+    initial_task.refcount.ref();
     initial_task.mm.?.vas = @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET;
     initial_task.fpu_state = &inital_fpu_state;
     krn.irq.registerHandler(0, &krn.timerHandler, null);

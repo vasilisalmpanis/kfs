@@ -99,6 +99,7 @@ pub const Bus = struct {
         defer bus.device_mutex.unlock();
         if (bus.sysfs_devices) |d| {
             const device_file = try d.inode.ops.lookup(d, device.name);
+            device_file.release();
             if (d.inode.ops.unlink) |unlink| {
                 try unlink(d.inode, device_file);
             }

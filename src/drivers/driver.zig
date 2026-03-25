@@ -83,6 +83,7 @@ pub const Driver = struct {
         // Remove file from sysfs
         if (bus.sysfs_drivers) |_drivers| {
             const driver_file = try _drivers.inode.ops.lookup(_drivers, self.name);
+            driver_file.release();
             if (driver_file.inode.ops.unlink) |unlink| {
                 try unlink(_drivers.inode, driver_file);
             }

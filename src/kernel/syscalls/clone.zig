@@ -174,7 +174,6 @@ pub fn clone(
         child.limit = krn.task.current.limit;
     }
 
-    try krn.fs.procfs.newProcess(child);
     child.initSelf(
         stack_top,
         stack,
@@ -187,6 +186,7 @@ pub fn clone(
         krn.logger.ERROR("clone: failed to init child task: {t}", .{err});
         return errors.ENOMEM;
     };
+    errdefer krn.fs.procfs.deleteProcess(child);
     child.fpu_state = child_fpu_state;
     child.fpu_used = child_fpu_used;
     child.save_fpu_state = false;

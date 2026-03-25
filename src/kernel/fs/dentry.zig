@@ -31,8 +31,13 @@ pub const DEntry = struct {
     tree: TreeNode,
 
     pub fn drop(self: *Refcount) void {
+        fs.dcache_lock.lock();
+        if (!self.isFree()) {
+            fs.dcache_lock.unlock();
+            return ;
+        }
         const dentry: *DEntry = list.containerOf(DEntry, @intFromPtr(self), "ref");
-        kernel.logger.WARN("Dropping {s}\n", .{dentry.name});
+        kernel.logger.WARN("Dropping {s}, ref: {d}\n", .{dentry.name, dentry.ref.getValue()});
         if (dentry.tree.parent) |_p| {
             const _parent = _p.entry(fs.DEntry, "tree");
             const key = fs.DentryHash{
@@ -42,14 +47,19 @@ pub const DEntry = struct {
             };
             _ = fs.dcache.remove(key);
             _ = dentry.sb.inode_map.remove(dentry.inode.i_no);
-            _parent.ref.unref();
         }
         if (dentry.sb.ops.destroy_inode) |_destroy_fn| {
             _destroy_fn(dentry.sb, dentry.inode) catch {
             };
         }
-        kernel.mm.kfree(dentry.name.ptr);
+        const parent = dentry.tree.parent;
         dentry.tree.del();
+        fs.dcache_lock.unlock();
+        if (parent) |_p| {
+            const _parent = _p.entry(fs.DEntry, "tree");
+            _parent.ref.unref();
+        }
+        kernel.mm.kfree(dentry.name.ptr);
         kernel.mm.kfree(dentry);
     }
 
@@ -79,6 +89,8 @@ pub const DEntry = struct {
         const new_dentry: *fs.DEntry = fs.DEntry.alloc(name, ino.sb.?, ino) catch {
             return kernel.errors.PosixError.ENOMEM;
         };
+        fs.dcache_lock.lock();
+        defer fs.dcache_lock.unlock();
         parent.tree.addChild(&new_dentry.tree);
         fs.dcache.put(
             fs.DentryHash{

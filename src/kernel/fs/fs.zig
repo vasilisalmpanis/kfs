@@ -86,6 +86,8 @@ pub var dcache: std.HashMap(
     99
 ) = undefined;
 
+pub var dcache_lock = kernel.Spinlock.init();
+
 pub var last_ino: u32 = 0;
 var last_ino_lock = kernel.Mutex.init();
 

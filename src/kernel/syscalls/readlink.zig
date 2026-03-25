@@ -22,6 +22,7 @@ pub fn readlink(_path: ?[*:0]u8, _buf: ?[*]u8, size: isize) !u32 {
     }
 
     const target_dentry =  try parent.dentry.inode.ops.lookup(parent.dentry, last_segment);
+    defer target_dentry.release();
     if (!target_dentry.inode.mode.isLink())
         return errors.EINVAL;
     if (target_dentry.inode.ops.readlink) |_readlink| {

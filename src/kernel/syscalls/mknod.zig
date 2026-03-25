@@ -26,19 +26,17 @@ pub fn mknod(
     ) {
         return errors.EACCES;
     }
-    var can_create_name: bool = false;
-    _ = parent_dir.dentry.inode.ops.lookup(
+    const dent: ?*fs.DEntry = parent_dir.dentry.inode.ops.lookup(
         parent_dir.dentry,
         name
-    ) catch |err| {
+    ) catch |err| blk: {
         switch (err) {
-            kernel.errors.PosixError.ENOENT => {
-                can_create_name = true;
-            },
+            kernel.errors.PosixError.ENOENT => break :blk null,
             else => return err
         }
     };
-    if (!can_create_name) {
+    if (dent) |_d| {
+        _d.release();
         return errors.EEXIST;
     }
 

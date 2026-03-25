@@ -72,7 +72,6 @@ pub fn doFork() !u32 {
     child_regs.eax = 0;
     child.tls = krn.task.current.tls;
     child.limit = krn.task.current.limit;
-    try procfs.newProcess(child);
     child.initSelf(
         stack_top,
         stack,
@@ -87,6 +86,7 @@ pub fn doFork() !u32 {
         krn.logger.ERROR("fork: failed to init child task: {any}", .{err});
         return errors.ENOMEM;
     };
+    errdefer procfs.deleteProcess(child);
     child.fpu_state = child_fpu_state;
     child.fpu_used = child_fpu_used;
     child.save_fpu_state = false;

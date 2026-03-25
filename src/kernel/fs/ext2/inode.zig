@@ -192,9 +192,13 @@ pub const Ext2Inode = struct {
             .ino = dir.inode.i_no,
             .name = name,
         };
+        fs.dcache_lock.lock();
         if (fs.dcache.get(key)) |entry| {
+            entry.ref.ref();
+            fs.dcache_lock.unlock();
             return entry;
         }
+        fs.dcache_lock.unlock();
         // Get from disk
         const ext2_dir_inode = dir.inode.getImpl(Ext2Inode, "base");
         const ext2_super = dir.sb.getImpl(ext2_sb.Ext2Super, "base");
@@ -213,7 +217,9 @@ pub const Ext2Inode = struct {
                         errdefer kernel.mm.kfree(new_inode);
                         try new_inode.iget(ext2_super, curr_dir.inode);
                         new_inode.base.i_no = curr_dir.inode;
-                        return try dir.new(name, &new_inode.base);
+                        const new_d = try dir.new(name, &new_inode.base);
+                        new_d.ref.ref();
+                        return new_d;
                     }
                 }
             }
@@ -254,7 +260,7 @@ pub const Ext2Inode = struct {
             return kernel.errors.PosixError.EACCES;
 
         // Lookup if file already exists.
-        _ = base.ops.lookup(parent, name) catch |err| {
+        const dent = base.ops.lookup(parent, name) catch |err| {
             if (err == kernel.errors.PosixError.ENOENT) {
                 const parent_inode = base.getImpl(Ext2Inode, "base");
                 const sb = base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
@@ -375,6 +381,7 @@ pub const Ext2Inode = struct {
             }
             return err;
         };
+        dent.release();
         return kernel.errors.PosixError.EEXIST;
     }
 
@@ -835,6 +842,7 @@ pub const Ext2Inode = struct {
         };
         const new_parent_ino_ext2 = new_parent.inode.getImpl(Ext2Inode, "base");
         if (new_d) |_d| {
+            defer _d.release();
             const ino_ext2 = _d.inode.getImpl(Ext2Inode, "base");
             if (_d.inode.mode.isDir() and !ino_ext2.isEmptyDir())
                 return kernel.errors.PosixError.ENOTEMPTY;
