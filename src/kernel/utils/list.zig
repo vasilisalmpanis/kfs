@@ -79,17 +79,18 @@ pub const ListHead = packed struct {
     }
 
     pub fn del(self: *ListHead) void {
-        if (self.prev == null and self.next == null) {
+        if (self.prev == null and self.next == null)
             return;
-        } else if (self.prev == null) {
-            self.next.?.prev = null;
-            return ;
-        } else if (self.next == null) {
-            self.prev.?.next = null;
-            return ;
+
+        if (self.prev) |prev| {
+            prev.next = self.next;
         }
-        self.prev.?.next = self.next;
-        self.next.?.prev = self.prev;
+        if (self.next) |next| {
+            next.prev = self.prev;
+        }
+
+        self.prev = null;
+        self.next = null;
     }
 
     pub fn isEmpty(self: *ListHead) bool {
