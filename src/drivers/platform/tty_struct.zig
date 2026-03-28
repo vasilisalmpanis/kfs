@@ -366,6 +366,13 @@ const Page = struct {
         return self.getCell(self.cursor.x, self.cursor.y);
     }
 
+    pub fn isVisible(self: *Page) bool {
+        if (scr.current_tty) |_tty| {
+            return _tty.curr_page == self;
+        }
+        return false;
+    }
+
     pub fn setCursor(self: *Page, x: usize, y: usize) void {
         if (self.cursor.drawn) {
             self.markCellDirty(self.cursor.x, self.cursor.y);
@@ -411,6 +418,8 @@ const Page = struct {
         ) {
             return;
         }
+        if (!self.isVisible())
+            return ;
         self.restorePrevCursorPos();
         if (self.cursor.kind == .Underline) {
             scr.framebuffer.cursor(
@@ -433,7 +442,7 @@ const Page = struct {
     }
 
     pub fn render(self: *Page) void {
-        if (self.has_dirty) {
+        if (self.has_dirty and self.isVisible()) {
             const x1 = self.dirty.x1;
             const y1 = self.dirty.y1;
             const x2 = @min(self.dirty.x2, self.width - 1);
@@ -514,15 +523,17 @@ const Page = struct {
         }
 
         // Scroll the pixel buffer
-        const pixel_lines = lines * scr.framebuffer.font.height;
-        scr.framebuffer.scrollPixels(
-            pixel_lines,
-            direction,
-            self.curr_bg.toU32()
-        );
+        if (self.isVisible()) {
+            const pixel_lines = lines * scr.framebuffer.font.height;
+            scr.framebuffer.scrollPixels(
+                pixel_lines,
+                direction,
+                self.curr_bg.toU32()
+            );
 
-        if (self.cursor.drawn) {
-            self.cleanupScrolledCursor(lines, direction);
+            if (self.cursor.drawn) {
+                self.cleanupScrolledCursor(lines, direction);
+            }
         }
         self.cursor.drawn = false;
 
