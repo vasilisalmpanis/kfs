@@ -28,8 +28,6 @@ pub fn deleteRecursive(dentry: *fs.DEntry) !void {
         const child = child_node.entry(fs.DEntry, "tree");
         if (child.inode.mode.isDir()) {
             try deleteRecursive(child);
-            if (child.inode.ops.rmdir) |_rmdir|
-                try _rmdir(child, dentry);
         } else {
             if (child.inode.ops.unlink) |_unlink|
                 try _unlink(dentry.inode, child);
