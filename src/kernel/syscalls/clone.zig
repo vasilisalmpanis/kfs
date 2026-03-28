@@ -86,7 +86,7 @@ pub fn clone(
     };
     errdefer krn.mm.kfree(child);
     child.* = krn.task.Task.init(0, 0, 0, .PROCESS);
-    child.assignPID();
+    try child.assignPID();
 
     const stack: u32 = kthread.kthreadStackAlloc(kthread.STACK_PAGES);
     if (stack == 0) {

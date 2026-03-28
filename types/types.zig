@@ -818,7 +818,7 @@ pub const kernel = struct {
         };
 
         pub const Task = struct {
-            pid : u32,
+            pid : u16,
             tsktype : kernel.task.TaskType,
             name : [16]u8,
             uid : u16,

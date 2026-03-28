@@ -15,7 +15,7 @@ pub fn doFork() !u32 {
     };
     errdefer km.kfree(child);
     child.* = tsk.Task.init(0, 0, 0, .PROCESS);
-    child.assignPID();
+    try child.assignPID();
 
     const stack: u32 = kthread.kthreadStackAlloc(kthread.STACK_PAGES);
     if (stack == 0) {

@@ -8,7 +8,7 @@ pub fn getPID() !u32 {
 }
 
 pub fn getPPID() !u32 {
-    var pid: u32 = 0;
+    var pid: u16 = 0;
     if (tsk.current.tree.parent != null) {
         const p: *tsk.Task = tsk.current.tree.parent.?.entry(tsk.Task, "tree");
         pid = p.pid;
@@ -27,7 +27,7 @@ pub fn setUID(uid: u16) !u32 {
 }
 
 pub fn getGID() !u32 {
-    return tsk.current.gid;
+    return @intCast(tsk.current.gid);
 }
 
 pub fn setGID(gid: u16) !u32 {
@@ -36,13 +36,12 @@ pub fn setGID(gid: u16) !u32 {
     return 0;
 }
 
-pub fn getPGID(pid_arg: u32) !u32 {
-    const pid: i32 = @intCast(pid_arg);
+pub fn getPGID(pid: i32) !u32 {
     if (pid < 0)
         return errors.EEXIST;
     if (pid == 0)
         return tsk.current.pgid;
-    if (tsk.current.findByPid(pid_arg)) |task| {
+    if (tsk.current.findByPid(@intCast(pid))) |task| {
         defer task.refcount.unref();
         return task.pgid;
     }
@@ -53,13 +52,12 @@ pub fn getPGRP() !u32 {
     return tsk.current.pgid;
 }
 
-pub fn getSID(pid_arg: u32) !u32 {
-    const pid: i32 = @intCast(pid_arg);
+pub fn getSID(pid: i32) !u32 {
     if (pid < 0)
         return errors.EINVAL;
     if (pid == 0)
         return tsk.current.sid;
-    if (tsk.current.findByPid(pid_arg)) |task| {
+    if (tsk.current.findByPid(@intCast(pid))) |task| {
         defer task.refcount.unref();
         return task.sid;
     }
@@ -69,25 +67,31 @@ pub fn getSID(pid_arg: u32) !u32 {
 pub fn setSID() !u32 {
     if (tsk.current.pgid == tsk.current.pid)
         return errors.EPERM;
-    tsk.current.sid = @intCast(tsk.current.pid);
-    tsk.current.pgid = @intCast(tsk.current.pid);
+    tsk.current.sid = tsk.current.pid;
+    tsk.current.pgid = tsk.current.pid;
     tsk.current.clearControllingTTY();
     return tsk.current.sid;
 }
 
-pub fn setPGID(pid_arg: u32, pgid_arg: u32) !u32 {
-    const pid: i32 = @intCast(pid_arg);
-    const pgid: i32 = @intCast(pgid_arg);
+pub fn setPGID(pid: i32, pgid: i32) !u32 {
     krn.logger.INFO("setPGID pid: {d}, pgid: {d}", .{pid, pgid});
-    if (pid < 0) {
+    if (pgid < 0)
+        return errors.EINVAL;
+    if (pid < 0)
         return errors.ESRCH;
-    } else if (pid == 0) {
-        tsk.current.pgid = @intCast(pgid_arg);
-        return 0;
-    }
-    if (tsk.current.findByPid(pid_arg)) |task| {
+    var _task: ?*tsk.Task = null;
+    if (pid == 0) {
+        _task = tsk.current;
+    } else if (tsk.current.findByPid(@intCast(pid))) |task| {
         defer task.refcount.unref();
-        task.pgid = @intCast(pgid);
+        _task = task;
+    }
+    if (_task) |t| {
+        if (pgid == 0) {
+            t.pgid = t.pid;
+        } else {
+            t.pgid = @intCast(pgid);
+        }
         return 0;
     }
     return errors.ESRCH;
