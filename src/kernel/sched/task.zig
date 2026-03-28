@@ -14,7 +14,30 @@ const ThreadHandler = @import("./kthread.zig").ThreadHandler;
 const mm = @import("../mm/init.zig");
 const errors = @import("../syscalls/error-codes.zig").PosixError;
 
-var pid: u32 = 0;
+var pid_bitset = std.bit_set.ArrayBitSet(usize, std.math.maxInt(u16)).initEmpty();
+var pid_lock = krn.Spinlock.init();
+
+pub fn allocPid() !u16 {
+    const lock_state = pid_lock.lock_irq_disable();
+    defer pid_lock.unlock_irq_enable(lock_state);
+
+    var pid_it = pid_bitset.iterator(.{
+        .direction = .forward,
+        .kind = .unset
+    });
+    if (pid_it.next()) |_pid| {
+        pid_bitset.set(_pid);
+        return @intCast(_pid);
+    }
+    return error.EAGAIN;
+}
+
+pub fn releasePid(_pid: u16) void {
+    const lock_state = pid_lock.lock_irq_disable();
+    defer pid_lock.unlock_irq_enable(lock_state);
+
+    pid_bitset.unset(_pid);
+}
 
 pub const TaskState = enum(u8) {
     RUNNING,
@@ -86,7 +109,7 @@ pub const MAX_GROUPS: usize = 32;
 // and put it when no longer needed.
 pub const Task = struct {
 
-    pid:            u32,
+    pid:            u16,
     tsktype:        TaskType,
     name:           [16] u8,
     uid:            u16,
@@ -170,8 +193,8 @@ pub const Task = struct {
         return false;
     }
 
-    pub fn setup(self: *Task, task_stack_top: usize, task_stack_bottom: usize, name: []const u8) void {
-        self.assignPID();
+    pub fn setup(self: *Task, task_stack_top: usize, task_stack_bottom: usize, name: []const u8) !void {
+        try self.assignPID();
         self.uid = 0;
         self.regs.setStackPointer(task_stack_top);
         self.stack_bottom = task_stack_bottom;
@@ -206,7 +229,7 @@ pub const Task = struct {
     ) anyerror!*Task {
         if (krn.mm.kmalloc(Task)) |task| {
             errdefer krn.mm.kfree(task);
-            task.assignPID();
+            try task.assignPID();
             try task.initSelf(task_stack_top, stack_btm, uid, gid, pgid, tp, name);
             return task;
         }
@@ -294,12 +317,11 @@ pub const Task = struct {
         self.tree.del();
     }
 
-    pub fn assignPID(self: *Task) void{
-        self.pid = pid;
-        pid += 1;
+    pub fn assignPID(self: *Task) !void {
+        self.pid = try allocPid();
     }
 
-    fn findByPidRec(self: *Task, task_pid: u32) ?*Task {
+    fn findByPidRec(self: *Task, task_pid: u16) ?*Task {
         if (self.pid == task_pid) {
             self.refcount.ref();
             return self;
@@ -317,7 +339,7 @@ pub const Task = struct {
         return res;
     }
 
-    pub fn findByPid(self: *Task, task_pid: u32) ?*Task {
+    pub fn findByPid(self: *Task, task_pid: u16) ?*Task {
         if (self.pid == task_pid) {
             self.refcount.ref();
             return self;
@@ -361,7 +383,7 @@ pub const Task = struct {
         return result;
     }
 
-    pub fn findChildByPid(self: *Task, task_pid: u32) ?*Task {
+    pub fn findChildByPid(self: *Task, task_pid: u16) ?*Task {
         const lock_state = tasks_lock.lock_irq_disable();
         defer tasks_lock.unlock_irq_enable(lock_state);
         if (self.tree.hasChildren()) {
@@ -514,7 +536,10 @@ pub fn initMultitasking() void {
         @intFromPtr(&stack_top),
         @intFromPtr(&stack_bottom),
         "swapper"
-    );
+    ) catch |err| {
+        krn.logger.ERROR("initMultitasking(): {t}", .{err});
+        @panic("Failed to setup initial task!");
+    };
     initial_task.refcount.ref();
     initial_task.mm.?.vas = @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET;
     initial_task.fpu_state = &inital_fpu_state;

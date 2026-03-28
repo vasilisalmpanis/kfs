@@ -37,6 +37,7 @@ fn processTasks() void {
         task.delFromTree(); // Already done in task finish but safe
         task.mm.?.delete();
         kthreadStackFree(task.stack_bottom);
+        tsk.releasePid(task.pid);
         km.kfree(task);
         if (end)
             break;

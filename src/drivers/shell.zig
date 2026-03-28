@@ -187,7 +187,7 @@ fn vmas(_: *Shell, args: [][]const u8) void {
         );
         return ;
     }
-    const pid: u32 = std.fmt.parseInt(u32, args[0], 10) catch 0;
+    const pid: u16 = std.fmt.parseInt(u16, args[0], 10) catch 0;
     debug.printTaskVMAs(pid);
     return;
 }
