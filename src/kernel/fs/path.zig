@@ -111,6 +111,7 @@ pub const Path = struct {
             return buf[0..0];
         }
         var curr = try resolveFrom("..", self, true);
+        defer curr.release();
         const res = try curr.getAbsPath(buf);
         buf[res.len] = '/';
         var _d: *fs.DEntry = undefined;
