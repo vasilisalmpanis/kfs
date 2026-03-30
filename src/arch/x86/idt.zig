@@ -238,10 +238,17 @@ pub const pop_regs: []const u8 =
 \\
 ;
 
+const kernel_entry_clear_flags: []const u8 =
+    \\    pushl $2
+    \\    popfd
+    \\
+;
+
 pub fn generateIRQStub(comptime n: u8) []const u8 {
     return std.fmt.comptimePrint(
         \\irq_stub_{d}:
         \\ cli
+        \\ {s}
         \\ push $0
         \\ push ${d}
         \\ {s}
@@ -255,7 +262,13 @@ pub fn generateIRQStub(comptime n: u8) []const u8 {
         \\ add $8, %esp
         \\ iret
         \\
-        , .{n, n, push_regs, pop_regs}
+        , .{
+            n,
+            kernel_entry_clear_flags,
+            n,
+            push_regs,
+            pop_regs
+        }
     );
 }
 
@@ -264,6 +277,7 @@ fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
     return std.fmt.comptimePrint(
         \\isr_stub_{d}:
         \\ cli
+        \\ {s}
         \\ {s}
         \\ push ${d}
         \\ {s}
@@ -277,7 +291,14 @@ fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
         \\ add $8, %esp
         \\ iret
         \\
-        , .{n, if (has_error) "" else "push $0", n, push_regs, pop_regs}
+        , .{
+            n,
+            kernel_entry_clear_flags,
+            if (has_error) "" else "push $0",
+            n,
+            push_regs,
+            pop_regs,
+        }
     );
 }
 

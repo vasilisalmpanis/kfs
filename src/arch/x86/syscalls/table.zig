@@ -14,7 +14,7 @@ pub const SyscallHandler = fn (
 
 fn notImpl(_: u32, _: u32, _: u32, _: u32, _: u32, _: u32) !u32 {
     const state: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
-    krn.logger.WARN("syscall {d} {s} is not implemented", .{
+    krn.logger.ERROR("syscall {d} {s} is not implemented", .{
         state.eax,
         @tagName(@as(Syscall, @enumFromInt(state.eax)))
     });
@@ -24,6 +24,7 @@ fn notImpl(_: u32, _: u32, _: u32, _: u32, _: u32, _: u32) !u32 {
 pub const SyscallTable = brk: {
     @setEvalBranchQuota(1700);
     break :brk std.EnumMap(Syscall, *const SyscallHandler).init(.{
+        .SYS_fallocate                  = &notImpl,
         .SYS_setup                      = &notImpl,
         .SYS_exit                       = @ptrCast(&krn.syscalls.exit.exit),
         .SYS_fork                       = @ptrCast(&krn.syscalls.fork.fork),
