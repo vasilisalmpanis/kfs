@@ -199,8 +199,8 @@ pub fn hPageFault(regs: *Regs) *Regs {
     var addr: u32 = 0;
     addr = arch.vmm.getCR2();
     arch.cpu.disableInterrupts();
-    kernel.logger.DEBUG("PID {d}\n", .{kernel.task.current.pid});
-    kernel.logger.DEBUG(
+    kernel.logger.ERROR("PID {d}\n", .{kernel.task.current.pid});
+    kernel.logger.ERROR(
         \\Page Fault at addr: {x}
         \\EIP: {x}
         \\  present:      {d}

@@ -38,7 +38,12 @@ pub fn panic(
             msg
         }
     );
-    cpu.Regs.state().dump();
+    if (krn.task.current.regs.esp != 0) {
+        const curr_regs: *cpu.Regs = @ptrFromInt(krn.task.current.regs.esp);
+        curr_regs.dump();
+    } else {
+        cpu.Regs.state().dump();
+    }
     dbg.traceStackTrace(20);
     system.halt();
     while (true) {}

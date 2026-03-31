@@ -20,9 +20,7 @@ pub const Path = struct {
     }
 
     pub fn release(self: *const Path) void {
-        krn.logger.DEBUG("[PID {d}] dentry {s}\n", .{krn.task.current.pid, self.dentry.name});
         self.dentry.ref.unref();
-        krn.logger.DEBUG("mntpoint\n", .{});
         self.mnt.count.unref();
     }
 
