@@ -63,23 +63,8 @@ fn findNextTask() *tsk.Task {
         }
         if (task.state == .INTERRUPTIBLE_SLEEP and task.sighand.hasPending())
             task.state = .RUNNING;
-        if (task.state == .RUNNING) {
-            if (task.mm == null) {
-                krn.logger.ERROR(\\
-                    \\ Broken task pid {d}: task.mm == null"
-                    \\   current pid: {d}
-                    \\
-                    ,.{
-                        task.pid,
-                        krn.task.current.pid,
-                    }
-                );
-                task.dbgPrint();
-                @panic("corrupted task");
-                // continue ;
-            }
+        if (task.state == .RUNNING)
             return task;
-        }
     }
     return &tsk.initial_task;
 }

@@ -48,13 +48,13 @@ pub const DEntry = struct {
             _ = fs.dcache.remove(key);
             _ = dentry.sb.inode_map.remove(dentry.inode.i_no);
         }
+        const parent = dentry.tree.parent;
+        dentry.tree.del();
+        fs.dcache_lock.unlock();
         if (dentry.sb.ops.destroy_inode) |_destroy_fn| {
             _destroy_fn(dentry.sb, dentry.inode) catch {
             };
         }
-        const parent = dentry.tree.parent;
-        dentry.tree.del();
-        fs.dcache_lock.unlock();
         if (parent) |_p| {
             const _parent = _p.entry(fs.DEntry, "tree");
             _parent.ref.unref();

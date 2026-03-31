@@ -32,7 +32,7 @@ pub fn vfreeSlice(slice: anytype) void {
         if (@typeInfo(Slice) != .pointer or
             @typeInfo(Slice).pointer.size != .slice)
         {
-            @compileError("kfreeSlice expects a slice");
+            @compileError("vfreeSlice expects a slice");
         }
     }
 

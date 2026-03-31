@@ -14,17 +14,29 @@ const ThreadHandler = @import("./kthread.zig").ThreadHandler;
 const mm = @import("../mm/init.zig");
 const errors = @import("../syscalls/error-codes.zig").PosixError;
 
-var pid_bitset = std.bit_set.ArrayBitSet(usize, std.math.maxInt(u16)).initEmpty();
+var pid_bitset = std.bit_set.ArrayBitSet(
+    usize,
+    std.math.maxInt(u16) + 1
+).initEmpty();
 var pid_lock = krn.Spinlock.init();
+pub var pid_it: std.bit_set.ArrayBitSet(usize, std.math.maxInt(u16)).Iterator(.{
+    .direction = .forward,
+    .kind = .unset,
+}) = undefined;
 
 pub fn allocPid() !u16 {
     const lock_state = pid_lock.lock_irq_disable();
     defer pid_lock.unlock_irq_enable(lock_state);
 
-    var pid_it = pid_bitset.iterator(.{
-        .direction = .forward,
-        .kind = .unset
-    });
+    if (
+        pid_it.words_remain.len == 0
+        and pid_it.bits_remain == 0
+    ) {
+        pid_it = pid_bitset.iterator(.{
+            .direction = .forward,
+            .kind = .unset,
+        });
+    }
     if (pid_it.next()) |_pid| {
         pid_bitset.set(_pid);
         return @intCast(_pid);
@@ -532,6 +544,10 @@ extern const stack_bottom: u32;
 var inital_fpu_state = arch.fpu.FPUState{};
 
 pub fn initMultitasking() void {
+    pid_it = pid_bitset.iterator(.{
+        .direction = .forward,
+        .kind = .unset,
+    });
     initial_task.setup(
         @intFromPtr(&stack_top),
         @intFromPtr(&stack_bottom),
