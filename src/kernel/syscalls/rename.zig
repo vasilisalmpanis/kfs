@@ -58,8 +58,11 @@ pub fn renameat2(
     defer old_parent.release();
     const new_parent = try resolveat(newdirfd, _newpath, &newname);
     defer new_parent.release();
+
     const old_path = try fs.path.resolveFrom(oldname, old_parent, true);
-    errdefer old_path.release();
+    var old_path_released: bool = false;
+    errdefer if (!old_path_released) old_path.release();
+
     const new_path: ?fs.path.Path = fs.path.resolveFrom(newname, new_parent, true) catch |err| blk: {
         switch (err) {
             errors.ENOENT => break :blk null,
@@ -67,7 +70,8 @@ pub fn renameat2(
         }
     };
     if (new_path) |_p| {
-        errdefer _p.release();
+        var p_released: bool = false;
+        errdefer if (!p_released) _p.release();
         if (old_path.dentry.inode.mode.isDir() and !_p.dentry.inode.mode.isDir())
             return errors.ENOTDIR;
         if (old_path.mnt != _p.mnt)
@@ -82,7 +86,11 @@ pub fn renameat2(
         if (old_path.dentry.inode.ops.rename) |_rename| {
             old_path.release();
             _p.release();
-            try _rename(old_parent.dentry, old_path.dentry, new_parent.dentry, newname);
+            _rename(old_parent.dentry, old_path.dentry, new_parent.dentry, newname) catch |err| {
+                p_released = true;
+                old_path_released = true;
+                return err;
+            };
             return 0;
         }
         return errors.EPERM;
@@ -93,7 +101,10 @@ pub fn renameat2(
             return errors.EINVAL;
         if (old_path.dentry.inode.ops.rename) |_rename| {
             old_path.release();
-            try _rename(old_parent.dentry, old_path.dentry, new_parent.dentry, newname);
+            _rename(old_parent.dentry, old_path.dentry, new_parent.dentry, newname) catch |err| {
+                old_path_released = true;
+                return err;
+            };
             return 0;
         }
         return errors.EPERM;

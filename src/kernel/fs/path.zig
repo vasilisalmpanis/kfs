@@ -163,6 +163,7 @@ pub fn dir_resolve(path: []const u8, last: *[]const u8) !Path {
         cwd.mnt,
         cwd.dentry
     );
+    errdefer curr.release();
     try curr.stepInto(".", true);
     var it = std.mem.tokenizeScalar(
         u8,
@@ -192,6 +193,7 @@ pub fn dir_resolve_from(path: []const u8, from: Path, last: *[]const u8) !Path {
         cwd.mnt,
         cwd.dentry
     );
+    errdefer curr.release();
     try curr.stepInto(".", true);
     var it = std.mem.tokenizeScalar(
         u8,
@@ -217,6 +219,7 @@ pub fn isRelative(path: []const u8) bool {
 pub fn resolveFrom(path: []const u8, from: Path, follow: bool) !Path {
     var last: [] const u8 = "";
     var res = try dir_resolve_from(path, from, &last);
+    errdefer res.release();
     if (last.len > 0) {
         try res.stepInto(last, follow);
     }
@@ -226,6 +229,7 @@ pub fn resolveFrom(path: []const u8, from: Path, follow: bool) !Path {
 pub fn resolve(path: []const u8) !Path {
     var last: [] const u8 = "";
     var res = try dir_resolve(path, &last);
+    errdefer res.release();
     if (last.len > 0) {
         try res.stepInto(last, true);
     }
