@@ -117,8 +117,12 @@ pub const SysInode = struct {
         if (_dentry.inode.mode.isDir())
             return kernel.errors.PosixError.EISDIR;
 
-        if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2)
+        fs.dcache_lock.lock();
+        if (_dentry.tree.hasChildren() or _dentry.ref.getValue() > 2) {
+            fs.dcache_lock.unlock();
             return kernel.errors.PosixError.EBUSY;
+        }
+        fs.dcache_lock.unlock();
 
         _dentry.inode.links -= 1;
         _dentry.release();
