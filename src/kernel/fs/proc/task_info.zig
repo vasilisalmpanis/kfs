@@ -133,33 +133,27 @@ pub const stat_file_ops = kernel.fs.FileOps{
     .close = close,
 };
 
-fn cmdline_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
-    const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
+fn cmdline_open(file: *kernel.fs.File, ino: *kernel.fs.Inode) !void {
+    const proc_inode = ino.getImpl(inode.ProcInode, "base");
     const task = proc_inode.task orelse {
         @panic("Should not happen");
     };
+    file.data = null;
     const mm = task.mm orelse
-        return 0;
+        return;
     if (mm.arg_start == 0 or mm.arg_end <= mm.arg_start)
-        return 0;
+        return;
     const args = try mm.accessTaskVM(mm.arg_start, mm.arg_end - mm.arg_start);
-    defer kernel.mm.kfree(args.ptr);
+    errdefer kernel.mm.kfree(args.ptr);
 
-    if (file.pos >= args.len)
-        return 0;
-    var to_read = size;
-    if (file.pos + to_read > args.len)
-        to_read = args.len - file.pos;
-    @memcpy(buff[0..to_read], args[file.pos..file.pos + to_read]);
-    file.pos += to_read;
-    return to_read;
+    try generic_ops.assignSlice(file, args);
 }
 
 pub const cmdline_file_ops = kernel.fs.FileOps{
-    .open = open,
-    .read = cmdline_read,
-    .write = write,
-    .close = close,
+    .open = cmdline_open,
+    .read = generic_ops.generic_read,
+    .write = generic_ops.generic_write,
+    .close = generic_ops.generic_close,
 };
 
 fn kernel_stack_trace_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
