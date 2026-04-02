@@ -83,13 +83,21 @@ pub const ProcInode = struct {
     }
 
     fn rmdir(current: *fs.DEntry, parent: *fs.DEntry) !void {
-        _ = if (current.inode.sb) |_s| _s else return kernel.errors.PosixError.EINVAL;
-        if (current.tree.hasChildren())
+        _ = if (current.inode.sb) |_s| _s else
+            return kernel.errors.PosixError.EINVAL;
+        fs.dcache_lock.lock();
+        if (current.tree.hasChildren()) {
+            fs.dcache_lock.unlock();
             return kernel.errors.PosixError.ENOTEMPTY;
-        if (current.ref.getValue() > 2)
+        }
+        if (current.ref.getValue() > 2) {
+            fs.dcache_lock.unlock();
             return kernel.errors.PosixError.EBUSY;
+        }
+        fs.dcache_lock.unlock();
 
         parent.inode.links -= 1;
+        current.inode.links = 0;
         current.release();
         current.release();
     }
@@ -100,8 +108,12 @@ pub const ProcInode = struct {
         if (_dentry.inode.mode.isDir())
             return kernel.errors.PosixError.EISDIR;
 
-        if (_dentry.ref.getValue() > 2)
+        fs.dcache_lock.lock();
+        if (_dentry.ref.getValue() > 2) {
+            fs.dcache_lock.unlock();
             return kernel.errors.PosixError.EBUSY;
+        }
+        fs.dcache_lock.unlock();
 
         _dentry.inode.links -= 1;
         _dentry.release();
