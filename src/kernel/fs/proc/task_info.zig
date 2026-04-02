@@ -140,34 +140,19 @@ fn cmdline_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
     };
     const mm = task.mm orelse
         return 0;
-    if (mm.arg_start == 0)
+    if (mm.arg_start == 0 or mm.arg_end <= mm.arg_start)
         return 0;
     const args = try mm.accessTaskVM(mm.arg_start, mm.arg_end - mm.arg_start);
     defer kernel.mm.kfree(args.ptr);
 
-    var written: usize = 0;
-    var args_off: usize = 0;
-    while (args_off < args.len) {
-        const arg_ptr: [*:0]const u8 = @ptrCast(&args.ptr[args_off]);
-        const arg: []const u8 = std.mem.span(arg_ptr);
-        if (args_off + arg.len > file.pos) {
-            const arg_pos = file.pos - args_off;
-            var to_write = args_off + arg.len - file.pos;
-            if (written + to_write > size)
-                to_write = size - written;
-            @memcpy(
-                buff[written..written + to_write],
-                arg[arg_pos..arg_pos + to_write]
-            );
-            written += to_write;
-            file.pos += to_write;
-            if (written >= size)
-                return written;
-        }
-        file.pos += 1;
-        args_off += arg.len + 1;
-    }
-    return written;
+    if (file.pos >= args.len)
+        return 0;
+    var to_read = size;
+    if (file.pos + to_read > args.len)
+        to_read = args.len - file.pos;
+    @memcpy(buff[0..to_read], args[file.pos..file.pos + to_read]);
+    file.pos += to_read;
+    return to_read;
 }
 
 pub const cmdline_file_ops = kernel.fs.FileOps{
