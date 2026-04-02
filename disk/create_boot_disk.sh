@@ -6,9 +6,18 @@ KERNEL=zig-out/bin/kfs.bin
 EXT2=ext2.img
 GRUB_CFG=iso/boot/grub/grub.cfg
 
-DISK_SIZE_MB=256 # total disk size in MB (must be large enough to hold all partitions)
-BOOT_SIZE_MB=8  # size of boot partition (must be large enough to hold kernel + GRUB files)
+KERNEL_SIZE_K=`du -s zig-out/bin/kfs.bin | awk '{print $1}'`
+BOOT_DIR_SIZE_K=`du -s iso | awk '{print $1}'`
+ROOT_SIZE_K=`du -s $EXT2 | awk '{print $1}'`
+ROOT_SIZE_MB=$(( $ROOT_SIZE_K / 1024 ))
+
 CORE_SIZE_MB=1  # size of core.img (BIOS Boot partition, must be at least 1MB for GRUB)
+BOOT_SIZE_MB=$(( ($KERNEL_SIZE_K + BOOT_DIR_SIZE_K) / 1024 + 3 ))  # size of boot partition (must be large enough to hold kernel + GRUB files)
+DISK_SIZE_MB=$(( $BOOT_SIZE_MB + $CORE_SIZE_MB + $ROOT_SIZE_MB + 16 )) # total disk size in MB (must be large enough to hold all partitions)
+
+echo "BOOT_SIZE_MB: $BOOT_SIZE_MB"
+echo "ROOT_SIZE_MB: $ROOT_SIZE_MB"
+echo "DISK_SIZE_MB: $DISK_SIZE_MB"
 
 BS=512 # sector size in bytes
 
@@ -36,9 +45,9 @@ sgdisk -n 3:$ROOT_START:                      -t 3:8300 -c 3:root      $DISK
 
 # Build /boot partition image
 BOOT_DIR=$(mktemp -d)
-mkdir -p        "$BOOT_DIR/boot/grub"
-cp "$KERNEL"    "$BOOT_DIR/boot/kfs.bin"
-cp "$GRUB_CFG"  "$BOOT_DIR/boot/grub/grub.cfg"
+mkdir -p        "$BOOT_DIR/grub"
+cp "$KERNEL"    "$BOOT_DIR/kfs.bin"
+cp "$GRUB_CFG"  "$BOOT_DIR/grub/grub.cfg"
 
 BOOT_IMG=$(mktemp)
 mke2fs -L '' -N 0 -O ^64bit -d $BOOT_DIR -m 5 -r 1 -t ext2 $BOOT_IMG $BOOT_SIZE_MB"M"
@@ -49,7 +58,7 @@ dd if=$EXT2     of=$DISK bs=$BS seek=$ROOT_START conv=notrunc
 
 # Build core.img with embedded prefix
 $GRUB_MKIMAGE -O i386-pc -o core.img \
-    -p '(hd0,gpt2)/boot/grub' \
+    -p '(hd0,gpt2)/grub' \
     biosdisk part_gpt ext2 multiboot2 normal boot configfile
 
 # Patch core.img's diskboot block list before writing to disk.

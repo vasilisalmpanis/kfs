@@ -94,7 +94,7 @@ $(IMG): $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:=.o)) \
 		-t ext2 \
 		-b 8196 \
 		$(IMG) \
-		$(IMG_SIZE)
+		$$(du -s $(IMG_DIR) | awk '{print int($$1 * 1.1) + 10240 "K"}')
 
 $(IMG_DIR): $(FILESYSTEM_TAR)
 	$(shell [ ! -d $(IMG_DIR) ] && \
