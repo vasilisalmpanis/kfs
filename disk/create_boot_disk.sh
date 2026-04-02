@@ -6,7 +6,7 @@ KERNEL=zig-out/bin/kfs.bin
 EXT2=ext2.img
 GRUB_CFG=iso/boot/grub/grub.cfg
 
-DISK_SIZE_MB=80 # total disk size in MB (must be large enough to hold all partitions)
+DISK_SIZE_MB=256 # total disk size in MB (must be large enough to hold all partitions)
 BOOT_SIZE_MB=8  # size of boot partition (must be large enough to hold kernel + GRUB files)
 CORE_SIZE_MB=1  # size of core.img (BIOS Boot partition, must be at least 1MB for GRUB)
 
