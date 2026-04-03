@@ -8,10 +8,11 @@ psf2arr*
 userspace_c
 *.img
 zls.json
-disk/*.img
+release
 .DS_Store
 ext2_dir/modules/
 ext2_dir/bin/init
 .venv
 ext2_dir
 filesystem.tar.gz
+rootfs*

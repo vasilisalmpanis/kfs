@@ -89,9 +89,8 @@ fn parentPid(task: *kernel.task.Task) u32 {
 
 fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
     const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
-    const task = proc_inode.task orelse {
-        @panic("Should not happen");
-    };
+    const task = proc_inode.task orelse 
+        return kernel.errors.PosixError.ESRCH;
     var buffer: [512]u8 = .{0} ** 512;
     kernel.logger.INFO("TASK name {s}\n", .{task.name[0..16]});
     const status: u8 = switch (task.state) {
@@ -135,9 +134,8 @@ pub const stat_file_ops = kernel.fs.FileOps{
 
 fn cmdline_open(file: *kernel.fs.File, ino: *kernel.fs.Inode) !void {
     const proc_inode = ino.getImpl(inode.ProcInode, "base");
-    const task = proc_inode.task orelse {
-        @panic("Should not happen");
-    };
+    const task = proc_inode.task orelse
+        return kernel.errors.PosixError.ESRCH;
     file.data = null;
     const mm = task.mm orelse
         return;
@@ -159,9 +157,8 @@ pub const cmdline_file_ops = kernel.fs.FileOps{
 fn kernel_stack_trace_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
     if (file.data == null) {
         const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
-        const task = proc_inode.task orelse {
-            @panic("Should not happen");
-        };
+        const task = proc_inode.task orelse
+            return kernel.errors.PosixError.ESRCH;
         const kbuf = kernel.mm.kmallocSlice(u8, kstack_snapshot_cap) orelse
             return kernel.errors.PosixError.ENOMEM;
         errdefer kernel.mm.kfree(kbuf.ptr);

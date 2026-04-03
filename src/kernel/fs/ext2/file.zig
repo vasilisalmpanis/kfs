@@ -183,7 +183,7 @@ pub const Ext2File = struct {
 
             const entry_size: usize = @sizeOf(fs.LinuxDirent) + ext_dir.getName().len + 1; // For null termination
             if (entry_size > buf.len - bytes_written)
-                return krn.errors.PosixError.EINVAL;
+                return bytes_written;
             const dirent: *fs.LinuxDirent = @ptrFromInt(@intFromPtr(buf.ptr) + bytes_written);
 
             dirent.ino = ext_dir.inode;
