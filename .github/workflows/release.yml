@@ -1,4 +1,4 @@
-name: Build and Release kfs.img
+name: Build and Release Artifacts
 
 on:
   push:
@@ -29,14 +29,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             grub-pc-bin grub-common \
-            gdisk e2fsprogs wget python3
+            gdisk e2fsprogs wget python3 xorriso mtools
 
-      - name: Build kfs.img
-        run: make kfs.img
+      - name: Build release artifacts
+        run: make release-all
+
+      - name: Verify artifact directory
+        run: ls -lah release/dist
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.version || github.ref_name }}
-          files: kfs.img
+          body_path: .github/release-body.md
+          files: |
+            release/dist/kfs-full.img
+            release/dist/kfs-min.img
+            release/dist/kfs-kernel.iso
+            release/dist/kfs.bin
           generate_release_notes: true

@@ -9,9 +9,9 @@ A minimalistic kernel written in Zig.
 - [x] kfs-5
 - [x] kfs-6
 - [x] kfs-7
-- [ ] kfs-8
-- [ ] kfs-9
-- [ ] kfs-x
+- [x] kfs-8
+- [x] kfs-9
+- [x] kfs-x
 
 ## Overview
 
@@ -46,7 +46,7 @@ make
 
 This will:
 1. Compile the kernel using `zig build`.
-2. Copy the kernel binary to `iso/boot/`.
+2. Stage boot assets from `boot/grub/grub.cfg`.
 3. Generate `kfs.iso` using `grub-mkrescue`.
 
 ### Cleaning the Build
@@ -54,6 +54,25 @@ This will:
 To remove compiled files, use:
 ```sh
 make clean
+```
+
+### Release Targets
+
+```sh
+make release-full
+make release-min
+make release-kernel
+make release-all
+```
+
+
+Install build tools:
+
+```sh
+make install-tools
+make install-tools-user
+make install-tools-system
+make check-tools
 ```
 
 ## Running KFS in QEMU
@@ -75,7 +94,8 @@ make debug
 ```
 kfs/
 │── src/          # Source code
-│── iso/          # Bootable ISO-related files
+│── boot/         # GRUB and boot config
+│── scripts/      # Build/release helper scripts
 │── build.zig     # Zig build script
 │── linker.ld     # Linker script
 │── Makefile      # Makefile for building ISO
