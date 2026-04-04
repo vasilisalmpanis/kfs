@@ -123,7 +123,7 @@ $(ROOTFS_MIN_IMG): $(ROOTFS_MIN_DIR)
 		-t ext2 \
 		-b 4096 \
 		$(ROOTFS_MIN_IMG) \
-		$$(du -s $(ROOTFS_MIN_DIR) | awk '{print int($$1 * 1.1) + 2048 "K"}')
+		$$(du -s $(ROOTFS_MIN_DIR) | awk '{print int($$1 * 1.1) + 1024 "K"}')
 
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
