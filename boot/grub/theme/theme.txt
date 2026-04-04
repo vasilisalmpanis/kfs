@@ -1,0 +1,42 @@
+title-text: "BOOT KFS"
+title-font: "font"
+title-color: "#aaaaaa"
+desktop-color: "#211d1d"
+
++ boot_menu {
+    left    = 20%
+    top     = 20%
+    width   = 60%
+    height  = 60%
+
+    item_font   = "font"
+    item_color  = "#aaaaaa"
+    selected_item_color = "#7e9a49"
+
+    item_height     = 36
+    item_padding    = 6
+    item_spacing    = 4
+}
+
++ progress_bar {
+    id      = "__timeout__"
+    text    = @TIMEOUT_NOTIFICATION_SHORT@
+    fg_color = "#aaaaaa"
+    
+    left    = 20%
+    top     = 80%
+    width   = 60%
+    height  = 20
+}
+
++ label { 
+    text        = "e - edit entry, c - grub cmd line"
+    item_font   = "font"
+    color       = "#7a7a7a"
+    align       = "center"
+
+    left    = 20%
+    top     = 90%
+    width   = 60%
+    height  = 8%
+}

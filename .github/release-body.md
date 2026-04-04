@@ -1,3 +1,9 @@
+## Release files
+
+- `kfs-min.img`: Minimal bootable disk image (kernel + compact userspace). Includes BusyBox-style/core shell tools (e.g., `sh`, `ls`, `cp`, `grep`, `sed`, `mount`, `tar` etc).
+- `kfs-full.img`: Bootable disk image with extended userspace and development tools. Includes everything from `kfs-min.img` plus extra utilities such as `gcc`/`g++`, `binutils` (`ld`, `as`, `objdump`, `readelf`), `make`, `bash`, etc.
+- `kfs.bin`: Raw kernel binary artifact.
+
 ## Run the image with QEMU
 
 Download either `kfs-min.img` or `kfs-full.img` from this release, then run:
@@ -42,6 +48,9 @@ qemu-system-i386 -drive file=kfs-min.img,format=raw -m 4G -enable-kvm -serial nu
 
 # 4) Logs in current terminal, two PTY TTYs
 qemu-system-i386 -drive file=kfs-min.img,format=raw -m 4G -enable-kvm -serial stdio -serial pty -serial pty
+
+# 5) No logs, no graphics, TTY in current terminal
+qemu-system-i386 -drive file=kfs-min.img,format=raw -m 4G -enable-kvm -serial null -serial stdio -display none
 ```
 
 ## Default login
