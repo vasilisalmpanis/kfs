@@ -30,6 +30,7 @@ pub const poll = @import("poll.zig");
 pub const readlink = @import("readlink.zig");
 pub const read = @import("read.zig");
 pub const rename = @import("rename.zig");
+pub const reboot = @import("reboot.zig");
 pub const sendfile = @import("sendfile.zig");
 pub const sigaction = @import("sigaction.zig");
 pub const sleep = @import("sleep.zig");
