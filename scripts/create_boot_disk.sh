@@ -5,6 +5,7 @@ DISK=${1:-${DISK:-kfs.img}}
 KERNEL=${KERNEL:-zig-out/bin/kfs.bin}
 ROOT_IMG=${ROOT_IMG:-rootfs.img}
 GRUB_CFG=${GRUB_CFG:-boot/grub/grub.cfg}
+GRUB_THEME=${GRUB_THEME:-boot/grub/theme}
 
 BOOT_TREE=$(dirname "$(dirname "$GRUB_CFG")")
 
@@ -42,9 +43,10 @@ sgdisk -n 2:$BOOT_START:$(( ROOT_START - 1 )) -t 2:8300 -c 2:boot "$DISK"
 sgdisk -n 3:$ROOT_START:                      -t 3:8300 -c 3:root "$DISK"
 
 BOOT_TMP_DIR=$(mktemp -d)
-mkdir -p        "$BOOT_TMP_DIR/grub"
-cp "$KERNEL"    "$BOOT_TMP_DIR/kfs.bin"
-cp "$GRUB_CFG"  "$BOOT_TMP_DIR/grub/grub.cfg"
+mkdir -p                "$BOOT_TMP_DIR/grub"
+cp "$KERNEL"            "$BOOT_TMP_DIR/kfs.bin"
+cp "$GRUB_CFG"          "$BOOT_TMP_DIR/grub/grub.cfg"
+cp -rf "$GRUB_THEME"    "$BOOT_TMP_DIR/grub/"
 
 BOOT_IMG=$(mktemp)
 mke2fs -L '' -N 0 -O ^64bit -d "$BOOT_TMP_DIR" -m 5 -r 1 -t ext2 "$BOOT_IMG" $BOOT_SIZE_MB"M"
@@ -54,7 +56,7 @@ dd if="$ROOT_IMG" of="$DISK" bs=$BS seek=$ROOT_START conv=notrunc
 
 $GRUB_MKIMAGE -O i386-pc -o core.img \
     -p '(hd0,gpt2)/grub' \
-    biosdisk part_gpt ext2 multiboot2 normal boot configfile
+    biosdisk part_gpt ext2 multiboot2 normal boot configfile gfxterm gfxmenu font
 
 CORE_SIZE=$(stat -f%z core.img 2>/dev/null || stat -c%s core.img)
 CORE_SECTORS=$(( (CORE_SIZE + 511) / BS ))
