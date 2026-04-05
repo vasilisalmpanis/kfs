@@ -111,7 +111,7 @@ $(ROOTFS_FULL_IMG): $(ROOTFS_FULL_DIR) $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:
 		-d $(ROOTFS_FULL_DIR) \
 		-m 5 -r 1 \
 		-t ext2 \
-		-b 4096 \
+		-b 8192 \
 		$(ROOTFS_FULL_IMG) \
 		$$(du -s $(ROOTFS_FULL_DIR) | awk '{print int($$1 * 1.1) + 10240 "K"}')
 
@@ -121,7 +121,7 @@ $(ROOTFS_MIN_IMG): $(ROOTFS_MIN_DIR)
 		-d $(ROOTFS_MIN_DIR) \
 		-m 5 -r 1 \
 		-t ext2 \
-		-b 4096 \
+		-b 8192 \
 		$(ROOTFS_MIN_IMG) \
 		$$(du -s $(ROOTFS_MIN_DIR) | awk '{print int($$1 * 1.1) + 1024 "K"}')
 
