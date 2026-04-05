@@ -60,6 +60,8 @@ pub fn init() void {
     platform.nulldev.init();
     platform.serial.init();
     platform.tty.init();
+    platform.fb.init();
+
     pci.ide.init();
     storage.ata.init();
 }

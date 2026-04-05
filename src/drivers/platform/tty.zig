@@ -32,15 +32,33 @@ pub const TIOCNOTTY: u32 = 0x5422;
 pub const TIOCSCTTY: u32 = 0x540E;
 pub const TIOCGSID: u32 = 0x5429;
 pub const FIONBIO: u32 = 0x5421;
-// VT/KD stubs
+// VT stubs
 pub const VT_OPENQRY: u32 = 0x5600;
 pub const VT_GETSTATE: u32 = 0x5603;
 pub const VT_ACTIVATE: u32 = 0x5606;
 pub const VT_WAITACTIVE: u32 = 0x5607;
+
+// KD stubs
 pub const KDGETMODE: u32 = 0x4B3B;
 pub const KDSETMODE: u32 = 0x4B3A;
 pub const KD_TEXT: u32 = 0x00;
 pub const KD_GRAPHICS: u32 = 0x01;
+pub const KDGKBMODE:u32 = 0x4B44; // gets current keyboard mode
+pub const KDSKBMODE:u32 = 0x4B45; // sets current keyboard mode
+pub const KDGKBENT: u32 = 0x4B46; // gets one entry in translation table
+pub const KDSKBENT: u32 = 0x4B47; // sets one entry in translation table
+pub const KDGETLED:u32 = 0x4B31;  // return current led state
+pub const KDSETLED:u32 = 0x4B32;  // set led state [lights, not flags]
+
+pub const K_HOLE: u16 = 2 << 8 | 0;
+pub const K_NOSUCHMAP: u16 = 2 << 8 | 127;
+
+
+const kbentry = extern struct {
+    kb_table: u8,
+    kb_index: u8,
+    kb_value: u16,
+};
 
 // VT state structure for VT_GETSTATE
 pub const VtStat = extern struct {
@@ -247,6 +265,67 @@ fn tty_write(file: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     return size;
 }
 
+fn kbdGetEntry(entry: *kbentry) u16{
+    krn.logger.ERROR("ENTRY {any}\n", .{entry});
+    const ptr: *u16 = @ptrCast(&entry.kb_value);
+    if (entry.kb_table > 0) {
+        ptr.* = K_NOSUCHMAP;
+    } else {
+        ptr.* = K_HOLE;
+    }
+    return 0;
+}
+
+fn kbd_ioctl(_tty: *TTY, op: u32, data: ?*anyopaque) !u32{
+    switch (op) {
+        KDGETMODE => {
+            if (data) |p| {
+                krn.logger.DEBUG(
+                    "tty_ioctl KDGETMODE old kd_mode {d}\n",
+                    .{_tty.kd_mode}
+                );
+                @as(*u32, @ptrCast(@alignCast(p))).* = _tty.kd_mode;
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        KDSETMODE => {
+            if (data) |p| {
+                _tty.kd_mode = @as(*u32, @ptrCast(@alignCast(p))).*;
+                krn.logger.DEBUG(
+                    "tty_ioctl KDSETMODE new kd_mode: {d}\n",
+                    .{_tty.kd_mode}
+                );
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        KDGKBMODE => {
+            return 0;
+        },
+        KDSKBMODE => {
+            return 0;
+        },
+        KDGKBENT => {
+            if (data) |entry| {
+                const kbd_entry: *kbentry = @ptrCast(@alignCast(entry));
+                return kbdGetEntry(kbd_entry);
+            }
+            return 0;
+        },
+        KDSKBENT => {
+            return 0;
+        },
+        KDGETLED => {
+            return 0;
+        },
+        KDSETLED => {
+            return 0;
+        },
+        else => return krn.errors.PosixError.ENOIOCTLCMD,
+    }
+}
+
 fn tty_ioctl(
     file: *krn.fs.File,
     op: u32,
@@ -254,6 +333,12 @@ fn tty_ioctl(
 ) !u32 {
     var _tty = try getTTY(file);
     const data_ptr: ?*anyopaque = if (data == 0) null else @ptrFromInt(data);
+    if (kbd_ioctl(_tty, op, data_ptr)) |res| {
+        return res;
+    } else |err| switch (err) {
+        krn.errors.PosixError.ENOIOCTLCMD => {},
+        else => return err,
+    }
     switch (op) {
         TCGETS => {
             if (data_ptr) |p| {
@@ -485,28 +570,6 @@ fn tty_ioctl(
             krn.logger.DEBUG("tty_ioctl VT_WAITACTIVE\n", .{});
             return 0;
         },
-        KDGETMODE => {
-            if (data_ptr) |p| {
-                krn.logger.DEBUG(
-                    "tty_ioctl KDGETMODE old kd_mode {d}\n",
-                    .{_tty.kd_mode}
-                );
-                @as(*u32, @ptrCast(@alignCast(p))).* = _tty.kd_mode;
-                return 0;
-            }
-            return krn.errors.PosixError.EINVAL;
-        },
-        KDSETMODE => {
-            if (data_ptr) |p| {
-                _tty.kd_mode = @as(*u32, @ptrCast(@alignCast(p))).*;
-                krn.logger.DEBUG(
-                    "tty_ioctl KDSETMODE new kd_mode: {d}\n",
-                    .{_tty.kd_mode}
-                );
-                return 0;
-            }
-            return krn.errors.PosixError.EINVAL;
-        },
         else => return krn.errors.PosixError.EINVAL,
     }
 }
@@ -680,6 +743,9 @@ fn addTTYDev(name: []const u8) !void {
 }
 
 pub fn init() void {
+    addTTYDev("tty") catch {
+        krn.logger.ERROR("Failed to register /dev/tty file\n", .{});
+    };
     for (1..MAX_VTS) |vt| {
         var name_buf: [8]u8 = undefined;
         const vt_name = std.fmt.bufPrint(name_buf[0..], "tty{d}", .{vt})

@@ -139,6 +139,7 @@ pub const PosixError = error{
 
     // From here on these errors belong only in kernel space
     ERESTARTSYS,     // 134 - KFS internal error for restarting syscalls
+    ENOIOCTLCMD,     // 135 - KFS internal error for continuing ioctl
 };
 pub inline fn toErrno(err: PosixError) i32 {
     return -@as(i32, @intCast((@intFromError(err) - @intFromError(PosixError.EPERM) + 1)));
