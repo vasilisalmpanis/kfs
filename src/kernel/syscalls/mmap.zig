@@ -57,14 +57,12 @@ pub fn mmap2(
         if (krn.task.current.files.fds.get(@intCast(fd))) |_file| {
             _file.ref.ref();
             defer _file.ref.unref();
-            if (!_file.inode.mode.isReg())
-                return errors.EACCES;
             if (!_file.mode.canRead(_file.inode.uid, _file.inode.gid))
                 return errors.EACCES;
             if (
                 flags.TYPE == .SHARED and
                 prot & mm.PROT_WRITE != 0 and
-                _file.mode.canWrite(_file.inode.uid, _file.inode.gid)
+                !_file.mode.canWrite(_file.inode.uid, _file.inode.gid)
             )
                 return errors.EACCES;
             if (off > _file.inode.size)

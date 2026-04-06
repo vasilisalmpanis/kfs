@@ -133,7 +133,7 @@ pub const FrameBuffer = struct {
             const cell_h: usize = font.height;
             const stride = tag.pitch / 4;
             const total_pixels = tag.height * stride;
-            
+
             const vbuf: ?[*]u32 = switch (mode) {
                 .double_buffered => mm.kmallocArray(u32, total_pixels),
                 .zero_copy => null,

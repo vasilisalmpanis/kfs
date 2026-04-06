@@ -46,8 +46,13 @@ pub fn init() void {
         krn.logger.ERROR("{any}", .{err});
         @panic("unable to mount devfs");
     };
+
     devfs_path = krn.fs.path.resolve("/dev") catch {
         @panic("unable to init devfs");
+    };
+
+    _ = krn.mkdir("/dev/input", 0o444) catch {
+        @panic("unable to create input folder");
     };
 
     cdev.init();
@@ -61,6 +66,7 @@ pub fn init() void {
     platform.serial.init();
     platform.tty.init();
     platform.fb.init();
+    platform.mouse.init();
 
     pci.ide.init();
     storage.ata.init();
