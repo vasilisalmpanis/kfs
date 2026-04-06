@@ -59,7 +59,7 @@ pub export fn unregisterPlatformDriver(driver: *drv.driver.Driver) i32 {
 }
 
 pub export fn addCharacterDevice(device: *drv.device.Device, mode: krn.fs.UMode) i32 {
-    drv.cdev.addCdev(device, mode) catch |err| {
+    drv.cdev.addCdev(device, mode, null) catch |err| {
         return @intFromError(err);
     };
     return 0;

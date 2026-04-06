@@ -51,7 +51,7 @@ pub const cdev_default_ops: krn.fs.FileOps = .{
     .readdir = null,
 };
 
-pub fn addCdev(device: *dev.Device, mode: krn.fs.UMode) !void {
+pub fn addCdev(device: *dev.Device, mode: krn.fs.UMode, path: ?[]const u8) !void {
     if (cdev_map.get(device.id)) |_d| {
         krn.logger.ERROR(
             "Cdev with id {d}:{d} already exists: {s}\n",
@@ -60,16 +60,21 @@ pub fn addCdev(device: *dev.Device, mode: krn.fs.UMode) !void {
         return krn.errors.PosixError.EEXIST;
     }
 
-    if (drivers.devfs_path.dentry.inode.ops.mknod) |_mknod| {
+    const dir_path = if (path != null)
+        try krn.fs.path.resolve(path.?)
+    else
+        drivers.devfs_path;
+    defer if (path != null) dir_path.release();
+    if (dir_path.dentry.inode.ops.mknod) |_mknod| {
         cdev_map_mtx.lock();
         defer cdev_map_mtx.unlock();
 
         var new_mode  = mode;
         new_mode.type = krn.fs.S_IFCHR;
-        _ = _mknod(drivers.devfs_path.dentry.inode,
+        _ = _mknod(dir_path.dentry.inode,
             device.name,
             new_mode,
-            drivers.devfs_path.dentry,
+            dir_path.dentry,
             device.id
         ) catch |err| {
             krn.logger.ERROR("mknod failed: {t}", .{err});
@@ -78,8 +83,8 @@ pub fn addCdev(device: *dev.Device, mode: krn.fs.UMode) !void {
         try cdev_map.put(device.id, device);
     } else {
         krn.logger.ERROR(
-            "No mknod operation in {s}\n", 
-            .{drivers.devfs_path.dentry.inode.sb.?.fs.name}
+            "No mknod operation in {s}\n",
+            .{dir_path.dentry.inode.sb.?.fs.name}
         );
         return krn.errors.PosixError.ENOSYS;
     }
