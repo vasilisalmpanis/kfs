@@ -109,6 +109,7 @@ pub const FileOps = struct {
     readdir: ?*const fn (base: *File, buf: []u8) anyerror!usize = readdirVFS,
     ioctl: ?*const fn (base: *File, op: u32, data: usize) anyerror!u32 = null,
     poll: ?*const fn (base: *File, pollfd: *kernel.poll.PollFd) anyerror!u32 = pollVFS,
+    mmap: ?*const fn (base: *File, vma: *kernel.mm.VMA) anyerror!void = null,
 };
 
 pub const TaskFiles = struct {

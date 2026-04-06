@@ -72,7 +72,6 @@ pub const VMA = struct {
         self.list.setup();
         self.file = null;
         self.offset = 0;
-        try self.allocFullVMA();
     }
 
     pub fn dup(self: *VMA, other: *VMA, pair: krn.mm.VASpair) !void{
@@ -111,6 +110,17 @@ pub const VMA = struct {
     }
 
     pub fn allocFullVMA(self: *VMA) !void {
+        if (self.file) |_file| {
+            if (!_file.mode.isReg()) {
+                if (_file.ops.mmap) |_mmap| {
+                    krn.logger.INFO("calling  mmap\n", .{});
+                    return _mmap(_file, self);
+                } else {
+                    krn.logger.INFO("EACCES\n", .{});
+                    return krn.errors.PosixError.EACCES;
+                }
+            }
+        }
         return try allocatePages(self, self.start, self.end);
     }
 
@@ -131,6 +141,10 @@ pub const VMA = struct {
             };
             _vma.file = file;
             _vma.offset = offset;
+            _vma.allocFullVMA() catch {
+                mm.kfree(_vma);
+                return null;
+            };
             if (file) |_file| {
                 _file.ref.ref();
                 defer _file.ref.unref();
@@ -305,13 +319,13 @@ pub const MM = struct {
         var hint: usize = addr;
         var end = hint + length;
         var new_vma: ?*VMA = null;
-        
-        if (flags.FIXED) {            
+
+        if (flags.FIXED) {
             _ = krn.do_munmap(
                 self, @intCast(hint),
                 @intCast(end)
             ) catch {};
-            
+
             new_vma = try self.add_vma(
                 if (self.vmas == null) null else self.findInsertPoint(hint),
                 hint,
@@ -324,7 +338,7 @@ pub const MM = struct {
             if (self.vmas == null or hint < self.vmas.?.start)
                 self.vmas = new_vma;
             krn.logger.DEBUG(
-                "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+                "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n",
                 .{krn.task.current.pid, hint, end}
             );
             return @intCast(hint);
@@ -348,9 +362,9 @@ pub const MM = struct {
                         error.OutOfMemory => return errors.ENOMEM
                     };
                     if (hint < self.vmas.?.start)
-                        self.vmas = new_vma;        
+                        self.vmas = new_vma;
                     krn.logger.DEBUG(
-                        "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+                        "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n",
                         .{krn.task.current.pid, hint, end}
                     );
                     return @intCast(hint);
@@ -380,12 +394,12 @@ pub const MM = struct {
             self.vmas = new_vma;
         }
         krn.logger.DEBUG(
-            "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n", 
+            "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n",
             .{krn.task.current.pid, hint, end}
         );
         return @intCast(hint);
     }
-    
+
     fn findInsertPoint(self: *MM, addr: usize) ?*krn.list.ListHead {
         if (self.vmas) |list| {
             var it = list.list.iterator();

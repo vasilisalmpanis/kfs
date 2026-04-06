@@ -41,8 +41,12 @@ pub const VT_WAITACTIVE: u32 = 0x5607;
 // KD stubs
 pub const KDGETMODE: u32 = 0x4B3B;
 pub const KDSETMODE: u32 = 0x4B3A;
+
 pub const KD_TEXT: u32 = 0x00;
 pub const KD_GRAPHICS: u32 = 0x01;
+pub const KD_TEXT0: u32 = 0x02;	// obsolete
+pub const KD_TEXT1: u32 = 0x03;	// obsolete
+
 pub const KDGKBMODE:u32 = 0x4B44; // gets current keyboard mode
 pub const KDSKBMODE:u32 = 0x4B45; // sets current keyboard mode
 pub const KDGKBENT: u32 = 0x4B46; // gets one entry in translation table
@@ -115,7 +119,7 @@ fn flushInputQueue(_tty: *TTY) void {
 
 fn isControllingTTY(file: *krn.fs.File) bool {
     if (file.path) |path|
-        return std.mem.eql(u8, path.dentry.name, "tty");
+        return std.mem.eql(u8, path.dentry.name, "tty") or std.mem.eql(u8, path.dentry.name, "tty0");
     return false;
 }
 
@@ -290,15 +294,19 @@ fn kbd_ioctl(_tty: *TTY, op: u32, data: ?*anyopaque) !u32{
             return krn.errors.PosixError.EINVAL;
         },
         KDSETMODE => {
-            if (data) |p| {
-                _tty.kd_mode = @as(*u32, @ptrCast(@alignCast(p))).*;
-                krn.logger.DEBUG(
-                    "tty_ioctl KDSETMODE new kd_mode: {d}\n",
-                    .{_tty.kd_mode}
-                );
-                return 0;
+            var mode: u32 = @intFromPtr(data);
+            switch (mode) {
+                KD_GRAPHICS,
+                KD_TEXT => {},
+                KD_TEXT0, KD_TEXT1 => {mode = KD_TEXT;},
+                else => return krn.errors.PosixError.EINVAL,
             }
-            return krn.errors.PosixError.EINVAL;
+            _tty.kd_mode = mode;
+            krn.logger.DEBUG(
+                "tty_ioctl KDSETMODE new kd_mode: {d}\n",
+                .{_tty.kd_mode}
+            );
+            return 0;
         },
         KDGKBMODE => {
             return 0;
@@ -597,13 +605,14 @@ fn tty_probe(device: *pdev.PlatformDevice) !void {
     if (
         device.dev.data == null
         and !std.mem.eql(u8, device.dev.name, "tty")
+        and !std.mem.eql(u8, device.dev.name, "tty0")
     )
         return krn.errors.PosixError.EIO;
     if (device.dev.data) |data| {
         const cur_tty: *TTY = @ptrCast(@alignCast(data));
         cur_tty.clear();
     }
-    try cdev.addCdev(&device.dev, krn.fs.UMode.chardev());
+    try cdev.addCdev(&device.dev, krn.fs.UMode.chardev(), null);
 }
 
 fn tty_remove(device: *pdev.PlatformDevice) !void {
@@ -688,7 +697,9 @@ fn isVTControlKey(ctrl: kbd.CtrlType) bool {
 fn addTTYDev(name: []const u8) !void {
     if (pdev.PlatformDevice.alloc(name)) |platform_tty| {
         var serial_tty: ?*TTY = null;
-        if (std.mem.eql(u8, name, "tty")) {
+        if (std.mem.eql(u8, name, "tty") or
+            std.mem.eql(u8, name, "tty0")
+            ) {
             try platform_tty.register();
             return;
         }
@@ -746,6 +757,9 @@ pub fn init() void {
     addTTYDev("tty") catch {
         krn.logger.ERROR("Failed to register /dev/tty file\n", .{});
     };
+    addTTYDev("tty0") catch {
+        krn.logger.ERROR("Failed to register /dev/tty0 file\n", .{});
+    };
     for (1..MAX_VTS) |vt| {
         var name_buf: [8]u8 = undefined;
         const vt_name = std.fmt.bufPrint(name_buf[0..], "tty{d}", .{vt})
@@ -758,7 +772,7 @@ pub fn init() void {
         if (serial.getByIndex(ser_id)) |_| {
             var name_buf: [8]u8 = undefined;
             const ser_name = std.fmt.bufPrint(name_buf[0..], "ttyS{d}", .{ser_id})
-                catch continue;            
+                catch continue;
             addTTYDev(ser_name)
                 catch continue;
         }
