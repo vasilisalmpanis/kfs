@@ -20,7 +20,7 @@ var null_driver = pdrv.PlatformDriver {
 };
 
 fn null_probe(device: *pdev.PlatformDevice) !void {
-    try cdev.addCdev(&device.dev, krn.fs.UMode.chardev());
+    try cdev.addCdev(&device.dev, krn.fs.UMode.chardev(), null);
 }
 
 fn null_remove(device: *pdev.PlatformDevice) !void {
