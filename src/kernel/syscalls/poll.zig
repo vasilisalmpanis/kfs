@@ -64,7 +64,7 @@ pub const FD_WORDS:     usize = FD_SETSIZE / NFDBITS;
 const BitIdxType = @Type(
     std.builtin.Type{
         .int = .{
-            .bits = @ctz(@as(usize, 1)),
+            .bits = if (@sizeOf(usize) == @sizeOf(u32)) 5 else 6,
             .signedness = .unsigned
         }
     }
