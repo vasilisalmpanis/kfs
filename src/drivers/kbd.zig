@@ -230,7 +230,7 @@ pub var keyboard = Keyboard.init(&keymap_us);
 pub var global_keyboard = &keyboard;
 pub var wait_queue: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init();
 
-pub fn keyboardInterrupt() void {
+pub fn keyboardInterrupt(_: ?*anyopaque) callconv(.c) void {
     var scancode: u8 = undefined;
     keyboard.sendCommand(0xAD); // Disable keyboard
     defer keyboard.sendCommand(0xAE); // Enable keyboard

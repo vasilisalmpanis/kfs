@@ -73,7 +73,7 @@ fn kbd_remove(device: *pdev.PlatformDevice) !void {
 
 var mod_kbd: *kfs.drivers.Keyboard = undefined;
 
-pub fn keyboardInterrupt() void {
+pub fn keyboardInterrupt() callconv(.c) void {
     var scancode: u8 = undefined;
     mod_kbd.sendCommand(0xAD); // Disable keyboard
     defer mod_kbd.sendCommand(0xAE); // Enable keyboard
