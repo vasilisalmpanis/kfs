@@ -34,6 +34,8 @@ pub const TIOCGSID: u32 = 0x5429;
 pub const FIONBIO: u32 = 0x5421;
 // VT stubs
 pub const VT_OPENQRY: u32 = 0x5600;
+pub const VT_GETMODE: u32 = 0x5601;
+pub const VT_SETMODE: u32 = 0x5602;
 pub const VT_GETSTATE: u32 = 0x5603;
 pub const VT_ACTIVATE: u32 = 0x5606;
 pub const VT_WAITACTIVE: u32 = 0x5607;
@@ -62,6 +64,14 @@ const kbentry = extern struct {
     kb_table: u8,
     kb_index: u8,
     kb_value: u16,
+};
+
+const VTMode = extern struct {
+    mode: u8 = 0,
+    waitv: u8 = 0,
+    relsig: i16 = 0,
+    acqsig: i16 = 0,
+    frsig: i16 = 0,
 };
 
 // VT state structure for VT_GETSTATE
@@ -551,6 +561,19 @@ fn tty_ioctl(
                 return 0;
             }
             return krn.errors.PosixError.EINVAL;
+        },
+        VT_GETMODE => {
+            krn.logger.DEBUG("tty_ioctl VT_GETMODE\n", .{});
+            if (data_ptr) |p| {
+                const user_vt_mode: *VTMode = @ptrCast(@alignCast(p));
+                user_vt_mode.* = VTMode{};
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
+        },
+        VT_SETMODE => {
+            krn.logger.DEBUG("tty_ioctl VT_SETMODE\n", .{});
+            return 0;
         },
         VT_GETSTATE => {
             if (data_ptr) |p| {
