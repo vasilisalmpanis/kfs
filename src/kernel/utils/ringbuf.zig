@@ -8,7 +8,7 @@ pub const RingBuf = struct {
     w: usize = 0,
     line_count: u32 = 0,
 
-    fn _init(buff: []u8) !RingBuf {
+    pub fn _init(buff: []u8) !RingBuf {
         if (buff.len == 0 or (buff.len & (buff.len - 1)) != 0) {
             krn.logger.ERROR("RingBuf buffer length must be power of two, got {d}\n", .{ buff.len });
             return krn.errors.PosixError.EINVAL;
