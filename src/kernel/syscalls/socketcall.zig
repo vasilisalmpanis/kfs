@@ -34,6 +34,21 @@ pub fn socketcall(call: i32, args: [*]u32) !u32 {
     const call_type: CallType = @enumFromInt(call);
     krn.logger.INFO("socketcall: {any} {any}", .{call_type, args});
     switch (call_type) {
+        .SYS_SOCKET => return try krn.socket.do_socket(
+            args[0], args[1], args[2],
+        ),
+        .SYS_BIND => return try krn.socket.do_bind(
+            args[0], @ptrFromInt(args[1]), args[2],
+        ),
+        .SYS_CONNECT => return try krn.socket.do_connect(
+            args[0], @ptrFromInt(args[1]), args[2],
+        ),
+        .SYS_LISTEN => return try krn.socket.do_listen(
+            args[0], args[1],
+        ),
+        .SYS_ACCEPT => return try krn.socket.do_accept4(
+            args[0], args[1], args[2], 0,
+        ),
         .SYS_SOCKETPAIR => return try socketpair(
             @intCast(args[0]),
             @intCast(args[1]),
@@ -56,11 +71,34 @@ pub fn socketcall(call: i32, args: [*]u32) !u32 {
             args[4],
             @bitCast(args[5]),
         ),
+        .SYS_ACCEPT4 => return try krn.socket.do_accept4(
+            args[0], args[1], args[2], args[3],
+        ),
         else => {
             return errors.EINVAL;
         },
     }
     return 0;
+}
+
+pub fn socket(family: u32, sock_type: u32, protocol: u32) !u32 {
+    return try krn.socket.do_socket(family, sock_type, protocol);
+}
+
+pub fn bind(fd: u32, addr: u32, addr_len: u32) !u32 {
+    return try krn.socket.do_bind(fd, @ptrFromInt(addr), addr_len);
+}
+
+pub fn connect(fd: u32, addr: u32, addr_len: u32) !u32 {
+    return try krn.socket.do_connect(fd, @ptrFromInt(addr), addr_len);
+}
+
+pub fn listen(fd: u32, backlog: u32) !u32 {
+    return try krn.socket.do_listen(fd, backlog);
+}
+
+pub fn accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
+    return try krn.socket.do_accept4(fd, addr, addr_len, flags);
 }
 
 pub fn socketpair(family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) !u32 {
