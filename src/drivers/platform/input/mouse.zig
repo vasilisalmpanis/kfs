@@ -180,10 +180,18 @@ fn mouse_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
 }
 
 fn mouse_poll(file: *krn.fs.File, pollfd: *krn.poll.PollFd) !u32 {
-    _ = file;
-    _ = pollfd;
-    krn.logger.INFO("=== MOUSE POLL ===", .{});
-    return 1;
+    if (file.inode.data.dev) |_d| {
+        if (_d.data) |data| {
+            const mouse: *Mouse = @ptrCast(@alignCast(data));
+            if (pollfd.events & krn.poll.POLLIN != 0) {
+                if (mouse.rb.available() > 0) {
+                    pollfd.revents |= krn.poll.POLLIN;
+                }
+            }
+        }
+    }
+    if (pollfd.revents != 0) return 1;
+    return 0;
 }
 
 fn mouse_write(file: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
