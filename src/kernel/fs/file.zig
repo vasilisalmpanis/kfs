@@ -52,6 +52,7 @@ pub const File = struct {
         self.inode = inode;
         self.inode.ref.ref();
         self.data = null;
+        self.mode = fs.UMode{};
     }
 
     pub fn release(ref: *kernel.task.RefCount) void {
