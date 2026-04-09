@@ -17,12 +17,17 @@ pub const sockaddr_un = extern struct {
     sun_path: [MAX_UNIX_PATH]u8,
 };
 
+pub const sockaddr = extern struct {
+    sa_family: u16,
+    sa_data: [14]u8,
+};
+
 pub const Socket = struct {
     _buffer: [128]u8,
     rb: krn.ringbuf.RingBuf,
     conn: ?*Socket,
     list: lst.ListHead,
-    lock: mutex.Mutex = mutex.Mutex.init(),
+    lock: krn.Spinlock = krn.Spinlock.init(),
 
     sock_type: u16 = SOCK_STREAM,
     is_listening: bool = false,
@@ -33,6 +38,8 @@ pub const Socket = struct {
     accept_count: usize = 0,
     accept_backlog: usize = MAX_BACKLOG,
     accept_wait: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
+
+    rw_queue: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
 
     pending_link: lst.ListHead = lst.ListHead.init(),
 
@@ -45,7 +52,7 @@ pub const Socket = struct {
         self.conn = null;
         self.list.next = &self.list;
         self.list.prev = &self.list;
-        self.lock = mutex.Mutex.init();
+        self.lock = krn.Spinlock.init();
         self.sock_type = SOCK_STREAM;
         self.is_listening = false;
         self.bound_path = .{0} ** MAX_UNIX_PATH;
@@ -55,16 +62,21 @@ pub const Socket = struct {
         self.accept_backlog = MAX_BACKLOG;
         self.accept_wait.setup();
         self.pending_link.setup();
+        self.rw_queue.setup();
     }
 
     pub fn delete(self: *Socket) void {
         self.lock.lock();
         if (self.conn) |remote| {
+            remote.lock.lock();
             remote.conn = null;
+            remote.lock.unlock();
+            remote.rw_queue.wakeUpOne();
         }
         if (self.is_listening) {
             unregisterBound(self);
         }
+        self.lock.unlock();
         krn.mm.kfree(self);
     }
 
@@ -134,6 +146,9 @@ pub fn do_socket(family: u32, sock_type: u32, protocol: u32) !u32 {
     const file = try krn.fs.File.pseudo(inode);
     errdefer file.ref.unref();
 
+    file.mode = krn.fs.UMode.socket();
+    file.flags |= krn.fs.file.O_RDWR;
+
     const fd = try krn.task.current.files.getNextFD();
     errdefer _ = krn.task.current.files.releaseFD(fd);
 
@@ -142,10 +157,9 @@ pub fn do_socket(family: u32, sock_type: u32, protocol: u32) !u32 {
     return @intCast(fd);
 }
 
-pub fn do_bind(fd: u32, addr_ptr: [*]const u8, addr_len: u32) !u32 {
-    if (addr_len < 3 or addr_len > @sizeOf(sockaddr_un)) {
+pub fn do_bind(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
+    const addr_ptr = _addr_ptr orelse
         return krn.errors.PosixError.EINVAL;
-    }
 
     const file = krn.task.current.files.fds.get(fd) orelse
         return krn.errors.PosixError.EBADF;
@@ -155,10 +169,16 @@ pub fn do_bind(fd: u32, addr_ptr: [*]const u8, addr_len: u32) !u32 {
     const sock = file.inode.data.sock orelse
         return krn.errors.PosixError.ENOTSOCK;
 
-    const addr: *const sockaddr_un = @ptrCast(@alignCast(addr_ptr));
-    if (addr.sun_family != AF_UNIX and addr.sun_family != AF_LOCAL) {
+    const generic_sockaddr: *sockaddr = @ptrCast(@alignCast(addr_ptr));
+    if (generic_sockaddr.sa_family != AF_UNIX and generic_sockaddr.sa_family != AF_LOCAL) {
         return krn.errors.PosixError.EAFNOSUPPORT;
     }
+
+    if (addr_len < 3 or addr_len > @sizeOf(sockaddr_un)) {
+        return krn.errors.PosixError.EINVAL;
+    }
+
+    const addr: *const sockaddr_un = @ptrCast(@alignCast(addr_ptr));
 
     const path_max = addr_len - @offsetOf(sockaddr_un, "sun_path");
     var path_len: usize = 0;
@@ -253,6 +273,9 @@ pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
             const new_file = try krn.fs.File.pseudo(new_inode);
             errdefer new_file.ref.unref();
 
+            new_file.mode = krn.fs.UMode.socket();
+            new_file.flags |= krn.fs.file.O_RDWR;
+
             const new_fd = try krn.task.current.files.getNextFD();
             errdefer _ = krn.task.current.files.releaseFD(new_fd);
 
@@ -268,10 +291,9 @@ pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
     }
 }
 
-pub fn do_connect(fd: u32, addr_ptr: [*]const u8, addr_len: u32) !u32 {
-    if (addr_len < 3 or addr_len > @sizeOf(sockaddr_un)) {
+pub fn do_connect(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
+    const addr_ptr = _addr_ptr orelse
         return krn.errors.PosixError.EINVAL;
-    }
 
     const file = krn.task.current.files.fds.get(fd) orelse
         return krn.errors.PosixError.EBADF;
@@ -288,6 +310,10 @@ pub fn do_connect(fd: u32, addr_ptr: [*]const u8, addr_len: u32) !u32 {
     const addr: *const sockaddr_un = @ptrCast(@alignCast(addr_ptr));
     if (addr.sun_family != AF_UNIX and addr.sun_family != AF_LOCAL) {
         return krn.errors.PosixError.EAFNOSUPPORT;
+    }
+
+    if (addr_len < 3 or addr_len > @sizeOf(sockaddr_un)) {
+        return krn.errors.PosixError.EINVAL;
     }
 
     const path_max = addr_len - @offsetOf(sockaddr_un, "sun_path");
@@ -331,27 +357,67 @@ pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     sock = base.inode.data.sock.?;
     sock.lock.lock();
     defer sock.lock.unlock();
-    if (!sock.rb.isEmpty()) {
-        return sock.rb.readInto(buf[0..size]);
+
+    while (sock.rb.isEmpty()) {
+        if (sock.conn == null) {
+            return krn.errors.PosixError.ENOTCONN;
+        }
+
+        var wq_node = krn.wq.WaitQueueNode.init(krn.task.current);
+        wq_node.setup();
+
+        sock.rw_queue.addToQueue(&wq_node);
+        sock.lock.unlock();
+        sock.rw_queue.waitIfInQueue(&wq_node, true, 0);
+
+        if (krn.task.current.sighand.hasPending()) {
+            sock.lock.lock();
+            return krn.errors.PosixError.EINTR;
+        }
+
+        sock.lock.lock();
     }
-    return 0;
+    const ret_size: usize = sock.rb.readInto(buf[0..size]);
+    if (sock.conn) |remote| {
+        remote.rw_queue.wakeUpOne();
+    }
+    return ret_size;
 }
 
 pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     var sock: *Socket = undefined;
     if (base.inode.data.sock == null) return krn.errors.PosixError.EBADF;
     sock = base.inode.data.sock.?;
-    if (sock.conn) |remote| {
-        remote.lock.lock();
-        defer remote.lock.unlock();
-        for (buf[0..size], 0..) |ch, idx| {
-            if (!remote.rb.push(ch))
-                return idx;
-        }
-        return size;
-    } else {
+    var remote = sock.conn orelse
         return krn.errors.PosixError.ENOTCONN;
+
+    remote.lock.lock();
+    defer remote.lock.unlock();
+    while (remote.rb.isFull()) {
+        var wq_node = krn.wq.WaitQueueNode.init(krn.task.current);
+        wq_node.setup();
+
+        sock.rw_queue.addToQueue(&wq_node);
+        remote.lock.unlock();
+        sock.rw_queue.waitIfInQueue(&wq_node, true, 0);
+        if (krn.task.current.sighand.hasPending()) {
+            remote.lock.lock();
+            return krn.errors.PosixError.EINTR;
+        }
+
+        if (sock.conn == null) {
+            remote.lock.lock();
+            return krn.errors.PosixError.ENOTCONN;
+        }
+
+        remote.lock.lock();
     }
+    defer remote.rw_queue.wakeUpOne();
+    for (buf[0..size], 0..) |ch, idx| {
+        if (!remote.rb.push(ch))
+            return idx;
+    }
+    return size;
 }
 
 pub fn open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
@@ -361,8 +427,8 @@ pub fn open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
 
 pub fn close(base: *krn.fs.File) void {
     if (base.inode.data.sock) |sock| {
-        sock.delete();
         base.inode.data.sock = null;
+        sock.delete();
     }
 }
 
@@ -402,8 +468,10 @@ pub fn sock_poll(base: *krn.fs.File, pollfd: *krn.poll.PollFd) !u32 {
     }
     if (pollfd.events & krn.poll.POLLOUT != 0) {
         if (sock.conn != null) {
-            pollfd.revents |= krn.poll.POLLOUT;
-            ready = 1;
+            if (!sock.conn.?.rb.isFull()) {
+                pollfd.revents |= krn.poll.POLLOUT;
+                ready = 1;
+            }
         }
     }
     return ready;
