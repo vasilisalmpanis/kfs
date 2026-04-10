@@ -164,7 +164,6 @@ fn mouse_open(_: *krn.fs.File, _: *krn.fs.Inode) !void {}
 fn mouse_close(_: *krn.fs.File) void {}
 
 fn mouse_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
-    krn.logger.WARN("== MOUSE READ ==", .{});
     if (file.inode.data.dev) |_d| {
         const mouse: *Mouse = @ptrCast(@alignCast(_d.data.?));
         var to_read = size;
@@ -172,6 +171,11 @@ fn mouse_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
         if (avail != 0) {
             if (avail < to_read)
                 to_read = avail;
+            if (to_read < mouse.packet_size)
+                return 0;
+            const rem = to_read % mouse.packet_size;
+            if (rem != 0)
+                to_read -= (mouse.packet_size - rem);
             return mouse.rb.readInto(buf[0..to_read]);
         }
         return 0;

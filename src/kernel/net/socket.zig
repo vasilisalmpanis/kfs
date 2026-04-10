@@ -23,7 +23,7 @@ pub const sockaddr = extern struct {
 };
 
 pub const Socket = struct {
-    _buffer: [128]u8,
+    _buffer: [4096]u8,
     rb: krn.ringbuf.RingBuf,
     conn: ?*Socket,
     list: lst.ListHead,
@@ -44,9 +44,9 @@ pub const Socket = struct {
     pending_link: lst.ListHead = lst.ListHead.init(),
 
     pub fn setup(self: *Socket) void {
-        self._buffer = .{0} ** 128;
+        self._buffer = .{0} ** 4096;
         self.rb = krn.ringbuf.RingBuf{
-            .buf = self._buffer[0..128],
+            .buf = self._buffer[0..4096],
             .mask = 127,
         };
         self.conn = null;
@@ -414,9 +414,12 @@ pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     }
     defer remote.rw_queue.wakeUpOne();
     for (buf[0..size], 0..) |ch, idx| {
-        if (!remote.rb.push(ch))
+        if (!remote.rb.push(ch)) {
+            krn.logger.WARN("sendto: sent {d} from {d}", .{idx, size});
             return idx;
+        }
     }
+    krn.logger.WARN("sendto: sent {d} from {d} (all)", .{size, size});
     return size;
 }
 
