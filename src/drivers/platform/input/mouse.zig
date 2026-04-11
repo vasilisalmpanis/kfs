@@ -53,6 +53,7 @@ const Mouse = struct {
     packet_size:    u8 = 3,
     buff:           [512]u8 = .{0} ** 512,
     rb:             krn.ringbuf.RingBuf = undefined,
+    wait_queue:     krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
 
     pub fn new() ?*Mouse {
         if (krn.mm.kmalloc(Mouse)) |_m| {
@@ -68,6 +69,7 @@ const Mouse = struct {
     pub fn setup(self: *Mouse) !void {
         self.* = Mouse{};
         self.rb = try krn.ringbuf.RingBuf._init(&self.buff);
+        self.wait_queue.setup();
     }
 
     pub fn getMotion(self: *Mouse) struct {x: i32, y: i32} {
@@ -98,6 +100,7 @@ const Mouse = struct {
 
     pub fn consume(self: *Mouse, packet: u8) void {
         _ = self.rb.push(packet);
+        self.wait_queue.wakeUpOne();
         self.packet[self.packet_cnt] = packet;
         self.packet_cnt += 1;
         if (self.packet_cnt == self.packet_size) {
@@ -183,18 +186,25 @@ fn mouse_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     return krn.errors.PosixError.EIO;
 }
 
-fn mouse_poll(file: *krn.fs.File, pollfd: *krn.poll.PollFd) !u32 {
+fn mouse_poll(
+    file: *krn.fs.File,
+    pollfd: *krn.poll.PollFd,
+    poll_table: ?*krn.poll.PollTable
+) !u32 {
     if (file.inode.data.dev) |_d| {
         if (_d.data) |data| {
             const mouse: *Mouse = @ptrCast(@alignCast(data));
             if (pollfd.events & krn.poll.POLLIN != 0) {
                 if (mouse.rb.available() > 0) {
                     pollfd.revents |= krn.poll.POLLIN;
+                } else if (poll_table) |pt| {
+                    try pt.addNode(&mouse.wait_queue);
                 }
             }
         }
     }
-    if (pollfd.revents != 0) return 1;
+    if (pollfd.revents != 0)
+        return 1;
     return 0;
 }
 

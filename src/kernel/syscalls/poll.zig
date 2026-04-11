@@ -15,44 +15,135 @@ pub const PollFd = extern struct {
     revents: u16,
 };
 
+const POLL_TABLE_INLINE_SIZE = 16;
+
+const PollTableEntry = struct{
+    node: krn.wq.WaitQueueNode,
+    head: *krn.wq.WaitQueueHead,
+
+    pub fn init(
+        head: *krn.wq.WaitQueueHead,
+    ) PollTableEntry {
+        return PollTableEntry{
+            .node = krn.wq.WaitQueueNode.init(krn.task.current),
+            .head = head,
+        };
+    }
+};
+
+pub const PollTable = struct {
+    wq_nodes_inline: [POLL_TABLE_INLINE_SIZE]?PollTableEntry = .{null} ** POLL_TABLE_INLINE_SIZE,
+    wq_nodes_idx: usize = 0,
+    wq_nodes: ?std.ArrayList(?PollTableEntry) = null,
+
+    pub fn init() PollTable {
+        return PollTable{};
+    }
+
+    /// Creartes WaitQueueNode, adds it to PollTable and to WaitQueue
+    pub fn addNode(
+        self: *PollTable,
+        head: *krn.wq.WaitQueueHead
+    ) !void {
+        if (self.wq_nodes_idx < POLL_TABLE_INLINE_SIZE) {
+            self.wq_nodes_inline[self.wq_nodes_idx] = PollTableEntry.init(head);
+            const entry = &self.wq_nodes_inline[self.wq_nodes_idx];
+            self.wq_nodes_idx += 1;
+            entry.*.?.node.setup();
+            entry.*.?.node.wake_fn = null;
+            head.addToQueue(&entry.*.?.node);
+            return ;
+        }
+        if (self.wq_nodes == null) {
+            self.wq_nodes = try std.ArrayList(?PollTableEntry).initCapacity(
+                krn.mm.kernel_allocator.allocator(),
+                1024
+            );
+        }
+        try self.wq_nodes.?.append(
+            krn.mm.kernel_allocator.allocator(),
+            PollTableEntry.init(head)
+        );
+        const nodes = &self.wq_nodes.?;
+        const entry = &nodes.items[nodes.items.len - 1];
+        entry.*.?.node.setup();
+        entry.*.?.node.wake_fn = null;
+        head.addToQueue(&entry.*.?.node);
+        return ;
+    }
+
+    pub fn deinit(self: *PollTable) void {
+        for (self.wq_nodes_inline[0..self.wq_nodes_idx]) |*entry| {
+            if (entry.*) |*ent| {
+                ent.head.removeNode(&ent.node);
+            }
+            entry.* = null;
+        }
+        self.wq_nodes_idx = 0;
+
+        if (self.wq_nodes) |*arr| {
+            for (arr.items) |*entry| {
+                if (entry.*) |*ent| {
+                    ent.head.removeNode(&ent.node);
+                }
+                entry.* = null;
+            }
+            arr.deinit(krn.mm.kernel_allocator.allocator());
+            self.wq_nodes = null;
+        }
+    }
+};
+
 pub fn poll(user_fds: ?[*]PollFd, nfds: u32, timeout_ms: i32) !u32 {
     if (user_fds == null and nfds != 0) {
         return errors.EINVAL;
     }
+    if (nfds == 0)
+        return 0;
     const curr_time = krn.currentMs();
+    var poll_table = PollTable.init();
+    defer poll_table.deinit();
+    var pt_added = false;
     var fd_count: u32 = 0;
-    for (0..nfds) |i| {
-        // krn.logger.INFO("poll {d}: {any}", .{});
-        const fd: i32 = user_fds.?[i].fd;
-        if (fd < 0) {
-            user_fds.?[i].revents = 0;
-            continue ;
-        }
-        if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
-            file.ref.ref();
-            defer file.ref.unref();
-            if (file.ops.poll) |_poll| {
-                fd_count += try _poll(file, &user_fds.?[i]);
+    while (fd_count == 0) {
+        for (0..nfds) |i| {
+            // krn.logger.INFO("poll {d}: {any}", .{});
+            const fd: i32 = user_fds.?[i].fd;
+            if (fd < 0) {
+                user_fds.?[i].revents = 0;
+                continue ;
+            }
+            if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
+                file.ref.ref();
+                defer file.ref.unref();
+                if (file.ops.poll) |_poll| {
+                    fd_count += try _poll(
+                        file,
+                        &user_fds.?[i],
+                        if (pt_added) null else &poll_table
+                    );
+                } else {
+                    user_fds.?[i].revents |= POLLNVAL;
+                }
             } else {
                 user_fds.?[i].revents |= POLLNVAL;
+                continue ;
             }
-        } else {
-            user_fds.?[i].revents |= POLLNVAL;
-            continue ;
         }
-    }
-    if (timeout_ms == 0) {
-        return fd_count;
-    }
-    if (fd_count == 0) {
-        if (timeout_ms < 0) {
-            krn.task.current.wakeup_time = 1;
-            fd_count = 1;
-        } else {
-            krn.task.current.wakeup_time = curr_time + @as(u32, @intCast(timeout_ms));
+        pt_added = true;
+        if (timeout_ms == 0) {
+            break ;
         }
-        krn.task.current.state = .INTERRUPTIBLE_SLEEP;
-        krn.sched.reschedule();
+        if (fd_count == 0) {
+            if (timeout_ms < 0) {
+                krn.task.current.wakeup_time = 0;
+            } else {
+                krn.task.current.wakeup_time = curr_time + @as(u32, @intCast(timeout_ms));
+            }
+            krn.task.current.state = .INTERRUPTIBLE_SLEEP;
+            krn.sched.reschedule();
+
+        }
     }
     return fd_count;
 }
@@ -116,7 +207,8 @@ fn pollOneFd(
     fd: usize,
     check_read: bool,
     check_write: bool,
-    check_except: bool
+    check_except: bool,
+    poll_table: ?*PollTable,
 ) ?PollRes {
     const file = krn.task.current.files.fds.get(@intCast(fd))
         orelse return null;
@@ -137,7 +229,7 @@ fn pollOneFd(
     };
 
     if (file.ops.poll) |_poll| {
-        _ = _poll(file, &pollfd) catch {};
+        _ = _poll(file, &pollfd, poll_table) catch {};
     }
 
     const rd = check_read and (pollfd.revents & (POLLIN | POLLERR | POLLHUP)) != 0;
@@ -158,6 +250,7 @@ fn doPollFds(
     result_read: *FDSet,
     result_write: *FDSet,
     result_except: *FDSet,
+    poll_table: ?*PollTable,
 ) ?u32 {
     var ready_count: u32 = 0;
 
@@ -183,7 +276,8 @@ fn doPollFds(
             fd,
             check_read,
             check_write,
-            check_except
+            check_except,
+            poll_table,
         ) orelse
             return null;
 
@@ -203,16 +297,13 @@ fn doPollFds(
     return ready_count;
 }
 
-pub fn newselect(
+fn doSelect(
     nfds: i32,
     read_fds: ?*FDSet,
     write_fds: ?*FDSet,
     except_fds: ?*FDSet,
-    timeout: ?*krn.time.kernel_timespec,
-    sigmask: ?*krn.signals.sigset_t,
+    timeout_ms: i32,
 ) !u32 {
-    _ = sigmask;
-
     if (nfds < 0) {
         return errors.EINVAL;
     }
@@ -222,22 +313,15 @@ pub fn newselect(
 
     const max_fd: usize = @intCast(nfds);
 
-    var timeout_ms: i32 = -1; // -1 means wait indefinitely
-    if (timeout) |t| {
-        if (!t.isValid()) {
-            return errors.EINVAL;
-        }
-        const sec_ms: i64 = @as(i64, t.tv_sec) * 1000;
-        const nsec_ms: i64 = @divTrunc(@as(i64, t.tv_nsec), 1000000);
-        timeout_ms = @intCast(sec_ms + nsec_ms);
-    }
-
     const start_time = krn.currentMs();
 
     var result_read: FDSet = .{ .fds_bits = .{0} ** FD_WORDS };
     var result_write: FDSet = .{ .fds_bits = .{0} ** FD_WORDS };
     var result_except: FDSet = .{ .fds_bits = .{0} ** FD_WORDS };
 
+    var poll_table = PollTable.init();
+    defer poll_table.deinit();
+    var pt_added = false;
     while (true) {
         const ready_count = doPollFds(
             max_fd,
@@ -247,9 +331,11 @@ pub fn newselect(
             &result_read,
             &result_write,
             &result_except,
+            if (pt_added) null else &poll_table,
         ) orelse {
             return errors.EBADF;
         };
+        pt_added = true;
 
         if (ready_count > 0) {
             if (read_fds) |rfd|
@@ -287,18 +373,40 @@ pub fn newselect(
         var wait_timeout: u32 = 0;
         const curr_time = krn.currentMs();
         if (timeout_ms < 0) {
-            wait_timeout = 20; // Poll every 20ms
+            krn.task.current.wakeup_time = 0;
         } else {
             const elapsed = curr_time - start_time;
             const remaining = @as(u32, @intCast(timeout_ms)) -| elapsed;
             wait_timeout = remaining;
+            krn.task.current.wakeup_time = curr_time + wait_timeout;
         }
-
-        // TODO: implement normal waiting
-        if (wait_timeout > 20)
-            wait_timeout = 20;
-        krn.task.current.wakeup_time = curr_time + wait_timeout;
         krn.task.current.state = .INTERRUPTIBLE_SLEEP;
         krn.sched.reschedule();
     }
+}
+
+pub fn newselect(
+    nfds: i32,
+    read_fds: ?*FDSet,
+    write_fds: ?*FDSet,
+    except_fds: ?*FDSet,
+    timeout: ?*krn.kernel_timespec,
+    _: u32,
+) !u32 {
+    var timeout_ms: i32 = -1;
+    if (timeout) |t| {
+        if (!t.isValid()) {
+            return errors.EINVAL;
+        }
+        const sec_ms: i64 = @as(i64, t.tv_sec) * 1000;
+        const usec_ms: i64 = @divTrunc(@as(i64, t.tv_nsec), 1000);
+        timeout_ms = @intCast(sec_ms + usec_ms);
+    }
+    return doSelect(
+        nfds,
+        read_fds,
+        write_fds,
+        except_fds,
+        timeout_ms,
+    );
 }
