@@ -11,6 +11,7 @@ pub const SOCK_DGRAM: u16 = 2;
 
 pub const MAX_UNIX_PATH: usize = 108;
 pub const MAX_BACKLOG: usize = 16;
+const SOCK_BUFFER_SIZE = 4096;
 
 pub const sockaddr_un = extern struct {
     sun_family: u16,
@@ -22,8 +23,9 @@ pub const sockaddr = extern struct {
     sa_data: [14]u8,
 };
 
+
 pub const Socket = struct {
-    _buffer: [4096]u8,
+    _buffer: [SOCK_BUFFER_SIZE]u8,
     rb: krn.ringbuf.RingBuf,
     conn: ?*Socket,
     list: lst.ListHead,
@@ -44,10 +46,9 @@ pub const Socket = struct {
     pending_link: lst.ListHead = lst.ListHead.init(),
 
     pub fn setup(self: *Socket) void {
-        self._buffer = .{0} ** 4096;
-        self.rb = krn.ringbuf.RingBuf{
-            .buf = self._buffer[0..4096],
-            .mask = 127,
+        self._buffer = .{0} ** SOCK_BUFFER_SIZE;
+        self.rb = krn.ringbuf.RingBuf._init(self._buffer[0..SOCK_BUFFER_SIZE]) catch {
+            @panic("Make buffer size a power of two.");
         };
         self.conn = null;
         self.list.next = &self.list;

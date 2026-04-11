@@ -65,7 +65,7 @@ pub fn do_open(
         return errors.ENOMEM;
     };
     target_path_owned = false;
-    new_file.mode = new_mode;
+    new_file.mode = new_file.inode.mode;
     new_file.flags = flags;
     new_file.ops.open(new_file, new_file.inode) catch {
         new_file.ref.unref();
