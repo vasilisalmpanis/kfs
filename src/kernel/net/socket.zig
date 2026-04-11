@@ -444,7 +444,11 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     return try do_sendto(base, buf, size);
 }
 
-pub fn sock_poll(base: *krn.fs.File, pollfd: *krn.poll.PollFd) !u32 {
+pub fn sock_poll(
+    base: *krn.fs.File,
+    pollfd: *krn.poll.PollFd,
+    poll_table: ?*krn.poll.PollTable,
+) !u32 {
     const sock = base.inode.data.sock orelse return 0;
     var ready: u32 = 0;
 
@@ -457,6 +461,10 @@ pub fn sock_poll(base: *krn.fs.File, pollfd: *krn.poll.PollFd) !u32 {
                 pollfd.revents |= krn.poll.POLLIN;
                 ready = 1;
             }
+        }
+        if (ready == 0 and pollfd.events & krn.poll.POLLIN != 0) {
+            if (poll_table) |pt|
+                try pt.addNode(&sock.accept_wait);
         }
         return ready;
     }
@@ -477,6 +485,13 @@ pub fn sock_poll(base: *krn.fs.File, pollfd: *krn.poll.PollFd) !u32 {
                 ready = 1;
             }
         }
+    }
+    if (
+        ready == 0
+        and pollfd.events & (krn.poll.POLLIN | krn.poll.POLLOUT) != 0
+    ) {
+        if (poll_table) |pt|
+            try pt.addNode(&sock.rw_queue);
     }
     return ready;
 }
