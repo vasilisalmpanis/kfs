@@ -50,7 +50,10 @@ pub fn sendfile64(out_fd: i32, in_fd: i32, offset: ?*u64, count: u32) !u32 {
         return 0;
     }
 
-    const optimal_buffer_size = @min(count, out_file.inode.sb.?.block_size);
+    const optimal_buffer_size = @min(
+        count,
+        if (out_file.inode.sb) |sb| sb.block_size else 4096
+    );
     const buffer_size = @max(optimal_buffer_size, 4096);
 
     const buffer = krn.mm.kmallocSlice(u8, buffer_size) orelse {

@@ -109,7 +109,7 @@ pub const FileOps = struct {
     lseek: ?*const fn (base: *File, offset: i32, origin: usize) anyerror!usize = null,
     readdir: ?*const fn (base: *File, buf: []u8) anyerror!usize = readdirVFS,
     ioctl: ?*const fn (base: *File, op: u32, data: usize) anyerror!u32 = null,
-    poll: ?*const fn (base: *File, pollfd: *kernel.poll.PollFd) anyerror!u32 = pollVFS,
+    poll: ?*const fn (base: *File, pollfd: *kernel.poll.PollFd, poll_table: ?*kernel.poll.PollTable) anyerror!u32 = pollVFS,
     mmap: ?*const fn (base: *File, vma: *kernel.mm.VMA) anyerror!void = null,
 };
 
@@ -311,7 +311,11 @@ pub fn readdirVFS(base: *fs.File, buf: []u8) !usize {
     return 0;
 }
 
-pub fn pollVFS(_: *fs.File, pollfd: *kernel.poll.PollFd) !u32 {
+pub fn pollVFS(
+    _: *fs.File,
+    pollfd: *kernel.poll.PollFd,
+    _: ?*kernel.poll.PollTable
+) !u32 {
     // Immediately report fd as ready
     if (pollfd.events & kernel.poll.POLLIN != 0)
         pollfd.revents |= kernel.poll.POLLIN;

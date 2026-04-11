@@ -605,7 +605,11 @@ fn tty_ioctl(
     }
 }
 
-fn tty_poll(base: *krn.fs.File, pollfd: *krn.poll.PollFd) !u32 {
+fn tty_poll(
+    base: *krn.fs.File,
+    pollfd: *krn.poll.PollFd,
+    poll_table: ?*krn.poll.PollTable
+) !u32 {
     const _tty = try getTTY(base);
     var ready: bool = false;
     if (pollfd.events & krn.poll.POLLOUT != 0) {
@@ -620,6 +624,8 @@ fn tty_poll(base: *krn.fs.File, pollfd: *krn.poll.PollFd) !u32 {
     }
     if (ready)
         return 1;
+    if (poll_table != null and (pollfd.events & krn.poll.POLLIN != 0))
+        try poll_table.?.addNode(&_tty.read_queue);
     return 0;
 }
 
