@@ -70,6 +70,12 @@ pub const WaitQueueHead = struct {
 
         krn.sched.reschedule();
 
+        if (!node.list.isEmpty()) {
+            const lck_state = self.lock.lock_irq_disable();
+            defer self.lock.unlock_irq_enable(lck_state);
+
+            node.list.del();
+        }
     }
 
     pub fn addToQueue(
@@ -117,7 +123,12 @@ pub const WaitQueueHead = struct {
         if (self.list.isEmpty())
             return;
         const first_node = self.list.next.?.entry(WaitQueueNode, "list");
-        if (first_node.wake_fn) |_fn| _fn(first_node);
+        if (first_node.wake_fn) |_wake_fn|
+            _wake_fn(first_node);
+        if (!first_node.list.isEmpty()) {
+            first_node.list.del();
+            self.list.addTail(&first_node.list);
+        }
         if (first_node.task.state != .STOPPED and first_node.task.state != .ZOMBIE)
             first_node.task.state = .RUNNING;
     }
@@ -126,12 +137,18 @@ pub const WaitQueueHead = struct {
         const lock_state = self.lock.lock_irq_disable();
         defer self.lock.unlock_irq_enable(lock_state);
 
-        while (!self.list.isEmpty()) {
-            const curr_node = self.list.next.?.entry(WaitQueueNode, "list");
-            if (curr_node.wake_fn) |_fn| _fn(curr_node);
-            curr_node.list.setup();
+        if (self.list.next == null)
+            return;
+        var curr_item = self.list.next.?;
+        var next_item = curr_item;
+        while (!self.list.isEmpty() and next_item != &self.list) {
+            next_item = curr_item.next.?;
+            const curr_node = curr_item.entry(WaitQueueNode, "list");
+            if (curr_node.wake_fn) |_wake_fn|
+                _wake_fn(curr_node);
             if (curr_node.task.state != .STOPPED and curr_node.task.state != .ZOMBIE)
                 curr_node.task.state = .RUNNING;
+            curr_item = next_item;
         }
     }
 

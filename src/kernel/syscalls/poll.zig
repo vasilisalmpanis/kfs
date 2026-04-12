@@ -15,7 +15,8 @@ pub const PollFd = extern struct {
     revents: u16,
 };
 
-const POLL_TABLE_INLINE_SIZE = 16;
+const POLL_TABLE_INLINE_SIZE = 64;
+const POLL_TABLE_ALLOC_SIZE = 1024;
 
 const PollTableEntry = struct{
     node: krn.wq.WaitQueueNode,
@@ -57,7 +58,7 @@ pub const PollTable = struct {
         if (self.wq_nodes == null) {
             self.wq_nodes = try std.ArrayList(?PollTableEntry).initCapacity(
                 krn.mm.kernel_allocator.allocator(),
-                1024
+                POLL_TABLE_ALLOC_SIZE
             );
         }
         try self.wq_nodes.?.append(
@@ -98,9 +99,23 @@ pub fn poll(user_fds: ?[*]PollFd, nfds: u32, timeout_ms: i32) !u32 {
     if (user_fds == null and nfds != 0) {
         return errors.EINVAL;
     }
-    if (nfds == 0)
+    if (nfds > POLL_TABLE_INLINE_SIZE + POLL_TABLE_ALLOC_SIZE)
+        return errors.EINVAL;
+    const start_time = krn.currentMs();
+    if (nfds == 0) {
+        if (timeout_ms == 0)
+            return 0;
+        if (timeout_ms < 0) {
+            krn.task.current.wakeup_time = 0;
+        } else {
+            krn.task.current.wakeup_time = start_time + @as(u32, @intCast(timeout_ms));
+        }
+        krn.task.current.state = .INTERRUPTIBLE_SLEEP;
+        krn.sched.reschedule();
+        if (krn.task.current.sighand.hasPending())
+            return errors.EINTR;
         return 0;
-    const curr_time = krn.currentMs();
+    }
     var poll_table = PollTable.init();
     defer poll_table.deinit();
     var pt_added = false;
@@ -138,11 +153,17 @@ pub fn poll(user_fds: ?[*]PollFd, nfds: u32, timeout_ms: i32) !u32 {
             if (timeout_ms < 0) {
                 krn.task.current.wakeup_time = 0;
             } else {
-                krn.task.current.wakeup_time = curr_time + @as(u32, @intCast(timeout_ms));
+                const curr_time = krn.currentMs();
+                const to_sleep = @as(u32, @intCast(timeout_ms)) -| (curr_time - start_time);
+                if (to_sleep == 0)
+                    break ;
+                krn.task.current.wakeup_time = curr_time + @as(u32, @intCast(to_sleep));
             }
             krn.task.current.state = .INTERRUPTIBLE_SLEEP;
             krn.sched.reschedule();
 
+            if (krn.task.current.sighand.hasPending())
+                return errors.EINTR;
         }
     }
     return fd_count;
@@ -393,14 +414,16 @@ pub fn newselect(
     timeout: ?*krn.kernel_timespec,
     _: u32,
 ) !u32 {
+    if (nfds > POLL_TABLE_INLINE_SIZE + POLL_TABLE_ALLOC_SIZE)
+        return errors.EINVAL;
     var timeout_ms: i32 = -1;
     if (timeout) |t| {
         if (!t.isValid()) {
             return errors.EINVAL;
         }
         const sec_ms: i64 = @as(i64, t.tv_sec) * 1000;
-        const usec_ms: i64 = @divTrunc(@as(i64, t.tv_nsec), 1000);
-        timeout_ms = @intCast(sec_ms + usec_ms);
+        const nsec_ms: i64 = @divTrunc(@as(i64, t.tv_nsec), 1_000_000);
+        timeout_ms = @intCast(sec_ms + nsec_ms);
     }
     return doSelect(
         nfds,
