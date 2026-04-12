@@ -415,12 +415,9 @@ pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     }
     defer remote.rw_queue.wakeUpOne();
     for (buf[0..size], 0..) |ch, idx| {
-        if (!remote.rb.push(ch)) {
-            krn.logger.WARN("sendto: sent {d} from {d}", .{idx, size});
+        if (!remote.rb.push(ch))
             return idx;
-        }
     }
-    krn.logger.WARN("sendto: sent {d} from {d} (all)", .{size, size});
     return size;
 }
 
