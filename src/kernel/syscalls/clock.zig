@@ -13,21 +13,22 @@ const CLOCK_BOOTTIME			= 7;
 const CLOCK_REALTIME_ALARM	= 8;
 const CLOCK_BOOTTIME_ALARM	= 9;
 
-pub fn clock_gettime64(clock_id: u32, _tp: ?*krn.kernel_timespec) !u32 {
+pub fn clock_gettime64(clock_id: u32, _tp: ?*krn.time.kernel_timespec64) !u32 {
     const  tp = _tp orelse {
         return errors.EFAULT;
     };
     switch (clock_id) {
         CLOCK_REALTIME => {
             const curr_seconds: u64 = krn.cmos.toUnixSeconds(krn.cmos);
+            const monotonic = krn.getTimeFromStart();
             tp.tv_sec = @intCast(curr_seconds);
-            tp.tv_nsec = 0;
+            tp.tv_nsec = monotonic.tv_nsec;
             return 0;
         },
         CLOCK_MONOTONIC => {
-            const secs = krn.getSecondsFromStart();
-            tp.tv_sec = @intCast(secs);
-            tp.tv_nsec = 0;
+            const monotonic = krn.getTimeFromStart();
+            tp.tv_sec = monotonic.tv_sec;
+            tp.tv_nsec = monotonic.tv_nsec;
             return 0;
         },
         else => {

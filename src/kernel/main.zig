@@ -34,6 +34,7 @@ pub const userspace = @import("./userspace/userspace.zig");
 pub const signals = @import("./sched/signals.zig");
 
 pub const getSecondsFromStart = @import("./time/jiffies.zig").getSecondsFromStart;
+pub const getTimeFromStart = @import("./time/jiffies.zig").getTimeFromStart;
 pub const currentMs = @import("./time/jiffies.zig").currentMs;
 pub const jiffies = @import("./time/jiffies.zig");
 pub const errors = @import("./syscalls/error-codes.zig");
