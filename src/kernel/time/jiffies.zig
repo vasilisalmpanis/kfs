@@ -37,6 +37,16 @@ pub fn getSecondsFromStart() u32 {
     return (jiffies / drivers.pit.HZ);
 }
 
+pub fn getTimeFromStart() krn.time.kernel_timespec {
+    const seconds: i32 = @intCast(jiffies / drivers.pit.HZ);
+    const sub_jiffies: u32 = jiffies % drivers.pit.HZ;
+    const nanoseconds: i32 = @intCast(sub_jiffies * (1_000_000_000 / drivers.pit.HZ));
+    return krn.time.kernel_timespec{
+        .tv_sec = seconds,
+        .tv_nsec = nanoseconds,
+    };
+}
+
 pub fn currentMs() u32 {
     if (drivers.pit.HZ < 1000) {
         return (jiffies * (1000 / drivers.pit.HZ));

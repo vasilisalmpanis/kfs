@@ -21,3 +21,8 @@ pub const kernel_timespec = extern struct {
         return self.tv_nsec == UTIME_OMIT;
     }
 };
+
+pub const kernel_timespec64 = extern struct {
+    tv_sec: i64,
+    tv_nsec: i64,
+};
