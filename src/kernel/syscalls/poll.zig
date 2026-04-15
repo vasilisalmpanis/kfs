@@ -403,6 +403,8 @@ fn doSelect(
         }
         krn.task.current.state = .INTERRUPTIBLE_SLEEP;
         krn.sched.reschedule();
+        if (krn.task.current.sighand.hasPending())
+            return krn.errors.PosixError.EINTR;
     }
 }
 
