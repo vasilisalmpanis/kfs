@@ -22,8 +22,8 @@ pub fn reboot() noreturn {
 pub fn halt() noreturn {
     asm volatile (\\
         \\ hlt
-        \\ loop:
-        \\   jmp loop
+        \\ 1:
+        \\   jmp 1b
     );
     while(true) {}
 }
