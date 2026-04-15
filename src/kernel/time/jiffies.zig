@@ -1,5 +1,6 @@
 const drivers = @import("drivers");
 const krn = @import("../main.zig");
+const vdso = @import("../vdso.zig");
 pub var jiffies: u32 = 0;
 pub var cpu_user_ticks: u64 = 0;
 pub var cpu_system_ticks: u64 = 0;
@@ -24,6 +25,8 @@ pub fn timerHandler() void {
         cpu_system_ticks += 1;
         current.stime += 1;
     }
+
+    vdso.update();
 
     if (jiffies % drivers.pit.HZ == 0) {
         // Every second

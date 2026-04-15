@@ -48,6 +48,9 @@ const AT_PHNUM = 5; // number of program headers
 const AT_PAGESZ = 6;
 const AT_BASE = 7;  // load base for PIE
 const AT_ENTRY = 9; // entry point address
+const AT_SYSINFO_EHDR = 33; // vDSO ELF header address
+
+const vdso = @import("../vdso.zig");
 
 pub const ElfValidationError = error {
     InvalidMagic,
@@ -253,7 +256,9 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
             heap_start = seg_end;
     }
     const stack_size: usize = stack_pages * arch.PAGE_SIZE;
-    var stack_bottom: usize = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE;
+    const vdso_code_pages = vdso.imagePages();
+    const vdso_total_pages = 1 + vdso_code_pages; // vvar + code
+    var stack_bottom: usize = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE - vdso_total_pages * arch.PAGE_SIZE;
     stack_bottom = krn.task.current.mm.?.mmap_area(
         stack_bottom,
         stack_size,
@@ -268,7 +273,15 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
     const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
     @memset(stack_ptr[0..stack_size], 0);
 
-    var aux_buf: [8]AuxEntry = undefined;
+    // Map vDSO and vvar pages above the stack
+    const vdso_base = stack_bottom + stack_size; // vvar page
+    const vdso_ehdr_addr = vdso_base + arch.PAGE_SIZE; // vDSO ELF code
+    vdso.mapIntoUserspace(krn.task.current.mm.?, vdso_base) catch {
+        krn.task.current.mm.?.releaseMappings();
+        return krn.errors.PosixError.ENOMEM;
+    };
+
+    var aux_buf: [10]AuxEntry = undefined;
     var aux_count: usize = 0;
     if (is_pie) {
         aux_buf[aux_count] = .{ .key = AT_PHDR, .val = load_base + ehdr.e_phoff };
@@ -282,6 +295,8 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
         aux_buf[aux_count] = .{ .key = AT_BASE, .val = load_base };
         aux_count += 1;
     }
+    aux_buf[aux_count] = .{ .key = AT_SYSINFO_EHDR, .val = vdso_ehdr_addr };
+    aux_count += 1;
     aux_buf[aux_count] = .{ .key = AT_PAGESZ, .val = krn.mm.PAGE_SIZE };
     aux_count += 1;
     aux_buf[aux_count] = .{ .key = AT_NULL, .val = 0 };
