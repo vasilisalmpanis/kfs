@@ -80,7 +80,7 @@ pub const CMOS = struct {
         const epoch_day = epoch_secs.getEpochDay();
         const year_day = epoch_day.calculateYearDay();
         const month_day = year_day.calculateMonthDay();
-        
+
         const sec = day_secs.getSecondsIntoMinute();
         const mins = day_secs.getMinutesIntoHour();
         const hours = day_secs.getHoursIntoDay();
@@ -112,7 +112,7 @@ pub const CMOS = struct {
         }
         if (status & 0x04 != 0)
             bin_mode = true;
-    
+
         if (self.curr_time[5] != year) {
             writeByte(0x09, if (bin_mode) @intCast(year) else binToBCD(@intCast(year)));
             self.curr_time[5] = @intCast(year);
@@ -208,8 +208,10 @@ pub const CMOS = struct {
 };
 
 var cmos: CMOS = undefined;
+pub var ready: bool = false;
 
 pub fn init() void {
     cmos = CMOS.init();
     krn.cmos = &cmos;
+    ready = true;
 }
