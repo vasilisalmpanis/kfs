@@ -57,7 +57,7 @@ pub fn build(b: *std.Build) !void {
 
     arch_mod.addImport("debug", debug_mod);
     arch_mod.addImport("kernel", kernel_mod);
-    
+
     debug_mod.addImport("arch", arch_mod);
     debug_mod.addImport("drivers", drivers_mod);
     debug_mod.addImport("kernel", kernel_mod);
@@ -72,7 +72,44 @@ pub fn build(b: *std.Build) !void {
     modules_mod.addImport("debug", debug_mod);
     modules_mod.addImport("drivers", drivers_mod);
 
-    var target: std.Target.Query = .{ 
+    var vdso_target: std.Target.Query = .{
+        .cpu_arch = arch,
+        .os_tag = .linux,
+        .abi = .none
+    };
+    const VdsoFeatures = std.Target.x86.Feature;
+    vdso_target.cpu_features_sub.addFeature(@intFromEnum(VdsoFeatures.avx));
+    vdso_target.cpu_features_sub.addFeature(@intFromEnum(VdsoFeatures.avx2));
+    vdso_target.cpu_features_sub.addFeature(@intFromEnum(VdsoFeatures.sse));
+    vdso_target.cpu_features_sub.addFeature(@intFromEnum(VdsoFeatures.sse2));
+    vdso_target.cpu_features_add.addFeature(@intFromEnum(VdsoFeatures.soft_float));
+
+    const vdso = b.addLibrary(.{
+        .linkage = .dynamic,
+        .name = "vdso",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/vdso/vdso_time.zig"),
+            .target = b.resolveTargetQuery(vdso_target),
+            .optimize = .ReleaseSmall,
+            .pic = true,
+            .strip = true,
+        }),
+    });
+    vdso.setLinkerScript(b.path("src/vdso/vdso.ld"));
+    vdso.root_module.stack_protector = false;
+    vdso.root_module.stack_check = false;
+    vdso.root_module.red_zone = false;
+
+    const vdso_wf = b.addWriteFiles();
+    _ = vdso_wf.addCopyFile(vdso.getEmittedBin(), "vdso.so");
+    const vdso_wrapper = vdso_wf.add("vdso_image.zig",
+        \\pub const data = @embedFile("vdso.so");
+    );
+    kernel_mod.addAnonymousImport("vdso_image", .{
+        .root_source_file = vdso_wrapper,
+    });
+
+    var target: std.Target.Query = .{
         .cpu_arch = arch,
         .os_tag = .freestanding,
         .abi = .none
