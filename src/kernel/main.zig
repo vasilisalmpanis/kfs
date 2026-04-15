@@ -31,6 +31,7 @@ pub const sleep = @import("./sched/task.zig").sleep;
 pub const Mutex = @import("./sched/mutex.zig").Mutex;
 pub const Spinlock = @import("./sched/spinlock.zig").Spinlock;
 pub const userspace = @import("./userspace/userspace.zig");
+pub const vdso = @import("./vdso.zig");
 pub const signals = @import("./sched/signals.zig");
 
 pub const getSecondsFromStart = @import("./time/jiffies.zig").getSecondsFromStart;
@@ -48,6 +49,7 @@ pub var logger: Logger = undefined;
 pub var boot_info: multiboot.Multiboot = undefined;
 pub var scr: screen.Screen = undefined;
 pub var cmos: *drv.cmos.CMOS = undefined;
+pub var cmos_ready = &drv.cmos.ready;
 
 pub const proc_mm = @import("./mm/proc_mm.zig");
 pub const fs = @import("fs/fs.zig");
