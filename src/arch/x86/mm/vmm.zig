@@ -226,8 +226,10 @@ pub const VMM = struct {
         pt = @ptrCast(first_page_table);
         pt += (0x400 * pd_idx);
         if (pt[pt_idx] != 0) {
-            krn.logger.ERROR("PD idx {d}\n", .{pd_idx});
-            @panic("PT is not 0\n");
+            const phys = pt[pt_idx] >> 12 << 12;
+            if (phys != physical_addr) {
+                @panic("Page already mapped to different physical address");
+            }
         }
         const new_flags = @as(u12, @bitCast(flags));
         pt[pt_idx] = physical_addr | new_flags;
