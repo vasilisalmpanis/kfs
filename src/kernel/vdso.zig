@@ -81,24 +81,25 @@ pub fn init() void {
     krn.logger.INFO("vDSO: vvar phys=0x{X:0>8} kern_virt=0x{X:0>8} image_size={d} code_pages={d}", .{
         vvar_page, vvar_virt, vdso_image.len, num_code_pages,
     });
-}
-
-pub fn update() void {
-    if (vvar_phys == 0) return;
-
-    vvar_data.seq +%= 1;
-    asm volatile ("" ::: .{ .memory = true });
-
-    const monotonic = krn.getTimeFromStart();
-    vvar_data.monotonic_sec = monotonic.tv_sec;
-    vvar_data.monotonic_nsec = monotonic.tv_nsec;
-
     if (krn.cmos_ready.*) {
+        const monotonic = krn.getTimeFromStart();
         const realtime_sec: u64 = krn.cmos.toUnixSeconds(krn.cmos);
         vvar_data.realtime_sec = @intCast(realtime_sec);
         vvar_data.realtime_nsec = monotonic.tv_nsec;
     }
+}
 
+pub inline fn updateTime(sec: i32, nsec: i32) void {
+    if (vvar_phys == 0) return;
+
+    vvar_data.seq +%= 1;
+    asm volatile ("" ::: .{ .memory = true });
+    vvar_data.monotonic_sec += sec;
+    vvar_data.monotonic_nsec = 
+        if (nsec == 0) 0
+        else vvar_data.monotonic_nsec + nsec;
+    vvar_data.realtime_sec += sec;
+    vvar_data.realtime_nsec = vvar_data.monotonic_nsec;
     asm volatile ("" ::: .{ .memory = true });
     vvar_data.seq +%= 1;
 }
