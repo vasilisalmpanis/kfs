@@ -19,10 +19,10 @@ pub fn nanosleep(
     krn.sched.reschedule();
     if (krn.task.current.sighand.hasPending()) {
         if (rem) |r| {
-            const passed_millis: i32 = @intCast(krn.currentMs() - start_time);
-            const passed_nanos: i32 = @rem(passed_millis, 1000_000) * 1000_000;
-            r.tv_sec = dur.tv_sec - @divTrunc(passed_millis, 1000);
-            r.tv_nsec = dur.tv_nsec - passed_nanos;
+            const passed_time = krn.time.kernel_timespec.fromMSec(
+                krn.currentMs() - start_time
+            );
+            r.* = dur.sub(&passed_time);
         }
         return errors.EINTR;
     }

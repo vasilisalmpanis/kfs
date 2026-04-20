@@ -182,8 +182,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial.print("[INIT]: IDT done\n");
     mm.mmInit(&krn.boot_info);
     krn.serial.print("[INIT]: Memory done\n");
-    krn.vdso.init();
-    krn.serial.print("[INIT]: vDSO done\n");
     krn.task.initMultitasking();
     krn.serial.print("[INIT]: Multitasking done\n");
     fpu.setTaskSwitched();
@@ -201,6 +199,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial.print("[INIT]: Syscalls done\n");
     drv.cmos.init();
     krn.serial.print("[INIT]: CMOS done\n");
+    krn.vdso.init(); // Should be initialized after cmos
+    krn.serial.print("[INIT]: vDSO done\n");
 
     // FS
     krn.fs.init();
