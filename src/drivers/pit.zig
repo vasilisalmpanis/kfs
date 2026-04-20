@@ -2,6 +2,7 @@ const io = @import("arch").io;
 const krn = @import("kernel");
 
 pub var HZ: u32 = 1000;
+pub var ns_in_one_tick: u32 = undefined;
 
 pub const PIT = struct {
     clock_freq: u32 = 1193182,
@@ -38,14 +39,16 @@ pub const PIT = struct {
         return @truncate(reload_value);
     }
 
-    pub fn setFrequency(self: *PIT, frequency: u32) void {
+    pub fn setFrequency(self: *PIT, _frequency: u32) void {
+        var frequency = _frequency;
+        if (frequency < 1000) {
+            frequency = 1000;
+        }
         HZ = frequency;
+        ns_in_one_tick = 1_000_000_000 / frequency;
         const divider = self.calculateDivider(frequency);
         io.outb(0x43, 0b00110100);
         io.outb(0x40, @truncate(divider & 0xFF));
         io.outb(0x40, @truncate(divider >> 8));
     }
-
-
 };
-

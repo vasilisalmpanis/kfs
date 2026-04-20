@@ -12,8 +12,13 @@ pub const CpuTicks = struct {
     idle: u64,
 };
 
+var fb_counter: u8 = 0;
+var hz_counter: u32 = 0;
+
 pub fn timerHandler() void {
     jiffies += 1;
+    fb_counter += 1;
+    hz_counter += 1;
 
     const current = krn.task.current;
     if (current == &krn.task.initial_task) {
@@ -26,14 +31,19 @@ pub fn timerHandler() void {
         current.stime += 1;
     }
 
-    vdso.update();
-
-    if (jiffies % drivers.pit.HZ == 0) {
+    if (hz_counter == drivers.pit.HZ) {
+        hz_counter = 0;
         // Every second
         krn.cmos.incSec(krn.cmos);
+        vdso.updateTime(1, 0);
+    } else {
+        vdso.updateTime(0, @intCast(drivers.pit.ns_in_one_tick));
     }
-    if (jiffies % 30 == 0 and krn.screen.framebuffer.has_dirty)
-        drivers.framebuffer.render_queue.wakeUpOne();
+    if (fb_counter == 30) {
+        fb_counter = 0;
+        if (krn.screen.framebuffer.has_dirty)
+            drivers.framebuffer.render_queue.wakeUpOne();
+    }
 }
 
 pub fn getSecondsFromStart() u32 {
