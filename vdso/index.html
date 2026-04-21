@@ -1,0 +1,1072 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../signals/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>vDSO (virtual Dynamic Shared Object) - KFS</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#vdso-virtual-dynamic-shared-object" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="KFS" class="md-header__button md-logo" aria-label="KFS" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            KFS
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              vDSO (virtual Dynamic Shared Object)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="KFS" class="md-nav__button md-logo" aria-label="KFS" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    KFS
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Welcome to KFS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../about/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../libc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    KFS compatibility with LibC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../locking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Locking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../signals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vDSO (virtual Dynamic Shared Object)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vDSO (virtual Dynamic Shared Object)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-two-separate-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why two separate pages?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shared-data-vdsodata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Data: VdsoData
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Shared Data: VdsoData">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#seqlock-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seqlock Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build Pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Build Pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#position-independence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position Independence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kernel-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kernel Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kernel Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timer-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timer Update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#process-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Process Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fork-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fork Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#userspace-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Userspace Discovery
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-clocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Clocks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-two-separate-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why two separate pages?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shared-data-vdsodata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Data: VdsoData
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Shared Data: VdsoData">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#seqlock-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seqlock Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build Pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Build Pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#position-independence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position Independence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kernel-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kernel Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kernel Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timer-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timer Update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#process-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Process Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fork-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fork Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#userspace-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Userspace Discovery
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-clocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Clocks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="vdso-virtual-dynamic-shared-object">vDSO (virtual Dynamic Shared Object)<a class="headerlink" href="#vdso-virtual-dynamic-shared-object" title="Permanent link">&para;</a></h1>
+<p>The vDSO is a small shared library that the kernel maps into every userspace
+process. It allows certain system calls — specifically time-related ones — to
+be executed entirely in userspace without the cost of a context switch into
+the kernel.</p>
+<p>On x86, every <code>int $0x80</code> or <code>sysenter</code> transition involves saving registers,
+switching privilege levels, and flushing pipeline state. For frequently called
+functions like <code>clock_gettime</code>, this overhead dominates the actual work.
+The vDSO eliminates it by placing both the data and the code to read it
+directly in the process's address space.</p>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<p>The vDSO consists of two components mapped into every process:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Component</th>
+<th style="text-align: left;">Size</th>
+<th style="text-align: left;">Permissions</th>
+<th style="text-align: left;">Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>vvar page</strong></td>
+<td style="text-align: left;">1 page (4 KiB)</td>
+<td style="text-align: left;">User: read-only, Kernel: read-write</td>
+<td style="text-align: left;">Shared time data updated by the kernel</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>vDSO code page</strong></td>
+<td style="text-align: left;">1 page (4 KiB)</td>
+<td style="text-align: left;">User: read-only</td>
+<td style="text-align: left;">ELF shared library with <code>__vdso_clock_gettime</code></td>
+</tr>
+</tbody>
+</table>
+<p>The vvar page holds a <code>VdsoData</code> struct that the kernel writes to on every
+timer tick. The vDSO code page contains a position-independent ELF shared
+library that reads from the vvar page to service time queries.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Process virtual address space (top):
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  0xBFFE0000  ┌──────────────────┐
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>              │   User stack     │  30 pages, RW
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>              │   (grows down)   │
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  0xBFFFE000  ├──────────────────┤
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>              │   vvar page      │  1 page, RO (shared physical page)
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  0xBFFFF000  ├──────────────────┤
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>              │   vDSO code      │  1 page, RO (ELF with __vdso_clock_gettime)
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  0xC0000000  └──────────────────┘
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>              │   Kernel space   │
+</span></code></pre></div>
+<h3 id="why-two-separate-pages">Why two separate pages?<a class="headerlink" href="#why-two-separate-pages" title="Permanent link">&para;</a></h3>
+<p>The vvar and vDSO code live in separate pages for security:</p>
+<ul>
+<li>The <strong>vvar page</strong> is mapped read-only for userspace but the kernel holds a
+  separate read-write mapping to the same physical page. This allows the kernel
+  to update time data without giving userspace write access.</li>
+<li>The <strong>vDSO code page</strong> is read-only and contains executable code. Keeping data
+  and code separate follows the W^X (write xor execute) principle.</li>
+</ul>
+<h2 id="shared-data-vdsodata">Shared Data: VdsoData<a class="headerlink" href="#shared-data-vdsodata" title="Permanent link">&para;</a></h2>
+<p>The vvar page contains a single <code>VdsoData</code> struct at offset 0:</p>
+<div class="language-zig highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kr">pub</span><span class="w"> </span><span class="kr">const</span><span class="w"> </span><span class="n">VdsoData</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kr">extern</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="n">seq</span><span class="o">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w">            </span><span class="c1">// seqlock counter</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="n">monotonic_sec</span><span class="o">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="n">monotonic_nsec</span><span class="o">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="n">realtime_sec</span><span class="o">:</span><span class="w"> </span><span class="kt">i64</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="n">realtime_nsec</span><span class="o">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="n">_pad</span><span class="o">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">};</span>
+</span></code></pre></div>
+<p>The kernel writes to this struct from the timer interrupt handler on every tick.
+Userspace reads from it without any syscall.</p>
+<h3 id="seqlock-protocol">Seqlock Protocol<a class="headerlink" href="#seqlock-protocol" title="Permanent link">&para;</a></h3>
+<p>The <code>seq</code> field implements a seqlock — a lightweight synchronization mechanism
+optimized for the single-writer, multiple-reader pattern:</p>
+<p><strong>Kernel (writer):</strong></p>
+<ol>
+<li>Increment <code>seq</code> to an odd value (signals: update in progress)</li>
+<li>Memory barrier</li>
+<li>Write time data</li>
+<li>Memory barrier</li>
+<li>Increment <code>seq</code> to an even value (signals: update complete)</li>
+</ol>
+<p><strong>Userspace (reader):</strong></p>
+<ol>
+<li>Read <code>seq</code> — spin while odd (writer is active)</li>
+<li>Memory barrier</li>
+<li>Read time data</li>
+<li>Memory barrier</li>
+<li>Read <code>seq</code> again — if changed, data was torn, retry from step 1</li>
+</ol>
+<p>This guarantees userspace always reads a consistent snapshot without any locks
+or atomic operations beyond simple loads.</p>
+<div class="language-zig highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// Kernel side (timer interrupt)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">vvar_data</span><span class="p">.</span><span class="n">seq</span><span class="w"> </span><span class="o">+%=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">           </span><span class="c1">// odd: update started</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">asm</span><span class="w"> </span><span class="kr">volatile</span><span class="w"> </span><span class="p">(</span><span class="s">&quot;&quot;</span><span class="w"> </span><span class="o">:::</span><span class="w"> </span><span class="p">.{</span><span class="w"> </span><span class="p">.</span><span class="n">memory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">});</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">vvar_data</span><span class="p">.</span><span class="n">monotonic_sec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">vvar_data</span><span class="p">.</span><span class="n">monotonic_nsec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">asm</span><span class="w"> </span><span class="kr">volatile</span><span class="w"> </span><span class="p">(</span><span class="s">&quot;&quot;</span><span class="w"> </span><span class="o">:::</span><span class="w"> </span><span class="p">.{</span><span class="w"> </span><span class="p">.</span><span class="n">memory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">});</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">vvar_data</span><span class="p">.</span><span class="n">seq</span><span class="w"> </span><span class="o">+%=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w">           </span><span class="c1">// even: update complete</span>
+</span></code></pre></div>
+<div class="language-zig highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// Userspace side (vDSO code)</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="kc">true</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="kr">var</span><span class="w"> </span><span class="n">seq1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vvar</span><span class="p">.</span><span class="n">seq</span><span class="p">;</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">seq1</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="n">seq1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vvar</span><span class="p">.</span><span class="n">seq</span><span class="p">;</span><span class="w">  </span><span class="c1">// spin while odd</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="c1">// read time fields ...</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">seq1</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">vvar</span><span class="p">.</span><span class="n">seq</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">          </span><span class="c1">// consistent read</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<h2 id="build-pipeline">Build Pipeline<a class="headerlink" href="#build-pipeline" title="Permanent link">&para;</a></h2>
+<p>The vDSO is compiled as a separate ELF shared library and embedded into the
+kernel binary at build time:</p>
+<ol>
+<li><strong>Compile</strong> <code>src/vdso/vdso_time.zig</code> as a PIC shared library targeting
+   <code>x86-linux-none</code> with <code>ReleaseSmall</code> optimization</li>
+<li><strong>Link</strong> with <code>src/vdso/vdso.ld</code> which strips unnecessary sections (<code>.got</code>,
+   <code>.bss</code>, <code>.eh_frame</code>) to minimize size</li>
+<li><strong>Embed</strong> the resulting <code>vdso.so</code> into the kernel module via a generated
+   Zig wrapper that uses <code>@embedFile</code></li>
+<li>At runtime the kernel copies the embedded ELF bytes into userspace pages</li>
+</ol>
+<p>The vDSO ELF is typically under 1 KiB and fits in a single page.</p>
+<h3 id="position-independence">Position Independence<a class="headerlink" href="#position-independence" title="Permanent link">&para;</a></h3>
+<p>The vDSO code must work at any virtual address since the mapping location can
+vary. On x86-32 there is no RIP-relative addressing, so the vDSO uses a
+classic <code>call/pop</code> idiom to determine its own program counter at runtime:</p>
+<div class="language-zig highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kr">inline</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="n">getVvarData</span><span class="p">()</span><span class="w"> </span><span class="o">*</span><span class="kr">const</span><span class="w"> </span><span class="kr">volatile</span><span class="w"> </span><span class="n">VdsoData</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="kr">const</span><span class="w"> </span><span class="n">pc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">asm</span><span class="w"> </span><span class="kr">volatile</span><span class="w"> </span><span class="p">(</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">        </span><span class="sh">\\call 1f</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">        </span><span class="sh">\\1: pop %[ret]</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="n">ret</span><span class="p">]</span><span class="w"> </span><span class="s">&quot;=r&quot;</span><span class="w"> </span><span class="p">(</span><span class="o">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="p">),</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="p">);</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="kr">const</span><span class="w"> </span><span class="n">vvar_addr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">pc</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0xFFFFF000</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mh">0x1000</span><span class="p">;</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">@ptrFromInt</span><span class="p">(</span><span class="n">vvar_addr</span><span class="p">);</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>This avoids any GOT (Global Offset Table) dependency. The vvar page is always
+one page before the vDSO code page, so the address is computed by page-aligning
+the current PC and subtracting <code>0x1000</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Why not use an extern symbol?</p>
+<p>x86-32 PIC code routes extern symbol accesses through the GOT,
+which requires relocation processing by a dynamic linker.
+Since the kernel maps the vDSO by raw <code>@memcpy</code> without applying
+relocations, GOT entries remain uninitialized (zero), causing null pointer
+dereferences. The PC-relative approach eliminates this entirely.</p>
+</div>
+<h2 id="kernel-integration">Kernel Integration<a class="headerlink" href="#kernel-integration" title="Permanent link">&para;</a></h2>
+<h3 id="initialization">Initialization<a class="headerlink" href="#initialization" title="Permanent link">&para;</a></h3>
+<p>During boot, <code>vdso.init()</code> is called after memory management is set up:</p>
+<ol>
+<li>Allocate one physical page for the vvar data</li>
+<li>Map it into kernel virtual address space as read-write</li>
+<li>Zero the page</li>
+<li>allocated vdso.len / PAGE_SIZE pages, and copy the content of the vdso
+   libray to those pages, padding the rest with 0.</li>
+</ol>
+<p>After CMOS initialization, <code>cmos.ready</code> is set to true to enable
+realtime clock updates in the vvar data.</p>
+<h3 id="timer-update">Timer Update<a class="headerlink" href="#timer-update" title="Permanent link">&para;</a></h3>
+<p>On every timer interrupt, <code>vdso.update()</code> writes the current
+monotonic and realtime timestamps to the vvar page using the seqlock protocol.</p>
+<h3 id="process-mapping">Process Mapping<a class="headerlink" href="#process-mapping" title="Permanent link">&para;</a></h3>
+<p>When a new process is created via <code>execve</code>, <code>prepareBinary()</code> maps both the
+vvar and vDSO code pages into the process address space:</p>
+<ol>
+<li><strong>vvar page</strong>: A new VMA is created and the shared physical page is mapped
+   user-read-only. All processes share the same physical page so they all
+   see the same time data.</li>
+<li><strong>vDSO code page</strong>: A new physical page is allocated, the embedded ELF is
+   copied in, and the page is then made read-only.</li>
+<li><strong>Auxiliary vector</strong>: <code>AT_SYSINFO_EHDR</code> (value 33) is added pointing to
+   the vDSO ELF header address.</li>
+</ol>
+<h3 id="fork-behavior">Fork Behavior<a class="headerlink" href="#fork-behavior" title="Permanent link">&para;</a></h3>
+<p>On <code>fork()</code>, the vvar VMA is duplicated like any other shared mapping —
+<code>dupArea</code> maps the underlying physical frame to the vvar, vdso address.</p>
+<h2 id="userspace-discovery">Userspace Discovery<a class="headerlink" href="#userspace-discovery" title="Permanent link">&para;</a></h2>
+<p>C libraries (musl, glibc) automatically discover and use the vDSO:</p>
+<ol>
+<li>During <code>_start</code>, the C runtime walks the auxiliary vector on the stack</li>
+<li>It reads <code>AT_SYSINFO_EHDR</code> to find the vDSO ELF header</li>
+<li>It parses the ELF dynamic section to find <code>DT_SYMTAB</code>, <code>DT_STRTAB</code>, and
+   <code>DT_HASH</code></li>
+<li>It looks up <code>__vdso_clock_gettime</code> in the symbol table</li>
+<li>If found, <code>clock_gettime()</code> calls the vDSO function directly instead of
+   issuing a syscall</li>
+</ol>
+<p>This is transparent to application code — calling <code>clock_gettime()</code> in C
+automatically uses the vDSO path when available.</p>
+<h2 id="supported-clocks">Supported Clocks<a class="headerlink" href="#supported-clocks" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Clock ID</th>
+<th style="text-align: left;">Constant</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;"><code>CLOCK_REALTIME</code></td>
+<td style="text-align: left;">Wall clock time from CMOS</td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;"><code>CLOCK_MONOTONIC</code></td>
+<td style="text-align: left;">Time since kernel boot</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.indexes", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
