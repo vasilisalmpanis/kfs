@@ -122,7 +122,6 @@ pub fn poll(user_fds: ?[*]PollFd, nfds: u32, timeout_ms: i32) !u32 {
     var fd_count: u32 = 0;
     while (fd_count == 0) {
         for (0..nfds) |i| {
-            // krn.logger.INFO("poll {d}: {any}", .{});
             const fd: i32 = user_fds.?[i].fd;
             if (fd < 0) {
                 user_fds.?[i].revents = 0;

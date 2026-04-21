@@ -113,7 +113,7 @@ $(ROOTFS_FULL_IMG): $(ROOTFS_FULL_DIR) $(addprefix $(MOD_TARGET_DIR)/,$(MODULES:
 		-t ext2 \
 		-b 8192 \
 		$(ROOTFS_FULL_IMG) \
-		$$(du -s $(ROOTFS_FULL_DIR) | awk '{print int($$1 * 1.5) + 10240 "K"}')
+		$$(du -s $(ROOTFS_FULL_DIR) | awk '{print int($$1 * 1.3) + 10240 "K"}')
 
 $(ROOTFS_MIN_IMG): $(ROOTFS_MIN_DIR)
 	@mkdir -p $(dir $(ROOTFS_MIN_IMG))

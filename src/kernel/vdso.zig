@@ -95,7 +95,7 @@ pub inline fn updateTime(sec: i32, nsec: i32) void {
     vvar_data.seq +%= 1;
     asm volatile ("" ::: .{ .memory = true });
     vvar_data.monotonic_sec += sec;
-    vvar_data.monotonic_nsec = 
+    vvar_data.monotonic_nsec =
         if (nsec == 0) 0
         else vvar_data.monotonic_nsec + nsec;
     vvar_data.realtime_sec += sec;

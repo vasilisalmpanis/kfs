@@ -53,7 +53,7 @@ pub const WaitQueueHead = struct {
         const tsk = krn.task.current;
         var node = WaitQueueNode.init(tsk);
         node.setup();
-        const lock_state = self.lock.lock_irq_disable();
+        var lock_state = self.lock.lock_irq_disable();
         self.list.addTail(&node.list);
 
         if (timeout != 0) {
@@ -70,12 +70,10 @@ pub const WaitQueueHead = struct {
 
         krn.sched.reschedule();
 
-        if (!node.list.isEmpty()) {
-            const lck_state = self.lock.lock_irq_disable();
-            defer self.lock.unlock_irq_enable(lck_state);
-
+        lock_state = self.lock.lock_irq_disable();
+        defer self.lock.unlock_irq_enable(lock_state);
+        if (!node.list.isEmpty())
             node.list.del();
-        }
     }
 
     pub fn addToQueue(
