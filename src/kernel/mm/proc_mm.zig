@@ -113,10 +113,8 @@ pub const VMA = struct {
         if (self.file) |_file| {
             if (!_file.mode.isReg()) {
                 if (_file.ops.mmap) |_mmap| {
-                    krn.logger.INFO("calling  mmap\n", .{});
                     return _mmap(_file, self);
                 } else {
-                    krn.logger.INFO("EACCES\n", .{});
                     return krn.errors.PosixError.EACCES;
                 }
             }
