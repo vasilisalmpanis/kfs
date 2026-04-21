@@ -129,7 +129,13 @@ fn flushInputQueue(_tty: *TTY) void {
 
 fn isControllingTTY(file: *krn.fs.File) bool {
     if (file.path) |path|
-        return std.mem.eql(u8, path.dentry.name, "tty") or std.mem.eql(u8, path.dentry.name, "tty0");
+        return std.mem.eql(u8, path.dentry.name, "tty");
+    return false;
+}
+
+fn isActiveConsole(file: *krn.fs.File) bool {
+    if (file.path) |path|
+        return std.mem.eql(u8, path.dentry.name, "tty0");
     return false;
 }
 
@@ -144,6 +150,10 @@ fn getTTY(file: *krn.fs.File) !*TTY {
             return @ptrCast(@alignCast(_d.data));
         }
         return krn.errors.PosixError.EIO;
+    } else if (isActiveConsole(file)) {
+        const current_tty = krn.screen.current_tty orelse
+            return krn.errors.PosixError.ENXIO;
+        return current_tty;
     }
     if (file.inode.data.dev) |_d|
         return @ptrCast(@alignCast(_d.data));
