@@ -212,7 +212,7 @@ pub const ATADrive = struct {
     dma_buff_virt: usize = 0,
     dma_initialized: bool = false,
 
-    partitions: std.ArrayList(*part.Partition) = std.ArrayList(*part.Partition){},
+    partitions: std.ArrayList(*part.Partition) = undefined,
 
     pub const SECTOR_SIZE = 512;
     pub const DMA_BUFFER_PAGES = 8;
@@ -580,7 +580,7 @@ fn ata_probe_channel(
 pub const Iterator = struct {
     drives: *const std.ArrayList(*ATADrive),
     current: usize,
-    
+
     pub fn next(self: *Iterator) ?*const ATADrive {
         if (self.current >= self.drives.items.len) return null;
         const drive = self.drives.items[self.current];
@@ -592,8 +592,12 @@ pub const Iterator = struct {
 pub const ATAManager = struct {
     drives: std.ArrayList(*ATADrive) = undefined,
 
-    pub fn init(self: *ATAManager) void {
-        self.drives = std.ArrayList(*ATADrive){};
+    pub fn init(self: *ATAManager) !void {
+        self.drives = std.ArrayList(*ATADrive).initCapacity(
+            kernel.mm.kernel_allocator.allocator(),
+            1) catch {
+            return kernel.errors.PosixError.ENOMEM;
+        };
     }
 
     pub fn addDevice(self: *ATAManager, device: ATADrive) !*ATADrive {
@@ -601,9 +605,13 @@ pub const ATAManager = struct {
             .{@tagName(device.channel), device.name}
         );
         if (kernel.mm.kmalloc(ATADrive)) |drive| {
-            drive.* = device;
-            drive.partitions = std.ArrayList(*part.Partition){};
             errdefer kernel.mm.kfree(drive);
+            drive.* = device;
+            drive.partitions = std.ArrayList(*part.Partition).initCapacity(
+                kernel.mm.kernel_allocator.allocator(),
+                1) catch {
+                return kernel.errors.PosixError.ENOMEM;
+            };
             try self.drives.append(
                 kernel.mm.kernel_allocator.allocator(),
                 drive
@@ -681,7 +689,10 @@ pub fn ata_init(pci_device: *pci.PCIDevice) void {
     }
     @memset(ide_buf[0..256], 0);
     if (kernel.mm.kmalloc(ATAManager)) |manager| {
-        manager.init();
+        manager.init() catch {
+            dbg.printf("error Initializing ata manager\n", .{});
+            return;
+        };
         pci_device.dev.data = @ptrCast(manager);
         inline for (std.meta.fields(ChannelType)) |field| {
             if (ata_probe_channel(

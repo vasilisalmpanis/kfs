@@ -7,7 +7,9 @@ var visited_registry: std.StringHashMap([]const u8) = undefined;
 
 const LEVEL_0: u32 = 0;
 
-fn printIdentation(identation: u32, writer: *std.io.Writer) !void {
+pub export const initial_page_dir: [1024]u32 = .{0} ** 1024;
+
+fn printIdentation(identation: u32, writer: *std.Io.Writer) !void {
     for (0..identation) |_| {
         try writer.print(" ", .{});
     }
@@ -335,7 +337,7 @@ fn handleComplexType(
     identation: u32,
     type_name: []const u8,
     curr_type: std.builtin.Type,
-    writer: *std.io.Writer,
+    writer: *std.Io.Writer,
     type_val: type,
     visited: *std.StringHashMap([]const u8),
     first_run: bool,
@@ -450,28 +452,30 @@ fn handleComplexType(
     }
 }
 
-pub fn main() anyerror!void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    allocator = gpa.allocator();
-    
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
-    
+pub fn main(init: std.process.Init) anyerror!void {
+    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const gpa = init.gpa;
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
+
+    allocator = gpa;
+
     if (args.len < 2) {
         std.debug.print("Usage: {s} <output_file>\n", .{args[0]});
         return error.InvalidArgs;
     }
-    
+
     const output_path = args[1];
-    const file = try std.fs.cwd().createFile(output_path, std.fs.File.CreateFlags{
-        .read = true,
-    });
-    defer file.close();
-   
+    const file = try std.Io.Dir.cwd().createFile(
+        init.io,
+        output_path, std.Io.File.CreateFlags{
+            .read = true,
+        }
+    );
+    defer file.close(init.io);
+
     var buff: [4096]u8 = .{0} ** 4096;
-    var writer = file.writer(buff[0..4096]);
-    
+    var writer = file.writer(init.io, buff[0..4096]);
+
     try writer.interface.writeAll(
         \\// Auto-generated kernel type interface
         \\const std = @import("std");
@@ -482,9 +486,9 @@ pub fn main() anyerror!void {
         \\
     );
     const interface = &writer.interface;
-    
+
     visited_registry = std.StringHashMap([]const u8).init(allocator);
-    
+
     switch (@typeInfo(modules)) {
         .@"struct" => |_t| {
             inline for (_t.decls) |decl| {

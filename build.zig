@@ -10,6 +10,7 @@ const archs = [_]std.Target.Cpu.Arch{
 };
 
 pub fn build(b: *std.Build) !void {
+    b.release_mode = .fast;
     const user_arch = b.option(
         []const u8,
         "arch",
@@ -90,7 +91,7 @@ pub fn build(b: *std.Build) !void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/vdso/vdso_time.zig"),
             .target = b.resolveTargetQuery(vdso_target),
-            .optimize = .ReleaseSmall,
+            .optimize = .ReleaseFast,
             .pic = true,
             .strip = true,
         }),
@@ -147,15 +148,13 @@ pub fn build(b: *std.Build) !void {
 
     if (arch == .x86) {
         kernel.setLinkerScript(b.path("./src/arch/x86/linker.ld"));
-        kernel.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));
+        kernel.root_module.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));
     } else if (arch == .x86_64) {
         kernel.setLinkerScript(b.path("./src/arch/x86_64/linker.ld"));
-        kernel.addAssemblyFile(b.path("./src/arch/x86_64/boot/boot.s"));
+        kernel.root_module.addAssemblyFile(b.path("./src/arch/x86_64/boot/boot.s"));
     }
 
     // kernel.setVerboseLink(true);
-    b.installArtifact(kernel);
-
     target.abi = .musl;
     target.os_tag = .linux;
     const codegen_step = b.step("gen", "Build module types");
@@ -179,7 +178,8 @@ pub fn build(b: *std.Build) !void {
 
     const kernel_step = b.step(name, "Build the kernel");
     if (builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
-        kernel_step.dependOn(codegen_step);
+        b.getInstallStep().dependOn(&gen_output_file.step);
     }
     kernel_step.dependOn(&kernel.step);
+    b.installArtifact(kernel);
 }

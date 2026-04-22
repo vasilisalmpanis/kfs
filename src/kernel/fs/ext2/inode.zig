@@ -96,7 +96,7 @@ pub const Ext2DirEntry = extern struct {
 };
 
 pub const Ext2InodeData = extern struct {
-    i_mode:        fs.UMode,              // file mode
+    i_mode:        u16,                   // file mode
     i_uid:         u16,                   // low 16 bits of uid
     i_size:        u32,                   // size in bytes (low 32)
     i_atime:       u32,                   // atime (unix epoch)
@@ -438,7 +438,7 @@ pub const Ext2Inode = struct {
         inode.base.setCreds(
             raw_inode.i_uid | (@as(u32, raw_inode.osd2.linux2.l_i_uid_high) << 16),
             raw_inode.i_gid | (@as(u32, raw_inode.osd2.linux2.l_i_gid_high) << 16),
-            raw_inode.i_mode,
+            @bitCast(raw_inode.i_mode),
         );
         kernel.mm.vfree(raw_buff.ptr);
     }
@@ -631,7 +631,8 @@ pub const Ext2Inode = struct {
         if (attrs.mode != null) {
             updated = true;
             ext2_inode.data.i_mtime = base.mtime;
-            ext2_inode.data.i_mode.copyPerms(base.mode);
+            const umode :*kernel.fs.UMode = @ptrCast(@alignCast(&ext2_inode.data.i_mode));
+            umode.copyPerms(base.mode);
         }
         if (attrs.uid != null) {
             updated = true;

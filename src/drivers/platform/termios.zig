@@ -3,7 +3,7 @@ const krn = @import("kernel");
 
 pub const NCCS: usize = 19;
 
-pub const Termios = extern struct {
+pub const Termios = struct {
     c_iflag: IFlag,
     c_oflag: OFlag,
     c_cflag: u32,
@@ -24,31 +24,31 @@ pub const Termios = extern struct {
 
     pub fn printDiff(self: *const Termios, other: *const Termios) void {
         krn.logger.DEBUG("Termios diff:", .{});
-        if (self.c_iflag != other.c_iflag) {
+        if (!self.c_iflag.eql(&other.c_iflag)) {
             inline for (std.meta.fields(IFlag)) |field| {
                 const curr_val = @field(self.c_iflag, field.name);
                 const new_val = @field(other.c_iflag, field.name);
                 if (curr_val != new_val) {
                     krn.logger.DEBUG(
-                        "  iflag.{s:<8} {} => {}", 
+                        "  iflag.{s:<8} {} => {}",
                         .{field.name, curr_val, new_val}
                     );
                 }
             }
         }
-        if (self.c_oflag != other.c_oflag) {
+        if (!self.c_oflag.eql(&other.c_oflag)) {
             inline for (std.meta.fields(OFlag)) |field| {
                 const curr_val = @field(self.c_oflag, field.name);
                 const new_val = @field(other.c_oflag, field.name);
                 if (curr_val != new_val) {
                     krn.logger.DEBUG(
-                        "  oflag.{s:<8} {} => {}", 
+                        "  oflag.{s:<8} {} => {}",
                         .{field.name, curr_val, new_val}
                     );
                 }
             }
         }
-        if (self.c_lflag != other.c_lflag) {
+        if (!self.c_lflag.eql(&other.c_lflag)) {
             inline for (std.meta.fields(LFlag)) |field| {
                 const curr_val = @field(self.c_lflag, field.name);
                 const new_val = @field(other.c_lflag, field.name);
@@ -141,10 +141,15 @@ pub const IFlag = packed struct {
     IXOFF: bool = false,
     IMAXBEL: bool = false,
     IUTF8: bool = false,
-    _padding_1: u17 = 0,
+    _padding_1: bool = false,
+    _padding_2: u16 = 0,
 
     pub fn init() IFlag {
         return IFlag{};
+    }
+
+    pub fn eql(self: *const IFlag, other: *const IFlag) bool {
+        return @as(u32, @bitCast(self.*)) == @as(u32, @bitCast(other.*));
     }
 };
 
@@ -170,6 +175,10 @@ pub const OFlag = packed struct {
     pub fn init() OFlag {
         return OFlag{};
     }
+
+    pub fn eql(self: *const OFlag, other: *const OFlag) bool {
+        return @as(u32, @bitCast(self.*)) == @as(u32, @bitCast(other.*));
+    }
 };
 
 pub const LFlag = packed struct {
@@ -191,8 +200,13 @@ pub const LFlag = packed struct {
     IEXTEN: bool = false,
     EXTPROC: bool = false,
     _padding_2: u15 = 0,
+    // _padding_2: [15]bool = .{false} ** 15,
 
     pub fn init() LFlag {
         return LFlag{};
+    }
+
+    pub fn eql(self: *const LFlag, other: *const LFlag) bool {
+        return @as(u32, @bitCast(self.*)) == @as(u32, @bitCast(other.*));
     }
 };

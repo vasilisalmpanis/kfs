@@ -6,14 +6,14 @@ const dbg = @import("debug");
 const krn = @import("../main.zig");
 const PAGE_SIZE = @import("./init.zig").PAGE_SIZE;
 
-pub const FreeListNode = packed struct {
+pub const FreeListNode = extern struct {
     block_size: usize,
     next: ?*FreeListNode,
     unused_1: usize = 0,
     unused_2: usize = 0,
 };
 
-pub const AllocHeader = packed struct {
+pub const AllocHeader = extern struct {
     block_size: usize,
     head: ?*FreeList,
     unused_1: usize = 0,

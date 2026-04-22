@@ -122,7 +122,8 @@ pub const Ext2Super = struct {
             const ext2_root_inode = root_inode.getImpl(Ext2Inode, "base");
             errdefer kernel.mm.kfree(ext2_root_inode);
             try ext2_root_inode.iget(sb, ext2_inode.EXT2_ROOT_INO);
-            if (!ext2_root_inode.data.i_mode.isDir()) {
+            const root_mode: *kernel.fs.UMode = @ptrCast(@alignCast(&ext2_root_inode.data.i_mode));
+            if (!root_mode.isDir()) {
                 kernel.logger.WARN("Ext2: corrupted disk\n",.{});
                 return kernel.errors.PosixError.ENOENT;
             }

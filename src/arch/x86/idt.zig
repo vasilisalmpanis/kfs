@@ -356,7 +356,7 @@ fn IRQClearMask(IRQ_line: u8) void {
         IRQline -= 8;
     }
     value = io.inb(port);
-    io.outb(port, value & ~(@as(u8, 1) << @truncate(IRQline)));        
+    io.outb(port, value & ~(@as(u8, 1) << @truncate(IRQline)));
 }
 
 pub inline fn PICRemap() void {
@@ -382,7 +382,7 @@ const IdtEntry = packed struct {
 
 const Idtr = packed struct {
     limit: u16,
-    base: *const IdtEntry,
+    base: u32,
 };
 
 var idt: [IDT_MAX_DESCRIPTORS] IdtEntry align(0x10) = undefined;
@@ -399,7 +399,7 @@ pub fn idtSetDescriptor(vector: u8, isr: *const ISRHandler, flags: u8) void {
 }
 
 pub fn idtInit() void {
-    idtr.base = &idt[0];
+    idtr.base = @intFromPtr(&idt[0]);
     idtr.limit = idt.len * @sizeOf(IdtEntry) - 1;
 
     for (0..IDT_MAX_DESCRIPTORS) |index| {
