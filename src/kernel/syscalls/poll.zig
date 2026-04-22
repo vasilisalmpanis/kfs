@@ -172,14 +172,7 @@ pub const FD_SETSIZE:   usize = 1024;
 pub const NFDBITS:      usize = @bitSizeOf(usize);
 pub const FD_WORDS:     usize = FD_SETSIZE / NFDBITS;
 
-const BitIdxType = @Type(
-    std.builtin.Type{
-        .int = .{
-            .bits = if (@sizeOf(usize) == @sizeOf(u32)) 5 else 6,
-            .signedness = .unsigned
-        }
-    }
-);
+const BitIdxType = @Int(.unsigned, if (@sizeOf(usize) == @sizeOf(u32)) 5 else 6);
 
 pub const FDSet = extern struct {
     fds_bits: [FD_WORDS]usize,

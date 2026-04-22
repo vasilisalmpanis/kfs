@@ -58,14 +58,16 @@ pub export fn unregisterPlatformDriver(driver: *drv.driver.Driver) i32 {
     return 0;
 }
 
-pub export fn addCharacterDevice(device: *drv.device.Device, mode: krn.fs.UMode) i32 {
+pub export fn addCharacterDevice(device: *drv.device.Device, _mode: u16) i32 {
+    const mode: krn.fs.UMode = @bitCast(_mode);
     drv.cdev.addCdev(device, mode, null) catch |err| {
         return @intFromError(err);
     };
     return 0;
 }
 
-pub export fn rmCharacterDevice(dev: drv.device.dev_t) i32 {
+pub export fn rmCharacterDevice(_dev: u16) i32 {
+    const dev: drv.device.dev_t = @bitCast(_dev);
     drv.cdev.rmCdev(dev) catch |err| {
         return @intFromError(err);
     };

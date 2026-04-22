@@ -62,13 +62,13 @@ fn kbd_probe(device: *pdev.PlatformDevice) !void {
         return kfs.errors.PosixError.EIO;
     _ = api.addCharacterDevice(
         &device.dev,
-        krn.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0o6}
+        @bitCast(krn.fs.UMode{.usr = 0o6, .grp = 0o6, .other = 0o6})
     );
 
 }
 
 fn kbd_remove(device: *pdev.PlatformDevice) !void {
-    _ = api.rmCharacterDevice(device.dev.id);
+    _ = api.rmCharacterDevice(@bitCast(device.dev.id));
 }
 
 var mod_kbd: *kfs.drivers.Keyboard = undefined;

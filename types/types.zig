@@ -749,7 +749,7 @@ pub const kernel = struct {
             used : bool= false,
         };
 
-        pub const ListHead = packed struct {
+        pub const ListHead = extern struct {
             next : ?*kernel.list.ListHead,
             prev : ?*kernel.list.ListHead,
         };
@@ -787,6 +787,7 @@ pub const kernel = struct {
         pub const WaitQueueNode = struct {
             task : *kernel.task.Task,
             list : kernel.list.ListHead,
+            wake_fn : ?*const fn(*kernel.wq.WaitQueueNode) void,
         };
 
         pub const WaitQueueHead = struct {
@@ -869,6 +870,18 @@ pub const kernel = struct {
     };
 
     pub const userspace = struct {
+    };
+
+    pub const vdso = struct {
+        pub const VdsoData = extern struct {
+            seq : u32= 0,
+            monotonic_sec : i32= 0,
+            monotonic_nsec : i32= 0,
+            realtime_sec : i64= 0,
+            realtime_nsec : i32= 0,
+            _pad : i32= 0,
+        };
+
     };
 
     pub const signals = struct {
@@ -955,12 +968,32 @@ pub const kernel = struct {
     };
 
     pub const socket = struct {
+        pub const sockaddr_un = extern struct {
+            sun_family : u16,
+            sun_path : [108]u8,
+        };
+
+        pub const sockaddr = extern struct {
+            sa_family : u16,
+            sa_data : [14]u8,
+        };
+
         pub const Socket = struct {
-            _buffer : [128]u8,
+            _buffer : [4096]u8,
             rb : kernel.ringbuf.RingBuf,
             conn : ?*kernel.socket.Socket,
             list : kernel.list.ListHead,
-            lock : kernel.Mutex,
+            lock : kernel.Spinlock,
+            sock_type : u16= 1,
+            is_listening : bool= false,
+            bound_path : [108]u8,
+            bound_path_len : u32= 0,
+            accept_queue : kernel.list.ListHead,
+            accept_count : u32= 0,
+            accept_backlog : u32= 16,
+            accept_wait : kernel.wq.WaitQueueHead,
+            rw_queue : kernel.wq.WaitQueueHead,
+            pending_link : kernel.list.ListHead,
         };
 
     };
@@ -1110,7 +1143,8 @@ pub const kernel = struct {
                 lseek : ?*const fn(*kernel.fs.file.File, i32, u32) anyerror!u32= null,
                 readdir : ?*const fn(*kernel.fs.file.File, []u8) anyerror!u32= null,
                 ioctl : ?*const fn(*kernel.fs.file.File, u32, u32) anyerror!u32= null,
-                poll : ?*const fn(*kernel.fs.file.File, *kernel.poll.PollFd) anyerror!u32= null,
+                poll : ?*const fn(*kernel.fs.file.File, *kernel.poll.PollFd, ?*kernel.poll.PollTable) anyerror!u32= null,
+                mmap : ?*const fn(*kernel.fs.file.File, *kernel.mm.proc_mm.VMA) anyerror!void= null,
             };
 
             pub const TaskFiles = struct {
@@ -1224,6 +1258,11 @@ pub const kernel = struct {
 
     pub const time = struct {
 
+        pub const kernel_timespec64 = extern struct {
+            tv_sec : i64,
+            tv_nsec : i64,
+        };
+
     };
 
     pub const poll = struct {
@@ -1231,6 +1270,12 @@ pub const kernel = struct {
             fd : i32,
             events : u16,
             revents : u16,
+        };
+
+        pub const PollTable = struct {
+            wq_nodes_inline : [64]?std.syscalls.poll.PollTableEntry,
+            wq_nodes_idx : u32= 0,
+            wq_nodes : ?std.array_list.Aligned(?std.syscalls.poll.PollTableEntry, null)= null,
         };
 
         pub const FDSet = extern struct {
@@ -1365,6 +1410,9 @@ pub const kernel = struct {
         };
 
         pub const rename = struct {
+        };
+
+        pub const reboot = struct {
         };
 
         pub const sendfile = struct {
@@ -1741,6 +1789,7 @@ pub const drivers = struct {
 
 
 
+        pub extern fn keyboardInterrupt(?*anyopaque)void;
     };
 
     pub const pit = struct {
@@ -1948,6 +1997,13 @@ pub const drivers = struct {
 
         };
 
+        pub const fb = struct {
+        };
+
+        pub const mouse = struct {
+            pub extern fn mouseHandler(?*anyopaque)void;
+        };
+
 
 
 
@@ -2041,8 +2097,8 @@ pub const api = struct {
     pub extern fn allocPlatformDevice([*]const u8, u32)?*drivers.platform.device.PlatformDevice;
     pub extern fn registerPlatformDriver(*drivers.driver.Driver)i32;
     pub extern fn unregisterPlatformDriver(*drivers.driver.Driver)i32;
-    pub extern fn addCharacterDevice(*drivers.device.Device, kernel.fs.UMode)i32;
-    pub extern fn rmCharacterDevice(drivers.device.dev_t)i32;
+    pub extern fn addCharacterDevice(*drivers.device.Device, u16)i32;
+    pub extern fn rmCharacterDevice(u16)i32;
     pub extern fn printf([*]const u8, u32)void;
     pub extern fn print_serial([*]const u8, u32)void;
     pub extern fn setKBD(*drivers.Keyboard)void;

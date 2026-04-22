@@ -34,7 +34,7 @@ pub const Iterator = struct {
     }
 };
 
-pub const ListHead = packed struct {
+pub const ListHead = extern struct {
     next: ?*ListHead,
     prev: ?*ListHead,
 
