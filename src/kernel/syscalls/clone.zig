@@ -110,14 +110,15 @@ pub fn clone(
     // };
 
     if (flags.FS) {
+        child.fs.ref.get();
         child.fs = krn.task.current.fs;
     } else {
-        child.fs = krn.task.current.fs.clone() catch {
+        child.fs = krn.task.current.fs.dup() catch {
             krn.logger.ERROR("clone: failed to clone fs", .{});
             return errors.ENOMEM;
         };
     }
-    errdefer if (!flags.FS) child.fs.deinit();
+    errdefer child.fs.ref.put();
 
     // Not sure if second test is necessary not userspace task is supposed
     // to have sighand == NULL. Maybe assert that its not NULL.
@@ -130,7 +131,7 @@ pub fn clone(
     } else {
         child.sighand = try sighand.dup();
     }
-    errdefer if (!flags.SIGHAND) child.sighand.?.ref.put();
+    errdefer child.sighand.?.ref.put();
 
     if (flags.FILES) {
         krn.task.current.files.ref.get();
@@ -138,7 +139,7 @@ pub fn clone(
     } else {
         child.files = try krn.task.current.files.dup();
     }
-    errdefer if (!flags.FILES) child.files.ref.put();
+    errdefer child.files.ref.put();
 
     var child_fpu_state: ?*arch.fpu.FPUState = null;
     var child_fpu_used = krn.task.current.fpu_used;

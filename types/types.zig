@@ -1249,6 +1249,7 @@ pub const kernel = struct {
             root : kernel.fs.path.Path,
             pwd : kernel.fs.path.Path,
             umask : u32= 18,
+            ref : kernel.RefCount,
         };
 
     };
