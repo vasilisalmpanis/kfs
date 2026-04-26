@@ -20,7 +20,7 @@ pub const Mount = struct {
     root: *fs.DEntry,
     tree: tree.TreeNode,
     list: krn.list.ListHead,
-    ref: krn.task.RefCount,
+    ref: krn.RefCount,
     source: []const u8,
 
     pub fn mount(
@@ -87,7 +87,7 @@ pub const Mount = struct {
             mnt.tree.setup();
             mnt.list.setup();
             mnt_lock.lock();
-            mnt.ref = krn.task.RefCount.init();
+            mnt.ref = krn.RefCount.init();
             mnt.ref.get();
             defer mnt_lock.unlock();
             if (mountpoints == null) {

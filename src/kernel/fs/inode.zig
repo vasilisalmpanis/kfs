@@ -1,7 +1,7 @@
 const fs = @import("fs.zig");
 const drv = @import("drivers");
-const Refcount = fs.Refcount;
 const kernel = fs.kernel;
+const RefCount = kernel.RefCount;
 const UMode = fs.UMode;
 const Socket = @import("../net/socket.zig").Socket;
 
@@ -11,7 +11,7 @@ const Socket = @import("../net/socket.zig").Socket;
 pub const Inode = struct {
     i_no: u32 = 0,
     sb: ?*fs.SuperBlock,
-    ref: Refcount = Refcount.init(),
+    ref: RefCount = RefCount.init(),
     mode: fs.UMode = fs.UMode{},
     uid: u32 = 0,
     gid: u32 = 0,
@@ -35,7 +35,7 @@ pub const Inode = struct {
     ) void {
         self.i_no = fs.get_ino();
         self.sb = sb;
-        self.ref = Refcount.init();
+        self.ref = RefCount.init();
         self.ref.get();
         self.size = 0;
         self.mode = UMode{};

@@ -22,7 +22,7 @@ pub const InodeOps = @import("inode.zig").InodeOps;
 pub const InodeAttrs = @import("inode.zig").InodeAttrs;
 
 // Utils
-pub const Refcount = @import("../sched/task.zig").RefCount;
+pub const RefCount = kernel.RefCount;
 pub const TreeNode = @import("../utils/tree.zig").TreeNode;
 pub const list = kernel.list;
 

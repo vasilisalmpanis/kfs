@@ -261,13 +261,13 @@ pub const SigHand = struct {
             .SIGPWR     = default_sigaction,
             .SIGSYS     = default_sigaction,
         }),
-    ref: krn.task.RefCount = krn.task.RefCount.init(),
+    ref: krn.RefCount = krn.RefCount.init(),
 
     pub fn init() SigHand {
         return SigHand{};
     }
 
-    fn release(ref: *krn.task.RefCount) void {
+    fn release(ref: *krn.RefCount) void {
         const hand: *SigHand = @fieldParentPtr("ref", ref);
         krn.mm.kfree(hand);
     }

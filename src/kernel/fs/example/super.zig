@@ -38,7 +38,7 @@ pub const ExampleSuper = struct {
             dntry.inode = root_inode;
             sb.base.root = dntry;
             sb.base.list.setup();
-            sb.base.ref = kernel.task.RefCount.init();
+            sb.base.ref = kernel.RefCount.init();
             sb.base.fs = _fs;
             sb.base.ops = &example_super_ops;
             _fs.sbs.add(&sb.base.list);

@@ -1,9 +1,9 @@
 const fs = @import("fs.zig");
 const DEntry = fs.DEntry;
 const mount = fs.mount;
-const Refcount = fs.Refcount;
 const std = @import("std");
 const kernel = fs.kernel;
+const RefCount = kernel.RefCount;
 const errors = @import("../syscalls/error-codes.zig").PosixError;
 
 // Mode
@@ -35,7 +35,7 @@ pub const File = struct {
     ops: * const FileOps,
     pos: usize,
     inode: *fs.Inode,
-    ref: Refcount,
+    ref: RefCount,
     path: ?fs.path.Path,
     data: ?*anyopaque,
 
@@ -46,7 +46,7 @@ pub const File = struct {
     ) void {
         self.ops = ops;
         self.pos = 0;
-        self.ref = kernel.task.RefCount.init();
+        self.ref = kernel.RefCount.init();
         self.ref.dropFn = File.release;
         self.ref.get();
         self.inode = inode;
@@ -55,7 +55,7 @@ pub const File = struct {
         self.mode = fs.UMode{};
     }
 
-    pub fn release(ref: *kernel.task.RefCount) void {
+    pub fn release(ref: *kernel.RefCount) void {
         const file: *File = kernel.list.containerOf(File, @intFromPtr(ref), "ref");
         const inode: *fs.Inode = file.inode;
         file.ops.close(file); //?
