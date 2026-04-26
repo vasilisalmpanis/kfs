@@ -445,17 +445,26 @@ pub const FSInfo = struct {
     root: path.Path,
     pwd: path.Path,
     umask: u32 = 0o22,
+    ref: kernel.RefCount = kernel.RefCount.init(),
 
-    pub fn alloc() !*FSInfo {
+    pub fn new() !*FSInfo {
         if (kernel.mm.kmalloc(FSInfo)) |_fs| {
             _fs.umask = 0o22;
+            _fs.ref = kernel.RefCount.init();
+            _fs.ref.get();
+            _fs.ref.dropFn = FSInfo.release;
             return _fs;
         }
         return error.OutOfMemory;
     }
 
-    pub fn clone(self: *FSInfo) !*FSInfo {
-        const _fs = try FSInfo.alloc();
+    fn release(ref: *kernel.RefCount) void {
+        const _fs: *FSInfo= @fieldParentPtr("ref", ref);
+        _fs.deinit();
+    }
+
+    pub fn dup(self: *FSInfo) !*FSInfo {
+        const _fs = try FSInfo.new();
         _fs.* = self.*;
         _fs.pwd.dentry.ref.get();
         _fs.pwd.mnt.ref.get();
@@ -488,7 +497,7 @@ pub fn init() void {
             kernel.logger.ERROR("Failed to mount root: {t}\n",.{err});
             @panic("Failed to mount root\n");
         };
-        kernel.task.initial_task.fs = FSInfo.alloc() catch |err| {
+        kernel.task.initial_task.fs = FSInfo.new() catch |err| {
             kernel.logger.ERROR(
                 "Failed to alloc FSInfo for initial task: {t}\n",
                 .{err}

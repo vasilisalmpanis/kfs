@@ -28,11 +28,11 @@ pub fn doFork() !u32 {
         return errors.ENOMEM;
     };
     errdefer child.mm.?.delete();
-    child.fs = tsk.current.fs.clone() catch {
+    child.fs = tsk.current.fs.dup() catch {
         krn.logger.ERROR("fork: failed to clone fs", .{});
         return errors.ENOMEM;
     };
-    errdefer child.fs.deinit();
+    errdefer child.fs.ref.put();
 
     child.files = try krn.task.current.files.dup();
     errdefer child.files.ref.put();
