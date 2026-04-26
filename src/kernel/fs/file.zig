@@ -117,6 +117,7 @@ pub const TaskFiles = struct {
     map: std.DynamicBitSet,
     closexec: std.DynamicBitSet,
     fds: std.AutoHashMap(usize, *File),
+    ref: kernel.RefCount = kernel.RefCount.init(),
 
     pub fn new() ?*TaskFiles {
         if (kernel.mm.kmalloc(TaskFiles)) |files| {
@@ -129,9 +130,17 @@ pub const TaskFiles = struct {
                 return null;
             };
             files.fds = std.AutoHashMap(usize, *File).init(kernel.mm.kernel_allocator.allocator());
+            files.ref = kernel.RefCount.init();
+            files.ref.get();
+            files.ref.dropFn = release;
             return files;
         }
         return null;
+    }
+
+    fn release(ref: *kernel.RefCount) void {
+        const files: *TaskFiles = @fieldParentPtr("ref", ref);
+        files.deinit();
     }
 
     pub fn deinit(self: *TaskFiles) void {
@@ -150,7 +159,11 @@ pub const TaskFiles = struct {
         kernel.mm.kfree(self);
     }
 
-    pub fn dup(self: *TaskFiles, old: *TaskFiles) !void {
+    pub fn dup(old: *TaskFiles) !*TaskFiles {
+        const self: *TaskFiles = TaskFiles.new() orelse
+            return kernel.errors.PosixError.ENOMEM;
+        errdefer kernel.mm.kfree(self);
+
         var fd_it = old.map.iterator(.{});
         while (fd_it.next()) |id| {
             if (id > self.map.capacity()) {
@@ -176,6 +189,7 @@ pub const TaskFiles = struct {
                 return errors.ENOMEM;
             }
         }
+        return self;
     }
 
     pub fn releaseFD(self: *TaskFiles, fd: usize) bool {

@@ -385,7 +385,7 @@ pub const Task = struct {
 
     pub fn releaseSharedResources(self: *Task) void {
         self.clearControllingTTY();
-        self.files.deinit();
+        self.files.ref.put();
         self.fs.deinit();
 
 

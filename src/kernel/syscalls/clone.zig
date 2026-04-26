@@ -130,24 +130,15 @@ pub fn clone(
     } else {
         child.sighand = try sighand.dup();
     }
-    errdefer if (!flags.SIGHAND) krn.mm.kfree(child.sighand);
+    errdefer if (!flags.SIGHAND) child.sighand.?.ref.put();
 
     if (flags.FILES) {
+        krn.task.current.files.ref.get();
         child.files = krn.task.current.files;
     } else {
-        if (krn.fs.TaskFiles.new()) |files| {
-            errdefer krn.mm.kfree(files);
-            child.files = files;
-            child.files.dup(krn.task.current.files) catch {
-                krn.logger.ERROR("clone: failed to clone files", .{});
-                return errors.ENOMEM;
-            };
-        } else {
-            krn.logger.ERROR("clone: failed to alloc files", .{});
-            return errors.ENOMEM;
-        }
+        child.files = try krn.task.current.files.dup();
     }
-    errdefer if (!flags.FILES) krn.mm.kfree(child.files);
+    errdefer if (!flags.FILES) child.files.ref.put();
 
     var child_fpu_state: ?*arch.fpu.FPUState = null;
     var child_fpu_used = krn.task.current.fpu_used;

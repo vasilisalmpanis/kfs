@@ -1,0 +1,22 @@
+[INIT]: Serial done
+[INIT]: Logger done
+[INIT]: Multiboot done
+[INIT]: GDT done
+[INIT]: PIT done
+[INIT]: IDT done
+[INIT]: Memory done
+[INIT]: Multitasking done
+[INIT]: Interrupts are enabled
+[INIT]: Symbol Table done
+[INIT]: user_thread: waiting for kernel ready
+[INIT]: Screen done
+[INIT]: Keyboard done
+[INIT]: Syscalls done
+[INIT]: CMOS done
+[INIT]: vDSO done
+[INIT]: Filesystems done
+[INIT]: Drivers and Devices done
+[INIT]: Modules done
+[INIT]: Moved /
+[INIT]: == READY ==
+[INIT]: user_thread: executing /bin/init
