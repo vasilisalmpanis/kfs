@@ -49,7 +49,7 @@ pub const SysSuper = struct {
     }
 
     fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
-        base.ref.unref();
+        base.ref.put();
         while (!base.ref.isFree()) {
             arch.archReschedule();
         }

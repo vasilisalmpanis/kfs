@@ -15,8 +15,8 @@ pub fn init_module(image: [*]u8, size: u32, name: [*:0]u8) !u32 {
 
 pub fn finit_module(fd: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         if (!file.mode.canRead(file.inode.uid, file.inode.gid)) {
             return errors.EACCES;
         }

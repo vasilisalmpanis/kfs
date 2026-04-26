@@ -61,7 +61,7 @@ fn findNextTask() *tsk.Task {
             task.wakeup_time = 0;
             task.state = .RUNNING;
         }
-        if (task.state == .INTERRUPTIBLE_SLEEP and task.sighand.hasPending())
+        if (task.state == .INTERRUPTIBLE_SLEEP and task.hasPendingSignal())
             task.state = .RUNNING;
         if (task.state == .RUNNING)
             return task;

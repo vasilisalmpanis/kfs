@@ -261,11 +261,40 @@ pub const SigHand = struct {
             .SIGPWR     = default_sigaction,
             .SIGSYS     = default_sigaction,
         }),
+    ref: krn.task.RefCount = krn.task.RefCount.init(),
 
     pub fn init() SigHand {
         return SigHand{};
     }
 
+    fn release(ref: *krn.task.RefCount) void {
+        const hand: *SigHand = @fieldParentPtr("ref", ref);
+        krn.mm.kfree(hand);
+    }
+
+    /// Allocates and returns a new SigHand structure
+    /// set with the default dispositions based on POSIX.
+    /// The structure returned has been already reffed.
+    pub fn new() !*SigHand {
+        if (krn.mm.kmalloc(SigHand)) |hand| {
+            hand.* = SigHand.init();
+            hand.ref.dropFn = release;
+
+            // Start count with 1
+            hand.ref.get();
+            return hand;
+        }
+        return krn.errors.PosixError.ENOMEM;
+    }
+
+    pub fn dup(self: *SigHand)  !*SigHand {
+        const new_hand = try SigHand.new();
+        new_hand.actions = self.actions;
+
+
+
+        return new_hand;
+    }
 
     pub fn isBlocked(_: *SigHand, signal: Signal) bool {
         if (tsk.current.sigmask.sigIsSet(signal)) {
@@ -387,8 +416,9 @@ pub fn processSignals(regs: *arch.Regs, ucontext: ?*Ucontext) *arch.Regs {
     }
 
     const task = krn.task.current;
-    if (task.sighand.isReady()) {
-        const result = task.sighand.deliverSignal();
+    const sighand = task.getSighandOrPanic();
+    if (sighand.isReady()) {
+        const result = sighand.deliverSignal();
         if (result.signal == 0) {
             // maybe restart
             return regs;

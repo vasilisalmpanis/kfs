@@ -5,8 +5,8 @@ const krn = @import("../main.zig");
 
 pub fn lseek(fd: u32, offset: isize, whence: u32) !usize {
     if (krn.task.current.files.fds.get(fd)) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         if (file.ops.lseek) |_lseek| {
             return try _lseek(file, offset, whence);
         }

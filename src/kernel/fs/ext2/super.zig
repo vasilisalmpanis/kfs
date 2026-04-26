@@ -633,7 +633,7 @@ pub const Ext2Super = struct {
             return ;
         }
 
-        base.ref.unref();
+        base.ref.put();
         while (!base.ref.isFree()) {
             arch.archReschedule();
         }

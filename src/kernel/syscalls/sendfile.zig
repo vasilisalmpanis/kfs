@@ -22,8 +22,8 @@ pub fn sendfile64(out_fd: i32, in_fd: i32, offset: ?*u64, count: u32) !u32 {
     const in_file = krn.task.current.files.fds.get(@intCast(in_fd)) orelse {
         return errors.EBADF;
     };
-    in_file.ref.ref();
-    defer in_file.ref.unref();
+    in_file.ref.get();
+    defer in_file.ref.put();
 
     if (!in_file.mode.isReg()) {
         return errors.EINVAL;
@@ -32,8 +32,8 @@ pub fn sendfile64(out_fd: i32, in_fd: i32, offset: ?*u64, count: u32) !u32 {
     const out_file = krn.task.current.files.fds.get(@intCast(out_fd)) orelse {
         return errors.EBADF;
     };
-    out_file.ref.ref();
-    defer out_file.ref.unref();
+    out_file.ref.get();
+    defer out_file.ref.put();
 
     if (!in_file.mode.canRead(krn.task.current.uid, krn.task.current.gid)) {
         return errors.EACCES;

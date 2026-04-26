@@ -39,13 +39,13 @@ pub fn pipe2(pipefd: ?*[2]i32, flags: i32) !u32 {
         pipe_inode.data.pipe = pipe_data;
 
         write_file = try krn.fs.File.pseudo(pipe_inode);
-        pipe_inode.ref.unref();
-        errdefer write_file.ref.unref();
+        pipe_inode.ref.put();
+        errdefer write_file.ref.put();
         write_file.mode = fs.UMode.fifo();
         write_file.flags = fs.file.O_WRONLY | @as(u32, @intCast(flags));
 
         read_file = try krn.fs.File.pseudo(pipe_inode);
-        errdefer read_file.ref.unref();
+        errdefer read_file.ref.put();
         read_file.mode = fs.UMode.fifo();
         read_file.flags = fs.file.O_RDONLY | @as(u32, @intCast(flags));
 

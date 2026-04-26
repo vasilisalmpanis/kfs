@@ -42,7 +42,7 @@ pub const SysInode = struct {
         fs.dcache_lock.lock();
         defer fs.dcache_lock.unlock();
         if (fs.dcache.get(key)) |entry| {
-            entry.ref.ref();
+            entry.ref.get();
             return entry;
         }
         return kernel.errors.PosixError.ENOENT;
@@ -70,10 +70,10 @@ pub const SysInode = struct {
             errdefer kernel.mm.kfree(new_inode);
             var new_dentry = try fs.DEntry.alloc(_name, sb, new_inode);
             errdefer kernel.mm.kfree(new_dentry);
-            new_dentry.ref.ref();
+            new_dentry.ref.get();
             parent.inode.links += 1;
             parent.tree.addChild(&new_dentry.tree);
-            parent.ref.ref();
+            parent.ref.get();
             cash_key.name = new_dentry.name;
             fs.dcache_lock.lock();
             defer fs.dcache_lock.unlock();
@@ -101,7 +101,7 @@ pub const SysInode = struct {
                 mode
             );
             var dent = try parent.new(name, new_inode);
-            dent.ref.ref();
+            dent.ref.get();
             if (mode.isDir())
                 base.links += 1;
             return dent;

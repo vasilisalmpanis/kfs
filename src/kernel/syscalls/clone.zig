@@ -119,6 +119,19 @@ pub fn clone(
     }
     errdefer if (!flags.FS) child.fs.deinit();
 
+    // Not sure if second test is necessary not userspace task is supposed
+    // to have sighand == NULL. Maybe assert that its not NULL.
+    const sighand = krn.task.current.sighand orelse
+        @panic("No userspace task should have sighand == NULL\n");
+
+    if (flags.SIGHAND) {
+        sighand.ref.get();
+        child.sighand = sighand;
+    } else {
+        child.sighand = try sighand.dup();
+    }
+    errdefer if (!flags.SIGHAND) krn.mm.kfree(child.sighand);
+
     if (flags.FILES) {
         child.files = krn.task.current.files;
     } else {

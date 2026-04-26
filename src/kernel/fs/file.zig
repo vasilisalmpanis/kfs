@@ -48,9 +48,9 @@ pub const File = struct {
         self.pos = 0;
         self.ref = kernel.task.RefCount.init();
         self.ref.dropFn = File.release;
-        self.ref.ref();
+        self.ref.get();
         self.inode = inode;
-        self.inode.ref.ref();
+        self.inode.ref.get();
         self.data = null;
         self.mode = fs.UMode{};
     }
@@ -59,7 +59,7 @@ pub const File = struct {
         const file: *File = kernel.list.containerOf(File, @intFromPtr(ref), "ref");
         const inode: *fs.Inode = file.inode;
         file.ops.close(file); //?
-        inode.ref.unref();
+        inode.ref.put();
         if (file.path != null)
             file.path.?.release();
         kernel.mm.kfree(file);
@@ -141,7 +141,7 @@ pub const TaskFiles = struct {
         });
         while (it.next()) |idx| {
             if (self.fds.fetchRemove(idx)) |kv| {
-                kv.value.ref.unref();
+                kv.value.ref.put();
             }
         }
         self.fds.deinit();
@@ -168,8 +168,8 @@ pub const TaskFiles = struct {
                 self.closexec.set(id);
             errdefer self.map.unset(id);
             if (old.fds.get(id)) |file| {
-                file.ref.ref();
-                errdefer file.ref.unref();
+                file.ref.get();
+                errdefer file.ref.put();
                 try self.fds.put(id, file);
             } else {
                 kernel.logger.ERROR("TaskFiles.dup(): failed to get id {d} from fds", .{id});
@@ -182,7 +182,7 @@ pub const TaskFiles = struct {
         self.unsetFD(fd);
         if (self.fds.get(fd)) |file| {
             _ = self.fds.remove(fd);
-            file.ref.unref();
+            file.ref.put();
             return true;
         }
         return false;

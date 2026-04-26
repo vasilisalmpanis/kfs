@@ -36,7 +36,7 @@ pub const Inode = struct {
         self.i_no = fs.get_ino();
         self.sb = sb;
         self.ref = Refcount.init();
-        self.ref.ref();
+        self.ref.get();
         self.size = 0;
         self.mode = UMode{};
         self.data.dev = null;

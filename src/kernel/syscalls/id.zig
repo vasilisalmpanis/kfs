@@ -42,7 +42,7 @@ pub fn getPGID(pid: i32) !u32 {
     if (pid == 0)
         return tsk.current.pgid;
     if (tsk.current.findByPid(@intCast(pid))) |task| {
-        defer task.refcount.unref();
+        defer task.refcount.put();
         return task.pgid;
     }
     return errors.ESRCH;
@@ -58,7 +58,7 @@ pub fn getSID(pid: i32) !u32 {
     if (pid == 0)
         return tsk.current.sid;
     if (tsk.current.findByPid(@intCast(pid))) |task| {
-        defer task.refcount.unref();
+        defer task.refcount.put();
         return task.sid;
     }
     return errors.ESRCH;
@@ -83,7 +83,7 @@ pub fn setPGID(pid: i32, pgid: i32) !u32 {
     if (pid == 0) {
         _task = tsk.current;
     } else if (tsk.current.findByPid(@intCast(pid))) |task| {
-        defer task.refcount.unref();
+        defer task.refcount.put();
         _task = task;
     }
     if (_task) |t| {

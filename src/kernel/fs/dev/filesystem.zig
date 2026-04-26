@@ -22,13 +22,13 @@ pub const DevFileSystem = struct {
         if (!self.base.sbs.isEmpty()) {
             kernel.logger.INFO("sb already exists\n", .{});
             const sb = self.base.sbs.next.?.entry(fs.SuperBlock, "list");
-            sb.ref.ref();
+            sb.ref.get();
             return sb;
         } else {
             const sb: *fs.SuperBlock = super.DevSuper.create(base, dev_file) catch |err| {
                 return err;
             };
-            sb.ref.ref();
+            sb.ref.get();
             return sb;
         }
     }

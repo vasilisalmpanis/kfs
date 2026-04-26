@@ -31,8 +31,8 @@ pub fn fcntl(fd: u32, op: i32, arg: u32) !u32 {
 
 pub fn fcntl64(fd: u32, cmd: u32, arg: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         krn.logger.DEBUG(
             "fcntl64 {d}: {s}, cmd 0x{x}, arg 0x{x}", 
             .{

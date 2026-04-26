@@ -17,7 +17,7 @@ pub fn nanosleep(
     krn.task.current.wakeup_time = start_time +| millis;
     krn.task.current.state = .INTERRUPTIBLE_SLEEP;
     krn.sched.reschedule();
-    if (krn.task.current.sighand.hasPending()) {
+    if (krn.task.current.hasPendingSignal()) {
         if (rem) |r| {
             const passed_time = krn.time.kernel_timespec.fromMSec(
                 krn.currentMs() - start_time
