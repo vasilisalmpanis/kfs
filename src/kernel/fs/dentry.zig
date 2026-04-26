@@ -1,10 +1,10 @@
 const fs = @import("fs.zig");
 const SuperBlock = fs.SuperBlock;
-const Refcount = fs.Refcount;
 const TreeNode = fs.TreeNode;
 const kernel = fs.kernel;
 const list = fs.list;
 const std = @import("std");
+const RefCount = kernel.RefCount;
 
 
 /// Dentry: the path representation of every inode on the filesystem
@@ -26,11 +26,11 @@ pub var cache: std.StringHashMap(*DEntry) = undefined;
 pub const DEntry = struct {
     sb: *SuperBlock,
     inode: *fs.Inode,
-    ref: Refcount,
+    ref: RefCount,
     name: []u8,
     tree: TreeNode,
 
-    pub fn drop(self: *Refcount) void {
+    pub fn drop(self: *RefCount) void {
         fs.dcache_lock.lock();
         if (!self.isFree()) {
             fs.dcache_lock.unlock();
@@ -71,7 +71,7 @@ pub const DEntry = struct {
                 return error.OutOfMemory;
             }
             entry.sb = sb;
-            entry.ref = Refcount.init();
+            entry.ref = RefCount.init();
             entry.ref.get();
             entry.ref.dropFn = drop;
             entry.tree.setup();

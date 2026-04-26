@@ -7,7 +7,7 @@ pub fn pipe(pipefd: ?*[2]i32) !u32 {
     return try pipe2(pipefd, 0);
 }
 
-fn releasePipeInode(ref: *krn.task.RefCount) void {
+fn releasePipeInode(ref: *krn.RefCount) void {
     const inode: *krn.fs.Inode = @fieldParentPtr("ref", ref);
     if (inode.data.pipe) |_pipe| {
         krn.mm.kfree(_pipe);

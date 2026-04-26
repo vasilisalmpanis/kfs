@@ -34,7 +34,7 @@ pub const ProcSuper = struct {
         proc_super.base.root = dntry;
         proc_super.base.magic = PROCFS_MAGIC;
         proc_super.base.list.setup();
-        proc_super.base.ref = kernel.task.RefCount.init();
+        proc_super.base.ref = kernel.RefCount.init();
         proc_super.base.fs = _fs;
         proc_super.base.ops = &proc_super_ops;
         _fs.sbs.add(&proc_super.base.list);
@@ -65,7 +65,7 @@ pub var proc_super = ProcSuper{
         .inode_map = undefined,
         .list = undefined,
         .ops = &proc_super_ops,
-        .ref = kernel.task.RefCount.init(),
+        .ref = kernel.RefCount.init(),
         .root = undefined,
         .magic = PROCFS_MAGIC,
     },
