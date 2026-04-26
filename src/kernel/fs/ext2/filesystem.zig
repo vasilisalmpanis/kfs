@@ -31,14 +31,14 @@ pub const Ext2FileSystem = struct {
                 // disk abstraction is required which is missing for now.
                 if (std.mem.eql(u8, sb.dev_file.?.path.?.dentry.name, dev_file.?.path.?.dentry.name)
                     and sb.dev_file.?.inode.dev_id.major == dev_file.?.inode.dev_id.major) {
-                    sb.ref.ref();
+                    sb.ref.get();
                     return sb;
                 }
             }
             const sb: *fs.SuperBlock = super.Ext2Super.create(base, file) catch |err| {
                 return err;
             };
-            sb.ref.ref();
+            sb.ref.get();
             // here
             return sb;
         } else {

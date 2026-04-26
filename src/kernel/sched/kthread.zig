@@ -100,10 +100,10 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const 
 }
 
 pub fn kthreadStop(thread: *tsk.Task) i32 {
-    thread.refcount.ref();
+    thread.refcount.get();
     thread.should_stop = true;
     while (thread.state != .STOPPED) {}
     const result = thread.result;
-    thread.refcount.unref();
+    thread.refcount.put();
     return result;
 }

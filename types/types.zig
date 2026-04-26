@@ -846,7 +846,7 @@ pub const kernel = struct {
             mm : ?*kernel.mm.proc_mm.MM= null,
             fs : *kernel.fs.FSInfo,
             files : *kernel.fs.file.TaskFiles,
-            sighand : kernel.signals.SigHand,
+            sighand : ?*kernel.signals.SigHand= null,
             sigmask : kernel.signals.sigset_t,
             wait_wq : kernel.wq.WaitQueueHead,
             threadfn : ?*const fn(?*const anyopaque) i32= null,
@@ -951,6 +951,7 @@ pub const kernel = struct {
         pub const SigHand = struct {
             pending : std.bit_set.IntegerBitSet(32),
             actions : std.enums.EnumArray(kernel.signals.Signal, kernel.signals.Sigaction),
+            ref : kernel.task.RefCount,
         };
 
     };
@@ -1038,7 +1039,7 @@ pub const kernel = struct {
             root : *kernel.fs.DEntry,
             tree : kernel.tree.TreeNode,
             list : kernel.list.ListHead,
-            count : kernel.task.RefCount,
+            ref : kernel.task.RefCount,
             source : []const u8,
         };
 

@@ -194,7 +194,7 @@ pub const Ext2Inode = struct {
         };
         fs.dcache_lock.lock();
         if (fs.dcache.get(key)) |entry| {
-            entry.ref.ref();
+            entry.ref.get();
             fs.dcache_lock.unlock();
             return entry;
         }
@@ -218,7 +218,7 @@ pub const Ext2Inode = struct {
                         try new_inode.iget(ext2_super, curr_dir.inode);
                         new_inode.base.i_no = curr_dir.inode;
                         const new_d = try dir.new(name, &new_inode.base);
-                        new_d.ref.ref();
+                        new_d.ref.get();
                         return new_d;
                     }
                 }

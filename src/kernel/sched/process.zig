@@ -47,6 +47,11 @@ pub fn doFork() !u32 {
     }
     errdefer km.kfree(child.files);
 
+    const sighand = krn.task.current.sighand orelse
+        @panic("No userspace task should have sighand == NULL\n");
+    child.sighand = try sighand.dup();
+    errdefer krn.mm.kfree(child.sighand);
+
     var child_fpu_state: ?*arch.fpu.FPUState = null;
     var child_fpu_used = tsk.current.fpu_used;
     if (tsk.current.fpu_used and tsk.current.fpu_state != null) {

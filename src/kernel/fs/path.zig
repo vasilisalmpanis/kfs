@@ -7,8 +7,8 @@ pub const Path = struct {
     dentry: *fs.DEntry,
 
     pub fn init(mnt: *fs.Mount, dentry: *fs.DEntry) Path {
-        dentry.ref.ref();
-        mnt.count.ref();
+        dentry.ref.get();
+        mnt.ref.get();
         return Path{
             .mnt = mnt,
             .dentry = dentry,
@@ -20,8 +20,8 @@ pub const Path = struct {
     }
 
     pub fn release(self: *const Path) void {
-        self.dentry.ref.unref();
-        self.mnt.count.unref();
+        self.dentry.ref.put();
+        self.mnt.ref.put();
     }
 
     pub fn isRoot(self: *const Path) bool {
@@ -30,16 +30,16 @@ pub const Path = struct {
 
     pub fn resolveMount(self: *Path) void {
         if (self.mnt.checkChildMount(self.dentry)) |child_mnt| {
-            child_mnt.count.ref();
-            self.mnt.count.unref();
+            child_mnt.ref.get();
+            self.mnt.ref.put();
             self.mnt = child_mnt;
             self.setDentry(child_mnt.sb.root);
         }
     }
 
     pub fn setDentry(self: *Path, dent: *fs.DEntry) void {
-        dent.ref.ref();
-        self.dentry.ref.unref();
+        dent.ref.get();
+        self.dentry.ref.put();
         self.dentry = dent;
     }
 
@@ -69,8 +69,8 @@ pub const Path = struct {
                 if (self.mnt.root.tree.parent) |d| {
                     if (self.mnt.tree.parent) |p| {
                         const mnt = p.entry(fs.Mount, "tree");
-                        mnt.count.ref();
-                        self.mnt.count.unref();
+                        mnt.ref.get();
+                        self.mnt.ref.put();
                         self.mnt = mnt;
                         self.setDentry(d.entry(fs.DEntry, "tree"));
                     } else {
@@ -93,7 +93,7 @@ pub const Path = struct {
             ) catch |err| {
                 return err;
             };
-            self.dentry.ref.unref();
+            self.dentry.ref.put();
             self.dentry = dentry;
         }
         self.resolveMount();

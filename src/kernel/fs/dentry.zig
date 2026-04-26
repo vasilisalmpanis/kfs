@@ -57,7 +57,7 @@ pub const DEntry = struct {
         }
         if (parent) |_p| {
             const _parent = _p.entry(fs.DEntry, "tree");
-            _parent.ref.unref();
+            _parent.ref.put();
         }
         kernel.mm.kfree(dentry.name.ptr);
         kernel.mm.kfree(dentry);
@@ -72,7 +72,7 @@ pub const DEntry = struct {
             }
             entry.sb = sb;
             entry.ref = Refcount.init();
-            entry.ref.ref();
+            entry.ref.get();
             entry.ref.dropFn = drop;
             entry.tree.setup();
             entry.inode = ino;
@@ -82,8 +82,8 @@ pub const DEntry = struct {
     }
 
     pub fn new(parent: *DEntry, name: []const u8, ino: *fs.Inode) !*DEntry {
-        parent.ref.ref();
-        errdefer parent.ref.unref();
+        parent.ref.get();
+        errdefer parent.ref.put();
         if (ino.sb == null)
             return kernel.errors.PosixError.EINVAL;
         const new_dentry: *fs.DEntry = fs.DEntry.alloc(name, ino.sb.?, ino) catch {
@@ -108,7 +108,7 @@ pub const DEntry = struct {
     }
 
     pub fn release(self: *DEntry) void {
-        self.ref.unref();
+        self.ref.put();
     }
 };
 

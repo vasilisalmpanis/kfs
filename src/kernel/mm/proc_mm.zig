@@ -144,8 +144,8 @@ pub const VMA = struct {
                 return null;
             };
             if (file) |_file| {
-                _file.ref.ref();
-                defer _file.ref.unref();
+                _file.ref.get();
+                defer _file.ref.put();
                 const old_pos = _file.pos;
                 _file.pos = offset;
                 const buffer: [*]u8 = @ptrFromInt(_vma.start);

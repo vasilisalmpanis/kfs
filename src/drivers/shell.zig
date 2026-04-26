@@ -307,5 +307,5 @@ fn echo(_: *Shell, args: [][]const u8) void {
     _ = new_file.ops.write(new_file, args[0].ptr, args[0].len) catch |err| {
         debug.printf("Failed to write to file: {t}\n", .{err});
     };
-    new_file.ref.unref();
+    new_file.ref.put();
 }

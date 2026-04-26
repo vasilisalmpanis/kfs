@@ -17,8 +17,8 @@ fn do_unlinkat(dirfd: i32, _path: ?[*:0]u8) !u32 {
     } else if (dirfd == fs.AT_FDCWD) {
         from = krn.task.current.fs.pwd.clone();
     } else if (krn.task.current.files.fds.get(@intCast(dirfd))) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         if (file.path) |file_path| {
             from = file_path.clone();
             errdefer from.release();
@@ -56,7 +56,7 @@ fn do_unlinkat(dirfd: i32, _path: ?[*:0]u8) !u32 {
 
         try _unlink(parent.dentry.inode, target);
 
-        parent.dentry.ref.unref();
+        parent.dentry.ref.put();
         target.tree.del();
         target.tree.parent = null;
         return 0;

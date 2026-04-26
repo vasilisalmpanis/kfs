@@ -68,11 +68,11 @@ pub fn do_open(
     new_file.mode = new_file.inode.mode;
     new_file.flags = flags;
     new_file.ops.open(new_file, new_file.inode) catch {
-        new_file.ref.unref();
+        new_file.ref.put();
         return errors.ENOENT;
     };
     kernel.task.current.files.fds.put(fd, new_file) catch {
-        new_file.ref.unref();
+        new_file.ref.put();
         return errors.ENOENT;
     };
     if (flags & fs.file.O_CLOEXEC != 0)
@@ -141,8 +141,8 @@ pub fn openat(
             mode
         );
     } else if (kernel.task.current.files.fds.get(@intCast(dirfd))) |dir| {
-        dir.ref.ref();
-        defer dir.ref.unref();
+        dir.ref.get();
+        defer dir.ref.put();
         if (!dir.inode.mode.isDir())
             return errors.ENOTDIR;
         if (dir.path == null)

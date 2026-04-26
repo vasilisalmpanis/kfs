@@ -31,8 +31,8 @@ pub fn chdir(path: ?[*:0]const u8) !u32 {
 
 pub fn fchdir(fd: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         if (!file.inode.mode.isDir()) {
             return errors.ENOTDIR;
         }

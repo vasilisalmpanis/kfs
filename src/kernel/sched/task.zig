@@ -75,12 +75,12 @@ pub const RefCount = struct {
         };
     }
 
-    pub fn ref(rc: *RefCount) void {
+    pub fn get(rc: *RefCount) void {
         // no synchronization necessary; just updating a counter.
         _ = rc.count.fetchAdd(1, .monotonic);
     }
 
-    pub fn unref(rc: *RefCount) void {
+    pub fn put(rc: *RefCount) void {
         // release ensures code before unref() happens-before the
         // count is decremented as dropFn could be called by then.
         if (rc.getValue() == 0)
@@ -157,7 +157,7 @@ pub const Task = struct {
     files:          *krn.fs.TaskFiles,
 
     // signals
-    sighand:        signal.SigHand       = signal.SigHand.init(),
+    sighand:        ?*signal.SigHand     = null,
     sigmask:        signal.sigset_t      = signal.sigset_t.init(),
     wait_wq:        krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
 
@@ -270,11 +270,11 @@ pub const Task = struct {
         self.sid = current.sid;
         self.ctty = current.ctty;
         if (self.ctty) |ctty| {
-            ctty.ref.ref();
+            ctty.ref.get();
         }
         self.state = tmp.state;
         self.refcount = tmp.refcount;
-        self.refcount.ref();
+        self.refcount.get();
         self.wakeup_time = tmp.wakeup_time;
         self.utime = tmp.utime;
         self.stime = tmp.stime;
@@ -294,9 +294,7 @@ pub const Task = struct {
         self.tree.setup();
 
         self.setName(name);
-        self.sighand = current.sighand;
         self.sigmask = current.sigmask;
-        self.sighand.pending = std.StaticBitSet(32).initEmpty();
         self.wait_wq = krn.wq.WaitQueueHead.init();
         self.wait_wq.setup();
 
@@ -335,7 +333,7 @@ pub const Task = struct {
 
     fn findByPidRec(self: *Task, task_pid: u16) ?*Task {
         if (self.pid == task_pid) {
-            self.refcount.ref();
+            self.refcount.get();
             return self;
         }
 
@@ -353,7 +351,7 @@ pub const Task = struct {
 
     pub fn findByPid(self: *Task, task_pid: u16) ?*Task {
         if (self.pid == task_pid) {
-            self.refcount.ref();
+            self.refcount.get();
             return self;
         }
 
@@ -384,9 +382,9 @@ pub const Task = struct {
                     if (res.state != .STOPPED) {
                         result = true;
                         if (ref) {
-                            res.refcount.ref();
+                            res.refcount.get();
                         } else {
-                            res.refcount.unref();
+                            res.refcount.put();
                         }
                     }
                 }
@@ -403,7 +401,7 @@ pub const Task = struct {
             while (it.next()) |i| {
                 const res = i.curr.entry(Task, "tree");
                 if (res.pid == task_pid) {
-                    res.refcount.ref();
+                    res.refcount.get();
                     return res;
                 }
             }
@@ -415,13 +413,13 @@ pub const Task = struct {
         if (self.ctty == file)
             return;
         self.clearControllingTTY();
-        file.ref.ref();
+        file.ref.get();
         self.ctty = file;
     }
 
     pub fn clearControllingTTY(self: *Task) void {
         if (self.ctty) |ctty| {
-            ctty.ref.unref();
+            ctty.ref.put();
             self.ctty = null;
         }
     }
@@ -430,10 +428,17 @@ pub const Task = struct {
         return self.ctty;
     }
 
-    pub fn deinitAllocatedData(self: *Task) void {
+    pub fn releaseSharedResources(self: *Task) void {
         self.clearControllingTTY();
         self.files.deinit();
         self.fs.deinit();
+
+
+        const sighand = self.getSighandOrPanic();
+        sighand.ref.put();
+        self.sighand = null;
+
+        self.sighand = null;
         if (self.mm) |_mm| {
             _mm.releaseMappings();
         }
@@ -453,7 +458,7 @@ pub const Task = struct {
         defer if (!tasks_locked) tasks_lock.unlock_irq_enable(lock_state);
 
         self.list.del();
-        self.refcount.unref();
+        self.refcount.put();
         if (self.refcount.getValue() > 0) {
             krn.logger.ERROR("[PID: {d}] is exiting and is extra referenced", .{self.pid});
             @panic("exiting task being used");
@@ -472,9 +477,9 @@ pub const Task = struct {
 
         if (self.tree.parent) |_p| {
             const parent = _p.entry(Task, "tree");
-            parent.refcount.ref();
+            parent.refcount.get();
             parent.wait_wq.wakeUpOne();
-            parent.refcount.unref();
+            parent.refcount.put();
         }
     }
 
@@ -523,6 +528,17 @@ pub const Task = struct {
             }
         );
     }
+
+    pub fn getSighandOrPanic(self: *Task) *krn.signals.SigHand {
+        const sighand = self.sighand orelse {
+            @panic("No userspace task should have sighand == NULL\n");
+        };
+        return sighand;
+    }
+
+    pub fn hasPendingSignal(self: *Task) bool {
+        return self.getSighandOrPanic().hasPending();
+    }
 };
 
 pub fn sleep(millis: usize) void {
@@ -556,7 +572,7 @@ pub fn initMultitasking() void {
         krn.logger.ERROR("initMultitasking(): {t}", .{err});
         @panic("Failed to setup initial task!");
     };
-    initial_task.refcount.ref();
+    initial_task.refcount.get();
     initial_task.mm.?.vas = @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET;
     initial_task.fpu_state = &inital_fpu_state;
     krn.irq.registerHandler(0, &krn.timerHandler, null);

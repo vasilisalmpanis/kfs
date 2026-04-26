@@ -109,8 +109,8 @@ fn move_root() void {
             point,
             point.sb.root,
         );
-        defer sysfs.dentry.ref.unref();
-        defer devfs.dentry.ref.unref();
+        defer sysfs.dentry.ref.put();
+        defer devfs.dentry.ref.put();
         devfs.mnt.remove();
         sysfs.mnt.remove();
         krn.fs.mount.mountpoints.?.remove();
@@ -150,7 +150,7 @@ fn user_thread(_: ?*const anyopaque) i32 {
         false
     ) catch |err| {
         if (!file_was_unref)
-            file.ref.unref();
+            file.ref.put();
         krn.logger.ERROR("Failed execute init: {t}", .{err});
         @panic("execve /bin/init");
     };
@@ -158,6 +158,14 @@ fn user_thread(_: ?*const anyopaque) i32 {
 }
 
 var kernel_ready: bool = false;
+
+fn init_userspace() void {
+    const _task = krn.kthreadCreate(&user_thread, null, "init") catch null;
+    if (_task) |task| {
+        task.sighand = krn.signals.SigHand.new()
+            catch @panic("Cannot allocate PID 1's sigHand\n");
+    }
+}
 
 export fn kernel_main(magic: u32, address: u32) noreturn {
     if (magic != 0x36d76289) {
@@ -190,7 +198,8 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     dbg.initSymbolTable(&krn.boot_info);
     krn.serial.print("[INIT]: Symbol Table done\n");
     // Get PID1
-    _ = krn.kthreadCreate(&user_thread, null, "init") catch null;
+    init_userspace();
+
     screen.initScreen(&krn.scr, &krn.boot_info);
     krn.serial.print("[INIT]: Screen done\n");
     keyboard.init();

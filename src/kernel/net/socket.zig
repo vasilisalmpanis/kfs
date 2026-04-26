@@ -145,7 +145,7 @@ pub fn do_socket(family: u32, sock_type: u32, protocol: u32) !u32 {
     inode.data.sock = sock;
 
     const file = try krn.fs.File.pseudo(inode);
-    errdefer file.ref.unref();
+    errdefer file.ref.put();
 
     file.mode = krn.fs.UMode.socket();
     file.flags |= krn.fs.file.O_RDWR;
@@ -164,8 +164,8 @@ pub fn do_bind(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
 
     const file = krn.task.current.files.fds.get(fd) orelse
         return krn.errors.PosixError.EBADF;
-    file.ref.ref();
-    defer file.ref.unref();
+    file.ref.get();
+    defer file.ref.put();
 
     const sock = file.inode.data.sock orelse
         return krn.errors.PosixError.ENOTSOCK;
@@ -212,8 +212,8 @@ pub fn do_bind(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
 pub fn do_listen(fd: u32, backlog: u32) !u32 {
     const file = krn.task.current.files.fds.get(fd) orelse
         return krn.errors.PosixError.EBADF;
-    file.ref.ref();
-    defer file.ref.unref();
+    file.ref.get();
+    defer file.ref.put();
 
     const sock = file.inode.data.sock orelse
         return krn.errors.PosixError.ENOTSOCK;
@@ -238,8 +238,8 @@ pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
 
     const file = krn.task.current.files.fds.get(fd) orelse
         return krn.errors.PosixError.EBADF;
-    file.ref.ref();
-    defer file.ref.unref();
+    file.ref.get();
+    defer file.ref.put();
 
     const listener = file.inode.data.sock orelse
         return krn.errors.PosixError.ENOTSOCK;
@@ -272,7 +272,7 @@ pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
             new_inode.data.sock = server_sock;
 
             const new_file = try krn.fs.File.pseudo(new_inode);
-            errdefer new_file.ref.unref();
+            errdefer new_file.ref.put();
 
             new_file.mode = krn.fs.UMode.socket();
             new_file.flags |= krn.fs.file.O_RDWR;
@@ -287,7 +287,7 @@ pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
         listener.lock.unlock();
 
         listener.accept_wait.wait(true, 0);
-        if (krn.task.current.sighand.hasPending())
+        if (krn.task.current.hasPendingSignal())
             return krn.errors.PosixError.EINTR;
     }
 }
@@ -298,8 +298,8 @@ pub fn do_connect(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
 
     const file = krn.task.current.files.fds.get(fd) orelse
         return krn.errors.PosixError.EBADF;
-    file.ref.ref();
-    defer file.ref.unref();
+    file.ref.get();
+    defer file.ref.put();
 
     const sock = file.inode.data.sock orelse
         return krn.errors.PosixError.ENOTSOCK;
@@ -344,7 +344,7 @@ pub fn do_connect(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
         krn.task.current.wakeup_time = krn.currentMs() + 10;
         krn.task.current.state = .INTERRUPTIBLE_SLEEP;
         krn.sched.reschedule();
-        if (krn.task.current.sighand.hasPending())
+        if (krn.task.current.hasPendingSignal())
             return krn.errors.PosixError.EINTR;
     }
 
@@ -371,7 +371,7 @@ pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
         sock.lock.unlock();
         sock.rw_queue.waitIfInQueue(&wq_node, true, 0);
 
-        if (krn.task.current.sighand.hasPending()) {
+        if (krn.task.current.hasPendingSignal()) {
             sock.lock.lock();
             return krn.errors.PosixError.EINTR;
         }
@@ -401,7 +401,7 @@ pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
         sock.rw_queue.addToQueue(&wq_node);
         remote.lock.unlock();
         sock.rw_queue.waitIfInQueue(&wq_node, true, 0);
-        if (krn.task.current.sighand.hasPending()) {
+        if (krn.task.current.hasPendingSignal()) {
             remote.lock.lock();
             return krn.errors.PosixError.EINTR;
         }
