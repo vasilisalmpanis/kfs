@@ -22,7 +22,7 @@ pub const InodeOps = @import("inode.zig").InodeOps;
 pub const InodeAttrs = @import("inode.zig").InodeAttrs;
 
 // Utils
-pub const Refcount = @import("../sched/task.zig").RefCount;
+pub const RefCount = kernel.RefCount;
 pub const TreeNode = @import("../utils/tree.zig").TreeNode;
 pub const list = kernel.list;
 
@@ -445,22 +445,31 @@ pub const FSInfo = struct {
     root: path.Path,
     pwd: path.Path,
     umask: u32 = 0o22,
+    ref: kernel.RefCount = kernel.RefCount.init(),
 
-    pub fn alloc() !*FSInfo {
+    pub fn new() !*FSInfo {
         if (kernel.mm.kmalloc(FSInfo)) |_fs| {
             _fs.umask = 0o22;
+            _fs.ref = kernel.RefCount.init();
+            _fs.ref.get();
+            _fs.ref.dropFn = FSInfo.release;
             return _fs;
         }
         return error.OutOfMemory;
     }
 
-    pub fn clone(self: *FSInfo) !*FSInfo {
-        const _fs = try FSInfo.alloc();
+    fn release(ref: *kernel.RefCount) void {
+        const _fs: *FSInfo= @fieldParentPtr("ref", ref);
+        _fs.deinit();
+    }
+
+    pub fn dup(self: *FSInfo) !*FSInfo {
+        const _fs = try FSInfo.new();
         _fs.* = self.*;
-        _fs.pwd.dentry.ref.ref();
-        _fs.pwd.mnt.count.ref();
-        _fs.root.dentry.ref.ref();
-        _fs.root.mnt.count.ref();
+        _fs.pwd.dentry.ref.get();
+        _fs.pwd.mnt.ref.get();
+        _fs.root.dentry.ref.get();
+        _fs.root.mnt.ref.get();
         return _fs;
     }
 
@@ -488,7 +497,7 @@ pub fn init() void {
             kernel.logger.ERROR("Failed to mount root: {t}\n",.{err});
             @panic("Failed to mount root\n");
         };
-        kernel.task.initial_task.fs = FSInfo.alloc() catch |err| {
+        kernel.task.initial_task.fs = FSInfo.new() catch |err| {
             kernel.logger.ERROR(
                 "Failed to alloc FSInfo for initial task: {t}\n",
                 .{err}

@@ -95,8 +95,8 @@ pub fn clone(
     }
     errdefer kthread.kthreadStackFree(stack);
 
-    // TODO: implement refcount for MM struct and uncomment this.
     // if (flags.VM) {
+    //     krn.task.current.mm.?.ref.get();
     //     child.mm = krn.task.current.mm;
     // } else {
         child.mm = krn.task.current.mm.?.dup() orelse {
@@ -104,37 +104,42 @@ pub fn clone(
             return errors.ENOMEM;
         };
     // }
-    // errdefer if (!flags.VM) {
-        errdefer if (child.mm) |mm|
-            mm.delete();
-    // };
+    errdefer if (child.mm) |mm| {
+        // if (flags.VM) mm.ref.put() else mm.delete();
+        mm.delete();
+    };
 
     if (flags.FS) {
+        krn.task.current.fs.ref.get();
         child.fs = krn.task.current.fs;
     } else {
-        child.fs = krn.task.current.fs.clone() catch {
+        child.fs = krn.task.current.fs.dup() catch {
             krn.logger.ERROR("clone: failed to clone fs", .{});
             return errors.ENOMEM;
         };
     }
-    errdefer if (!flags.FS) child.fs.deinit();
+    errdefer child.fs.ref.put();
+
+    // Not sure if second test is necessary not userspace task is supposed
+    // to have sighand == NULL. Maybe assert that its not NULL.
+    const sighand = krn.task.current.sighand orelse
+        @panic("No userspace task should have sighand == NULL\n");
+
+    if (flags.SIGHAND) {
+        sighand.ref.get();
+        child.sighand = sighand;
+    } else {
+        child.sighand = try sighand.dup();
+    }
+    errdefer child.sighand.?.ref.put();
 
     if (flags.FILES) {
+        krn.task.current.files.ref.get();
         child.files = krn.task.current.files;
     } else {
-        if (krn.fs.TaskFiles.new()) |files| {
-            errdefer krn.mm.kfree(files);
-            child.files = files;
-            child.files.dup(krn.task.current.files) catch {
-                krn.logger.ERROR("clone: failed to clone files", .{});
-                return errors.ENOMEM;
-            };
-        } else {
-            krn.logger.ERROR("clone: failed to alloc files", .{});
-            return errors.ENOMEM;
-        }
+        child.files = try krn.task.current.files.dup();
     }
-    errdefer if (!flags.FILES) krn.mm.kfree(child.files);
+    errdefer child.files.ref.put();
 
     var child_fpu_state: ?*arch.fpu.FPUState = null;
     var child_fpu_used = krn.task.current.fpu_used;

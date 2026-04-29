@@ -1,9 +1,9 @@
 const fs = @import("fs.zig");
 const DEntry = fs.DEntry;
 const mount = fs.mount;
-const Refcount = fs.Refcount;
 const std = @import("std");
 const kernel = fs.kernel;
+const RefCount = kernel.RefCount;
 const errors = @import("../syscalls/error-codes.zig").PosixError;
 
 // Mode
@@ -35,7 +35,7 @@ pub const File = struct {
     ops: * const FileOps,
     pos: usize,
     inode: *fs.Inode,
-    ref: Refcount,
+    ref: RefCount,
     path: ?fs.path.Path,
     data: ?*anyopaque,
 
@@ -46,20 +46,20 @@ pub const File = struct {
     ) void {
         self.ops = ops;
         self.pos = 0;
-        self.ref = kernel.task.RefCount.init();
+        self.ref = kernel.RefCount.init();
         self.ref.dropFn = File.release;
-        self.ref.ref();
+        self.ref.get();
         self.inode = inode;
-        self.inode.ref.ref();
+        self.inode.ref.get();
         self.data = null;
         self.mode = fs.UMode{};
     }
 
-    pub fn release(ref: *kernel.task.RefCount) void {
+    pub fn release(ref: *kernel.RefCount) void {
         const file: *File = kernel.list.containerOf(File, @intFromPtr(ref), "ref");
         const inode: *fs.Inode = file.inode;
         file.ops.close(file); //?
-        inode.ref.unref();
+        inode.ref.put();
         if (file.path != null)
             file.path.?.release();
         kernel.mm.kfree(file);
@@ -117,6 +117,7 @@ pub const TaskFiles = struct {
     map: std.DynamicBitSet,
     closexec: std.DynamicBitSet,
     fds: std.AutoHashMap(usize, *File),
+    ref: kernel.RefCount = kernel.RefCount.init(),
 
     pub fn new() ?*TaskFiles {
         if (kernel.mm.kmalloc(TaskFiles)) |files| {
@@ -129,9 +130,17 @@ pub const TaskFiles = struct {
                 return null;
             };
             files.fds = std.AutoHashMap(usize, *File).init(kernel.mm.kernel_allocator.allocator());
+            files.ref = kernel.RefCount.init();
+            files.ref.get();
+            files.ref.dropFn = release;
             return files;
         }
         return null;
+    }
+
+    fn release(ref: *kernel.RefCount) void {
+        const files: *TaskFiles = @fieldParentPtr("ref", ref);
+        files.deinit();
     }
 
     pub fn deinit(self: *TaskFiles) void {
@@ -141,7 +150,7 @@ pub const TaskFiles = struct {
         });
         while (it.next()) |idx| {
             if (self.fds.fetchRemove(idx)) |kv| {
-                kv.value.ref.unref();
+                kv.value.ref.put();
             }
         }
         self.fds.deinit();
@@ -150,7 +159,11 @@ pub const TaskFiles = struct {
         kernel.mm.kfree(self);
     }
 
-    pub fn dup(self: *TaskFiles, old: *TaskFiles) !void {
+    pub fn dup(old: *TaskFiles) !*TaskFiles {
+        const self: *TaskFiles = TaskFiles.new() orelse
+            return kernel.errors.PosixError.ENOMEM;
+        errdefer kernel.mm.kfree(self);
+
         var fd_it = old.map.iterator(.{});
         while (fd_it.next()) |id| {
             if (id > self.map.capacity()) {
@@ -168,21 +181,22 @@ pub const TaskFiles = struct {
                 self.closexec.set(id);
             errdefer self.map.unset(id);
             if (old.fds.get(id)) |file| {
-                file.ref.ref();
-                errdefer file.ref.unref();
+                file.ref.get();
+                errdefer file.ref.put();
                 try self.fds.put(id, file);
             } else {
                 kernel.logger.ERROR("TaskFiles.dup(): failed to get id {d} from fds", .{id});
                 return errors.ENOMEM;
             }
         }
+        return self;
     }
 
     pub fn releaseFD(self: *TaskFiles, fd: usize) bool {
         self.unsetFD(fd);
         if (self.fds.get(fd)) |file| {
             _ = self.fds.remove(fd);
-            file.ref.unref();
+            file.ref.put();
             return true;
         }
         return false;

@@ -1,10 +1,10 @@
 const fs = @import("fs.zig");
 const SuperBlock = fs.SuperBlock;
-const Refcount = fs.Refcount;
 const TreeNode = fs.TreeNode;
 const kernel = fs.kernel;
 const list = fs.list;
 const std = @import("std");
+const RefCount = kernel.RefCount;
 
 
 /// Dentry: the path representation of every inode on the filesystem
@@ -26,11 +26,11 @@ pub var cache: std.StringHashMap(*DEntry) = undefined;
 pub const DEntry = struct {
     sb: *SuperBlock,
     inode: *fs.Inode,
-    ref: Refcount,
+    ref: RefCount,
     name: []u8,
     tree: TreeNode,
 
-    pub fn drop(self: *Refcount) void {
+    pub fn drop(self: *RefCount) void {
         fs.dcache_lock.lock();
         if (!self.isFree()) {
             fs.dcache_lock.unlock();
@@ -57,7 +57,7 @@ pub const DEntry = struct {
         }
         if (parent) |_p| {
             const _parent = _p.entry(fs.DEntry, "tree");
-            _parent.ref.unref();
+            _parent.ref.put();
         }
         kernel.mm.kfree(dentry.name.ptr);
         kernel.mm.kfree(dentry);
@@ -71,8 +71,8 @@ pub const DEntry = struct {
                 return error.OutOfMemory;
             }
             entry.sb = sb;
-            entry.ref = Refcount.init();
-            entry.ref.ref();
+            entry.ref = RefCount.init();
+            entry.ref.get();
             entry.ref.dropFn = drop;
             entry.tree.setup();
             entry.inode = ino;
@@ -82,8 +82,8 @@ pub const DEntry = struct {
     }
 
     pub fn new(parent: *DEntry, name: []const u8, ino: *fs.Inode) !*DEntry {
-        parent.ref.ref();
-        errdefer parent.ref.unref();
+        parent.ref.get();
+        errdefer parent.ref.put();
         if (ino.sb == null)
             return kernel.errors.PosixError.EINVAL;
         const new_dentry: *fs.DEntry = fs.DEntry.alloc(name, ino.sb.?, ino) catch {
@@ -108,7 +108,7 @@ pub const DEntry = struct {
     }
 
     pub fn release(self: *DEntry) void {
-        self.ref.unref();
+        self.ref.put();
     }
 };
 

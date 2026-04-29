@@ -8,8 +8,8 @@ const krn = @import("../main.zig");
 pub fn dup2(old_fd: u32, new_fd: u32) !u32 {
     krn.logger.INFO("dup2 {d} -> {d}", .{old_fd, new_fd});
     if (krn.task.current.files.fds.get(old_fd)) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         if (old_fd == new_fd) {
             return new_fd;
         }
@@ -17,7 +17,7 @@ pub fn dup2(old_fd: u32, new_fd: u32) !u32 {
             _ = krn.task.current.files.releaseFD(new_fd);
         }
         try krn.task.current.files.setFD(new_fd, file);
-        file.ref.ref();
+        file.ref.get();
         return new_fd;
     }
     return errors.EBADF;
@@ -25,14 +25,14 @@ pub fn dup2(old_fd: u32, new_fd: u32) !u32 {
 
 pub fn dup(old_fd: u32) !u32 {
     if (krn.task.current.files.fds.get(old_fd)) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         const new_fd = krn.task.current.files.getNextFD() catch |err| {
             krn.logger.ERROR("dup: failed to get next fd: {any}", .{err});
             return errors.EMFILE;
         };
         try krn.task.current.files.setFD(new_fd, file);
-        file.ref.ref();
+        file.ref.get();
         return new_fd;
     }
     return errors.EBADF;

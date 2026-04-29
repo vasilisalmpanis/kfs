@@ -39,7 +39,7 @@ pub const SysSuper = struct {
             dntry.inode = root_inode;
             sb.base.root = dntry;
             sb.base.list.setup();
-            sb.base.ref = kernel.task.RefCount.init();
+            sb.base.ref = kernel.RefCount.init();
             sb.base.fs = _fs;
             sb.base.ops = &sys_super_ops;
             _fs.sbs.add(&sb.base.list);
@@ -49,7 +49,7 @@ pub const SysSuper = struct {
     }
 
     fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
-        base.ref.unref();
+        base.ref.put();
         while (!base.ref.isFree()) {
             arch.archReschedule();
         }

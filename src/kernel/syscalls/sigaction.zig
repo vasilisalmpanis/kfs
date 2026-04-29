@@ -14,11 +14,12 @@ fn do_sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) !
     const signal: signals.Signal = @enumFromInt(sig);
     if (signal == .SIGKILL or signal == .SIGSTOP)
         return errors.EINVAL;
+    const sighand = krn.task.current.getSighandOrPanic();
     if (oact) |old_act| {
-        old_act.* = tsk.current.sighand.actions.get(signal);
+        old_act.* = sighand.actions.get(signal);
     }
     if (act) |_act| {
-        tsk.current.sighand.actions.set(signal, _act.*);
+        sighand.actions.set(signal, _act.*);
     }
     return 0;
 }
@@ -38,7 +39,9 @@ pub fn sigreturn() !u32 {
     const signal_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
     const num: *u32 = @ptrFromInt(signal_regs.useresp - 4);
     const signal: signals.Signal = @enumFromInt(num.*);
-    var action = tsk.current.sighand.actions.get(signal);
+
+    const sighand = krn.task.current.getSighandOrPanic();
+    var action = sighand.actions.get(signal);
     // for normal handlers offset should be 0 because restorer pops the signal number
     const regs_addr: u32 = signal_regs.useresp + 8;
     const saved_regs: *arch.Regs = @ptrFromInt(regs_addr);
@@ -54,7 +57,7 @@ pub fn sigreturn() !u32 {
     tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
     tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
     action.mask.sigDelSet(signal);
-    tsk.current.sighand.actions.set(signal, action);
+    sighand.actions.set(signal, action);
     if (saved_regs.eax >= 0) { // ERESTARTSYS
         return @intCast(saved_regs.eax);
     }
@@ -65,7 +68,9 @@ pub fn rt_sigreturn() !u32 {
     const signal_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
     const num: *u32 = @ptrFromInt(signal_regs.useresp);
     const signal: signals.Signal = @enumFromInt(num.*);
-    var action = tsk.current.sighand.actions.get(signal);
+
+    const sighand = krn.task.current.getSighandOrPanic();
+    var action = sighand.actions.get(signal);
     // for normal handlers offset should be 0 because restorer pops the signal number
     const regs_addr: u32 = signal_regs.useresp + 12;
     const saved_regs: *arch.Regs = @ptrFromInt(regs_addr);
@@ -81,7 +86,7 @@ pub fn rt_sigreturn() !u32 {
     tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
     tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
     action.mask.sigDelSet(signal);
-    tsk.current.sighand.actions.set(signal, action);
+    sighand.actions.set(signal, action);
     if (saved_regs.eax >= 0)
         return @intCast(saved_regs.eax);
     return krn.errors.fromErrno(saved_regs.eax);
@@ -149,8 +154,10 @@ pub fn rt_sigpending(
 
 pub fn sigpending(uset: ?*signals.sigset_t) u32 {
     var set = signals.sigset_t.init();
+    const sighand = krn.task.current.getSighandOrPanic();
+
     for (1..32) |idx| {
-        if (tsk.current.sighand.pending.isSet(idx)) {
+        if (sighand.pending.isSet(idx)) {
             set.sigAddSet(@enumFromInt(idx));
         }
     }
@@ -171,7 +178,7 @@ pub fn rt_sigsuspend(_mask: ?*signals.sigset_t) !u32 {
 
     krn.task.current.sigmask = mask.*;
 
-    if (krn.task.current.sighand.hasPending()) {
+    if (krn.task.current.hasPendingSignal()) {
         state.eax = krn.errors.toErrno(errors.EINTR);
         _ = signals.processSignals(state, &uctx);
         return errors.EINTR;
@@ -224,12 +231,13 @@ pub fn rt_sigtimedwait(
 
     const start_time = krn.currentMs();
 
+    const sighand = krn.task.current.getSighandOrPanic();
     while (true) {
         for (1..32) |sig| {
-            if (tsk.current.sighand.pending.isSet(sig)) {
+            if (sighand.pending.isSet(sig)) {
                 const signal: signals.Signal = @enumFromInt(sig);
                 if (wait_set.sigIsSet(signal)) {
-                    tsk.current.sighand.pending.unset(sig);
+                    sighand.pending.unset(sig);
                     if (info) |i| {
                         i.signo = @intCast(sig);
                         i.errno = 0;

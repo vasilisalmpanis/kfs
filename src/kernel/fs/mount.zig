@@ -20,7 +20,7 @@ pub const Mount = struct {
     root: *fs.DEntry,
     tree: tree.TreeNode,
     list: krn.list.ListHead,
-    count: krn.task.RefCount,
+    ref: krn.RefCount,
     source: []const u8,
 
     pub fn mount(
@@ -47,7 +47,7 @@ pub const Mount = struct {
             // 3. Retrieve fops from driver
 
             dummy_file = try fs.File.new(device_path);
-            errdefer dummy_file.?.ref.unref();
+            errdefer dummy_file.?.ref.put();
             try device_inode.fops.open(dummy_file.?, device_inode);
             blk_dev = device_inode.data.dev;
         }
@@ -68,10 +68,10 @@ pub const Mount = struct {
                 return krn.errors.PosixError.EBUSY;
             }
             sb = try fs_type.ops.getSB(fs_type, dummy_file);
-            errdefer sb.ref.unref();
+            errdefer sb.ref.put();
         } else {
             sb = try fs_type.ops.getSB(fs_type, dummy_file);
-            errdefer sb.ref.unref();
+            errdefer sb.ref.put();
             curr.dentry = fs.DEntry.alloc(target, sb, sb.root.inode) catch {
                 return error.OutOfMemory;
             };
@@ -87,19 +87,19 @@ pub const Mount = struct {
             mnt.tree.setup();
             mnt.list.setup();
             mnt_lock.lock();
-            mnt.count = krn.task.RefCount.init();
-            mnt.count.ref();
+            mnt.ref = krn.RefCount.init();
+            mnt.ref.get();
             defer mnt_lock.unlock();
             if (mountpoints == null) {
                 mountpoints = mnt;
             } else {
-                curr.mnt.count.ref();
+                curr.mnt.ref.get();
                 curr.mnt.tree.addChild(&mnt.tree);
                 curr.mnt.list.add(&mnt.list);
             }
             return mnt;
         } else {
-            sb.ref.unref(); // later maybe something else
+            sb.ref.put(); // later maybe something else
             return error.OutOfMemory;
         }
     }
@@ -124,7 +124,7 @@ pub const Mount = struct {
         self.list.del();
         if (parent) |_parent| {
             const parent_mount = _parent.entry(Mount, "tree");
-            parent_mount.count.unref();
+            parent_mount.ref.put();
         }
     }
 

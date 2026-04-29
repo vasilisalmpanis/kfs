@@ -71,7 +71,7 @@ fn handlerShbang(
         path.release();
         return err;
     };
-    errdefer if (!new_resources_released) intr_file.ref.unref();
+    errdefer if (!new_resources_released) intr_file.ref.put();
 
     const extra_args: usize = if (interp_arg != null and interp_arg.?.len > 0) 2 else 1;
     const new_argv = krn.mm.kmallocSlice([]const u8, argv.len + extra_args) orelse
@@ -108,7 +108,7 @@ fn handlerShbang(
     errdefer if (!new_resources_released) freeSlices(new_envp, new_envp.len);
 
     krn.mm.vfreeSlice(binary);
-    file.ref.unref();
+    file.ref.put();
     resources_released.* = true;
 
     if (free_arg_env) {
@@ -176,7 +176,15 @@ pub fn doExecve(
     krn.task.current.setName(file.path.?.dentry.name); // TODO: make copy of filename and set name only if we will execute
 
     if (krn.task.current.mm) |_mm| {
-        _mm.releaseMappings();
+        const old_mm = _mm;
+        const new_mm = krn.proc_mm.MM.new() orelse
+            return krn.errors.PosixError.ENOMEM;
+        const vas_pair = new_mm.newVAS() orelse
+            return krn.errors.PosixError.ENOMEM;
+        krn.mm.virt_memory_manager.unmapPage(vas_pair.virt, false);
+        arch.vmm.switchToVAS(new_mm.vas);
+        krn.task.current.mm = new_mm;
+        old_mm.ref.put();
     }
 
     try krn.userspace.prepareBinary(
@@ -186,7 +194,7 @@ pub fn doExecve(
     );
 
 
-    krn.task.current.sighand = krn.signals.SigHand.init();
+    krn.task.current.sighand = try krn.signals.SigHand.new();
     var it = krn.task.current.files.closexec.iterator(
         .{.direction = .forward, .kind = .set}
     );
@@ -210,7 +218,7 @@ pub fn doExecve(
         freeSlices(argv, argv.len);
         freeSlices(envp, envp.len);
     }
-    file.ref.unref();
+    file.ref.put();
     resources_released.* = true;
     krn.userspace.goUserspace();
     return 0;
@@ -278,7 +286,7 @@ pub fn execve(
         path.release();
         return err;
     };
-    errdefer if (!resources_released) file.ref.unref();
+    errdefer if (!resources_released) file.ref.put();
 
     return doExecve(
         file,

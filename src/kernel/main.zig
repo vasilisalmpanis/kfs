@@ -20,6 +20,7 @@ pub const list = @import("./utils/list.zig");
 pub const tree = @import("./utils/tree.zig");
 pub const ringbuf = @import("./utils/ringbuf.zig");
 pub const wq = @import("./utils/waitqueue.zig");
+pub const RefCount = @import("./utils/refcount.zig").RefCount;
 
 pub const kthreadCreate = @import("./sched/kthread.zig").kthreadCreate;
 pub const kthreadStop = @import("./sched/kthread.zig").kthreadStop;

@@ -28,24 +28,19 @@ pub fn doFork() !u32 {
         return errors.ENOMEM;
     };
     errdefer child.mm.?.delete();
-    child.fs = tsk.current.fs.clone() catch {
+    child.fs = tsk.current.fs.dup() catch {
         krn.logger.ERROR("fork: failed to clone fs", .{});
         return errors.ENOMEM;
     };
-    errdefer child.fs.deinit();
-    if (fs.TaskFiles.new()) |files| {
-        errdefer km.kfree(files);
-        child.files = files;
-        child.files.dup(tsk.current.files) catch {
-            // TODO: free mm and free fs.
-            krn.logger.ERROR("fork: failed to clone files", .{});
-            return errors.ENOMEM;
-        };
-    } else {
-            krn.logger.ERROR("fork: failed to clone files", .{});
-            return errors.ENOMEM;
-    }
-    errdefer km.kfree(child.files);
+    errdefer child.fs.ref.put();
+
+    child.files = try krn.task.current.files.dup();
+    errdefer child.files.ref.put();
+
+    const sighand = krn.task.current.sighand orelse
+        @panic("No userspace task should have sighand == NULL\n");
+    child.sighand = try sighand.dup();
+    errdefer child.sighand.?.ref.put();
 
     var child_fpu_state: ?*arch.fpu.FPUState = null;
     var child_fpu_used = tsk.current.fpu_used;

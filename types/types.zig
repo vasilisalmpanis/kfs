@@ -797,6 +797,11 @@ pub const kernel = struct {
 
     };
 
+    pub const RefCount = struct {
+        count : std.atomic.Value(usize),
+        dropFn : *const fn(*kernel.RefCount) void,
+    };
+
     pub const task = struct {
         pub const TaskState = enum(u8) {
             RUNNING = 0,
@@ -812,11 +817,6 @@ pub const kernel = struct {
             PROCESS = 1,
         };
 
-
-        pub const RefCount = struct {
-            count : std.atomic.Value(usize),
-            dropFn : *const fn(*kernel.task.RefCount) void,
-        };
 
         pub const Task = struct {
             pid : u16,
@@ -839,14 +839,14 @@ pub const kernel = struct {
             save_fpu_state : bool= false,
             tree : kernel.tree.TreeNode,
             list : kernel.list.ListHead,
-            refcount : kernel.task.RefCount,
+            refcount : kernel.RefCount,
             wakeup_time : u32= 0,
             utime : u32= 0,
             stime : u32= 0,
             mm : ?*kernel.mm.proc_mm.MM= null,
             fs : *kernel.fs.FSInfo,
             files : *kernel.fs.file.TaskFiles,
-            sighand : kernel.signals.SigHand,
+            sighand : ?*kernel.signals.SigHand= null,
             sigmask : kernel.signals.sigset_t,
             wait_wq : kernel.wq.WaitQueueHead,
             threadfn : ?*const fn(?*const anyopaque) i32= null,
@@ -951,6 +951,7 @@ pub const kernel = struct {
         pub const SigHand = struct {
             pending : std.bit_set.IntegerBitSet(32),
             actions : std.enums.EnumArray(kernel.signals.Signal, kernel.signals.Sigaction),
+            ref : kernel.RefCount,
         };
 
     };
@@ -1005,7 +1006,7 @@ pub const kernel = struct {
             ops : *const kernel.fs.SuperOps,
             root : *kernel.fs.DEntry,
             fs : *kernel.fs.filesystem.FileSystem,
-            ref : kernel.task.RefCount,
+            ref : kernel.RefCount,
             list : kernel.list.ListHead,
             block_size : u32,
             inode_map : std.hash_map.HashMap(u32, *kernel.fs.Inode, std.hash_map.AutoContext(u32), 80),
@@ -1038,7 +1039,7 @@ pub const kernel = struct {
             root : *kernel.fs.DEntry,
             tree : kernel.tree.TreeNode,
             list : kernel.list.ListHead,
-            count : kernel.task.RefCount,
+            ref : kernel.RefCount,
             source : []const u8,
         };
 
@@ -1049,7 +1050,7 @@ pub const kernel = struct {
         pub const DEntry = struct {
             sb : *kernel.fs.SuperBlock,
             inode : *kernel.fs.Inode,
-            ref : kernel.task.RefCount,
+            ref : kernel.RefCount,
             name : []u8,
             tree : kernel.tree.TreeNode,
         };
@@ -1074,7 +1075,7 @@ pub const kernel = struct {
         pub const Inode = struct {
             i_no : u32= 0,
             sb : ?*kernel.fs.SuperBlock,
-            ref : kernel.task.RefCount,
+            ref : kernel.RefCount,
             mode : kernel.fs.UMode,
             uid : u32= 0,
             gid : u32= 0,
@@ -1130,7 +1131,7 @@ pub const kernel = struct {
                 ops : *const kernel.fs.file.FileOps,
                 pos : u32,
                 inode : *kernel.fs.Inode,
-                ref : kernel.task.RefCount,
+                ref : kernel.RefCount,
                 path : ?kernel.fs.path.Path,
                 data : ?*anyopaque,
             };
@@ -1151,6 +1152,7 @@ pub const kernel = struct {
                 map : std.bit_set.DynamicBitSet,
                 closexec : std.bit_set.DynamicBitSet,
                 fds : std.hash_map.HashMap(usize, *kernel.fs.file.File, std.hash_map.AutoContext(usize), 80),
+                ref : kernel.RefCount,
             };
 
         };
@@ -1247,6 +1249,7 @@ pub const kernel = struct {
             root : kernel.fs.path.Path,
             pwd : kernel.fs.path.Path,
             umask : u32= 18,
+            ref : kernel.RefCount,
         };
 
     };
