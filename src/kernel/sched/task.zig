@@ -395,7 +395,9 @@ pub const Task = struct {
 
         self.sighand = null;
         if (self.mm) |_mm| {
-            _mm.releaseMappings();
+            _mm.ref.put();
+            // TODO: in case of thread:
+            // self.mm = null
         }
         if (self.fpu_state) |state| {
             self.fpu_used = false;
@@ -486,6 +488,11 @@ pub const Task = struct {
 
     pub fn getSighandOrPanic(self: *Task) *krn.signals.SigHand {
         const sighand = self.sighand orelse {
+            krn.logger.ERROR(
+                "Process with no SigHand {s}, pid: {d}",
+                .{self.name[0..16], self.pid}
+            );
+            self.dbgPrint();
             @panic("No userspace task should have sighand == NULL\n");
         };
         return sighand;

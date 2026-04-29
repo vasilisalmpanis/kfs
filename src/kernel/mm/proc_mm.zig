@@ -216,15 +216,19 @@ pub const MM = struct {
     brk: usize = 0,
     vas: usize = 0,
     vmas: ?*VMA = null,
+    ref: krn.RefCount = krn.RefCount.init(),
 
     pub fn init() MM {
-        return MM {
+        var _mm = MM {
             .vas = 0,
             .bss = 0,
             .stack_top = STACK_TOP,
             .stack_bottom = STACK_BOTTOM,
             .vmas = null,
         };
+        _mm.ref.get();
+        _mm.ref.dropFn = MM.release;
+        return _mm;
     }
 
     pub fn new() ?*MM {
@@ -233,6 +237,11 @@ pub const MM = struct {
             _mmap.* = MM.init();
         }
         return mmap;
+    }
+
+    fn release(ref: *krn.RefCount) void {
+        const _mm: *MM = @fieldParentPtr("ref", ref);
+        _mm.releaseMappings();
     }
 
     pub fn add_vma(
