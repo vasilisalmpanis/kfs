@@ -176,7 +176,15 @@ pub fn doExecve(
     krn.task.current.setName(file.path.?.dentry.name); // TODO: make copy of filename and set name only if we will execute
 
     if (krn.task.current.mm) |_mm| {
-        _mm.releaseMappings();
+        const old_mm = _mm;
+        const new_mm = krn.proc_mm.MM.new() orelse
+            return krn.errors.PosixError.ENOMEM;
+        const vas_pair = new_mm.newVAS() orelse
+            return krn.errors.PosixError.ENOMEM;
+        krn.mm.virt_memory_manager.unmapPage(vas_pair.virt, false);
+        arch.vmm.switchToVAS(new_mm.vas);
+        krn.task.current.mm = new_mm;
+        old_mm.ref.put();
     }
 
     try krn.userspace.prepareBinary(
