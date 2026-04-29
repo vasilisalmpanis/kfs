@@ -124,9 +124,16 @@ fn user_thread(_: ?*const anyopaque) i32 {
     while (kernel_ready == false)
         krn.sched.reschedule();
 
-    krn.task.current.mm = krn.task.initial_task.mm;
-    krn.task.current.fs = krn.task.initial_task.fs;
-    krn.task.current.files = krn.task.initial_task.files;
+    krn.task.current.mm = krn.task.initial_task.mm.?.dup() orelse
+        @panic("Allocation PID 1: mm.dup() failed");
+    krn.task.initial_task.mm.?.ref.put();
+    krn.task.current.fs = krn.task.initial_task.fs.dup() catch
+        @panic("Allocation PID 1: fs.dup() failed");
+    krn.task.current.files = krn.task.initial_task.files.dup() catch
+        @panic("Allocation PID 1: files.dup() failed");
+    krn.task.current.sighand = krn.signals.SigHand.new() catch
+        @panic("Allocation PID 1: SigHand.new() failed");
+    krn.task.current.tsktype = .PROCESS;
     krn.fs.procfs.newProcess(krn.task.current) catch {
         @panic("Could not create PID 1 procfs entries\n");
     };
@@ -176,7 +183,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     fpu.initFPU();
     drv.platform.serial.init_ports();
     krn.serial.print("[INIT]: Serial done\n");
-    krn.logger = Logger.init(.OFF);
+    krn.logger = Logger.init(.DEBUG);
     krn.serial.print("[INIT]: Logger done\n");
     const boot_info = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
     krn.boot_info = boot_info;

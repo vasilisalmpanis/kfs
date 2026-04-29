@@ -95,8 +95,8 @@ pub fn clone(
     }
     errdefer kthread.kthreadStackFree(stack);
 
-    // TODO: implement refcount for MM struct and uncomment this.
     // if (flags.VM) {
+    //     krn.task.current.mm.?.ref.get();
     //     child.mm = krn.task.current.mm;
     // } else {
         child.mm = krn.task.current.mm.?.dup() orelse {
@@ -104,13 +104,13 @@ pub fn clone(
             return errors.ENOMEM;
         };
     // }
-    // errdefer if (!flags.VM) {
-        errdefer if (child.mm) |mm|
-            mm.delete();
-    // };
+    errdefer if (child.mm) |mm| {
+        // if (flags.VM) mm.ref.put() else mm.delete();
+        mm.delete();
+    };
 
     if (flags.FS) {
-        child.fs.ref.get();
+        krn.task.current.fs.ref.get();
         child.fs = krn.task.current.fs;
     } else {
         child.fs = krn.task.current.fs.dup() catch {

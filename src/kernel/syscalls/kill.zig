@@ -9,8 +9,10 @@ fn send_signal(task: *tsk.Task, signal: signals.Signal) !u32 {
     if (tsk.current.uid != task.uid)
         return errors.EPERM;
     if (signal != .EMPTY) {
-        const sighand = task.getSighandOrPanic();
-        sighand.setSignal(signal);
+        if (task.state != .ZOMBIE and task.state != .STOPPED) {
+            const sighand = task.getSighandOrPanic();
+            sighand.setSignal(signal);
+        }
         if (
             task.state != .ZOMBIE
             and task.state != .STOPPED

@@ -16,6 +16,8 @@ pub const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 fn threadWrapper() callconv(.c) noreturn {
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
     tsk.current.finish(false);
+    if (tsk.current.mm) |_mm|
+        _mm.ref.put();
     krn.sched.reschedule();
     while (true) {}
 }
@@ -79,6 +81,8 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const 
         task.threadfn = f;
         task.arg = arg;
         task.mm = &mm.proc_mm.init_mm;
+        if (task.mm) |_mm|
+            _mm.ref.get();
         task.fs = krn.task.initial_task.fs;
         try task.assignPID();
         task.initSelf(
