@@ -242,6 +242,8 @@ pub const MM = struct {
     fn release(ref: *krn.RefCount) void {
         const _mm: *MM = @fieldParentPtr("ref", ref);
         _mm.releaseMappings();
+        if (!_mm.isCurrentMM())
+            _mm.delete();
     }
 
     pub fn add_vma(
@@ -420,17 +422,23 @@ pub const MM = struct {
         return null;
     }
 
+    pub fn newVAS(self: *MM) ?krn.mm.VASpair {
+        const vas_lock = krn.mm.mem_lock.lock_irq_disable();
+        defer krn.mm.mem_lock.unlock_irq_enable(vas_lock);
+        const vas_pair =  mm.virt_memory_manager.newVAS() catch {
+            krn.mm.mem_lock.unlock_irq_enable(vas_lock);
+            return null;
+        };
+        self.vas = vas_pair.phys;
+        return vas_pair;
+    }
+
     pub fn dup(self: *MM) ?*MM {
         const mmap: ?*MM = MM.new();
         if (mmap) |_mmap| {
-            const vas_lock = krn.mm.mem_lock.lock_irq_disable();
-            const vas_pair: krn.mm.VASpair = mm.virt_memory_manager.newVAS() catch {
-                krn.mm.mem_lock.unlock_irq_enable(vas_lock);
+            const vas_pair = _mmap.newVAS() orelse
                 return null;
-            };
-            krn.mm.mem_lock.unlock_irq_enable(vas_lock);
             defer mm.virt_memory_manager.unmapPage(vas_pair.virt, false);
-            _mmap.vas = vas_pair.phys;
             if (_mmap.vas == 0) {
                 mm.kfree(_mmap);
                 return null;
