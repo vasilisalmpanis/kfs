@@ -185,6 +185,10 @@ pub fn doExecve(
         arch.vmm.switchToVAS(new_mm.vas);
         krn.task.current.mm = new_mm;
         old_mm.ref.put();
+        if (krn.task.current.vfork_wq) |wq| {
+            wq.wakeUpOne();
+            krn.task.current.vfork_wq = null;
+        }
     }
 
     try krn.userspace.prepareBinary(
