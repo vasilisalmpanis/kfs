@@ -115,6 +115,7 @@ pub const Task = struct {
     sighand:        ?*signal.SigHand     = null,
     sigmask:        signal.sigset_t      = signal.sigset_t.init(),
     wait_wq:        krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
+    vfork_wq:       ?*krn.wq.WaitQueueHead = null,
 
     // only for kthreads
     threadfn:       ?ThreadHandler       = null,
@@ -142,6 +143,7 @@ pub const Task = struct {
             .should_stop = false,
             .utime = 0,
             .stime = 0,
+            .vfork_wq = null,
         };
     }
 
@@ -177,6 +179,7 @@ pub const Task = struct {
         self.setName(name);
         self.wait_wq.setup();
         self.should_stop = false;
+        self.vfork_wq = null;
     }
 
     pub fn setName(self: *Task, name: []const u8) void {
@@ -205,6 +208,7 @@ pub const Task = struct {
 
     pub fn initSelf(
         self: *Task,
+        state: TaskState,
         task_stack_top: usize,
         stack_btm: usize,
         uid: u16,
@@ -227,7 +231,7 @@ pub const Task = struct {
         if (self.ctty) |ctty| {
             ctty.ref.get();
         }
-        self.state = tmp.state;
+        self.state = state;
         self.refcount = tmp.refcount;
         self.refcount.get();
         self.wakeup_time = tmp.wakeup_time;
@@ -396,6 +400,10 @@ pub const Task = struct {
         self.sighand = null;
         if (self.mm) |_mm| {
             _mm.ref.put();
+            if (krn.task.current.vfork_wq) |wq| {
+                wq.wakeUpOne();
+                krn.task.current.vfork_wq = null;
+            }
             // TODO: in case of thread:
             // self.mm = null
         }

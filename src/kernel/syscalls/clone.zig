@@ -95,18 +95,18 @@ pub fn clone(
     }
     errdefer kthread.kthreadStackFree(stack);
 
-    // if (flags.VM) {
-    //     krn.task.current.mm.?.ref.get();
-    //     child.mm = krn.task.current.mm;
-    // } else {
+    if (flags.VM) {
+        krn.task.current.mm.?.ref.get();
+        child.mm = krn.task.current.mm;
+    } else {
         child.mm = krn.task.current.mm.?.dup() orelse {
             krn.logger.ERROR("clone: failed to dup mm", .{});
             return errors.ENOMEM;
         };
-    // }
+    }
     errdefer if (child.mm) |mm| {
-        // if (flags.VM) mm.ref.put() else mm.delete();
-        mm.delete();
+        if (flags.VM) mm.ref.put() else mm.delete();
+        // mm.delete();
     };
 
     if (flags.FS) {
@@ -166,6 +166,7 @@ pub fn clone(
     child_regs.eax = 0;
 
     if (child_stack != 0) {
+        // FIXME: properly map this address to userspace stack
         child_regs.useresp = child_stack;
     }
 
@@ -180,6 +181,7 @@ pub fn clone(
     }
 
     child.initSelf(
+        .UNINTERRUPTIBLE_SLEEP,
         stack_top,
         stack,
         krn.task.current.uid,
@@ -195,6 +197,17 @@ pub fn clone(
     child.fpu_state = child_fpu_state;
     child.fpu_used = child_fpu_used;
     child.save_fpu_state = false;
+
+    if (flags.VFORK) {
+        var vfork_head: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init();
+        vfork_head.setup();
+        var vfork_node = krn.wq.WaitQueueNode.init(krn.task.current);
+        vfork_node.setup();
+        child.vfork_wq = &vfork_head;
+        vfork_head.addToQueue(&vfork_node);
+        child.state = .RUNNING;
+        vfork_head.waitIfInQueue(&vfork_node, false, 0);
+    }
 
     if (flags.PARENT_SETTID) {
         if (parent_tid) |ptid| {

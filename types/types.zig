@@ -684,6 +684,7 @@ pub const kernel = struct {
                 brk : u32= 0,
                 vas : u32= 0,
                 vmas : ?*kernel.mm.proc_mm.VMA= null,
+                ref : kernel.RefCount,
             };
 
         };
@@ -849,6 +850,7 @@ pub const kernel = struct {
             sighand : ?*kernel.signals.SigHand= null,
             sigmask : kernel.signals.sigset_t,
             wait_wq : kernel.wq.WaitQueueHead,
+            vfork_wq : ?*kernel.wq.WaitQueueHead= null,
             threadfn : ?*const fn(?*const anyopaque) i32= null,
             arg : ?*const anyopaque= null,
             result : i32= 0,

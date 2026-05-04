@@ -121,8 +121,9 @@ pub const WaitQueueHead = struct {
         if (self.list.isEmpty())
             return;
         const first_node = self.list.next.?.entry(WaitQueueNode, "list");
-        if (first_node.wake_fn) |_wake_fn|
+        if (first_node.wake_fn) |_wake_fn| {
             _wake_fn(first_node);
+        }
         if (!first_node.list.isEmpty()) {
             first_node.list.del();
             self.list.addTail(&first_node.list);

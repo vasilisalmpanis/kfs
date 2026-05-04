@@ -68,6 +68,7 @@ pub fn doFork() !u32 {
     child.tls = krn.task.current.tls;
     child.limit = krn.task.current.limit;
     child.initSelf(
+        .RUNNING,
         stack_top,
         stack,
         tsk.current.uid,
