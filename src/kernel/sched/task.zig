@@ -256,6 +256,7 @@ pub const Task = struct {
         self.sigmask = current.sigmask;
         self.wait_wq = krn.wq.WaitQueueHead.init();
         self.wait_wq.setup();
+        self.vfork_wq = null;
 
         // We should create proc files here because if we do before
         // we could have the following sequence.
@@ -399,6 +400,11 @@ pub const Task = struct {
 
         self.sighand = null;
         if (self.mm) |_mm| {
+            const mm_ref = _mm.ref.getValue();
+            defer {
+                if (mm_ref > 1)
+                    self.mm = null;
+            }
             _mm.ref.put();
             if (krn.task.current.vfork_wq) |wq| {
                 wq.wakeUpOne();
