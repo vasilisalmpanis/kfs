@@ -124,9 +124,6 @@ fn user_thread(_: ?*const anyopaque) i32 {
     while (kernel_ready == false)
         krn.sched.reschedule();
 
-    krn.task.current.mm = krn.task.initial_task.mm.?.dup() orelse
-        @panic("Allocation PID 1: mm.dup() failed");
-    krn.task.initial_task.mm.?.ref.put();
     krn.task.current.fs = krn.task.initial_task.fs.dup() catch
         @panic("Allocation PID 1: fs.dup() failed");
     krn.task.current.files = krn.task.initial_task.files.dup() catch
