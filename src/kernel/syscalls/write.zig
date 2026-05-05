@@ -5,8 +5,8 @@ const krn = @import("../main.zig");
 
 pub fn write(fd: u32, buf: ?[*]u8, size: u32) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         if (!file.canWrite())
             return errors.EACCES;
         if (size == 0)

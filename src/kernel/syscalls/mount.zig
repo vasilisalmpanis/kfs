@@ -54,12 +54,12 @@ pub fn do_umount(
     const path = try krn.fs.path.resolve(name); // /ext2
     defer path.release();
     if (path.isRoot()) {
-        if (path.mnt.tree.hasChildren() or path.mnt.count.getValue() > 2) {
+        if (path.mnt.tree.hasChildren() or path.mnt.ref.getValue() > 2) {
             return errors.EBUSY;
         }
         const mountpoint: *fs.Mount = path.mnt;
         mountpoint.remove(); // Removed from tree. Now we can free all the children.
-        mountpoint.sb.ref.unref();
+        mountpoint.sb.ref.put();
         krn.mm.kfree(mountpoint.source.ptr);
         krn.mm.kfree(mountpoint);
         return 0;

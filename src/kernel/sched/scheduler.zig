@@ -35,7 +35,7 @@ fn processTasks() void {
         }
         curr.del();
         task.delFromTree(); // Already done in task finish but safe
-        task.mm.?.delete();
+        if (task.mm) |_mm| _mm.delete();
         kthreadStackFree(task.stack_bottom);
         tsk.releasePid(task.pid);
         km.kfree(task);
@@ -61,7 +61,7 @@ fn findNextTask() *tsk.Task {
             task.wakeup_time = 0;
             task.state = .RUNNING;
         }
-        if (task.state == .INTERRUPTIBLE_SLEEP and task.sighand.hasPending())
+        if (task.state == .INTERRUPTIBLE_SLEEP and task.hasPendingSignal())
             task.state = .RUNNING;
         if (task.state == .RUNNING)
             return task;

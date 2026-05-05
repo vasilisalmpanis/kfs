@@ -1,9 +1,9 @@
 const fs = @import("fs.zig");
 const DEntry = fs.DEntry;
-const Refcount = fs.Refcount;
 const list = fs.list;
 const std = @import("std");
 const krn = @import("../main.zig");
+const RefCount = krn.RefCount;
 const drv = @import("driver");
 
 /// SuperBlock: Is the representation of a mounted filesystem.
@@ -14,7 +14,7 @@ pub const SuperBlock = struct {
     ops: *const SuperOps,
     root: *DEntry,
     fs: *fs.FileSystem,
-    ref: Refcount,
+    ref: RefCount,
     list: list.ListHead,
     block_size: u32,
     inode_map: std.AutoHashMap(u32, *fs.Inode),

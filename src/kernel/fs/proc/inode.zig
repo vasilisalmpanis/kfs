@@ -45,7 +45,7 @@ pub const ProcInode = struct {
         fs.dcache_lock.lock();
         defer fs.dcache_lock.unlock();
         if (fs.dcache.get(key)) |entry| {
-            entry.ref.ref();
+            entry.ref.get();
             return entry;
         }
         return kernel.errors.PosixError.ENOENT;
@@ -70,11 +70,11 @@ pub const ProcInode = struct {
         new_inode.links = 2;
         errdefer kernel.mm.kfree(new_inode);
         var new_dentry = try fs.DEntry.alloc(name, sb, new_inode);
-        new_dentry.ref.ref();
+        new_dentry.ref.get();
         errdefer kernel.mm.kfree(new_dentry);
         parent.inode.links += 1;
         parent.tree.addChild(&new_dentry.tree);
-        parent.ref.ref();
+        parent.ref.get();
         cash_key.name = new_dentry.name;
         fs.dcache_lock.lock();
         defer fs.dcache_lock.unlock();
@@ -138,7 +138,7 @@ pub const ProcInode = struct {
                 mode
             );
             var dent = try parent.new(name, new_inode);
-            dent.ref.ref();
+            dent.ref.get();
             if (mode.isDir()) {
                 base.links += 1;
             }
@@ -161,13 +161,13 @@ pub const ProcInode = struct {
     fn link(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) !void {
         target.dentry.inode.links += 1;
         var dent = try parent.new(name, target.dentry.inode);
-        dent.ref.ref();
+        dent.ref.get();
     }
 
     pub fn deinit(self: *ProcInode) void {
         if (self.base.links == 0) {
             if (self.task) |t| {
-                t.refcount.unref();
+                t.refcount.put();
                 self.task = null;
             }
             kernel.mm.kfree(self);

@@ -33,8 +33,8 @@ pub fn chmod(path: ?[*:0]const u8, mode: fs.UMode) !u32 {
 
 pub fn fchmod(fd: u32, mode: fs.UMode) !u32 {
     if (krn.task.current.files.fds.get(fd)) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         var _mode = mode;
         if (
             krn.task.current.uid != 0 and

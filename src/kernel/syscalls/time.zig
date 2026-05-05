@@ -40,8 +40,8 @@ pub fn utimensat(
     } else {
         from.release();
         if (kernel.task.current.files.fds.get(@intCast(dirfd))) |file| {
-            file.ref.ref();
-            defer file.ref.unref();
+            file.ref.get();
+            defer file.ref.put();
             if (file.path) |file_path| {
                 from = file_path.clone();
             }

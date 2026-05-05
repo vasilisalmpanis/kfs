@@ -144,8 +144,8 @@ pub const VMA = struct {
                 return null;
             };
             if (file) |_file| {
-                _file.ref.ref();
-                defer _file.ref.unref();
+                _file.ref.get();
+                defer _file.ref.put();
                 const old_pos = _file.pos;
                 _file.pos = offset;
                 const buffer: [*]u8 = @ptrFromInt(_vma.start);
@@ -216,15 +216,19 @@ pub const MM = struct {
     brk: usize = 0,
     vas: usize = 0,
     vmas: ?*VMA = null,
+    ref: krn.RefCount = krn.RefCount.init(),
 
     pub fn init() MM {
-        return MM {
+        var _mm = MM {
             .vas = 0,
             .bss = 0,
             .stack_top = STACK_TOP,
             .stack_bottom = STACK_BOTTOM,
             .vmas = null,
         };
+        _mm.ref.get();
+        _mm.ref.dropFn = MM.release;
+        return _mm;
     }
 
     pub fn new() ?*MM {
@@ -233,6 +237,13 @@ pub const MM = struct {
             _mmap.* = MM.init();
         }
         return mmap;
+    }
+
+    fn release(ref: *krn.RefCount) void {
+        const _mm: *MM = @fieldParentPtr("ref", ref);
+        _mm.releaseMappings();
+        if (!_mm.isCurrentMM())
+            _mm.delete();
     }
 
     pub fn add_vma(
@@ -411,17 +422,23 @@ pub const MM = struct {
         return null;
     }
 
+    pub fn newVAS(self: *MM) ?krn.mm.VASpair {
+        const vas_lock = krn.mm.mem_lock.lock_irq_disable();
+        defer krn.mm.mem_lock.unlock_irq_enable(vas_lock);
+        const vas_pair =  mm.virt_memory_manager.newVAS() catch {
+            krn.mm.mem_lock.unlock_irq_enable(vas_lock);
+            return null;
+        };
+        self.vas = vas_pair.phys;
+        return vas_pair;
+    }
+
     pub fn dup(self: *MM) ?*MM {
         const mmap: ?*MM = MM.new();
         if (mmap) |_mmap| {
-            const vas_lock = krn.mm.mem_lock.lock_irq_disable();
-            const vas_pair: krn.mm.VASpair = mm.virt_memory_manager.newVAS() catch {
-                krn.mm.mem_lock.unlock_irq_enable(vas_lock);
+            const vas_pair = _mmap.newVAS() orelse
                 return null;
-            };
-            krn.mm.mem_lock.unlock_irq_enable(vas_lock);
             defer mm.virt_memory_manager.unmapPage(vas_pair.virt, false);
-            _mmap.vas = vas_pair.phys;
             if (_mmap.vas == 0) {
                 mm.kfree(_mmap);
                 return null;

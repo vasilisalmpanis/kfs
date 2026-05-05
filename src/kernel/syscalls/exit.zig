@@ -12,26 +12,27 @@ pub fn doExit(error_code: i32) !u32 {
     tsk.current.result = error_code;
 
     kernel.fs.procfs.deleteProcess(kernel.task.current);
-    kernel.task.current.refcount.unref();
+    kernel.task.current.refcount.put();
     while (kernel.task.current.refcount.getValue() > 1)
         arch.archReschedule();
 
-    tsk.current.deinitAllocatedData();
+    tsk.current.releaseSharedResources();
     const lock_state = kernel.task.tasks_lock.lock_irq_disable();
 
     if (tsk.current.tree.parent) |p| {
         const parent = p.entry(tsk.Task, "tree");
-        const act = parent.sighand.actions.get(.SIGCHLD);
+        const parent_handlers = parent.getSighandOrPanic();
+        const act = parent_handlers.actions.get(.SIGCHLD);
 
         tsk.current.state = .ZOMBIE;
         if (act.flags & signals.SA_NOCLDWAIT != 0) {
-            tsk.current.refcount.ref();
+            tsk.current.refcount.get();
             tsk.current.finish(true);
         }
 
         tsk.current.wakeupParent(true);
         if (act.handler.handler != signals.sigIGN)
-            parent.sighand.setSignal(.SIGCHLD);
+            parent_handlers.setSignal(.SIGCHLD);
     }
     kernel.task.tasks_lock.unlock_irq_enable(lock_state);
     sched.reschedule();

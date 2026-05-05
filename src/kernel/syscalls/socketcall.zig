@@ -124,9 +124,9 @@ pub fn socketpair(family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) !u3
             inode2.fops = &krn.socket.SocketFileOps;
             inode2.data.sock = sock_b;
             file1 = try krn.fs.File.pseudo(inode1);
-            errdefer file1.ref.unref();
+            errdefer file1.ref.put();
             file2 = try krn.fs.File.pseudo(inode2);
-            errdefer file2.ref.unref();
+            errdefer file2.ref.put();
             try krn.task.current.files.setFD(fd1, file1);
             try krn.task.current.files.setFD(fd2, file2);
             usockvec[0] = @intCast(fd1);
@@ -158,8 +158,8 @@ pub fn recvfrom(
     if (fd < 0)
         return errors.EBADF;
     if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         return try krn.socket.do_recvfrom(file, @ptrCast(ubuff), size);
     } else {
         return errors.EBADF;
@@ -180,8 +180,8 @@ pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, add
     if (fd < 0)
         return errors.EBADF;
     if (krn.task.current.files.fds.get(@intCast(fd))) |file| {
-        file.ref.ref();
-        defer file.ref.unref();
+        file.ref.get();
+        defer file.ref.put();
         return try krn.socket.do_sendto(file, @ptrCast(buff), len);
     } else {
         return errors.EBADF;

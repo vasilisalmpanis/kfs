@@ -4,10 +4,15 @@ const arch = @import("arch");
 const signals = @import("../sched/signals.zig");
 
 fn send_signal(task: *tsk.Task, signal: signals.Signal) !u32 {
+    if (task.tsktype == .KTHREAD)
+        return errors.EPERM;
     if (tsk.current.uid != task.uid)
         return errors.EPERM;
     if (signal != .EMPTY) {
-        task.sighand.setSignal(signal);
+        if (task.state != .ZOMBIE and task.state != .STOPPED) {
+            const sighand = task.getSighandOrPanic();
+            sighand.setSignal(signal);
+        }
         if (
             task.state != .ZOMBIE
             and task.state != .STOPPED
@@ -54,7 +59,7 @@ pub fn kill(pid: i32, sig: u32) !u32 {
         }
         return if (count == 0) errors.ESRCH else 0;
     } else if (tsk.initial_task.findByPid(@intCast(pid))) |task| {
-        defer task.refcount.unref();
+        defer task.refcount.put();
         return try send_signal(task, signal);
     }
     return errors.EPERM;

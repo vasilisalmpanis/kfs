@@ -43,7 +43,7 @@ pub const ExampleInode = struct {
         fs.dcache_lock.lock();
         defer fs.dcache_lock.unlock();
         if (fs.dcache.get(key)) |entry| {
-            entry.ref.ref();
+            entry.ref.get();
             return entry;
         }
         return kernel.errors.PosixError.ENOENT;
@@ -68,11 +68,11 @@ pub const ExampleInode = struct {
         new_inode.links = 2;
         errdefer kernel.mm.kfree(new_inode);
         var new_dentry = try fs.DEntry.alloc(name, sb, new_inode);
-        new_dentry.ref.ref();
+        new_dentry.ref.get();
         errdefer kernel.mm.kfree(new_dentry);
         parent.inode.links += 1;
         parent.tree.addChild(&new_dentry.tree);
-        parent.ref.ref();
+        parent.ref.get();
         cash_key.name = new_dentry.name;
         try fs.dcache.put(cash_key, new_dentry);
         return new_dentry;
@@ -96,7 +96,7 @@ pub const ExampleInode = struct {
                 mode
             );
             var dent = try parent.new(name, new_inode);
-            dent.ref.ref();
+            dent.ref.get();
             if (mode.isDir())
                 base.links += 1;
             return dent;
@@ -130,13 +130,13 @@ pub const ExampleInode = struct {
         @memset(example_inode.buff[0..example_inode.buff.len], 0);
         @memcpy(example_inode.buff[0..target.len], target);
         var dent = try parent.new(name, new_inode);
-        dent.ref.ref();
+        dent.ref.get();
     }
 
     fn link(parent: *fs.DEntry, name: []const u8, target: fs.path.Path) !void {
         target.dentry.inode.links += 1;
         var dent = try parent.new(name, target.dentry.inode);
-        dent.ref.ref();
+        dent.ref.get();
     }
 
     fn deinit(self: *ExampleInode) void {
@@ -175,7 +175,7 @@ pub const ExampleInode = struct {
             _d.release();
         }
         var dent = try new_parent.new(new_name, old.inode);
-        dent.ref.ref();
+        dent.ref.get();
         if (old.inode.mode.isDir()) {
             new_parent.inode.links += 1;
             old_parent.inode.links -= 1;

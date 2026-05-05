@@ -82,9 +82,9 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
     const wait_opts = WaitStates.init(options);
     if (pid > 0) {
         if (tsk.current.findChildByPid(@intCast(pid))) |task| {
-            errdefer task.refcount.unref();
+            errdefer task.refcount.put();
             while (!wait_opts.isSet(task.state)) {
-                if (tsk.current.sighand.hasPending())
+                if (tsk.current.hasPendingSignal())
                     return errors.EINTR;
                 if (options & WNOHANG > 0)
                     return 0;
@@ -130,7 +130,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 if (options & WNOHANG > 0)
                     break;
                 tsk.current.wait_wq.wait(true, 0);
-                if (tsk.current.sighand.hasPending())
+                if (tsk.current.hasPendingSignal())
                     return errors.EINTR;
             }
         }
@@ -160,7 +160,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 if (options & WNOHANG > 0)
                     break;
                 tsk.current.wait_wq.wait(true, 0);
-                if (tsk.current.sighand.hasPending())
+                if (tsk.current.hasPendingSignal())
                     return errors.EINTR;
             }
         }
@@ -191,7 +191,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 if (options & WNOHANG > 0)
                     break;
                 tsk.current.wait_wq.wait(true, 0);
-                if (tsk.current.sighand.hasPending())
+                if (tsk.current.hasPendingSignal())
                     return errors.EINTR;
             }
         } else {

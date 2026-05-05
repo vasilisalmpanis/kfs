@@ -145,7 +145,7 @@ pub const Ext2Super = struct {
             dntry.inode = root_inode;
             sb.base.root = dntry;
             sb.base.list.setup();
-            sb.base.ref = kernel.task.RefCount.init();
+            sb.base.ref = kernel.RefCount.init();
             sb.base.fs = _fs;
             sb.base.ops = &ext2_super_ops;
             _fs.sbs.add(&sb.base.list);
@@ -633,7 +633,7 @@ pub const Ext2Super = struct {
             return ;
         }
 
-        base.ref.unref();
+        base.ref.put();
         while (!base.ref.isFree()) {
             arch.archReschedule();
         }
