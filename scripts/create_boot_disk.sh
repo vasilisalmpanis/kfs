@@ -49,7 +49,7 @@ cp "$GRUB_CFG"          "$BOOT_TMP_DIR/grub/grub.cfg"
 cp -rf "$GRUB_THEME"    "$BOOT_TMP_DIR/grub/"
 
 BOOT_IMG=$(mktemp)
-mke2fs -L '' -N 0 -O ^64bit -d "$BOOT_TMP_DIR" -m 5 -r 1 -t ext2 "$BOOT_IMG" $BOOT_SIZE_MB"M"
+yes | mke2fs -L '' -N 0 -O ^64bit -d "$BOOT_TMP_DIR" -m 5 -r 1 -t ext2 "$BOOT_IMG" $BOOT_SIZE_MB"M" -b 8192
 
 dd if="$BOOT_IMG" of="$DISK" bs=$BS seek=$BOOT_START conv=notrunc
 dd if="$ROOT_IMG" of="$DISK" bs=$BS seek=$ROOT_START conv=notrunc
