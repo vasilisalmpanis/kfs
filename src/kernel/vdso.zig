@@ -81,12 +81,7 @@ pub fn init() void {
     krn.logger.INFO("vDSO: vvar phys=0x{X:0>8} kern_virt=0x{X:0>8} image_size={d} code_pages={d}", .{
         vvar_page, vvar_virt, vdso_image.len, num_code_pages,
     });
-    if (krn.cmos_ready.*) {
-        const monotonic = krn.getTimeFromStart();
-        const realtime_sec: u64 = krn.cmos.toUnixSeconds(krn.cmos);
-        vvar_data.realtime_sec = @intCast(realtime_sec);
-        vvar_data.realtime_nsec = monotonic.tv_nsec;
-    }
+    setTime();
 }
 
 pub inline fn updateTime(sec: i32, nsec: i32) void {
@@ -102,6 +97,15 @@ pub inline fn updateTime(sec: i32, nsec: i32) void {
     vvar_data.realtime_nsec = vvar_data.monotonic_nsec;
     asm volatile ("" ::: .{ .memory = true });
     vvar_data.seq +%= 1;
+}
+
+pub export fn setTime() void {
+    if (krn.cmos_ready.*) {
+        const monotonic = krn.getTimeFromStart();
+        const realtime_sec: u64 = krn.cmos.toUnixSeconds(krn.cmos);
+        vvar_data.realtime_sec = @intCast(realtime_sec);
+        vvar_data.realtime_nsec = monotonic.tv_nsec;
+    }
 }
 
 pub fn imageSize() usize {

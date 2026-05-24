@@ -882,6 +882,7 @@ pub const kernel = struct {
             _pad : i32= 0,
         };
 
+        pub extern fn setTime()void;
     };
 
     pub const signals = struct {
