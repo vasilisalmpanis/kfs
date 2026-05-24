@@ -137,6 +137,7 @@ pub const CMOS = struct {
             writeByte(0x00, if (bin_mode) sec else binToBCD(sec));
             self.curr_time[0] = sec;
         }
+        krn.vdso.setTime();
     }
 
     fn _toUnixSeconds(self: *CMOS) u64 {

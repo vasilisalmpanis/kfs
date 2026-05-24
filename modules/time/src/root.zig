@@ -79,7 +79,7 @@ fn setTime(self: *kfs.drivers.cmos.CMOS, timestamp: u64) void {
     const epoch_day = epoch_secs.getEpochDay();
     const year_day = epoch_day.calculateYearDay();
     const month_day = year_day.calculateMonthDay();
-    
+
     const sec = day_secs.getSecondsIntoMinute();
     const mins = day_secs.getMinutesIntoHour();
     const hours = day_secs.getHoursIntoDay();
@@ -136,6 +136,7 @@ fn setTime(self: *kfs.drivers.cmos.CMOS, timestamp: u64) void {
         writeByte(0x00, if (bin_mode) sec else binToBCD(sec));
         self.curr_time[0] = sec;
     }
+    kfs.kernel.vdso.setTime();
 }
 
 pub fn toUnixSeconds(self: *kfs.drivers.cmos.CMOS) u64 {
