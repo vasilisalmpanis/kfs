@@ -71,6 +71,10 @@ pub const Inode = struct {
         return @fieldParentPtr(member, base);
     }
 
+    pub fn get512Blocks(self: *Inode) usize {
+        return (self.size + 511) / 512;
+    }
+
     pub fn setup_special(inode: *Inode) void {
         switch (inode.mode) {
             fs.S_IFCHR => {
@@ -159,4 +163,5 @@ pub const InodeOps = struct {
     readlink: ?*const fn(base: *fs.Inode, buf: [*]u8, size: u32) anyerror!u32 = null,
     rename: ?*const fn(old_parent: *fs.DEntry, old: *fs.DEntry, new_parent: *fs.DEntry, new_name: []const u8) anyerror!void = null,
     setattr: ?*const fn(base: *fs.Inode, attr: *const InodeAttrs) anyerror!void = Inode.setattr,
+    get512Blocks: *const fn(base: *fs.Inode) usize = Inode.get512Blocks,
 };

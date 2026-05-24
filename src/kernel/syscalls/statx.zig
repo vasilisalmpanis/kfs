@@ -72,7 +72,7 @@ pub fn do_statx(inode: *fs.Inode, buf: *Statx) !u32 {
     buf.__spare0 = 0;
     buf.stx_ino = inode.i_no;
     buf.stx_size = inode.size;
-    buf.stx_blocks = 0;
+    buf.stx_blocks = inode.ops.get512Blocks(inode);
     buf.stx_attributes_mask = 0;
 
     buf.stx_ctime = StatxTimestamp{

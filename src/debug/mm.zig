@@ -56,7 +56,7 @@ pub fn printFreeList() void {
         );
         buf = buf.?.next;
     }
-    
+
     buf = mm.vheap.head;
     printf("VHeap {?}\n", .{buf});
     while (buf != null) {
