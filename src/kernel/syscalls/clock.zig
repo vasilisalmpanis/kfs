@@ -42,7 +42,6 @@ pub fn clock_settime(clock_id: u32, _tp: ?*krn.kernel_timespec) !u32 {
     const  tp = _tp orelse {
         return errors.EFAULT;
     };
-    krn.logger.INFO("clock_settime: clock_id {d}, {any}", .{clock_id, tp});
     if (clock_id == CLOCK_REALTIME) {
         krn.cmos.setTime(krn.cmos, @intCast(tp.tv_sec));
         return 0;
