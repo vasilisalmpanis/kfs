@@ -172,7 +172,7 @@ pub const Ext2Inode = struct {
             "base"
         );
         return (
-            self.data.i_blocks 
+            self.data.i_blocks
             / (@as(u32, 2) << @as(u5, @truncate(sb.data.s_log_block_size)))
         );
     }
@@ -874,6 +874,11 @@ pub const Ext2Inode = struct {
         try new_parent_ino_ext2.insertDirent(old.inode.i_no, new_name, old.inode.mode);
         old.release();
     }
+
+    pub fn get512Blocks(base: *fs.Inode) usize {
+        const ext2_inode = base.getImpl(Ext2Inode, "base");
+        return ext2_inode.data.i_blocks;
+    }
 };
 
 const ext2_inode_ops = fs.InodeOps {
@@ -889,4 +894,5 @@ const ext2_inode_ops = fs.InodeOps {
     .rmdir = Ext2Inode.rmdir,
     .rename = Ext2Inode.rename,
     .setattr = Ext2Inode.setattr,
+    .get512Blocks = Ext2Inode.get512Blocks,
 };

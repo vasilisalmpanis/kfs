@@ -1102,6 +1102,7 @@ pub const kernel = struct {
             readlink : ?*const fn(*kernel.fs.Inode, [*]u8, u32) anyerror!u32= null,
             rename : ?*const fn(*kernel.fs.DEntry, *kernel.fs.DEntry, *kernel.fs.DEntry, []const u8) anyerror!void= null,
             setattr : ?*const fn(*kernel.fs.Inode, *const kernel.fs.InodeAttrs) anyerror!void= null,
+            get512Blocks : *const fn(*kernel.fs.Inode) u32,
         };
 
         pub const InodeAttrs = struct {
