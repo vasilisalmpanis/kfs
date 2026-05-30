@@ -85,6 +85,7 @@ pub const Task = struct {
     groups_count:   u8              = 0,
     pgid:           u16             = 1,
     sid:            u16             = 1,
+    tgid:           u16             = 0,
     ctty:           ?*krn.fs.File   = null,
     stack_bottom:   usize,
     state:          TaskState       = TaskState.RUNNING,
@@ -99,7 +100,12 @@ pub const Task = struct {
 
     tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
+
+    group_leader:   *Task,
+    thread_node:    lst.ListHead    = lst.ListHead.init(),
+
     refcount:       krn.RefCount    = krn.RefCount.init(),
+
     wakeup_time:    usize           = 0,
 
     utime:          u32             = 0,
@@ -111,6 +117,8 @@ pub const Task = struct {
     // Open files info
     files:          *krn.fs.TaskFiles,
 
+    // exit_signal: i32 = @intFromEnum(kernel.signals.Signal.SIGCHLD),
+    //
     // signals
     sighand:        ?*signal.SigHand     = null,
     sigmask:        signal.sigset_t      = signal.sigset_t.init(),
@@ -144,6 +152,7 @@ pub const Task = struct {
             .utime = 0,
             .stime = 0,
             .vfork_wq = null,
+            .group_leader = undefined,
         };
     }
 
@@ -188,24 +197,6 @@ pub const Task = struct {
         @memcpy(self.name[0..len], name[0..len]);
     }
 
-    pub fn new(
-        task_stack_top: u32,
-        stack_btm: u32,
-        uid: u16,
-        gid: u16,
-        pgid: u16,
-        tp: TaskType,
-        name: []const u8,
-    ) anyerror!*Task {
-        if (krn.mm.kmalloc(Task)) |task| {
-            errdefer krn.mm.kfree(task);
-            try task.assignPID();
-            try task.initSelf(task_stack_top, stack_btm, uid, gid, pgid, tp, name);
-            return task;
-        }
-        return error.OutOfMemory;
-    }
-
     pub fn initSelf(
         self: *Task,
         state: TaskState,
@@ -216,6 +207,7 @@ pub const Task = struct {
         pgid: u16,
         tp: TaskType,
         name: []const u8,
+        group_leader: *Task,
     ) !void {
         const tmp = Task.init(uid, gid, pgid, tp);
         self.uid = tmp.uid;
@@ -247,10 +239,13 @@ pub const Task = struct {
         self.regs = Regs.init();
         self.tree = tree.TreeNode.init();
         self.list = lst.ListHead.init();
+        self.thread_node = lst.ListHead.init();
         self.regs.setStackPointer(task_stack_top);
         self.stack_bottom = stack_btm;
         self.list.setup();
         self.tree.setup();
+        self.thread_node.setup();
+        self.group_leader = group_leader;
 
         self.setName(name);
         self.sigmask = current.sigmask;
@@ -551,6 +546,7 @@ pub fn initMultitasking() void {
     initial_task.refcount.get();
     initial_task.mm.?.vas = @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET;
     initial_task.fpu_state = &inital_fpu_state;
+    initial_task.group_leader = &initial_task;
     krn.irq.registerHandler(0, &krn.timerHandler, null);
     arch.system.enableWriteProtect();
 }
