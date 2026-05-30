@@ -87,6 +87,11 @@ pub fn clone(
     errdefer krn.mm.kfree(child);
     child.* = krn.task.Task.init(0, 0, 0, .PROCESS);
     try child.assignPID();
+    if (flags.THREAD) {
+        child.tgid = krn.task.current.group_leader.pid;
+    } else {
+        child.tgid = child.pid;
+    }
 
     const stack: u32 = kthread.kthreadStackAlloc(kthread.STACK_PAGES);
     if (stack == 0) {
@@ -189,6 +194,7 @@ pub fn clone(
         krn.task.current.pgid,
         .PROCESS,
         krn.task.current.name[0..16],
+        if (flags.THREAD) krn.task.current.group_leader else child
     ) catch |err| {
         krn.logger.ERROR("clone: failed to init child task: {t}", .{err});
         return errors.ENOMEM;

@@ -16,6 +16,7 @@ pub fn doFork() !u32 {
     errdefer km.kfree(child);
     child.* = tsk.Task.init(0, 0, 0, .PROCESS);
     try child.assignPID();
+    child.tgid = child.pid;
 
     const stack: u32 = kthread.kthreadStackAlloc(kthread.STACK_PAGES);
     if (stack == 0) {
@@ -75,7 +76,8 @@ pub fn doFork() !u32 {
         tsk.current.gid,
         tsk.current.pgid,
         .PROCESS,
-        tsk.current.name[0..16]
+        tsk.current.name[0..16],
+        child
     ) catch |err| {
         // TODO: understand when error comes from kmalloc allocation of files
         // or from resizing of fds/map inside files to do deinit

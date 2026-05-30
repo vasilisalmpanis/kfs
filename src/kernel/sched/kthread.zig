@@ -93,7 +93,8 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const 
             0,
             1,
             .KTHREAD,
-            std.mem.span(name)
+            std.mem.span(name),
+            task
         ) catch |err| {
             krn.mm.kfree(task);
             return err;
