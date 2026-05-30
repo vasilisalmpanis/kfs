@@ -6,7 +6,6 @@ pub const ThreadData = struct {
     ref:            kernel.RefCount,
     lock:           kernel.Spinlock,
     pending:        kernel.signals.SigPending,
-    // TODO: Add locking
 
     fn setup(self: *ThreadData) void {
         self.nr_threads = 1;
@@ -37,5 +36,24 @@ pub const ThreadData = struct {
         self.threads.addTail(&task.thread_node);
         self.lock.unlock_irq_enable(lock_state);
     }
-};
 
+    pub fn findThread(self: *ThreadData, tid: u32) ?*kernel.task.Task {
+        const lock_state = self.lock.lock_irq_disable();
+        defer self.lock.unlock_irq_enable(lock_state);
+
+        var it = self.threads.iterator();
+        if (it.next() == null)
+            return null;
+        var prev = &self.threads;
+        while (it.next()) |i| {
+            if (prev == i.curr)
+                break ;
+            prev = i.curr;
+            const thread = i.curr.entry(kernel.task.Task, "thread_node");
+            if (thread.pid == tid) {
+                return thread;
+            }
+        }
+        return null;
+    }
+};
