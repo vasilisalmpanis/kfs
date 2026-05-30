@@ -841,6 +841,7 @@ pub const kernel = struct {
             save_fpu_state : bool= false,
             tree : kernel.tree.TreeNode,
             list : kernel.list.ListHead,
+            thread_data : ?*kernel.thread.ThreadData,
             group_leader : *kernel.task.Task,
             thread_node : kernel.list.ListHead,
             refcount : kernel.RefCount,
@@ -858,6 +859,15 @@ pub const kernel = struct {
             arg : ?*const anyopaque= null,
             result : i32= 0,
             should_stop : bool= false,
+        };
+
+    };
+
+    pub const thread = struct {
+        pub const ThreadData = struct {
+            nr_threads : u32= 0,
+            threads : kernel.list.ListHead,
+            ref : kernel.RefCount,
         };
 
     };

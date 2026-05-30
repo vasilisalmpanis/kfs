@@ -130,6 +130,8 @@ fn user_thread(_: ?*const anyopaque) i32 {
         @panic("Allocation PID 1: files.dup() failed");
     krn.task.current.sighand = krn.signals.SigHand.new() catch
         @panic("Allocation PID 1: SigHand.new() failed");
+    krn.task.current.thread_data = krn.thread.ThreadData.new() orelse
+        @panic("Allocation PID 1: ThreadData.new() failed");
     krn.task.current.tsktype = .PROCESS;
     krn.fs.procfs.newProcess(krn.task.current) catch {
         @panic("Could not create PID 1 procfs entries\n");

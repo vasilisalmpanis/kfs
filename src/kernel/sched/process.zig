@@ -43,6 +43,13 @@ pub fn doFork() !u32 {
     child.sighand = try sighand.dup();
     errdefer child.sighand.?.ref.put();
 
+    const thread_data = krn.thread.ThreadData.new() orelse {
+        krn.logger.ERROR("fork: failed to allocate thread data", .{});
+        return errors.ENOMEM;
+    };
+    child.thread_data = thread_data;
+    child.thread_data.?.addNode(child);
+
     var child_fpu_state: ?*arch.fpu.FPUState = null;
     var child_fpu_used = tsk.current.fpu_used;
     if (tsk.current.fpu_used and tsk.current.fpu_state != null) {

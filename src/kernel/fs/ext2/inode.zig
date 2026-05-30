@@ -481,8 +481,10 @@ pub const Ext2Inode = struct {
                 kernel.logger.ERROR("TODO: allocBlock(): implement indirect blocks", .{});
                 return kernel.errors.PosixError.ENOSPC;
             }
-            if (blk_idx >= EXT2_N_BLOCKS)
+            if (blk_idx >= EXT2_N_BLOCKS) {
+                kernel.logger.ERROR("File size exceeds maximum ext2 inode size\n", .{});
                 return kernel.errors.PosixError.ENOSPC;
+            }
         }
 
         // Find block group
@@ -495,8 +497,10 @@ pub const Ext2Inode = struct {
                 bgdt_idx += 1;
             }
         }
-        if (bgdt_idx >= sb.bgdt.len)
+        if (bgdt_idx >= sb.bgdt.len) {
+            kernel.logger.ERROR("BUG: we got bigger bgdt index than the length of descriptors\n", .{});
             return kernel.errors.PosixError.ENOSPC;
+        }
 
         const block = try sb.getFreeBlock(bgdt_idx);
         self.data.i_blocks += sb.base.block_size / 512;
