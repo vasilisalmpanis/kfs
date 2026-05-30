@@ -31,6 +31,15 @@ pub const RefCount = struct {
         }
     }
 
+    pub fn putAndTest(rc: *RefCount) bool {
+        if (rc.count.fetchSub(1, .release) == 1) {
+            _ = rc.count.load(.acquire);
+            return true;
+        }
+        _ = rc.count.load(.acquire);
+        return false;
+    }
+
     pub fn getValue(rc: *RefCount) usize {
         return rc.count.load(.monotonic);
     }
