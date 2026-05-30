@@ -46,6 +46,7 @@ pub const SyscallTable = brk: {
         .SYS_oldstat                    = &notImpl,
         .SYS_lseek                      = @ptrCast(&krn.syscalls.lseek.lseek),
         .SYS_getpid                     = @ptrCast(&krn.syscalls.id.getPID),
+        .SYS_gettid                     = @ptrCast(&krn.syscalls.id.getTID),
         .SYS_mount                      = @ptrCast(&krn.syscalls.mount.mount),
         .SYS_umount                     = @ptrCast(&krn.syscalls.mount.umount),
         .SYS_setuid                     = @ptrCast(&krn.syscalls.id.setUID),
