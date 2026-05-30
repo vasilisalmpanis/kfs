@@ -4,6 +4,10 @@ const errors = krn.errors.PosixError;
 const std = @import("std");
 
 pub fn getPID() !u32 {
+    return @intCast(tsk.current.tgid);
+}
+
+pub fn getTID() !u32 {
     return @intCast(tsk.current.pid);
 }
 
