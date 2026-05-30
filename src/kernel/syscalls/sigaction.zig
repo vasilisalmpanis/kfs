@@ -3,6 +3,7 @@ const signals = @import("../sched/signals.zig");
 const errors = @import("./error-codes.zig").PosixError;
 const arch = @import("arch");
 const krn = @import("../main.zig");
+const std = @import("std");
 
 pub fn sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) !u32 {
     return do_sigaction(sig, act, oact);
@@ -154,12 +155,11 @@ pub fn rt_sigpending(
 
 pub fn sigpending(uset: ?*signals.sigset_t) u32 {
     var set = signals.sigset_t.init();
-    const sighand = krn.task.current.getSighandOrPanic();
+    const static_bit: std.StaticBitSet(32) = krn.task.current.getRealPending();
+    var iterator = static_bit.iterator(.{});
 
-    for (1..32) |idx| {
-        if (sighand.pending.isSet(idx)) {
-            set.sigAddSet(@enumFromInt(idx));
-        }
+    while (iterator.next()) |idx| {
+        set.sigAddSet(@enumFromInt(idx));
     }
     if (uset) |_uset| {
         _uset.* = set;
@@ -172,7 +172,7 @@ pub fn rt_sigsuspend(_mask: ?*signals.sigset_t) !u32 {
     const mask = _mask orelse
         return errors.EFAULT;
     krn.logger.INFO("sigsuspend mask {b:0>32}", .{mask._bits[0]});
-    
+
     var uctx = signals.Ucontext{};
     uctx.mask = krn.task.current.sigmask;
 
@@ -231,21 +231,24 @@ pub fn rt_sigtimedwait(
 
     const start_time = krn.currentMs();
 
-    const sighand = krn.task.current.getSighandOrPanic();
     while (true) {
-        for (1..32) |sig| {
-            if (sighand.pending.isSet(sig)) {
-                const signal: signals.Signal = @enumFromInt(sig);
-                if (wait_set.sigIsSet(signal)) {
-                    sighand.pending.unset(sig);
-                    if (info) |i| {
-                        i.signo = @intCast(sig);
-                        i.errno = 0;
-                        i.code = 0;
-                        @memset(&i.fields.pad, 0);
-                    }
-                    return @intCast(sig);
+        const real_pending = krn.task.current.getRealPending();
+        var iterator = real_pending.iterator(.{});
+        while (iterator.next()) |sig| {
+            const signal: signals.Signal = @enumFromInt(sig);
+            if (wait_set.sigIsSet(signal)) {
+                if (krn.task.current.sigpending.pending.isSet(sig)) {
+                    krn.task.current.sigpending.pending.toggle(sig);
+                } else {
+                    krn.task.current.thread_data.?.pending.pending.toggle(sig);
                 }
+                if (info) |i| {
+                    i.signo = @intCast(sig);
+                    i.errno = 0;
+                    i.code = 0;
+                    @memset(&i.fields.pad, 0);
+                }
+                return @intCast(sig);
             }
         }
 
