@@ -395,7 +395,7 @@ pub const Task = struct {
     pub fn releaseSharedResources(self: *Task) void {
         self.clearControllingTTY();
         self.files.ref.put();
-        self.fs.deinit();
+        self.fs.ref.put();
 
 
         const sighand = self.getSighandOrPanic();
