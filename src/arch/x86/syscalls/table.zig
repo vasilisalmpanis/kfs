@@ -269,6 +269,7 @@ pub const SyscallTable = brk: {
         .SYS_clock_gettime64            = @ptrCast(&krn.syscalls.clock.clock_gettime64),
         .SYS_clock_settime              = @ptrCast(&krn.syscalls.clock.clock_settime),
         .SYS_tkill                      = @ptrCast(&krn.syscalls.kill.tkill),
+        .SYS_tgkill                     = @ptrCast(&krn.syscalls.kill.tgkill),
     });
 };
 

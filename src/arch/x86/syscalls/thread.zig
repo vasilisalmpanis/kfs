@@ -79,5 +79,5 @@ pub fn set_tid_address(tidptr: u32) !u32 {
         "set_tid_address addr: {x}",
         .{tidptr}
     );
-    return 0;
+    return tsk.current.pid;
 }
