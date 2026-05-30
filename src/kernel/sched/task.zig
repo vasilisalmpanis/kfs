@@ -122,6 +122,7 @@ pub const Task = struct {
     //
     // signals
     sighand:        ?*signal.SigHand     = null,
+    sigpending:     krn.signals.SigPending = krn.signals.SigPending.init(),
     sigmask:        signal.sigset_t      = signal.sigset_t.init(),
     wait_wq:        krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
     vfork_wq:       ?*krn.wq.WaitQueueHead = null,
@@ -191,6 +192,7 @@ pub const Task = struct {
         self.wait_wq.setup();
         self.should_stop = false;
         self.vfork_wq = null;
+        self.sigpending = krn.signals.SigPending.init();
     }
 
     pub fn setName(self: *Task, name: []const u8) void {
@@ -237,6 +239,7 @@ pub const Task = struct {
         self.fpu_used = tmp.fpu_used;
         self.fpu_state = tmp.fpu_state;
         self.should_stop = tmp.should_stop;
+        self.sigpending = tmp.sigpending;
 
         self.regs = Regs.init();
         self.tree = tree.TreeNode.init();
@@ -397,6 +400,9 @@ pub const Task = struct {
         const sighand = self.getSighandOrPanic();
         sighand.ref.put();
         self.sighand = null;
+        if (!self.thread_data.?.ref.putAndTest()) {
+            self.thread_data = null;
+        }
 
         self.sighand = null;
         if (self.mm) |_mm| {
@@ -429,6 +435,7 @@ pub const Task = struct {
         defer if (!tasks_locked) tasks_lock.unlock_irq_enable(lock_state);
 
         self.list.del();
+        self.thread_node.del();
         self.refcount.put();
         if (self.refcount.getValue() > 0) {
             krn.logger.ERROR("[PID: {d}] is exiting and is extra referenced", .{self.pid});
@@ -513,7 +520,17 @@ pub const Task = struct {
     }
 
     pub fn hasPendingSignal(self: *Task) bool {
-        return self.getSighandOrPanic().hasPending();
+        return (
+            self.sigpending.getRaw()
+            | self.thread_data.?.pending.getRaw())
+            & self.sigmask._bits[0] != 0;
+    }
+
+    pub fn getRealPending(self: *Task) std.StaticBitSet(32) {
+        const real_pending = (self.sigpending.getRaw()
+            | self.thread_data.?.pending.getRaw()
+        ) & self.sigmask._bits[0];
+        return @bitCast(real_pending);
     }
 };
 

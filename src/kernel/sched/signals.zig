@@ -223,8 +223,46 @@ const SigRes = struct {
     signal: u32,
 };
 
-pub const SigHand = struct {
+pub const SigPending = struct {
     pending: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
+
+    pub fn init() SigPending{
+        return SigPending{
+            .pending = std.StaticBitSet(32).initEmpty(),
+        };
+    }
+
+    pub fn isReady(self: *SigPending) bool {
+        if (self.pending.count() != 0) {
+            return true;
+        }
+        return false;
+    }
+
+    pub fn hasPending(self: *SigPending) bool {
+        if (!self.isReady())
+            return false;
+        var it = self.pending.iterator(.{});
+        while (it.next()) |i| {
+            const signal: Signal = @enumFromInt(i);
+            if (self.isBlocked(signal)) {
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    pub fn setSignal(self: *SigPending, signal: Signal) void {
+        self.pending.set(@intFromEnum(signal));
+    }
+
+    pub fn getRaw(self: *SigPending) u32 {
+        return @bitCast(self.pending);
+    }
+};
+
+pub const SigHand = struct {
     actions: std.EnumArray(Signal, Sigaction) =
         std.EnumArray(Signal, Sigaction).init(.{
             .EMPTY      = default_sigaction,
@@ -290,44 +328,34 @@ pub const SigHand = struct {
     pub fn dup(self: *SigHand)  !*SigHand {
         const new_hand = try SigHand.new();
         new_hand.actions = self.actions;
-
-
-
         return new_hand;
     }
 
-    pub fn isBlocked(_: *SigHand, signal: Signal) bool {
-        if (tsk.current.sigmask.sigIsSet(signal)) {
-            krn.logger.INFO("Blocked in mask\n", .{});
-            return true;
-        }
-        return false;
-    }
-
-    pub fn hasPending(self: *SigHand) bool {
-        if (!self.isReady())
-            return false;
-        var it = self.pending.iterator(.{});
-        while (it.next()) |i| {
-            const signal: Signal = @enumFromInt(i);
-            if (self.isBlocked(signal)) {
-                continue;
-            }
-            return true;
-        }
-        return false;
-    }
+    // pub fn isBlocked(_: *SigHand, signal: Signal) bool {
+    //     if (tsk.current.sigmask.sigIsSet(signal)) {
+    //         krn.logger.INFO("Blocked in mask\n", .{});
+    //         return true;
+    //     }
+    //     return false;
+    // }
+    //
 
     pub fn deliverSignal(self: *SigHand) SigRes {
-        var it = self.pending.iterator(.{});
-        while (it.next()) |i| {
-            self.pending.toggle(i);
+        const lock_state = krn.task.current.thread_data.?.lock.lock_irq_disable();
+        defer krn.task.current.thread_data.?.lock.unlock_irq_enable(lock_state);
+
+        const static_bit: std.StaticBitSet(32) = krn.task.current.getRealPending();
+        var iterator = static_bit.iterator(.{});
+
+        while (iterator.next()) |i| {
+            if (krn.task.current.sigpending.pending.isSet(i)) {
+                krn.task.current.sigpending.pending.toggle(i);
+            } else {
+                krn.task.current.thread_data.?.pending.pending.toggle(i);
+            }
             const signal: Signal = @enumFromInt(i);
             var action = self.actions.get(signal);
-            if (self.isBlocked(signal)) {
-                self.pending.toggle(i);
-                continue;
-            }
+
             if (action.handler.handler == sigIGN) {
                 continue;
             } else if (action.handler.handler == sigDFL) {
@@ -345,17 +373,6 @@ pub const SigHand = struct {
             }
         }
         return .{.action = default_sigaction, .signal = 0};
-    }
-
-    pub fn setSignal(self: *SigHand, signal: Signal) void {
-        self.pending.set(@intFromEnum(signal));
-    }
-
-    pub fn isReady(self: *SigHand) bool {
-        if (self.pending.count() != 0) {
-            return true;
-        }
-        return false;
     }
 };
 
@@ -417,7 +434,7 @@ pub fn processSignals(regs: *arch.Regs, ucontext: ?*Ucontext) *arch.Regs {
 
     const task = krn.task.current;
     const sighand = task.getSighandOrPanic();
-    if (sighand.isReady()) {
+    if (task.hasPendingSignal()) {
         const result = sighand.deliverSignal();
         if (result.signal == 0) {
             // maybe restart
@@ -470,7 +487,7 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         .SIGWINCH => {},
         else => {
             arch.cpu.enableInterrupts();
-            _ = krn.exit.doExit((128 + @intFromEnum(signal)) & 0x7f) catch {};
+            _ = krn.exit.doExitGroup((128 + @intFromEnum(signal)) & 0x7f) catch {};
             return krn.sched.schedule(regs);
         }
     }
