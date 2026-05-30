@@ -19,7 +19,7 @@ pub fn doExit(error_code: i32) !u32 {
     tsk.current.releaseSharedResources();
     const lock_state = kernel.task.tasks_lock.lock_irq_disable();
 
-    if (tsk.current.tree.parent) |p| {
+    if (tsk.current.group_leader.tree.parent) |p| {
         const parent = p.entry(tsk.Task, "tree");
         const parent_handlers = parent.getSighandOrPanic();
         const act = parent_handlers.actions.get(.SIGCHLD);

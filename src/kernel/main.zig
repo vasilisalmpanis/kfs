@@ -26,6 +26,7 @@ pub const kthreadCreate = @import("./sched/kthread.zig").kthreadCreate;
 pub const kthreadStop = @import("./sched/kthread.zig").kthreadStop;
 pub const STACK_SIZE = @import("sched/kthread.zig").STACK_SIZE;
 pub const task = @import("./sched/task.zig");
+pub const thread = @import("./sched/thread.zig");
 pub const sched = @import("./sched/scheduler.zig");
 pub const timerHandler = @import("./time/jiffies.zig").timerHandler;
 pub const sleep = @import("./sched/task.zig").sleep;

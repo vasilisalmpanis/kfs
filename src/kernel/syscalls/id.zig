@@ -13,9 +13,9 @@ pub fn getTID() !u32 {
 
 pub fn getPPID() !u32 {
     var pid: u16 = 0;
-    if (tsk.current.tree.parent != null) {
-        const p: *tsk.Task = tsk.current.tree.parent.?.entry(tsk.Task, "tree");
-        pid = p.pid;
+    if (tsk.current.group_leader.tree.parent != null) {
+        const p: *tsk.Task = tsk.current.group_leader.tree.parent.?.entry(tsk.Task, "tree");
+        pid = p.tgid;
     }
     return @intCast(pid);
 }

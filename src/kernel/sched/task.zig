@@ -101,6 +101,7 @@ pub const Task = struct {
     tree:           tree.TreeNode   = tree.TreeNode.init(),
     list:           lst.ListHead    = lst.ListHead.init(),
 
+    thread_data:    ?*krn.thread.ThreadData,
     group_leader:   *Task,
     thread_node:    lst.ListHead    = lst.ListHead.init(),
 
@@ -153,6 +154,7 @@ pub const Task = struct {
             .stime = 0,
             .vfork_wq = null,
             .group_leader = undefined,
+            .thread_data = null,
         };
     }
 
@@ -264,7 +266,10 @@ pub const Task = struct {
         const lock_state = tasks_lock.lock_irq_disable();
         defer tasks_lock.unlock_irq_enable(lock_state);
 
-        current.tree.addChild(&self.tree);
+        if (self.group_leader == self) {
+            // Process not thread
+            current.group_leader.tree.addChild(&self.tree);
+        }
         current.list.addTail(&self.list);
     }
 
@@ -441,7 +446,7 @@ pub const Task = struct {
         const lock_state = if (!tasks_locked) tasks_lock.lock_irq_disable() else false;
         defer if (!tasks_locked) tasks_lock.unlock_irq_enable(lock_state);
 
-        if (self.tree.parent) |_p| {
+        if (self.group_leader.tree.parent) |_p| {
             const parent = _p.entry(Task, "tree");
             parent.refcount.get();
             parent.wait_wq.wakeUpOne();

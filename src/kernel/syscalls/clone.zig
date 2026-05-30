@@ -35,7 +35,16 @@ pub const CloneFlags = packed struct(u32) {
         .sigmask = 0xff,
         .VM = true,
         .VFORK = true,
+        .FS = true,
+        .FILES = true,
+        .SIGHAND = true,
         .SETTLS = true,
+        .THREAD = true,
+        .PARENT_SETTID = true,
+        .CHILD_SETTID = true,
+        .CHILD_CLEARTID = true,
+        .SYSVSEM = true,
+        .DETACHED = true,
     };
 
     pub fn isSupported(self: CloneFlags) bool {
@@ -138,6 +147,20 @@ pub fn clone(
     }
     errdefer child.sighand.?.ref.put();
 
+    if (flags.THREAD) {
+        krn.task.current.thread_data.?.ref.get();
+        child.thread_data = krn.task.current.thread_data;
+        // Add child to list of threads
+    } else {
+        const thread_data = krn.thread.ThreadData.new() orelse {
+            krn.logger.ERROR("fork: failed to allocate thread data", .{});
+            return errors.ENOMEM;
+        };
+        child.thread_data = thread_data;
+    }
+    child.thread_data.?.addNode(child);
+
+
     if (flags.FILES) {
         krn.task.current.files.ref.get();
         child.files = krn.task.current.files;
@@ -213,6 +236,8 @@ pub fn clone(
         vfork_head.addToQueue(&vfork_node);
         child.state = .RUNNING;
         vfork_head.waitIfInQueue(&vfork_node, false, 0);
+    } else {
+        child.state = .RUNNING;
     }
 
     if (flags.PARENT_SETTID) {
