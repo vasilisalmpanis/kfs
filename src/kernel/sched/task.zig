@@ -121,11 +121,11 @@ pub const Task = struct {
     // exit_signal: i32 = @intFromEnum(kernel.signals.Signal.SIGCHLD),
     //
     // signals
-    sighand:        ?*signal.SigHand     = null,
-    sigpending:     krn.signals.SigPending = krn.signals.SigPending.init(),
-    sigmask:        signal.sigset_t      = signal.sigset_t.init(),
-    wait_wq:        krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
-    vfork_wq:       ?*krn.wq.WaitQueueHead = null,
+    sighand:        ?*signal.SigHand        = null,
+    sigpending:     krn.signals.SigPending  = krn.signals.SigPending.init(),
+    sigmask:        signal.sigset_t         = signal.sigset_t.init(),
+    wait_wq:        krn.wq.WaitQueueHead    = krn.wq.WaitQueueHead.init(),
+    vfork_wq:       ?*krn.wq.WaitQueueHead  = null,
 
     // only for kthreads
     threadfn:       ?ThreadHandler       = null,
@@ -176,6 +176,7 @@ pub const Task = struct {
 
     pub fn setup(self: *Task, task_stack_top: usize, task_stack_bottom: usize, name: []const u8) !void {
         try self.assignPID();
+        self.tgid = self.pid;
         self.uid = 0;
         self.regs.setStackPointer(task_stack_top);
         self.stack_bottom = task_stack_bottom;
@@ -521,15 +522,15 @@ pub const Task = struct {
 
     pub fn hasPendingSignal(self: *Task) bool {
         return (
-            self.sigpending.getRaw()
-            | self.thread_data.?.pending.getRaw())
-            & self.sigmask._bits[0] != 0;
+            (self.sigpending.getRaw() | self.thread_data.?.pending.getRaw())
+            & (~self.sigmask._bits[0])
+        ) != 0;
     }
 
     pub fn getRealPending(self: *Task) std.StaticBitSet(32) {
-        const real_pending = (self.sigpending.getRaw()
-            | self.thread_data.?.pending.getRaw()
-        ) & self.sigmask._bits[0];
+        const real_pending = (
+            self.sigpending.getRaw() | self.thread_data.?.pending.getRaw()
+        ) & (~self.sigmask._bits[0]);
         return @bitCast(real_pending);
     }
 };

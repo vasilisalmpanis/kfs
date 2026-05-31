@@ -32,11 +32,13 @@ pub const RefCount = struct {
     }
 
     pub fn putAndTest(rc: *RefCount) bool {
+        if (rc.getValue() == 0)
+            @panic("Underflow\n");
         if (rc.count.fetchSub(1, .release) == 1) {
             _ = rc.count.load(.acquire);
+            (rc.dropFn)(rc);
             return true;
         }
-        _ = rc.count.load(.acquire);
         return false;
     }
 

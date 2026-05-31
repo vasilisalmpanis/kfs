@@ -968,7 +968,7 @@ pub const kernel = struct {
 
 
         pub const SigPending = struct {
-            pending : std.bit_set.IntegerBitSet(32),
+            set : std.bit_set.IntegerBitSet(32),
         };
 
         pub const SigHand = struct {

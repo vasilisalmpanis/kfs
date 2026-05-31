@@ -16,7 +16,7 @@ const SigAltStack = extern struct {
 };
 
 const SigContext = extern struct {
-        gs: u16 = 0,
+    gs: u16 = 0,
 	fs: u16 = 0,
 	es: u16 = 0,
 	ds: u16 = 0,
@@ -117,15 +117,15 @@ pub const sigset_t = extern struct {
     }
 
     pub fn sigAddSet(self: *sigset_t, signal: Signal) void {
-        self._bits[0] |= sigmask(signal);
+        self._bits[0] |= signal.sigsetMask();
     }
 
     pub fn sigDelSet(self: *sigset_t, signal: Signal) void {
-        self._bits[0] &= ~sigmask(signal);
+        self._bits[0] &= ~signal.sigsetMask();
     }
 
     pub fn sigIsSet(self: *const sigset_t, signal: Signal) bool {
-        return (self._bits[0] & sigmask(signal)) != 0;
+        return (self._bits[0] & signal.sigsetMask()) != 0;
     }
 };
 
@@ -143,12 +143,6 @@ pub const Sigaction = struct {
     mask: sigset_t = sigset_t.init(),
 
 };
-
-pub fn sigmask(sig: Signal) u32 {
-    const num: u32 = @intFromEnum(sig);
-    const bit_index: u32 = @as(u32, 1) << @intCast(num - 1);
-    return bit_index;
-}
 
 pub const SA_NOCLDSTOP: u32  = 0x00000001; // Don't send SIGCHLD when children stop
 pub const SA_NOCLDWAIT: u32  = 0x00000002; // Don't create zombie processes
@@ -174,8 +168,8 @@ const ignore_sigaction: Sigaction = Sigaction{
 };
 
 pub const Signal = enum(u8) {
-    EMPTY = 0,      // Default action      comment                     posix       0
-    SIGHUP = 1,     // Terminate   Hang up controlling terminal or      Yes        1
+    //                 Default action      comment                     posix      num
+    SIGHUP = 0,     // Terminate   Hang up controlling terminal or      Yes        1
     SIGINT,         // Terminate   Interrupt from keyboard, Control-C   Yes        2
     SIGQUIT,        // Dump        Quit from keyboard, Control-\        Yes        3
     SIGILL,         // Dump        Illegal instruction                  Yes        4
@@ -207,6 +201,27 @@ pub const Signal = enum(u8) {
     SIGPOLL,        // Terminate   Equivalent to SIGIO                  No         30
     SIGPWR,         // Terminate   Power supply failure                 No         31
     SIGSYS,         // Dump        Bad system call                      No         32
+
+    pub inline fn sigsetMask(sig: Signal) u32 {
+        const mask = @as(u32, 1) << @intCast(sig.toInt());
+        return mask;
+    }
+
+    pub inline fn fromInt(sig: usize) Signal {
+        return @enumFromInt(sig);
+    }
+
+    pub inline fn toInt(sig: Signal) usize {
+        return @intFromEnum(sig);
+    }
+
+    pub inline fn toPosix(self: Signal) usize {
+        return @intFromEnum(self) + 1;
+    }
+
+    pub inline fn fromPosix(num: usize) Signal {
+        return @enumFromInt(num - 1);
+    }
 };
 
 fn sigHandler(signum: u8) void {
@@ -224,48 +239,26 @@ const SigRes = struct {
 };
 
 pub const SigPending = struct {
-    pending: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
+    set: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
 
     pub fn init() SigPending{
         return SigPending{
-            .pending = std.StaticBitSet(32).initEmpty(),
+            .set = std.StaticBitSet(32).initEmpty(),
         };
     }
 
-    pub fn isReady(self: *SigPending) bool {
-        if (self.pending.count() != 0) {
-            return true;
-        }
-        return false;
+    pub inline fn setSignal(self: *SigPending, signal: Signal) void {
+        self.set.set(signal.toInt());
     }
 
-    pub fn hasPending(self: *SigPending) bool {
-        if (!self.isReady())
-            return false;
-        var it = self.pending.iterator(.{});
-        while (it.next()) |i| {
-            const signal: Signal = @enumFromInt(i);
-            if (self.isBlocked(signal)) {
-                continue;
-            }
-            return true;
-        }
-        return false;
-    }
-
-    pub fn setSignal(self: *SigPending, signal: Signal) void {
-        self.pending.set(@intFromEnum(signal));
-    }
-
-    pub fn getRaw(self: *SigPending) u32 {
-        return @bitCast(self.pending);
+    pub inline fn getRaw(self: *SigPending) u32 {
+        return @bitCast(self.set);
     }
 };
 
 pub const SigHand = struct {
     actions: std.EnumArray(Signal, Sigaction) =
         std.EnumArray(Signal, Sigaction).init(.{
-            .EMPTY      = default_sigaction,
             .SIGHUP     = default_sigaction,
             .SIGINT     = default_sigaction,
             .SIGQUIT    = default_sigaction,
@@ -331,16 +324,7 @@ pub const SigHand = struct {
         return new_hand;
     }
 
-    // pub fn isBlocked(_: *SigHand, signal: Signal) bool {
-    //     if (tsk.current.sigmask.sigIsSet(signal)) {
-    //         krn.logger.INFO("Blocked in mask\n", .{});
-    //         return true;
-    //     }
-    //     return false;
-    // }
-    //
-
-    pub fn deliverSignal(self: *SigHand) SigRes {
+    pub fn deliverSignal(self: *SigHand) ?SigRes {
         const lock_state = krn.task.current.thread_data.?.lock.lock_irq_disable();
         defer krn.task.current.thread_data.?.lock.unlock_irq_enable(lock_state);
 
@@ -348,31 +332,28 @@ pub const SigHand = struct {
         var iterator = static_bit.iterator(.{});
 
         while (iterator.next()) |i| {
-            if (krn.task.current.sigpending.pending.isSet(i)) {
-                krn.task.current.sigpending.pending.toggle(i);
+            if (krn.task.current.sigpending.set.isSet(i)) {
+                krn.task.current.sigpending.set.toggle(i);
             } else {
-                krn.task.current.thread_data.?.pending.pending.toggle(i);
+                krn.task.current.thread_data.?.pending.set.toggle(i);
             }
-            const signal: Signal = @enumFromInt(i);
-            var action = self.actions.get(signal);
+            const signal = Signal.fromInt(i);
+            const action = self.actions.get(signal);
 
             if (action.handler.handler == sigIGN) {
                 continue;
             } else if (action.handler.handler == sigDFL) {
                 return .{.action = default_sigaction, .signal = i};
             } else {
-                if (action.flags & SA_NODEFER == 0) {
-                    action.mask.sigAddSet(signal);
-                    self.actions.set(signal, action);
-                }
                 if (action.flags & SA_RESETHAND > 0) {
-                    action.handler.handler = sigDFL;
-                    self.actions.set(signal, action);
+                    var reset = action;
+                    reset.handler.handler = sigDFL;
+                    self.actions.set(signal, reset);
                 }
                 return .{.action = action, .signal = i};
             }
         }
-        return .{.action = default_sigaction, .signal = 0};
+        return null;
     }
 };
 
@@ -384,7 +365,7 @@ fn setupSiginfo(ptr: u32, sig: u32, siginfo: ?*Siginfo) void {
     if (siginfo) |s| {
         _siginfo.* = s.*;
     } else {
-        _siginfo.signo = @intCast(sig);
+        _siginfo.signo = @intCast(sig + 1);
     }
 }
 
@@ -404,7 +385,7 @@ fn setupUcontext(ptr: u32, ucontext: ?*Ucontext) void {
 fn setupHandlerFnFrame(
     regs: *arch.Regs,
     result: SigRes,
-    ucontext: ?*Ucontext,
+    ucontext: *Ucontext,
 ) void {
     const returnAddrSize: u32 = 4 + 4 + 4 + 4 + @sizeOf(arch.Regs) + @sizeOf(Siginfo) + @sizeOf(Ucontext);
     const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 16);
@@ -427,7 +408,7 @@ fn setupHandlerFnFrame(
     signal_stack[3] = ucontext_ptr;
 }
 
-pub fn processSignals(regs: *arch.Regs, ucontext: ?*Ucontext) *arch.Regs {
+pub fn processSignals(regs: *arch.Regs, ucontext: *Ucontext) *arch.Regs {
     if (!regs.isRing3()) {
         return regs;
     }
@@ -435,25 +416,25 @@ pub fn processSignals(regs: *arch.Regs, ucontext: ?*Ucontext) *arch.Regs {
     const task = krn.task.current;
     const sighand = task.getSighandOrPanic();
     if (task.hasPendingSignal()) {
-        const result = sighand.deliverSignal();
-        if (result.signal == 0) {
-            // maybe restart
+        const result = sighand.deliverSignal() orelse
             return regs;
-        }
-        if (result.action.handler.handler != default_sigaction.handler.handler and
-            result.action.handler.handler != ignore_sigaction.handler.handler) {
-            tsk.current.sigmask = result.action.mask;
-        }
         if (result.action.handler.handler == default_sigaction.handler.handler) {
-            const _regs = defaultHandler(@enumFromInt(result.signal), regs);
+            const _regs = defaultHandler(Signal.fromInt(result.signal), regs);
             // maybe restart
             return _regs;
         }
-        setupHandlerFnFrame(
-            regs,
-            result,
-            ucontext,
-        );
+        if (result.action.handler.handler != ignore_sigaction.handler.handler) {
+            tsk.current.sigmask._bits[0] |= result.action.mask._bits[0];
+            tsk.current.sigmask._bits[1] |= result.action.mask._bits[1];
+            if (result.action.flags & SA_NODEFER == 0) {
+                tsk.current.sigmask.sigAddSet(Signal.fromInt(result.signal));
+            }
+            setupHandlerFnFrame(
+                regs,
+                result,
+                ucontext
+            );
+        }
         // Go to signal handler
         return regs;
     }
@@ -487,7 +468,9 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
         .SIGWINCH => {},
         else => {
             arch.cpu.enableInterrupts();
-            _ = krn.exit.doExitGroup((128 + @intFromEnum(signal)) & 0x7f) catch {};
+            _ = krn.exit.doExitGroup((
+                128 + @as(i32, @intCast(signal.toPosix()))
+            ) & 0x7f) catch {};
             return krn.sched.schedule(regs);
         }
     }
