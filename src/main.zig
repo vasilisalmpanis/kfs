@@ -166,11 +166,7 @@ fn user_thread(_: ?*const anyopaque) i32 {
 var kernel_ready: bool = false;
 
 fn init_userspace() void {
-    const _task = krn.kthreadCreate(&user_thread, null, "init") catch null;
-    if (_task) |task| {
-        task.sighand = krn.signals.SigHand.new()
-            catch @panic("Cannot allocate PID 1's sigHand\n");
-    }
+    _ = krn.kthreadCreate(&user_thread, null, "init") catch null;
 }
 
 export fn kernel_main(magic: u32, address: u32) noreturn {

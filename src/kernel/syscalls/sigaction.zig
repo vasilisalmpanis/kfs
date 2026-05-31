@@ -5,14 +5,10 @@ const arch = @import("arch");
 const krn = @import("../main.zig");
 const std = @import("std");
 
-pub fn sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) !u32 {
-    return do_sigaction(sig, act, oact);
-}
-
 fn do_sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) !u32 {
-    if (sig == 0 or sig > @intFromEnum(signals.Signal.SIGSYS))
+    if (sig == 0 or sig > signals.Signal.SIGSYS.toPosix())
         return errors.EINVAL;
-    const signal: signals.Signal = @enumFromInt(sig);
+    const signal = signals.Signal.fromPosix(@intCast(sig));
     if (signal == .SIGKILL or signal == .SIGSTOP)
         return errors.EINVAL;
     const sighand = krn.task.current.getSighandOrPanic();
@@ -23,6 +19,10 @@ fn do_sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) !
         sighand.actions.set(signal, _act.*);
     }
     return 0;
+}
+
+pub fn sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) !u32 {
+    return do_sigaction(sig, act, oact);
 }
 
 pub fn rt_sigaction(
@@ -38,11 +38,6 @@ pub fn rt_sigaction(
 
 pub fn sigreturn() !u32 {
     const signal_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
-    const num: *u32 = @ptrFromInt(signal_regs.useresp - 4);
-    const signal: signals.Signal = @enumFromInt(num.*);
-
-    const sighand = krn.task.current.getSighandOrPanic();
-    var action = sighand.actions.get(signal);
     // for normal handlers offset should be 0 because restorer pops the signal number
     const regs_addr: u32 = signal_regs.useresp + 8;
     const saved_regs: *arch.Regs = @ptrFromInt(regs_addr);
@@ -57,8 +52,6 @@ pub fn sigreturn() !u32 {
     signal_regs.* = saved_regs.*;
     tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
     tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
-    action.mask.sigDelSet(signal);
-    sighand.actions.set(signal, action);
     if (saved_regs.eax >= 0) { // ERESTARTSYS
         return @intCast(saved_regs.eax);
     }
@@ -67,11 +60,6 @@ pub fn sigreturn() !u32 {
 
 pub fn rt_sigreturn() !u32 {
     const signal_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
-    const num: *u32 = @ptrFromInt(signal_regs.useresp);
-    const signal: signals.Signal = @enumFromInt(num.*);
-
-    const sighand = krn.task.current.getSighandOrPanic();
-    var action = sighand.actions.get(signal);
     // for normal handlers offset should be 0 because restorer pops the signal number
     const regs_addr: u32 = signal_regs.useresp + 12;
     const saved_regs: *arch.Regs = @ptrFromInt(regs_addr);
@@ -86,8 +74,6 @@ pub fn rt_sigreturn() !u32 {
     signal_regs.* = saved_regs.*;
     tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
     tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
-    action.mask.sigDelSet(signal);
-    sighand.actions.set(signal, action);
     if (saved_regs.eax >= 0)
         return @intCast(saved_regs.eax);
     return krn.errors.fromErrno(saved_regs.eax);
@@ -155,12 +141,9 @@ pub fn rt_sigpending(
 
 pub fn sigpending(uset: ?*signals.sigset_t) u32 {
     var set = signals.sigset_t.init();
-    const static_bit: std.StaticBitSet(32) = krn.task.current.getRealPending();
-    var iterator = static_bit.iterator(.{});
-
-    while (iterator.next()) |idx| {
-        set.sigAddSet(@enumFromInt(idx));
-    }
+    const task_raw = krn.task.current.sigpending.getRaw();
+    const thread_raw = krn.task.current.thread_data.?.pending.getRaw();
+    set._bits[0] = (task_raw | thread_raw) & krn.task.current.sigmask._bits[0];
     if (uset) |_uset| {
         _uset.* = set;
     }
@@ -232,23 +215,25 @@ pub fn rt_sigtimedwait(
     const start_time = krn.currentMs();
 
     while (true) {
-        const real_pending = krn.task.current.getRealPending();
-        var iterator = real_pending.iterator(.{});
+        const task_raw = krn.task.current.sigpending.getRaw();
+        const thread_raw = krn.task.current.thread_data.?.pending.getRaw();
+        const all_pending: std.StaticBitSet(32) = @bitCast(task_raw | thread_raw);
+        var iterator = all_pending.iterator(.{});
         while (iterator.next()) |sig| {
-            const signal: signals.Signal = @enumFromInt(sig);
+            const signal = signals.Signal.fromInt(sig);
             if (wait_set.sigIsSet(signal)) {
-                if (krn.task.current.sigpending.pending.isSet(sig)) {
-                    krn.task.current.sigpending.pending.toggle(sig);
+                if (krn.task.current.sigpending.set.isSet(sig)) {
+                    krn.task.current.sigpending.set.toggle(sig);
                 } else {
-                    krn.task.current.thread_data.?.pending.pending.toggle(sig);
+                    krn.task.current.thread_data.?.pending.set.toggle(sig);
                 }
                 if (info) |i| {
-                    i.signo = @intCast(sig);
+                    i.signo = @intCast(sig + 1);
                     i.errno = 0;
                     i.code = 0;
                     @memset(&i.fields.pad, 0);
                 }
-                return @intCast(sig);
+                return @intCast(sig + 1);
             }
         }
 

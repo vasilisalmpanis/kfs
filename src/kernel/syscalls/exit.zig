@@ -25,6 +25,8 @@ pub fn doExitGroup(error_code: i32) !u32 {
             continue;
 
         task.sigpending.setSignal(kernel.signals.Signal.SIGKILL);
+        if (task.state != .ZOMBIE and task.state != .STOPPED)
+            task.state = .RUNNING;
     }
 
     kernel.task.current.thread_data.?.lock.unlock_irq_enable(lock_state);
