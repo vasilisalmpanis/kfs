@@ -436,7 +436,6 @@ pub const Task = struct {
         defer if (!tasks_locked) tasks_lock.unlock_irq_enable(lock_state);
 
         self.list.del();
-        self.thread_node.del();
         self.refcount.put();
         if (self.refcount.getValue() > 0) {
             krn.logger.ERROR("[PID: {d}] is exiting and is extra referenced", .{self.pid});
