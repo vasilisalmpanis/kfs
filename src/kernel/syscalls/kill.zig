@@ -97,6 +97,9 @@ pub fn kill(pid: i32, sig: i32) !u32 {
 
 /// Thread-directed kill: target is identified by TID alone.
 pub fn tkill(tid: i32, sig: i32) !u32 {
+    if (tid <= 0)
+        return errors.EINVAL;
+
     return try tgkill(-1, tid, sig);
 }
 
