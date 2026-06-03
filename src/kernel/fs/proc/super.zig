@@ -44,7 +44,7 @@ pub const ProcSuper = struct {
     fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
         base.ref.put();
         while (!base.ref.isFree()) {
-            arch.archReschedule();
+            kernel.sched.reschedule();
         }
         _ = self.inode_map.remove(base.i_no);
         const proc_inode = base.getImpl(ProcInode, "base");

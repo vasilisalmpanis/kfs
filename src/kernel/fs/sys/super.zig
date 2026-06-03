@@ -4,6 +4,7 @@ const SysInode = @import("inode.zig").SysInode;
 const std = @import("std");
 const device = @import("drivers").device;
 const arch = @import("arch");
+const krn = @import("../../main.zig");
 
 const SYSFS_MAGIC = 0x62656572;
 
@@ -51,7 +52,7 @@ pub const SysSuper = struct {
     fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
         base.ref.put();
         while (!base.ref.isFree()) {
-            arch.archReschedule();
+            krn.sched.reschedule();
         }
         _ = self.inode_map.remove(base.i_no);
         const sys_inode = base.getImpl(SysInode, "base");

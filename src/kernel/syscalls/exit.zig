@@ -1,5 +1,4 @@
 const tsk = @import("../sched/task.zig");
-const arch = @import("arch");
 const sched = @import("../sched/scheduler.zig");
 const signals = @import("../sched/signals.zig");
 const kernel = @import("../main.zig");
@@ -43,7 +42,7 @@ pub fn doExit(error_code: i32) !u32 {
     kernel.fs.procfs.deleteProcess(kernel.task.current);
     kernel.task.current.refcount.put();
     while (kernel.task.current.refcount.getValue() > 1)
-        arch.archReschedule();
+        kernel.sched.reschedule();
 
     tsk.current.releaseSharedResources();
     const lock_state = kernel.task.tasks_lock.lock_irq_disable();

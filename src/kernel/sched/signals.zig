@@ -460,7 +460,8 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
             task.wakeup_time = 0;
             task.state = .INTERRUPTIBLE_SLEEP;
             task.wakeupParent(false);
-            return krn.sched.schedule(regs);
+            krn.sched.reschedule();
+            return regs;
         },
         .SIGCONT => {},
         .SIGCHLD,
@@ -471,7 +472,8 @@ fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
             _ = krn.exit.doExitGroup((
                 128 + @as(i32, @intCast(signal.toPosix()))
             ) & 0x7f) catch {};
-            return krn.sched.schedule(regs);
+            krn.sched.reschedule();
+            return regs;
         }
     }
     return regs;

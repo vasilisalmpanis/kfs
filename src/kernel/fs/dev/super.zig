@@ -51,7 +51,7 @@ pub const DevSuper = struct {
     fn destroyInode(self: *fs.SuperBlock, base: *fs.Inode) !void {
         base.ref.put();
         while (!base.ref.isFree()) {
-            arch.archReschedule();
+            kernel.sched.reschedule();
         }
         _ = self.inode_map.remove(base.i_no);
         const dev_inode = base.getImpl(DevInode, "base");
