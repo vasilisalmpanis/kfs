@@ -601,9 +601,6 @@ pub const arch = struct {
 
     };
 
-    pub const sw = struct {
-    };
-
     pub const syscalls = struct {
         pub const thread = struct {
             pub const UserDesc = extern struct {
@@ -836,7 +833,6 @@ pub const kernel = struct {
             ctty : ?*kernel.fs.file.File= null,
             stack_bottom : u32,
             state : kernel.task.TaskState,
-            kernel_esp : u32= 0,
             regs : arch.Regs,
             tls : u32= 0,
             limit : u32= 0,
@@ -875,11 +871,14 @@ pub const kernel = struct {
             ref : kernel.RefCount,
             lock : kernel.Spinlock,
             pending : kernel.signals.SigPending,
+            group_exit : bool= false,
+            group_exit_code : i32= 0,
         };
 
     };
 
     pub const sched = struct {
+        pub extern fn schedule(*arch.Regs)*arch.Regs;
     };
 
     pub const Mutex = struct {

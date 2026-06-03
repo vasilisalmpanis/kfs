@@ -41,7 +41,7 @@ pub const ProcInode = struct {
             .ino = dir.inode.i_no,
             .name = name,
         };
-            
+
         fs.dcache_lock.lock();
         defer fs.dcache_lock.unlock();
         if (fs.dcache.get(key)) |entry| {
