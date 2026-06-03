@@ -5,7 +5,6 @@ const km = @import("../mm/kmalloc.zig");
 const kthreadStackFree = @import("./kthread.zig").kthreadStackFree;
 const STACK_SIZE = @import("./kthread.zig").STACK_SIZE;
 const currentMs = @import("../time/jiffies.zig").currentMs;
-const archReschedule = @import("arch").archReschedule;
 const signals = @import("./signals.zig");
 const std = @import("std");
 const gdt = @import("arch").gdt;
@@ -69,13 +68,20 @@ fn findNextTask() *tsk.Task {
     return &tsk.initial_task;
 }
 
-pub export fn schedule(state: *Regs) *Regs {
+pub fn schedule() void {
     if (tsk.initial_task.list.isEmpty())
-        return state;
+        return;
+    const flags = arch.cpu.saveFlagsAndCli();
+    defer arch.cpu.restoreFlags(flags);
     processTasks();
-    return arch.idt.switchTo(tsk.current, findNextTask(), state);
+    const prev = tsk.current;
+    const next = findNextTask();
+    if (prev != next)
+        arch.contextSwitch(prev, next);
 }
 
 pub fn reschedule() void {
-    archReschedule();
+    if (!arch.cpu.areIntEnabled())
+        return;
+    schedule();
 }
