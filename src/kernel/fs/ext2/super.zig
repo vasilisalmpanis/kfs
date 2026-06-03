@@ -635,7 +635,7 @@ pub const Ext2Super = struct {
 
         base.ref.put();
         while (!base.ref.isFree()) {
-            arch.archReschedule();
+            kernel.sched.reschedule();
         }
 
         // Inode Bitmap

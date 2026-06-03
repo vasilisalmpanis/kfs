@@ -14,6 +14,7 @@ pub const STACK_SIZE: u32 = (STACK_PAGES - 1) * PAGE_SIZE;
 pub const ThreadHandler = *const fn (arg: ?*const anyopaque) i32;
 
 fn threadWrapper() callconv(.c) noreturn {
+    arch.cpu.enableInterrupts();
     tsk.current.result = tsk.current.threadfn.?(tsk.current.arg);
     tsk.current.finish(false);
     if (tsk.current.mm) |_mm|
@@ -71,12 +72,9 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const 
             km.kfree(task);
             return error.MemoryAllocation;
         }
-        const stack_top: usize = arch.setupStack(
+        task.kernel_esp = arch.setupSwitchFrame(
             stack + STACK_SIZE,
             @intFromPtr(&threadWrapper),
-            0,
-            arch.idt.KERNEL_CODE_SEGMENT,
-            arch.idt.KERNEL_DATA_SEGMENT,
         );
         task.threadfn = f;
         task.arg = arg;
@@ -88,7 +86,7 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const 
         task.tgid = task.pid;
         task.initSelf(
             .RUNNING,
-            stack_top,
+            stack + STACK_SIZE,
             stack,
             0,
             0,
