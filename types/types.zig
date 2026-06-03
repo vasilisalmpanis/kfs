@@ -601,6 +601,9 @@ pub const arch = struct {
 
     };
 
+    pub const sw = struct {
+    };
+
     pub const syscalls = struct {
         pub const thread = struct {
             pub const UserDesc = extern struct {
@@ -833,6 +836,7 @@ pub const kernel = struct {
             ctty : ?*kernel.fs.file.File= null,
             stack_bottom : u32,
             state : kernel.task.TaskState,
+            kernel_esp : u32= 0,
             regs : arch.Regs,
             tls : u32= 0,
             limit : u32= 0,
@@ -876,7 +880,6 @@ pub const kernel = struct {
     };
 
     pub const sched = struct {
-        pub extern fn schedule(*arch.Regs)*arch.Regs;
     };
 
     pub const Mutex = struct {
@@ -930,39 +933,38 @@ pub const kernel = struct {
         };
 
         pub const Signal = enum(u8) {
-            EMPTY = 0,
-            SIGHUP = 1,
-            SIGINT = 2,
-            SIGQUIT = 3,
-            SIGILL = 4,
-            SIGTRAP = 5,
-            SIGABRT = 6,
-            SIGBUS = 7,
-            SIGFPE = 8,
-            SIGKILL = 9,
-            SIGUSR1 = 10,
-            SIGSEGV = 11,
-            SIGUSR2 = 12,
-            SIGPIPE = 13,
-            SIGALRM = 14,
-            SIGTERM = 15,
-            SIGSTKFLT = 16,
-            SIGCHLD = 17,
-            SIGCONT = 18,
-            SIGSTOP = 19,
-            SIGTSTP = 20,
-            SIGTTIN = 21,
-            SIGTTOU = 22,
-            SIGURG = 23,
-            SIGXCPU = 24,
-            SIGXFSZ = 25,
-            SIGVTALRM = 26,
-            SIGPROF = 27,
-            SIGWINCH = 28,
-            SIGIO = 29,
-            SIGPOLL = 30,
-            SIGPWR = 31,
-            SIGSYS = 32,
+            SIGHUP = 0,
+            SIGINT = 1,
+            SIGQUIT = 2,
+            SIGILL = 3,
+            SIGTRAP = 4,
+            SIGABRT = 5,
+            SIGBUS = 6,
+            SIGFPE = 7,
+            SIGKILL = 8,
+            SIGUSR1 = 9,
+            SIGSEGV = 10,
+            SIGUSR2 = 11,
+            SIGPIPE = 12,
+            SIGALRM = 13,
+            SIGTERM = 14,
+            SIGSTKFLT = 15,
+            SIGCHLD = 16,
+            SIGCONT = 17,
+            SIGSTOP = 18,
+            SIGTSTP = 19,
+            SIGTTIN = 20,
+            SIGTTOU = 21,
+            SIGURG = 22,
+            SIGXCPU = 23,
+            SIGXFSZ = 24,
+            SIGVTALRM = 25,
+            SIGPROF = 26,
+            SIGWINCH = 27,
+            SIGIO = 28,
+            SIGPOLL = 29,
+            SIGPWR = 30,
+            SIGSYS = 31,
         };
 
 
