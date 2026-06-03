@@ -58,50 +58,6 @@ pub fn goUserspace() void {
     );
 }
 
-pub fn switchTo(from: *tsk.Task, to: *tsk.Task, state: *Regs) *Regs {
-    @setRuntimeSafety(false);
-    from.regs = state.*;
-    from.regs.setStackPointer(@intFromPtr(state));
-    if (from.save_fpu_state) {
-        if (from.fpu_state) |fpu_state| {
-            fpu.saveFPUState(fpu_state);
-            fpu.setTaskSwitched();
-        }
-        from.save_fpu_state = false;
-    }
-    tsk.current = to;
-    if (to == &tsk.initial_task) {
-        gdt.tss.esp0 = @intFromPtr(&stack_top);
-    } else {
-        gdt.tss.esp0 = to.stack_bottom + krn.STACK_SIZE; // this needs fixing
-    }
-    vmm.switchToVAS(to.mm.?.vas);
-    var access: u8 = 0;
-    access |= 0x10; // S=1
-    access |= 0x60; // DPL=3
-    access |= 0x02; // data, writable
-    access |= 0x80; // P=1  (force present, don’t trust user)
-
-    var gran: u8 = 0;
-    gran |= 0x80; // G=1 (pages)
-    gran |= 0x40; // D=1 (32-bit)
-    gran |= 0x10; // AVL=1 (harmless)
-    gdt.gdtSetEntry(
-        gdt.GDT_TLS0_INDEX,
-        to.tls,
-        to.limit,
-        access,
-        gran,
-    );
-    const sel: u16 = @intCast((gdt.GDT_TLS0_INDEX << 3) | 0x3);
-    asm volatile (
-        "mov %[_sel], %gs"
-        :: [_sel]"r"(sel)
-        : .{ .memory = true}
-    );
-    return @ptrFromInt(to.regs.getStackPointer());
-}
-
 pub export fn exceptionHandler(state: *Regs) callconv(.c) *Regs {
     if (krn.irq.handlers[state.int_no] != null) {
         const handler: *const ExceptionHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
@@ -113,7 +69,6 @@ pub export fn exceptionHandler(state: *Regs) callconv(.c) *Regs {
 pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     @setRuntimeSafety(false);
     const orig_eax = state.eax;
-    var new_state: *Regs = state;
     if (krn.irq.handlers[state.int_no] != null) {
         if (state.int_no == SYSCALL_INTERRUPT) {
             const handler: *const SyscallHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
@@ -128,21 +83,12 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     if (state.int_no >= 40) {
         io.outb(0xA0, 0x20);
     }
-    if (state.int_no == TIMER_INTERRUPT) {
-        new_state = krn.sched.schedule(state);
-    }
+    if (state.int_no == TIMER_INTERRUPT)
+        krn.sched.schedule();
 
-    if (new_state != state) {
-        // schedule() switched to a different task. We're still on the old
-        // task's kernel stack, but tsk.current is the new task. Process
-        // signals on the new task's kernel stack so that any kernel-mode
-        // work (doExit, archReschedule, etc.) uses the correct stack.
-        new_state = processSignalsOnNewStack(new_state, orig_eax);
-    } else {
-        new_state = processSignalsHelper(new_state, orig_eax);
-    }
+    _ = processSignalsHelper(state, orig_eax);
 
-    return new_state;
+    return state;
 }
 
 pub export fn processSignalsHelper(regs: *Regs, orig_eax: i32) callconv(.c) *Regs {
@@ -153,30 +99,6 @@ pub export fn processSignalsHelper(regs: *Regs, orig_eax: i32) callconv(.c) *Reg
         return signals.processSignals(regs, &ucontext);
     }
     return regs;
-}
-
-/// Switches ESP to the new task's kernel stack (at the saved Regs frame),
-/// calls processSignalsHelper there, then restores the original ESP.
-/// If processSignalsHelper never returns (doExit → reschedule), the old
-/// stack is abandoned — the old task resumes from its own saved state.
-noinline fn processSignalsOnNewStack(new_state: *Regs, orig_eax: i32) *Regs {
-    @setRuntimeSafety(false);
-    return @ptrFromInt(asm volatile (
-        \\ mov %%esp, %%ecx
-        \\ mov %%edi, %%esp
-        \\ push %%ecx
-        \\ push %%ebx
-        \\ push %%esi
-        \\ lea processSignalsHelper, %%eax
-        \\ call *%%eax
-        \\ add $8, %%esp
-        \\ pop %%esp
-        : [ret] "={eax}" (-> usize),
-        : [new_esp] "{edi}" (@intFromPtr(new_state)),
-          [regs] "{esi}" (@intFromPtr(new_state)),
-          [orig_eax] "{ebx}" (@as(u32, @bitCast(orig_eax))),
-        : .{ .memory = true }
-    ));
 }
 
 const ErrorCodes = std.EnumMap(krn.exceptions.Exceptions, bool).init(.{

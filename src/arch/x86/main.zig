@@ -9,8 +9,13 @@ pub const fpu = @import("fpu.zig");
 pub const Regs = @import("system/cpu.zig").Regs;
 pub const cpu = @import("system/cpu.zig");
 pub const cpuid = @import("system/cpuid.zig");
-pub const archReschedule = @import("system/cpu.zig").archReschedule;
+pub const saveFlagsAndCli = @import("system/cpu.zig").saveFlagsAndCli;
+pub const restoreFlags = @import("system/cpu.zig").restoreFlags;
 pub const setupStack = @import("system/cpu.zig").setupStack;
+pub const sw = @import("system/switch.zig");
+pub const contextSwitch = sw.contextSwitch;
+pub const setupSwitchFrame = sw.setupSwitchFrame;
+pub const retFromFork = sw.retFromFork;
 pub const syscalls = @import("syscalls/syscalls.zig");
 
 pub const pageAlign = @import("mm/pmm.zig").pageAlign;
