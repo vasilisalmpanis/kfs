@@ -6,11 +6,22 @@ const kernel = @import("../main.zig");
 const errors = @import("./error-codes.zig").PosixError;
 
 pub fn doExitGroup(error_code: i32) !u32 {
-    kernel.logger.INFO("before\n", .{});
-    const lock_state = kernel.task.current.thread_data.?.lock.lock_irq_disable();
-    kernel.logger.INFO("after\n", .{});
+    const td = kernel.task.current.thread_data.?;
+    const lock_state = td.lock.lock_irq_disable();
 
-    const list = &tsk.current.thread_data.?.threads;
+    if (td.group_exit) {
+        // Group teardown already in progress: just exit this thread, using
+        // the code latched by the initiator. Don't re-zap the group.
+        const code = td.group_exit_code;
+        td.lock.unlock_irq_enable(lock_state);
+        _ = doExit(code) catch {};
+        @panic("Exit: task executed after exit finished\n");
+    }
+
+    td.group_exit = true;
+    td.group_exit_code = error_code;
+
+    const list = &td.threads;
     var it = list.iterator();
     _ = it.next();
     var prev = list;
@@ -18,7 +29,6 @@ pub fn doExitGroup(error_code: i32) !u32 {
         if (prev == node.curr)
             break;
         prev = node.curr;
-        kernel.logger.INFO("curr {x} list {x}\n", .{@intFromPtr(node.curr), @intFromPtr(list)});
 
         const task = node.curr.entry(kernel.task.Task, "thread_node");
         if (task == tsk.current)
@@ -29,7 +39,7 @@ pub fn doExitGroup(error_code: i32) !u32 {
             task.state = .RUNNING;
     }
 
-    kernel.task.current.thread_data.?.lock.unlock_irq_enable(lock_state);
+    td.lock.unlock_irq_enable(lock_state);
     _ = doExit(error_code) catch {};
     @panic("Exit: task executed after exit finished\n");
 }
@@ -38,7 +48,7 @@ pub fn doExit(error_code: i32) !u32 {
     if (tsk.current == &tsk.initial_task)
         return errors.EINVAL;
 
-    tsk.current.result = error_code;
+    tsk.current.group_leader.result = error_code;
 
     kernel.fs.procfs.deleteProcess(kernel.task.current);
     kernel.task.current.refcount.put();
@@ -58,8 +68,12 @@ pub fn doExit(error_code: i32) !u32 {
             tsk.current.refcount.get();
             tsk.current.finish(true);
         }
+        if (tsk.current != tsk.current.group_leader) {
+            tsk.current.refcount.get();
+            tsk.current.finish(true);
+        }
 
-        if (kernel.task.current.thread_data != null) {
+        if (kernel.task.current.group_leader.thread_data.?.nr_threads == 0) {
             tsk.current.wakeupParent(true);
             if (act.handler.handler != signals.sigIGN)
                 // Check if its the last thread of the thread group

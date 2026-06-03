@@ -414,29 +414,30 @@ pub fn processSignals(regs: *arch.Regs, ucontext: *Ucontext) *arch.Regs {
     }
 
     const task = krn.task.current;
-    const sighand = task.getSighandOrPanic();
-    if (task.hasPendingSignal()) {
-        const result = sighand.deliverSignal() orelse
-            return regs;
-        if (result.action.handler.handler == default_sigaction.handler.handler) {
-            const _regs = defaultHandler(Signal.fromInt(result.signal), regs);
-            // maybe restart
-            return _regs;
-        }
-        if (result.action.handler.handler != ignore_sigaction.handler.handler) {
-            tsk.current.sigmask._bits[0] |= result.action.mask._bits[0];
-            tsk.current.sigmask._bits[1] |= result.action.mask._bits[1];
-            if (result.action.flags & SA_NODEFER == 0) {
-                tsk.current.sigmask.sigAddSet(Signal.fromInt(result.signal));
+    if (task.sighand) |sighand| {
+        if (task.hasPendingSignal()) {
+            const result = sighand.deliverSignal() orelse
+                return regs;
+            if (result.action.handler.handler == default_sigaction.handler.handler) {
+                const _regs = defaultHandler(Signal.fromInt(result.signal), regs);
+                // maybe restart
+                return _regs;
             }
-            setupHandlerFnFrame(
-                regs,
-                result,
-                ucontext
-            );
+            if (result.action.handler.handler != ignore_sigaction.handler.handler) {
+                tsk.current.sigmask._bits[0] |= result.action.mask._bits[0];
+                tsk.current.sigmask._bits[1] |= result.action.mask._bits[1];
+                if (result.action.flags & SA_NODEFER == 0) {
+                    tsk.current.sigmask.sigAddSet(Signal.fromInt(result.signal));
+                }
+                setupHandlerFnFrame(
+                    regs,
+                    result,
+                    ucontext
+                );
+            }
+            // Go to signal handler
+            return regs;
         }
-        // Go to signal handler
-        return regs;
     }
     // maybe restart
     return regs;
