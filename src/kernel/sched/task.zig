@@ -397,28 +397,15 @@ pub const Task = struct {
         self.files.ref.put();
         self.fs.ref.put();
 
-
         const sighand = self.getSighandOrPanic();
         sighand.ref.put();
         self.sighand = null;
-        if (!self.thread_data.?.ref.putAndTest()) {
-            self.thread_data = null;
-        }
 
-        self.sighand = null;
-        if (self.mm) |_mm| {
-            const mm_ref = _mm.ref.getValue();
-            defer {
-                if (mm_ref > 1)
-                    self.mm = null;
-            }
-            _mm.ref.put();
-            if (krn.task.current.vfork_wq) |wq| {
-                wq.wakeUpOne();
-                krn.task.current.vfork_wq = null;
-            }
-            // TODO: in case of thread:
-            // self.mm = null
+        self.removeThread();
+
+        if (krn.task.current.vfork_wq) |wq| {
+            wq.wakeUpOne();
+            krn.task.current.vfork_wq = null;
         }
         if (self.fpu_state) |state| {
             self.fpu_used = false;
@@ -431,12 +418,27 @@ pub const Task = struct {
     pub fn finish(self: *Task, tasks_locked: bool) void {
         if (self.state != .ZOMBIE and self.state != .STOPPED)
             return ;
+
         self.state = .STOPPED;
         const lock_state = if (!tasks_locked) tasks_lock.lock_irq_disable() else false;
         defer if (!tasks_locked) tasks_lock.unlock_irq_enable(lock_state);
 
+        if (self.mm) |_mm| {
+            const mm_ref = _mm.ref.getValue();
+            defer {
+                if (mm_ref > 1) {
+                    self.mm = null;
+                }
+            }
+            _mm.ref.put();
+        }
+
         self.list.del();
         self.refcount.put();
+        if (self == self.group_leader) {
+            self.thread_data.?.ref.put();
+            self.thread_data = null;
+        }
         if (self.refcount.getValue() > 0) {
             krn.logger.ERROR("[PID: {d}] is exiting and is extra referenced", .{self.pid});
             @panic("exiting task being used");
@@ -531,6 +533,18 @@ pub const Task = struct {
             self.sigpending.getRaw() | self.thread_data.?.pending.getRaw()
         ) & (~self.sigmask._bits[0]);
         return @bitCast(real_pending);
+    }
+
+    pub fn removeThread(self: *Task) void {
+        const td = self.thread_data.?;
+        const lock_state = td.lock.lock_irq_disable();
+        defer td.lock.unlock_irq_enable(lock_state);
+        self.thread_data.?.nr_threads -= 1;
+        self.thread_node.del();
+        if (self != self.group_leader) {
+            self.thread_data.?.ref.put();
+            self.thread_data = null;
+        }
     }
 };
 

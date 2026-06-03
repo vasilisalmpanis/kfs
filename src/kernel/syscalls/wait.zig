@@ -53,11 +53,12 @@ const WaitStates = struct {
         return ret;
     }
 
-    pub fn isSet(self: *const WaitStates, state: krn.task.TaskState) bool {
-        if (state == .ZOMBIE and self.exited)
+    pub fn isSet(self: *const WaitStates, task: *krn.task.Task) bool {
+        if (task.state == .ZOMBIE and self.exited and task.thread_data.?.nr_threads == 0)
             return true;
-        if (state == .STOPPED and self.exited)
+        if (task.state == .STOPPED and self.exited) {
             return true;
+        }
         // if (state == .INTERRUPTIBLE_SLEEP and self.stopped)
         //     return true;
         return false;
@@ -83,11 +84,13 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
     if (pid > 0) {
         if (tsk.current.findChildByPid(@intCast(pid))) |task| {
             errdefer task.refcount.put();
-            while (!wait_opts.isSet(task.state)) {
+            while (!wait_opts.isSet(task)) {
                 if (tsk.current.hasPendingSignal())
                     return errors.EINTR;
-                if (options & WNOHANG > 0)
+                if (options & WNOHANG > 0) {
+                    task.refcount.put();
                     return 0;
+                }
                 tsk.current.wait_wq.wait(true, 0);
             }
             if (task.state == .STOPPED)
@@ -114,7 +117,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
                     const child_pid = res.pid;
-                    if (wait_opts.isSet(res.state) and res.pgid == tsk.current.pgid) {
+                    if (wait_opts.isSet(res) and res.pgid == tsk.current.pgid) {
                         if (stat_addr != null) {
                             stat_addr.?.* =  wait_opts.status(res);
                         }
@@ -144,7 +147,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
                     const child_pid = res.pid;
-                    if (wait_opts.isSet(res.state)) {
+                    if (wait_opts.isSet(res)) {
                         if (stat_addr != null) {
                             stat_addr.?.* = wait_opts.status(res);
                         }
@@ -175,7 +178,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                 while (it.next()) |i| {
                     const res = i.curr.entry(tsk.Task, "tree");
                     const child_pid = res.pid;
-                    if (wait_opts.isSet(res.state) and pgid == res.pgid) {
+                    if (wait_opts.isSet(res) and pgid == res.pgid) {
                         if (stat_addr != null) {
                             stat_addr.?.* = wait_opts.status(res);
                         }
