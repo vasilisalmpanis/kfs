@@ -73,6 +73,9 @@ pub fn doFork() !u32 {
     var child_regs: *arch.Regs = @ptrFromInt(stack_top);
     child_regs.* = parent_regs.*;
     child_regs.eax = 0;
+    // The switch frame sits below the trap frame so the first switch_to lands
+    // on ret_from_fork, which irets to userspace.
+    child.kernel_esp = arch.setupSwitchFrame(stack_top, @intFromPtr(&arch.retFromFork));
     child.tls = krn.task.current.tls;
     child.limit = krn.task.current.limit;
     child.initSelf(
