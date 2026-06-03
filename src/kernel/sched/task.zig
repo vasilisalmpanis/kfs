@@ -89,6 +89,7 @@ pub const Task = struct {
     ctty:           ?*krn.fs.File   = null,
     stack_bottom:   usize,
     state:          TaskState       = TaskState.RUNNING,
+    kernel_esp:     u32             = 0,
     regs:           Regs            = Regs.init(),
     tls:            u32             = 0,
     limit:          u32             = 0,
@@ -156,6 +157,7 @@ pub const Task = struct {
             .vfork_wq = null,
             .group_leader = undefined,
             .thread_data = null,
+            .kernel_esp = 0
         };
     }
 
@@ -194,6 +196,7 @@ pub const Task = struct {
         self.should_stop = false;
         self.vfork_wq = null;
         self.sigpending = krn.signals.SigPending.init();
+        self.kernel_esp = 0;
     }
 
     pub fn setName(self: *Task, name: []const u8) void {
