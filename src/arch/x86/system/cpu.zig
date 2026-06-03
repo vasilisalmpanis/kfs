@@ -139,48 +139,24 @@ pub fn areIntEnabled() bool {
     return false;
 }
 
-pub inline fn archReschedule() void {
-    asm volatile(
+/// Saves EFLAGS and disables interrupts.
+pub inline fn saveFlagsAndCli() u32 {
+    return asm volatile (
         \\ pushf
-        \\ pop %%eax            # Pop into EAX
-        \\ test $0x200, %%eax   # Test bit 9 (IF)
-        \\ jz 1f      # Jump if interrupts are disabled
-        \\ pushf
+        \\ pop %[flags]
         \\ cli
-        \\ push %[code_seg]     # CS (kernel code segment)
-        \\ push $1f
-        \\ push $0
-        \\ push $16
-        \\ pusha
-        \\ push %%ds
-        \\ push %%es
-        \\ push %%fs
-        \\ push %%gs
-        \\ mov %[data_seg], %%ax
-        \\ mov %%ax, %%ds
-        \\ mov %%ax, %%es
-        \\ mov %%ax, %%fs
-        \\ mov %%ax, %%gs
-        \\ mov %%esp, %%eax
-        \\ push %%eax
-        \\ lea schedule, %%eax
-        \\ call *%%eax
-        \\ add $4, %%esp
-        \\ mov %%eax, %%esp
-        \\ pop %%gs
-        \\ pop %%fs
-        \\ pop %%es
-        \\ pop %%ds
-        \\ popa
-        \\ add $8, %%esp
-        \\ iret
-        \\ 1:
-        \\ nop
-        \\
-        :
-        : [code_seg] "i" (KERNEL_CODE_SEGMENT),
-          [data_seg] "i" (KERNEL_DATA_SEGMENT)
-        : .{ .memory = true, .eax = true }
+        : [flags] "=r" (-> u32),
+        :: .{ .memory = true, .cc = true }
+    );
+}
+
+/// Restores EFLAGS passed from flags.
+pub inline fn restoreFlags(flags: u32) void {
+    asm volatile (
+        \\ push %[flags]
+        \\ popf
+        :: [flags] "r" (flags)
+        : .{ .memory = true, .cc = true }
     );
 }
 
