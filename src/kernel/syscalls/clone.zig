@@ -158,7 +158,7 @@ pub fn clone(
         };
         child.thread_data = thread_data;
     }
-    child.thread_data.?.addNode(child);
+    errdefer child.thread_data.?.ref.put();
 
 
     if (flags.FILES) {
@@ -222,6 +222,7 @@ pub fn clone(
         krn.logger.ERROR("clone: failed to init child task: {t}", .{err});
         return errors.ENOMEM;
     };
+    child.thread_data.?.addNode(child);
     errdefer krn.fs.procfs.deleteProcess(child);
     child.fpu_state = child_fpu_state;
     child.fpu_used = child_fpu_used;

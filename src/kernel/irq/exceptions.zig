@@ -48,7 +48,7 @@ fn hDivisionError(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGFPE)
+            @intCast(Signal.SIGFPE.toPosix())
         ) catch {};
         return regs;
     }
@@ -72,7 +72,7 @@ pub fn hOverflow(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGSEGV)
+            @intCast(Signal.SIGSEGV.toPosix())
         ) catch {};
         return regs;
     }
@@ -83,7 +83,7 @@ pub fn hBoundRangeExceeded(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGSEGV)
+            @intCast(Signal.SIGSEGV.toPosix())
         ) catch {};
         return regs;
     }
@@ -96,7 +96,7 @@ pub fn hInvalidOpcode(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGILL)
+            @intCast(Signal.SIGILL.toPosix())
         ) catch {};
         return regs;
     }
@@ -109,7 +109,7 @@ pub fn hDeviceNotAvailable(regs: *Regs) *Regs {
         if (regs.isRing3()) {
             _ = kernel.kill(
                 @intCast(kernel.task.current.pid),
-                @intFromEnum(Signal.SIGILL)
+                @intCast(Signal.SIGILL.toPosix())
             ) catch {};
             return regs;
         }
@@ -129,7 +129,7 @@ pub fn hCoprocessorSegmentOverrun(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGFPE)
+            @intCast(Signal.SIGFPE.toPosix())
         ) catch {};
         return regs;
     }
@@ -141,7 +141,7 @@ pub fn hInvalidTSS(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGSEGV)
+            @intCast(Signal.SIGSEGV.toPosix())
         ) catch {};
         return regs;
     }
@@ -153,7 +153,7 @@ pub fn hSegmentNotPresent(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGBUS)
+            @intCast(Signal.SIGBUS.toPosix())
         ) catch {};
         return regs;
     }
@@ -165,7 +165,7 @@ pub fn hStackSegmentFault(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGBUS)
+            @intCast(Signal.SIGBUS.toPosix())
         ) catch {};
         return regs;
     }
@@ -177,7 +177,7 @@ pub fn hGeneralProtectionFault(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGSEGV)
+            @intCast(Signal.SIGSEGV.toPosix())
         ) catch {};
         return regs;
     }
@@ -192,7 +192,7 @@ pub fn hPageFault(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGSEGV)
+            @intCast(Signal.SIGSEGV.toPosix())
         ) catch {};
         return regs;
     }
@@ -232,7 +232,7 @@ pub fn hx87FloatingPointException(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGFPE)
+            @intCast(Signal.SIGFPE.toPosix())
         ) catch {};
         return regs;
     }
@@ -244,7 +244,7 @@ pub fn hAlignmentCheck(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGBUS)
+            @intCast(Signal.SIGBUS.toPosix())
         ) catch {};
         return regs;
     }
@@ -261,7 +261,7 @@ pub fn hSIMDFloatingPointException(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
             @intCast(kernel.task.current.pid),
-            @intFromEnum(Signal.SIGFPE)
+            @intCast(Signal.SIGFPE.toPosix())
         ) catch {};
         return regs;
     }

@@ -37,8 +37,8 @@ pub const ThreadData = struct {
     pub fn addNode(self: *ThreadData, task: *kernel.task.Task) void {
         const lock_state = self.lock.lock_irq_disable();
         self.threads.addTail(&task.thread_node);
-        self.lock.unlock_irq_enable(lock_state);
         self.nr_threads += 1;
+        self.lock.unlock_irq_enable(lock_state);
     }
 
     pub fn findThread(self: *ThreadData, tid: u32) ?*kernel.task.Task {

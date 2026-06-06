@@ -48,7 +48,7 @@ pub fn doFork() !u32 {
         return errors.ENOMEM;
     };
     child.thread_data = thread_data;
-    child.thread_data.?.addNode(child);
+    errdefer child.thread_data.?.ref.put();
 
     var child_fpu_state: ?*arch.fpu.FPUState = null;
     var child_fpu_used = tsk.current.fpu_used;
@@ -91,6 +91,7 @@ pub fn doFork() !u32 {
         krn.logger.ERROR("fork: failed to init child task: {any}", .{err});
         return errors.ENOMEM;
     };
+    child.thread_data.?.addNode(child);
     errdefer procfs.deleteProcess(child);
     child.fpu_state = child_fpu_state;
     child.fpu_used = child_fpu_used;

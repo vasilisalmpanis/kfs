@@ -403,7 +403,7 @@ fn setupHandlerFnFrame(
 
     const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
     signal_stack[0] = @intFromPtr(result.action.restorer);
-    signal_stack[1] = result.signal;
+    signal_stack[1] = result.signal + 1;
     signal_stack[2] = siginfo_ptr;
     signal_stack[3] = ucontext_ptr;
 }
