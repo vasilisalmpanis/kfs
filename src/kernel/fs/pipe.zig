@@ -106,7 +106,7 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     if (pipe.readers == 0) {
         _ = try krn.kill(
             @intCast(krn.task.current.pid),
-            @intFromEnum(krn.signals.Signal.SIGPIPE)
+            @intCast(krn.signals.Signal.SIGPIPE.toPosix())
         );
         return krn.errors.PosixError.EPIPE;
     }
@@ -126,7 +126,7 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
         if (pipe.readers == 0) {
             _ = try krn.kill(
                 @intCast(krn.task.current.pid),
-                @intFromEnum(krn.signals.Signal.SIGPIPE)
+                @intCast(krn.signals.Signal.SIGPIPE.toPosix())
             );
             return krn.errors.PosixError.EPIPE;
         }

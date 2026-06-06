@@ -179,7 +179,7 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     if (krn.task.current.pgid != _tty.fg_pgid) {
         _ = krn.kill(
             -@as(i32, @intCast(krn.task.current.pgid)),
-            @intFromEnum(krn.signals.Signal.SIGTTIN)
+            @intCast(krn.signals.Signal.SIGTTIN.toPosix())
         ) catch {
         };
         return krn.errors.PosixError.EINTR;
