@@ -235,7 +235,7 @@ pub fn handleDeviceNotAvailable() void {
             arch.cpu.disableInterrupts();
             _ = krn.kill(
                 @intCast(krn.task.current.pid),
-                @intFromEnum(krn.signals.Signal.SIGSEGV)
+                @intCast(krn.signals.Signal.SIGSEGV.toPosix())
             ) catch {};
             return;
         };

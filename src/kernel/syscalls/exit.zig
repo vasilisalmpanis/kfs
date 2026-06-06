@@ -67,8 +67,7 @@ pub fn doExit(error_code: i32) !u32 {
         if (act.flags & signals.SA_NOCLDWAIT != 0) {
             tsk.current.refcount.get();
             tsk.current.finish(true);
-        }
-        if (tsk.current != tsk.current.group_leader) {
+        } else if (tsk.current != tsk.current.group_leader) {
             tsk.current.refcount.get();
             tsk.current.finish(true);
         }

@@ -811,7 +811,7 @@ pub const TTY = struct {
             );
             _ = krn.kill(
                 -self.fg_pgid,
-                @intFromEnum(sig)
+                @intCast(sig.toPosix())
             ) catch 0;
         } else {
             krn.logger.WARN(

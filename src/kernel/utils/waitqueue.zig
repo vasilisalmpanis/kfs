@@ -93,7 +93,7 @@ pub const WaitQueueHead = struct {
         interruptable: bool,
         timeout: u32
     ) void{
-        const lock_state = self.lock.lock_irq_disable();
+        var lock_state = self.lock.lock_irq_disable();
         if (node.list.isEmpty()) {
             self.lock.unlock_irq_enable(lock_state);
             return;
@@ -112,6 +112,11 @@ pub const WaitQueueHead = struct {
         self.lock.unlock_irq_enable(lock_state);
 
         krn.sched.reschedule();
+
+        lock_state = self.lock.lock_irq_disable();
+        defer self.lock.unlock_irq_enable(lock_state);
+        if (!node.list.isEmpty())
+            node.list.del();
     }
 
     pub fn wakeUpOne(self: *WaitQueueHead) void {
@@ -128,8 +133,10 @@ pub const WaitQueueHead = struct {
             first_node.list.del();
             self.list.addTail(&first_node.list);
         }
-        if (first_node.task.state != .STOPPED and first_node.task.state != .ZOMBIE)
+        if (first_node.task.state != .STOPPED and first_node.task.state != .ZOMBIE) {
+            first_node.task.wakeup_time = 0;
             first_node.task.state = .RUNNING;
+        }
     }
 
     pub fn wakeUpAll(self: *WaitQueueHead) void {
@@ -145,8 +152,10 @@ pub const WaitQueueHead = struct {
             const curr_node = curr_item.entry(WaitQueueNode, "list");
             if (curr_node.wake_fn) |_wake_fn|
                 _wake_fn(curr_node);
-            if (curr_node.task.state != .STOPPED and curr_node.task.state != .ZOMBIE)
+            if (curr_node.task.state != .STOPPED and curr_node.task.state != .ZOMBIE) {
+                curr_node.task.wakeup_time = 0;
                 curr_node.task.state = .RUNNING;
+            }
             curr_item = next_item;
         }
     }
