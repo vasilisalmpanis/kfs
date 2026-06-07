@@ -252,6 +252,8 @@ pub fn clone(
             ctid.* = child.pid;
         }
     }
+    if (flags.CHILD_CLEARTID)
+        child.clear_tid = child_tid;
     return @intCast(child.pid);
 }
 

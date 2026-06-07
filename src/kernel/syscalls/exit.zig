@@ -4,6 +4,7 @@ const sched = @import("../sched/scheduler.zig");
 const signals = @import("../sched/signals.zig");
 const kernel = @import("../main.zig");
 const errors = @import("./error-codes.zig").PosixError;
+const futex = @import("./futex.zig");
 
 pub fn doExitGroup(error_code: i32) !u32 {
     const td = kernel.task.current.thread_data.?;
@@ -54,6 +55,17 @@ pub fn doExit(error_code: i32) !u32 {
     kernel.task.current.refcount.put();
     while (kernel.task.current.refcount.getValue() > 1)
         arch.archReschedule();
+
+    if (tsk.current.clear_tid) |ctid| {
+        ctid.* = 0;
+        _ = futex.futex(
+            ctid,
+            futex.FUTEX_WAKE,
+            1,
+            null, null, 0
+        ) catch {};
+        tsk.current.clear_tid = null;
+    }
 
     tsk.current.releaseSharedResources();
     const lock_state = kernel.task.tasks_lock.lock_irq_disable();

@@ -52,6 +52,12 @@ pub fn syscallsManager(state: *arch.Regs) void {
             return ;
         };
         state.eax = @bitCast(result);
+    } else {
+        krn.logger.ERROR("[PID: {d:<2}]: not implemented: {t}", .{
+            tsk.current.pid, sys
+        });
+        state.eax = errors.toErrno(errors.PosixError.ENOSYS);
+        return ;
     }
 }
 

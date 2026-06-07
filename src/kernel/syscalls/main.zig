@@ -10,6 +10,7 @@ pub const dup = @import("dup.zig");
 pub const exec = @import("exec.zig");
 pub const exit = @import("exit.zig");
 pub const fcntl = @import("fcntl.zig");
+pub const futex = @import("futex.zig");
 pub const fork = @import("fork.zig");
 pub const getcwd = @import("getcwd.zig");
 pub const getdents = @import("getdents.zig");
