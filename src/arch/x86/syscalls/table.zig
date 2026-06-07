@@ -270,6 +270,7 @@ pub const SyscallTable = brk: {
         .SYS_clock_settime              = @ptrCast(&krn.syscalls.clock.clock_settime),
         .SYS_tkill                      = @ptrCast(&krn.syscalls.kill.tkill),
         .SYS_tgkill                     = @ptrCast(&krn.syscalls.kill.tgkill),
+        .SYS_futex                      = @ptrCast(&krn.syscalls.futex.futex),
     });
 };
 
