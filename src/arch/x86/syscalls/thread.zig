@@ -79,5 +79,10 @@ pub fn set_tid_address(tidptr: u32) !u32 {
         "set_tid_address addr: {x}",
         .{tidptr}
     );
+    if (tidptr == 0) {
+        tsk.current.clear_tid = null;
+    } else {
+        tsk.current.clear_tid = @ptrFromInt(tidptr);
+    }
     return tsk.current.pid;
 }

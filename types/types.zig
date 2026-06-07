@@ -846,6 +846,7 @@ pub const kernel = struct {
             thread_node : kernel.list.ListHead,
             refcount : kernel.RefCount,
             wakeup_time : u32= 0,
+            clear_tid : ?*u32= null,
             utime : u32= 0,
             stime : u32= 0,
             mm : ?*kernel.mm.proc_mm.MM= null,
@@ -1372,6 +1373,9 @@ pub const kernel = struct {
         };
 
         pub const fcntl = struct {
+        };
+
+        pub const futex = struct {
         };
 
         pub const fork = struct {

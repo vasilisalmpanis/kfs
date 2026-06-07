@@ -109,6 +109,7 @@ pub const Task = struct {
     refcount:       krn.RefCount    = krn.RefCount.init(),
 
     wakeup_time:    usize           = 0,
+    clear_tid:      ?*u32           = null,
 
     utime:          u32             = 0,
     stime:          u32             = 0,
@@ -244,6 +245,7 @@ pub const Task = struct {
         self.fpu_state = tmp.fpu_state;
         self.should_stop = tmp.should_stop;
         self.sigpending = tmp.sigpending;
+        self.clear_tid = tmp.clear_tid;
 
         self.regs = Regs.init();
         self.tree = tree.TreeNode.init();
