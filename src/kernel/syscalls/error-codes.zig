@@ -45,6 +45,7 @@ pub const PosixError = error{
     ENOTEMPTY,       // 39 - Directory not empty
     ELOOP,           // 40 - Too many symbolic links encountered
     // Note: EWOULDBLOCK = EAGAIN, so we alias EAGAIN
+    _RESERVED_41,
     ENOMSG,          // 42 - No message of desired type
     EIDRM,           // 43 - Identifier removed
     ECHRNG,          // 44 - Channel number out of range
@@ -61,6 +62,8 @@ pub const PosixError = error{
     ENOANO,          // 55 - No anode
     EBADRQC,         // 56 - Invalid request code
     EBADSLT,         // 57 - Invalid slot
+    // Reserved: 58 = EDEADLOCK (aliased to EDEADLK)
+    _RESERVED_58,
     EBFONT,          // 59 - Bad font file format
     ENOSTR,          // 60 - Device not a stream
     ENODATA,         // 61 - No data available
