@@ -2,7 +2,8 @@ const tsk = @import("./task.zig");
 const krn = @import("../main.zig");
 const std = @import("std");
 const arch = @import("arch");
-pub const SIG_COUNT: u8 = 32;
+
+pub const NSIG: u8 = 64;
 
 pub const Sigval = extern union {
     int: i32,
@@ -116,16 +117,30 @@ pub const sigset_t = extern struct {
         };
     }
 
+    pub fn toU64(self: *const sigset_t) u64 {
+        return @as(u64, self._bits[0]) | (@as(u64, self._bits[1]) << 32);
+    }
+
+    pub fn fromU64(val: u64) sigset_t {
+        return sigset_t{ ._bits = .{
+            @truncate(val),
+            @truncate(val >> 32),
+        } };
+    }
+
     pub fn sigAddSet(self: *sigset_t, signal: Signal) void {
-        self._bits[0] |= signal.sigsetMask();
+        const idx = signal.toInt();
+        self._bits[idx / 32] |= (@as(u32, 1) << @intCast(idx % 32));
     }
 
     pub fn sigDelSet(self: *sigset_t, signal: Signal) void {
-        self._bits[0] &= ~signal.sigsetMask();
+        const idx = signal.toInt();
+        self._bits[idx / 32] &= ~(@as(u32, 1) << @intCast(idx % 32));
     }
 
     pub fn sigIsSet(self: *const sigset_t, signal: Signal) bool {
-        return (self._bits[0] & signal.sigsetMask()) != 0;
+        const idx = signal.toInt();
+        return (self._bits[idx / 32] & (@as(u32, 1) << @intCast(idx % 32))) != 0;
     }
 };
 
@@ -133,7 +148,7 @@ pub const HandlerFn = *align(1) const fn (i32) callconv(.c) void;
 pub const SigactionFn = *const fn (i32, *const Siginfo, ?*anyopaque) callconv(.c) void;
 pub const RestorerFn = *const fn () callconv(.c) void;
 
-pub const Sigaction = struct {
+pub const Sigaction = extern struct {
     handler: extern union {
         handler: ?HandlerFn,
         sigaction: ?SigactionFn,
@@ -202,8 +217,14 @@ pub const Signal = enum(u8) {
     SIGPWR,         // Terminate   Power supply failure                 No         31
     SIGSYS,         // Dump        Bad system call                      No         32
 
-    pub inline fn sigsetMask(sig: Signal) u32 {
-        const mask = @as(u32, 1) << @intCast(sig.toInt());
+    // RT
+    SIGRT00, SIGRT01, SIGRT02, SIGRT03, SIGRT04, SIGRT05, SIGRT06, SIGRT07,
+    SIGRT08, SIGRT09, SIGRT10, SIGRT11, SIGRT12, SIGRT13, SIGRT14, SIGRT15,
+    SIGRT16, SIGRT17, SIGRT18, SIGRT19, SIGRT20, SIGRT21, SIGRT22, SIGRT23,
+    SIGRT24, SIGRT25, SIGRT26, SIGRT27, SIGRT28, SIGRT29, SIGRT30, SIGRT31,
+
+    pub inline fn sigsetMask(sig: Signal) u64 {
+        const mask = @as(u64, 1) << @intCast(sig.toInt());
         return mask;
     }
 
@@ -239,11 +260,11 @@ const SigRes = struct {
 };
 
 pub const SigPending = struct {
-    set: std.StaticBitSet(32) = std.StaticBitSet(32).initEmpty(),
+    set: std.StaticBitSet(NSIG) = std.StaticBitSet(NSIG).initEmpty(),
 
     pub fn init() SigPending{
         return SigPending{
-            .set = std.StaticBitSet(32).initEmpty(),
+            .set = std.StaticBitSet(NSIG).initEmpty(),
         };
     }
 
@@ -251,47 +272,17 @@ pub const SigPending = struct {
         self.set.set(signal.toInt());
     }
 
-    pub inline fn getRaw(self: *SigPending) u32 {
+    pub inline fn getRaw(self: *SigPending) u64 {
         return @bitCast(self.set);
     }
 };
 
 pub const SigHand = struct {
-    actions: std.EnumArray(Signal, Sigaction) =
-        std.EnumArray(Signal, Sigaction).init(.{
-            .SIGHUP     = default_sigaction,
-            .SIGINT     = default_sigaction,
-            .SIGQUIT    = default_sigaction,
-            .SIGILL     = default_sigaction,
-            .SIGTRAP    = default_sigaction,
-            .SIGABRT    = default_sigaction,
-            .SIGBUS     = default_sigaction,
-            .SIGFPE     = default_sigaction,
-            .SIGKILL    = default_sigaction,
-            .SIGUSR1    = default_sigaction,
-            .SIGSEGV    = default_sigaction,
-            .SIGUSR2    = default_sigaction,
-            .SIGPIPE    = default_sigaction,
-            .SIGALRM    = default_sigaction,
-            .SIGTERM    = default_sigaction,
-            .SIGSTKFLT  = default_sigaction,
-            .SIGCHLD    = ignore_sigaction,
-            .SIGCONT    = default_sigaction,
-            .SIGSTOP    = default_sigaction,
-            .SIGTSTP    = default_sigaction,
-            .SIGTTIN    = default_sigaction,
-            .SIGTTOU    = default_sigaction,
-            .SIGURG     = default_sigaction,
-            .SIGXCPU    = default_sigaction,
-            .SIGXFSZ    = default_sigaction,
-            .SIGVTALRM  = default_sigaction,
-            .SIGPROF    = default_sigaction,
-            .SIGWINCH   = default_sigaction,
-            .SIGIO      = default_sigaction,
-            .SIGPOLL    = default_sigaction,
-            .SIGPWR     = default_sigaction,
-            .SIGSYS     = default_sigaction,
-        }),
+    actions: std.EnumArray(Signal, Sigaction) = blk: {
+        var arr = std.EnumArray(Signal, Sigaction).initFill(default_sigaction);
+        arr.set(.SIGCHLD, ignore_sigaction);
+        break :blk arr;
+    },
     ref: krn.RefCount = krn.RefCount.init(),
 
     pub fn init() SigHand {
@@ -328,7 +319,7 @@ pub const SigHand = struct {
         const lock_state = krn.task.current.thread_data.?.lock.lock_irq_disable();
         defer krn.task.current.thread_data.?.lock.unlock_irq_enable(lock_state);
 
-        const static_bit: std.StaticBitSet(32) = krn.task.current.getRealPending();
+        const static_bit: std.StaticBitSet(NSIG) = krn.task.current.getRealPending();
         var iterator = static_bit.iterator(.{});
 
         while (iterator.next()) |i| {
