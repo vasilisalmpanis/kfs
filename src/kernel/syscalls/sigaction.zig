@@ -6,7 +6,7 @@ const krn = @import("../main.zig");
 const std = @import("std");
 
 fn do_sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) !u32 {
-    if (sig == 0 or sig > signals.Signal.SIGSYS.toPosix())
+    if (sig == 0 or sig > signals.NSIG)
         return errors.EINVAL;
     const signal = signals.Signal.fromPosix(@intCast(sig));
     if (signal == .SIGKILL or signal == .SIGSTOP)
@@ -99,33 +99,31 @@ pub fn sigprocmask(
     set: ?*signals.sigset_t,
     oset: ?*signals.sigset_t,
 ) !u32 {
-    var oldset: u32 = 0;
-    var newset: u32 = 0;
-    var new_blocked: signals.sigset_t = signals.sigset_t.init();
-    oldset = tsk.current.sigmask._bits[0];
+    const oldset: u64 = tsk.current.sigmask.toU64();
     if (set) |_set| {
-        newset = _set._bits[0];
-        new_blocked = tsk.current.sigmask;
+        const newset: u64 = _set.toU64();
+        var blocked: u64 = oldset;
         switch (how) {
             SIG_BLOCK => {
-                new_blocked._bits[0] |= newset;
+                blocked |= newset;
             },
             SIG_UNBLOCK => {
-                new_blocked._bits[0] &= ~newset;
+                blocked &= ~newset;
             },
             SIG_SETMASK => {
-                new_blocked._bits[0] = newset;
+                blocked = newset;
             },
             else => {
                 return errors.EINVAL;
             }
         }
+        var new_blocked = signals.sigset_t.fromU64(blocked);
         new_blocked.sigDelSet(signals.Signal.SIGKILL);
         new_blocked.sigDelSet(signals.Signal.SIGSTOP);
         tsk.current.sigmask = new_blocked;
     }
     if (oset) |_oset| {
-        _oset._bits[0] = oldset;
+        _oset.* = signals.sigset_t.fromU64(oldset);
     }
     return 0;
 }
@@ -140,10 +138,11 @@ pub fn rt_sigpending(
 }
 
 pub fn sigpending(uset: ?*signals.sigset_t) u32 {
-    var set = signals.sigset_t.init();
     const task_raw = krn.task.current.sigpending.getRaw();
     const thread_raw = krn.task.current.thread_data.?.pending.getRaw();
-    set._bits[0] = (task_raw | thread_raw) & krn.task.current.sigmask._bits[0];
+    const set = signals.sigset_t.fromU64(
+        (task_raw | thread_raw) & krn.task.current.sigmask.toU64()
+    );
     if (uset) |_uset| {
         _uset.* = set;
     }
@@ -217,7 +216,7 @@ pub fn rt_sigtimedwait(
     while (true) {
         const task_raw = krn.task.current.sigpending.getRaw();
         const thread_raw = krn.task.current.thread_data.?.pending.getRaw();
-        const all_pending: std.StaticBitSet(32) = @bitCast(task_raw | thread_raw);
+        const all_pending: std.StaticBitSet(signals.NSIG) = @bitCast(task_raw | thread_raw);
         var iterator = all_pending.iterator(.{});
         while (iterator.next()) |sig| {
             const signal = signals.Signal.fromInt(sig);
