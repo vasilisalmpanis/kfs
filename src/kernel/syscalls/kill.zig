@@ -43,7 +43,7 @@ fn send_signal(_task: *tsk.Task, signal: i32, tid: u32) !u32 {
 
 /// tid == 0 - send to process
 pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
-    if (sig < 0 or sig > signals.Signal.SIGSYS.toPosix())
+    if (sig < 0 or sig > @as(i32, signals.NSIG))
         return errors.EINVAL;
     if (pid == 0 or pid < -1) {
         const lock_state = tsk.tasks_lock.lock_irq_disable();

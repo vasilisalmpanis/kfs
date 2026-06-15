@@ -601,6 +601,9 @@ pub const arch = struct {
 
     };
 
+    pub const sw = struct {
+    };
+
     pub const syscalls = struct {
         pub const thread = struct {
             pub const UserDesc = extern struct {
@@ -833,6 +836,7 @@ pub const kernel = struct {
             ctty : ?*kernel.fs.file.File= null,
             stack_bottom : u32,
             state : kernel.task.TaskState,
+            kernel_esp : u32= 0,
             regs : arch.Regs,
             tls : u32= 0,
             limit : u32= 0,
@@ -879,7 +883,6 @@ pub const kernel = struct {
     };
 
     pub const sched = struct {
-        pub extern fn schedule(*arch.Regs)*arch.Regs;
     };
 
     pub const Mutex = struct {
@@ -925,7 +928,7 @@ pub const kernel = struct {
             _bits : [2]u32,
         };
 
-        pub const Sigaction = struct {
+        pub const Sigaction = extern struct {
             handler : extern union { handler: ?*const fn(i32) void, sigaction: ?*const fn(i32, *const kernel.signals.Siginfo, ?*anyopaque) void },
             flags : u32,
             restorer : ?*const fn() void= null,
@@ -965,11 +968,43 @@ pub const kernel = struct {
             SIGPOLL = 29,
             SIGPWR = 30,
             SIGSYS = 31,
+            SIGRT00 = 32,
+            SIGRT01 = 33,
+            SIGRT02 = 34,
+            SIGRT03 = 35,
+            SIGRT04 = 36,
+            SIGRT05 = 37,
+            SIGRT06 = 38,
+            SIGRT07 = 39,
+            SIGRT08 = 40,
+            SIGRT09 = 41,
+            SIGRT10 = 42,
+            SIGRT11 = 43,
+            SIGRT12 = 44,
+            SIGRT13 = 45,
+            SIGRT14 = 46,
+            SIGRT15 = 47,
+            SIGRT16 = 48,
+            SIGRT17 = 49,
+            SIGRT18 = 50,
+            SIGRT19 = 51,
+            SIGRT20 = 52,
+            SIGRT21 = 53,
+            SIGRT22 = 54,
+            SIGRT23 = 55,
+            SIGRT24 = 56,
+            SIGRT25 = 57,
+            SIGRT26 = 58,
+            SIGRT27 = 59,
+            SIGRT28 = 60,
+            SIGRT29 = 61,
+            SIGRT30 = 62,
+            SIGRT31 = 63,
         };
 
 
         pub const SigPending = struct {
-            set : std.bit_set.IntegerBitSet(32),
+            set : std.bit_set.ArrayBitSet(usize, 64),
         };
 
         pub const SigHand = struct {

@@ -529,14 +529,14 @@ pub const Task = struct {
     pub fn hasPendingSignal(self: *Task) bool {
         return (
             (self.sigpending.getRaw() | self.thread_data.?.pending.getRaw())
-            & (~self.sigmask._bits[0])
+            & (~self.sigmask.toU64())
         ) != 0;
     }
 
-    pub fn getRealPending(self: *Task) std.StaticBitSet(32) {
+    pub fn getRealPending(self: *Task) std.StaticBitSet(signal.NSIG) {
         const real_pending = (
             self.sigpending.getRaw() | self.thread_data.?.pending.getRaw()
-        ) & (~self.sigmask._bits[0]);
+        ) & (~self.sigmask.toU64());
         return @bitCast(real_pending);
     }
 
