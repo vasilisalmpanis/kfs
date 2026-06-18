@@ -68,7 +68,6 @@ pub export fn exceptionHandler(state: *Regs) callconv(.c) *Regs {
 
 pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     @setRuntimeSafety(false);
-    const orig_eax = state.eax;
     if (krn.irq.handlers[state.int_no] != null) {
         if (state.int_no == SYSCALL_INTERRUPT) {
             const handler: *const SyscallHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
@@ -86,15 +85,15 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     if (state.int_no == TIMER_INTERRUPT)
         krn.sched.schedule();
 
-    _ = processSignalsHelper(state, orig_eax);
+    _ = processSignalsHelper(state);
 
     return state;
 }
 
-pub export fn processSignalsHelper(regs: *Regs, orig_eax: i32) callconv(.c) *Regs {
+pub export fn processSignalsHelper(regs: *Regs) callconv(.c) *Regs {
     if (tsk.current.tsktype != .KTHREAD) {
         var ucontext = signals.Ucontext{};
-        ucontext.setRegs(regs, orig_eax);
+        ucontext.setRegs(regs);
         ucontext.mask = tsk.current.sigmask;
         return signals.processSignals(regs, &ucontext);
     }
@@ -137,6 +136,7 @@ const ErrorCodes = std.EnumMap(krn.exceptions.Exceptions, bool).init(.{
 });
 
 pub const push_regs: []const u8 =
+\\    push %eax
 \\    pusha
 \\    push %ds
 \\    push %es
@@ -157,7 +157,7 @@ pub const pop_regs: []const u8 =
 \\    pop %es
 \\    pop %ds
 \\    popa
-\\
+\\    add $4, %esp
 ;
 
 const kernel_entry_clear_flags: []const u8 =

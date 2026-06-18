@@ -7,24 +7,25 @@ const USER_DATA_SEGMENT = @import("../idt.zig").USER_DATA_SEGMENT;
 
 
 pub const Regs = struct {
-    gs: u32, 
+    gs: u32,
     fs: u32,
     es: u32,
-    ds: u32,      // pushed the segs last 
-    edi: u32, 
-    esi: u32, 
-    ebp: u32, 
-    esp: u32, 
-    ebx: u32, 
-    edx: u32, 
-    ecx: u32, 
+    ds: u32,      // pushed the segs last
+    edi: u32,
+    esi: u32,
+    ebp: u32,
+    esp: u32,
+    ebx: u32,
+    edx: u32,
+    ecx: u32,
     eax: i32,
-    int_no: u32, 
+    orig_eax: i32,
+    int_no: u32,
     err_code: u32,
-    eip: u32, 
-    cs: u32, 
-    eflags: u32, 
-    useresp: u32, 
+    eip: u32,
+    cs: u32,
+    eflags: u32,
+    useresp: u32,
     ss: u32,
 
     pub fn init() Regs {
@@ -41,6 +42,7 @@ pub const Regs = struct {
             .edx = 0,
             .ecx = 0,
             .eax = 0,
+            .orig_eax = 0,
             .int_no = 0,
             .err_code = 0,
             .eip = 0,
@@ -107,13 +109,14 @@ pub fn setupStack(
     stack_ptr[9] = 0;               // edx
     stack_ptr[10] = 0;              // ecx
     stack_ptr[11] = 0;              // eax
-    stack_ptr[12] = 0;              // int code
-    stack_ptr[13] = 0;              // error code
-    stack_ptr[14] = eip;            // eip
-    stack_ptr[15] = cs;             // cs
-    stack_ptr[16] = 0x202;          // eflags
-    stack_ptr[17] = useresp;        // useresp
-    stack_ptr[18] = ss;             // ss
+    stack_ptr[12] = 0;              // orig_eax
+    stack_ptr[13] = 0;              // int code
+    stack_ptr[14] = 0;              // error code
+    stack_ptr[15] = eip;            // eip
+    stack_ptr[16] = cs;             // cs
+    stack_ptr[17] = 0x202;          // eflags
+    stack_ptr[18] = useresp;        // useresp
+    stack_ptr[19] = ss;             // ss
     return @intFromPtr(stack_ptr);
 }
 
