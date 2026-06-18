@@ -359,7 +359,7 @@ pub const SigHand = struct {
             const action = self.actions.get(signal);
 
             if (action.handler.handler == sigIGN) {
-                continue;
+                return .{.action = ignore_sigaction, .signal = i};
             } else if (action.handler.handler == sigDFL) {
                 return .{.action = default_sigaction, .signal = i};
             } else {
@@ -422,7 +422,7 @@ fn setupHandlerFnFrame(
     setupUcontext(ucontext_ptr, ucontext);
     const _ucontext: *Ucontext = @ptrFromInt(ucontext_ptr);
     if (krn.errors.fromErrno(regs.eax) == krn.errors.PosixError.ERESTARTSYS) {
-        if (result.action.flags & SA_RESTART != 0) {
+        if (result.action.flags & SA_RESTART != 0 and regs.int_no == arch.idt.SYSCALL_INTERRUPT) {
             _ucontext.mcontext.eip -= 2;
             _ucontext.mcontext.eax = @bitCast(regs.orig_eax);
         } else {
@@ -449,7 +449,6 @@ pub fn processSignals(regs: *arch.Regs, mask: sigset_t) *arch.Regs {
                 return regs;
             if (result.action.handler.handler == default_sigaction.handler.handler) {
                 const _regs = defaultHandler(Signal.fromInt(result.signal), regs);
-                // maybe restart
                 return _regs;
             }
             if (result.action.handler.handler != ignore_sigaction.handler.handler) {
@@ -467,12 +466,22 @@ pub fn processSignals(regs: *arch.Regs, mask: sigset_t) *arch.Regs {
                     result,
                     &ucontext
                 );
+            } else {
+                if (krn.errors.fromErrno(regs.eax) == krn.errors.PosixError.ERESTARTSYS) {
+                    if (regs.int_no == arch.idt.SYSCALL_INTERRUPT) {
+                        regs.eax = regs.orig_eax;
+                        regs.eip -= 2;
+                    }
+                }
             }
             // Go to signal handler
             return regs;
+        } else {
+            if (krn.errors.fromErrno(regs.eax) == krn.errors.PosixError.ERESTARTSYS) {
+                regs.eax = krn.errors.toErrno(krn.errors.PosixError.EINTR);
+            }
         }
     }
-    // maybe restart
     return regs;
 }
 

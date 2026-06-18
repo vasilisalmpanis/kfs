@@ -86,7 +86,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
             errdefer task.refcount.put();
             while (!wait_opts.isSet(task)) {
                 if (tsk.current.hasPendingSignal())
-                    return errors.EINTR;
+                    return errors.ERESTARTSYS;
                 if (options & WNOHANG > 0) {
                     task.refcount.put();
                     return 0;
@@ -134,7 +134,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                     break;
                 tsk.current.wait_wq.wait(true, 0);
                 if (tsk.current.hasPendingSignal())
-                    return errors.EINTR;
+                    return errors.ERESTARTSYS;
             }
         }
     } else if (pid == -1) {
@@ -164,7 +164,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                     break;
                 tsk.current.wait_wq.wait(true, 0);
                 if (tsk.current.hasPendingSignal())
-                    return errors.EINTR;
+                    return errors.ERESTARTSYS;
             }
         }
     } else {
@@ -195,7 +195,7 @@ pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
                     break;
                 tsk.current.wait_wq.wait(true, 0);
                 if (tsk.current.hasPendingSignal())
-                    return errors.EINTR;
+                    return errors.ERESTARTSYS;
             }
         } else {
         }

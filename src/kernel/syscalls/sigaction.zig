@@ -60,7 +60,6 @@ pub fn sigreturn() !u32 {
     const signal_regs: *arch.Regs = arch.Regs.state();
     // for normal handlers offset should be 0 because restorer pops the signal number
     const regs_addr: u32 = signal_regs.useresp + 8;
-    const saved_regs: *arch.Regs = @ptrFromInt(regs_addr);
 
     const siginfo_addr: u32 = regs_addr + @sizeOf(arch.Regs);
     const siginfo: *signals.Siginfo = @ptrFromInt(siginfo_addr);
@@ -72,14 +71,13 @@ pub fn sigreturn() !u32 {
     restoreRegs(ucontext, signal_regs);
     tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
     tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
-    return krn.errors.fromErrno(saved_regs.eax);
+    return @bitCast(signal_regs.eax);
 }
 
 pub fn rt_sigreturn() !u32 {
     const signal_regs: *arch.Regs = arch.Regs.state();
     // for normal handlers offset should be 0 because restorer pops the signal number
     const regs_addr: u32 = signal_regs.useresp + 12;
-    const saved_regs: *arch.Regs = @ptrFromInt(regs_addr);
 
     const siginfo_addr: u32 = regs_addr + @sizeOf(arch.Regs);
     const siginfo: *signals.Siginfo = @ptrFromInt(siginfo_addr);
@@ -91,7 +89,7 @@ pub fn rt_sigreturn() !u32 {
     restoreRegs(ucontext, signal_regs);
     tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
     tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
-    return krn.errors.fromErrno(saved_regs.eax);
+    return @bitCast(signal_regs.eax);
 }
 
 const SIG_BLOCK  : i32 = 0;	// for blocking signals

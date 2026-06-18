@@ -189,7 +189,10 @@ fn futexWait(
     if (woke)
         return 0;
     if (krn.task.current.hasPendingSignal())
-        return errors.EINTR;
+        // An untimed FUTEX_WAIT is restartable. A timed wait would need
+        // restart_syscall to resume with the remaining timeout (a plain eip
+        // rewind would wait the full duration again), so keep it on EINTR.
+        return if (has_timeout) errors.EINTR else errors.ERESTARTSYS;
     if (has_timeout)
         return errors.ETIMEDOUT;
     return errors.EAGAIN;
