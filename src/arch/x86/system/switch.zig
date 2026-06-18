@@ -56,7 +56,7 @@ pub fn retFromFork() callconv(.naked) noreturn {
         \\ pop %es
         \\ pop %ds
         \\ popa
-        \\ add $8, %esp
+        \\ add $12, %esp
         \\ iret
     );
 }

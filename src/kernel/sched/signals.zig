@@ -50,9 +50,9 @@ pub const Ucontext = extern struct {
     mcontext: SigContext = SigContext{},
     mask: sigset_t = .{ ._bits = .{0, 0} },
 
-    pub fn setRegs(self: *Ucontext, regs: *arch.Regs, syscall: i32) void {
+    pub fn setRegs(self: *Ucontext, regs: *arch.Regs) void {
         self.mcontext.eax = @bitCast(regs.eax);
-        self.mcontext.trapno = @bitCast(syscall);
+        self.mcontext.trapno = @bitCast(regs.orig_eax);
         // TODO add the rest of the regs
     }
 };
