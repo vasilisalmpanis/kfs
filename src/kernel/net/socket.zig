@@ -288,7 +288,7 @@ pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
 
         listener.accept_wait.wait(true, 0);
         if (krn.task.current.hasPendingSignal())
-            return krn.errors.PosixError.EINTR;
+            return krn.errors.PosixError.ERESTARTSYS;
     }
 }
 
@@ -345,7 +345,7 @@ pub fn do_connect(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
         krn.task.current.state = .INTERRUPTIBLE_SLEEP;
         krn.sched.reschedule();
         if (krn.task.current.hasPendingSignal())
-            return krn.errors.PosixError.EINTR;
+            return krn.errors.PosixError.ERESTARTSYS;
     }
 
     krn.logger.INFO("connect() fd {d} connected", .{fd});
@@ -373,7 +373,7 @@ pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
 
         if (krn.task.current.hasPendingSignal()) {
             sock.lock.lock();
-            return krn.errors.PosixError.EINTR;
+            return krn.errors.PosixError.ERESTARTSYS;
         }
 
         sock.lock.lock();
@@ -403,7 +403,7 @@ pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
         sock.rw_queue.waitIfInQueue(&wq_node, true, 0);
         if (krn.task.current.hasPendingSignal()) {
             remote.lock.lock();
-            return krn.errors.PosixError.EINTR;
+            return krn.errors.PosixError.ERESTARTSYS;
         }
 
         if (sock.conn == null) {
