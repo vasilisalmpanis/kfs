@@ -36,8 +36,28 @@ pub fn rt_sigaction(
     return do_sigaction(sig, act, oact);
 }
 
+fn restoreRegs(ctx: *signals.Ucontext, regs: *arch.cpu.Regs) void {
+    regs.edi = ctx.mcontext.edi;
+    regs.esi = ctx.mcontext.esi;
+    regs.ebp = ctx.mcontext.ebp;
+    regs.esp = ctx.mcontext.esp;
+    regs.useresp = ctx.mcontext.esp;
+    regs.ebx = ctx.mcontext.ebx;
+    regs.edx = ctx.mcontext.edx;
+    regs.ecx = ctx.mcontext.ecx;
+    regs.eax = @bitCast(ctx.mcontext.eax);
+    regs.eip = ctx.mcontext.eip;
+    regs.cs = ctx.mcontext.cs;
+    regs.ss = ctx.mcontext.ss;
+    regs.gs = ctx.mcontext.gs;
+    regs.fs = ctx.mcontext.fs;
+    regs.es = ctx.mcontext.es;
+    regs.ds = ctx.mcontext.ds;
+    regs.orig_eax = -1; // To not restart syscall again
+}
+
 pub fn sigreturn() !u32 {
-    const signal_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
+    const signal_regs: *arch.Regs = arch.Regs.state();
     // for normal handlers offset should be 0 because restorer pops the signal number
     const regs_addr: u32 = signal_regs.useresp + 8;
     const saved_regs: *arch.Regs = @ptrFromInt(regs_addr);
@@ -49,17 +69,14 @@ pub fn sigreturn() !u32 {
     const ucontext_addr: u32 = siginfo_addr + @sizeOf(signals.Siginfo);
     const ucontext: *signals.Ucontext = @ptrFromInt(ucontext_addr);
 
-    signal_regs.* = saved_regs.*;
+    restoreRegs(ucontext, signal_regs);
     tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
     tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
-    if (saved_regs.eax >= 0) { // ERESTARTSYS
-        return @intCast(saved_regs.eax);
-    }
     return krn.errors.fromErrno(saved_regs.eax);
 }
 
 pub fn rt_sigreturn() !u32 {
-    const signal_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
+    const signal_regs: *arch.Regs = arch.Regs.state();
     // for normal handlers offset should be 0 because restorer pops the signal number
     const regs_addr: u32 = signal_regs.useresp + 12;
     const saved_regs: *arch.Regs = @ptrFromInt(regs_addr);
@@ -71,11 +88,9 @@ pub fn rt_sigreturn() !u32 {
     const ucontext_addr: u32 = siginfo_addr + @sizeOf(signals.Siginfo);
     const ucontext: *signals.Ucontext = @ptrFromInt(ucontext_addr);
 
-    signal_regs.* = saved_regs.*;
+    restoreRegs(ucontext, signal_regs);
     tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
     tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
-    if (saved_regs.eax >= 0)
-        return @intCast(saved_regs.eax);
     return krn.errors.fromErrno(saved_regs.eax);
 }
 
@@ -155,14 +170,13 @@ pub fn rt_sigsuspend(_mask: ?*signals.sigset_t) !u32 {
         return errors.EFAULT;
     krn.logger.INFO("sigsuspend mask {b:0>32}", .{mask._bits[0]});
 
-    var uctx = signals.Ucontext{};
-    uctx.mask = krn.task.current.sigmask;
+    const oldmask = krn.task.current.sigmask;
 
     krn.task.current.sigmask = mask.*;
 
     if (krn.task.current.hasPendingSignal()) {
         state.eax = krn.errors.toErrno(errors.EINTR);
-        _ = signals.processSignals(state, &uctx);
+        _ = signals.processSignals(state, oldmask);
         return errors.EINTR;
     }
 
@@ -170,7 +184,12 @@ pub fn rt_sigsuspend(_mask: ?*signals.sigset_t) !u32 {
     krn.sched.reschedule();
 
     state.eax = krn.errors.toErrno(errors.EINTR);
-    _ = signals.processSignals(state, &uctx);
+    // we might have two pending signals
+    // We will do setupHandlerFrame here
+    // and also another time after syscall and this
+    // will corrupt signal delivery.
+
+    _ = signals.processSignals(state, oldmask);
 
     return errors.EINTR;
 }

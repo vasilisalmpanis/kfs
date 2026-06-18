@@ -92,10 +92,7 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
 
 pub export fn processSignalsHelper(regs: *Regs) callconv(.c) *Regs {
     if (tsk.current.tsktype != .KTHREAD) {
-        var ucontext = signals.Ucontext{};
-        ucontext.setRegs(regs);
-        ucontext.mask = tsk.current.sigmask;
-        return signals.processSignals(regs, &ucontext);
+        return signals.processSignals(regs, krn.task.current.sigmask);
     }
     return regs;
 }
