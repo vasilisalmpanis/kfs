@@ -17,10 +17,14 @@ const SigAltStack = extern struct {
 };
 
 const SigContext = extern struct {
-    gs: u16 = 0,
+        gs: u16 = 0,
+        __gsh: u16 = 0,
 	fs: u16 = 0,
+	__fsh: u16 = 0,
 	es: u16 = 0,
+	__esh: u16 = 0,
 	ds: u16 = 0,
+	__dsh: u16 = 0,
 	edi: u32 = 0,
 	esi: u32 = 0,
 	ebp: u32 = 0,
@@ -51,9 +55,32 @@ pub const Ucontext = extern struct {
     mask: sigset_t = .{ ._bits = .{0, 0} },
 
     pub fn setRegs(self: *Ucontext, regs: *arch.Regs) void {
+        self.mcontext.gs  = @truncate(regs.gs);
+        self.mcontext.fs  = @truncate(regs.fs);
+        self.mcontext.es  = @truncate(regs.es);
+        self.mcontext.ds  = @truncate(regs.ds);
+        self.mcontext.edi = regs.edi;
+        self.mcontext.esi = regs.esi;
+        self.mcontext.ebp = regs.ebp;
+        self.mcontext.esp = regs.useresp;          // user esp
+        self.mcontext.ebx = regs.ebx;
+        self.mcontext.edx = regs.edx;
+        self.mcontext.ecx = regs.ecx;
         self.mcontext.eax = @bitCast(regs.eax);
         self.mcontext.trapno = @bitCast(regs.orig_eax);
-        // TODO add the rest of the regs
+        self.mcontext.err = regs.err_code;
+        self.mcontext.eip = regs.eip;              // <-- the field the handler reads as MC_PC
+        self.mcontext.cs  = @truncate(regs.cs);
+        self.mcontext.eflags = regs.eflags;
+        self.mcontext.esp_at_signal = regs.useresp;
+        self.mcontext.ss  = @truncate(regs.ss);
+        // Todo save fpu state and restore it
+	self.mcontext.fpstate = 0;
+        // TODO this code is ARCH dependent and restoring of oldmask depends on it
+        // move to arch together with sigreturn and use it to reflect changes of
+        // userspace.
+	self.mcontext.oldmask = krn.task.current.sigmask._bits[0];
+        self.mcontext.cr2 = arch.vmm.getCR2();
     }
 };
 
@@ -378,6 +405,8 @@ fn setupHandlerFnFrame(
     result: SigRes,
     ucontext: *Ucontext,
 ) void {
+    // TODO: removed saved regs from userspace stack its not neccessary because
+    // its already present in ucontext
     const returnAddrSize: u32 = 4 + 4 + 4 + 4 + @sizeOf(arch.Regs) + @sizeOf(Siginfo) + @sizeOf(Ucontext);
     const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 16);
     const regs_ptr: u32 = @intFromPtr(saved_regs);
@@ -391,6 +420,15 @@ fn setupHandlerFnFrame(
 
     const ucontext_ptr = siginfo_ptr + @sizeOf(Siginfo);
     setupUcontext(ucontext_ptr, ucontext);
+    const _ucontext: *Ucontext = @ptrFromInt(ucontext_ptr);
+    if (krn.errors.fromErrno(regs.eax) == krn.errors.PosixError.ERESTARTSYS) {
+        if (result.action.flags & SA_RESTART != 0) {
+            _ucontext.mcontext.eip -= 2;
+            _ucontext.mcontext.eax = @bitCast(regs.orig_eax);
+        } else {
+            _ucontext.mcontext.eax = @bitCast(krn.errors.toErrno(krn.errors.PosixError.EINTR));
+        }
+    }
 
     const signal_stack: [*]u32 = @ptrFromInt(regs.useresp);
     signal_stack[0] = @intFromPtr(result.action.restorer);
@@ -399,7 +437,7 @@ fn setupHandlerFnFrame(
     signal_stack[3] = ucontext_ptr;
 }
 
-pub fn processSignals(regs: *arch.Regs, ucontext: *Ucontext) *arch.Regs {
+pub fn processSignals(regs: *arch.Regs, mask: sigset_t) *arch.Regs {
     if (!regs.isRing3()) {
         return regs;
     }
@@ -415,6 +453,10 @@ pub fn processSignals(regs: *arch.Regs, ucontext: *Ucontext) *arch.Regs {
                 return _regs;
             }
             if (result.action.handler.handler != ignore_sigaction.handler.handler) {
+                var ucontext = Ucontext{};
+                ucontext.setRegs(regs);
+                ucontext.mask = mask;
+
                 tsk.current.sigmask._bits[0] |= result.action.mask._bits[0];
                 tsk.current.sigmask._bits[1] |= result.action.mask._bits[1];
                 if (result.action.flags & SA_NODEFER == 0) {
@@ -423,7 +465,7 @@ pub fn processSignals(regs: *arch.Regs, ucontext: *Ucontext) *arch.Regs {
                 setupHandlerFnFrame(
                     regs,
                     result,
-                    ucontext
+                    &ucontext
                 );
             }
             // Go to signal handler
