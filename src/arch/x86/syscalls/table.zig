@@ -271,6 +271,8 @@ pub const SyscallTable = brk: {
         .SYS_tkill                      = @ptrCast(&krn.syscalls.kill.tkill),
         .SYS_tgkill                     = @ptrCast(&krn.syscalls.kill.tgkill),
         .SYS_futex                      = @ptrCast(&krn.syscalls.futex.futex),
+        .SYS_set_robust_list            = @ptrCast(&krn.syscalls.robust_list.set_robust_list),
+        .SYS_get_robust_list            = @ptrCast(&krn.syscalls.robust_list.get_robust_list),
     });
 };
 

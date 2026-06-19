@@ -862,6 +862,7 @@ pub const kernel = struct {
             sigmask : kernel.signals.sigset_t,
             wait_wq : kernel.wq.WaitQueueHead,
             vfork_wq : ?*kernel.wq.WaitQueueHead= null,
+            robust_list : ?*kernel.syscalls.robust_list.RobustListHead= null,
             threadfn : ?*const fn(?*const anyopaque) i32= null,
             arg : ?*const anyopaque= null,
             result : i32= 0,
@@ -1601,6 +1602,15 @@ pub const kernel = struct {
         };
 
         pub const id = struct {
+        };
+
+        pub const robust_list = struct {
+            pub const RobustListHead = extern struct {
+                list : std.syscalls.robust_list.RobustList,
+                futex_offset : u32,
+                list_op_pending : *std.syscalls.robust_list.RobustList,
+            };
+
         };
 
     };

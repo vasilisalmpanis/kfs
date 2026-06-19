@@ -129,6 +129,9 @@ pub const Task = struct {
     wait_wq:        krn.wq.WaitQueueHead    = krn.wq.WaitQueueHead.init(),
     vfork_wq:       ?*krn.wq.WaitQueueHead  = null,
 
+    // futex
+    robust_list:    ?*krn.syscalls.robust_list.RobustListHead = null,
+
     // only for kthreads
     threadfn:       ?ThreadHandler       = null,
     arg:            ?*const anyopaque    = null,
@@ -198,6 +201,7 @@ pub const Task = struct {
         self.vfork_wq = null;
         self.sigpending = krn.signals.SigPending.init();
         self.kernel_esp = 0;
+        self.robust_list = null;
     }
 
     pub fn setName(self: *Task, name: []const u8) void {
@@ -246,6 +250,7 @@ pub const Task = struct {
         self.should_stop = tmp.should_stop;
         self.sigpending = tmp.sigpending;
         self.clear_tid = tmp.clear_tid;
+        self.robust_list = tmp.robust_list;
 
         self.regs = Regs.init();
         self.tree = tree.TreeNode.init();
