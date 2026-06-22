@@ -860,6 +860,7 @@ pub const kernel = struct {
             sighand : ?*kernel.signals.SigHand= null,
             sigpending : kernel.signals.SigPending,
             sigmask : kernel.signals.sigset_t,
+            altstack : kernel.signals.SigAltStack,
             wait_wq : kernel.wq.WaitQueueHead,
             vfork_wq : ?*kernel.wq.WaitQueueHead= null,
             robust_list : ?*kernel.syscalls.robust_list.RobustListHead= null,
@@ -912,10 +913,16 @@ pub const kernel = struct {
     };
 
     pub const signals = struct {
+        pub const SigAltStack = extern struct {
+            sp : u32= 0,
+            flags : u32= 0,
+            size : u32= 0,
+        };
+
         pub const Ucontext = extern struct {
             flags : u32= 0,
             link : ?*kernel.signals.Ucontext= null,
-            stack : std.sched.signals.SigAltStack,
+            stack : kernel.signals.SigAltStack,
             mcontext : std.sched.signals.SigContext,
             mask : kernel.signals.sigset_t,
         };
@@ -1487,12 +1494,6 @@ pub const kernel = struct {
         };
 
         pub const sigaction = struct {
-            pub const StackT = extern struct {
-                ss_sp : ?*anyopaque= null,
-                ss_flags : i32= 2,
-                ss_size : u32= 0,
-            };
-
         };
 
         pub const sleep = struct {
