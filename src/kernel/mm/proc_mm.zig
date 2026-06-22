@@ -242,8 +242,6 @@ pub const MM = struct {
     fn release(ref: *krn.RefCount) void {
         const _mm: *MM = @fieldParentPtr("ref", ref);
         _mm.releaseMappings();
-        if (!_mm.isCurrentMM())
-            _mm.delete();
     }
 
     pub fn add_vma(
