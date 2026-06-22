@@ -279,28 +279,27 @@ pub const MINSIGSTKSZ: usize = 2048;
 pub const SIGSTKSZ: usize = 8192;
 
 /// Signal stack flags
-pub const SS_ONSTACK: i32 = 1;
-pub const SS_DISABLE: i32 = 2;
-
-pub const StackT = extern struct {
-    ss_sp: ?*anyopaque = null,
-    ss_flags: i32 = SS_DISABLE,
-    ss_size: usize = 0,
-};
+pub const SS_ONSTACK: u32 = 1;
+pub const SS_DISABLE: u32 = 2;
+pub const SS_AUTODISARM: u32 = 1 << 31;
 
 pub fn sigaltstack(
-    ss: ?*StackT,
-    old_ss: ?*StackT
+    _ss: ?*signals.SigAltStack,
+    old_ss: ?*signals.SigAltStack
 ) !u32 {
     if (old_ss) |oss| {
-        // Report no alternate signal stack configured
-        oss.ss_sp = null;
-        oss.ss_flags = SS_DISABLE;
-        oss.ss_size = 0;
+        const state = arch.Regs.state();
+        oss.* = krn.task.current.altstack;
+        if (state.useresp > oss.sp and state.useresp - oss.sp <= oss.size)
+            oss.flags |= SS_ONSTACK;
     }
 
-    if (ss) |_| {
-        // TODO: Actually implement alternate signal stack
+    if (_ss) |ss| {
+        if (ss.flags & SS_AUTODISARM != 0)
+            return errors.EINVAL;
+        if (ss.flags & SS_ONSTACK != 0)
+            return errors.EINVAL;
+        // TODO: Check if anyother flags are there and return EINVAL if true
     }
     return 0;
 }

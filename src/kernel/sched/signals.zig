@@ -10,9 +10,9 @@ pub const Sigval = extern union {
     ptr: *anyopaque,
 };
 
-const SigAltStack = extern struct {
-    sp: ?*anyopaque = null,
-    flags: i32 = 0,
+pub const SigAltStack = extern struct {
+    sp: u32 = 0,
+    flags: u32 = 0,
     size: usize = 0,
 };
 
