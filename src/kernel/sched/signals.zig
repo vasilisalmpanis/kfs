@@ -192,6 +192,13 @@ pub const SA_NODEFER  : u32  = 0x40000000; // Don't block the signal during its 
 pub const SA_RESETHAND: u32  = 0x80000000; // Reset handler to default after one use
 pub const SA_RESTART  : u32  = 0x10000000; // Restart syscall if possible after handler
 pub const SA_SIGINFO  : u32  = 0x00000004; // Use sa_sigaction instead of sa_handler
+pub const SA_ONSTACK  : u32  = 0x08000000; // Deliver the signal on the alternate stack
+
+pub const SS_ONSTACK   : u32 = 1;          // Currently executing on the alt stack
+pub const SS_DISABLE   : u32 = 2;          // Alt stack is disabled
+
+pub const MINSIGSTKSZ: usize = 2048;
+pub const SIGSTKSZ: usize = 8192;
 
 pub const sigDFL: ?HandlerFn = @ptrFromInt(0);
 pub const sigIGN: ?HandlerFn = @ptrFromInt(1);
@@ -400,6 +407,32 @@ fn setupUcontext(ptr: u32, ucontext: ?*Ucontext) void {
     }
 }
 
+pub fn onSigStack(sp: u32) bool {
+    const alt = krn.task.current.altstack;
+    if (alt.size == 0)
+        return false;
+    return sp > alt.sp and (sp - alt.sp) <= @as(u32, @intCast(alt.size));
+}
+
+fn altStackFlags(sp: u32) u32 {
+    if (krn.task.current.altstack.size == 0)
+        return SS_DISABLE;
+    return if (onSigStack(sp)) SS_ONSTACK else 0;
+}
+
+fn sigFrameTop(regs: *arch.Regs, action: Sigaction) u32 {
+    const alt = krn.task.current.altstack;
+    if (action.flags & SA_ONSTACK != 0
+        and alt.size != 0
+        and !onSigStack(regs.useresp))
+    {
+        const top: u32 = alt.sp + @as(u32, @intCast(alt.size));
+        // return top & ~@as(u32, 0xf);
+        return top;
+    }
+    return regs.useresp;
+}
+
 fn setupHandlerFnFrame(
     regs: *arch.Regs,
     result: SigRes,
@@ -408,12 +441,13 @@ fn setupHandlerFnFrame(
     // TODO: removed saved regs from userspace stack its not neccessary because
     // its already present in ucontext
     const returnAddrSize: u32 = 4 + 4 + 4 + 4 + @sizeOf(arch.Regs) + @sizeOf(Siginfo) + @sizeOf(Ucontext);
-    const saved_regs: *arch.Regs = @ptrFromInt(regs.useresp - returnAddrSize + 16);
+    const frame_top: u32 = sigFrameTop(regs, result.action);
+    const saved_regs: *arch.Regs = @ptrFromInt(frame_top - returnAddrSize + 16);
     const regs_ptr: u32 = @intFromPtr(saved_regs);
 
     saved_regs.* = regs.*;
     regs.eip = @intFromPtr(result.action.handler.sigaction);
-    regs.useresp -= returnAddrSize;
+    regs.useresp = frame_top - returnAddrSize;
 
     const siginfo_ptr = regs_ptr + @sizeOf(arch.Regs);
     setupSiginfo(siginfo_ptr, result.signal, null);
@@ -455,6 +489,9 @@ pub fn processSignals(regs: *arch.Regs, mask: sigset_t) *arch.Regs {
                 var ucontext = Ucontext{};
                 ucontext.setRegs(regs);
                 ucontext.mask = mask;
+                ucontext.stack.sp = task.altstack.sp;
+                ucontext.stack.size = task.altstack.size;
+                ucontext.stack.flags = altStackFlags(regs.useresp);
 
                 tsk.current.sigmask._bits[0] |= result.action.mask._bits[0];
                 tsk.current.sigmask._bits[1] |= result.action.mask._bits[1];
