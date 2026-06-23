@@ -126,6 +126,7 @@ pub const Task = struct {
     sighand:        ?*signal.SigHand        = null,
     sigpending:     krn.signals.SigPending  = krn.signals.SigPending.init(),
     sigmask:        signal.sigset_t         = signal.sigset_t.init(),
+    altstack:       signal.SigAltStack      = signal.SigAltStack{},
     wait_wq:        krn.wq.WaitQueueHead    = krn.wq.WaitQueueHead.init(),
     vfork_wq:       ?*krn.wq.WaitQueueHead  = null,
 
@@ -202,6 +203,7 @@ pub const Task = struct {
         self.sigpending = krn.signals.SigPending.init();
         self.kernel_esp = 0;
         self.robust_list = null;
+        self.altstack = signal.SigAltStack{};
     }
 
     pub fn setName(self: *Task, name: []const u8) void {
@@ -265,6 +267,7 @@ pub const Task = struct {
 
         self.setName(name);
         self.sigmask = current.sigmask;
+        self.altstack = tmp.altstack;
         self.wait_wq = krn.wq.WaitQueueHead.init();
         self.wait_wq.setup();
         self.vfork_wq = null;

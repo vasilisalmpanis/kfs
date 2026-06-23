@@ -36,6 +36,18 @@ pub fn rt_sigaction(
     return do_sigaction(sig, act, oact);
 }
 
+fn restoreAltStack(uss: *const signals.SigAltStack) void {
+    if (signals.onSigStack(arch.Regs.state().useresp))
+        return;
+    if (uss.flags & signals.SS_DISABLE != 0) {
+        tsk.current.altstack = .{ .sp = 0, .flags = 0, .size = 0 };
+        return;
+    }
+    if (uss.size < signals.MINSIGSTKSZ)
+        return;
+    tsk.current.altstack = .{ .sp = uss.sp, .flags = 0, .size = uss.size };
+}
+
 fn restoreRegs(ctx: *signals.Ucontext, regs: *arch.cpu.Regs) void {
     regs.edi = ctx.mcontext.edi;
     regs.esi = ctx.mcontext.esi;
@@ -89,6 +101,7 @@ pub fn rt_sigreturn() !u32 {
     restoreRegs(ucontext, signal_regs);
     tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
     tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
+    restoreAltStack(&ucontext.stack);
     return @bitCast(signal_regs.eax);
 }
 
@@ -273,34 +286,47 @@ pub fn rt_sigtimedwait(
     }
 }
 
-/// Minimum signal stack size
-pub const MINSIGSTKSZ: usize = 2048;
-/// Default signal stack size
-pub const SIGSTKSZ: usize = 8192;
-
-/// Signal stack flags
-pub const SS_ONSTACK: i32 = 1;
-pub const SS_DISABLE: i32 = 2;
-
-pub const StackT = extern struct {
-    ss_sp: ?*anyopaque = null,
-    ss_flags: i32 = SS_DISABLE,
-    ss_size: usize = 0,
-};
-
 pub fn sigaltstack(
-    ss: ?*StackT,
-    old_ss: ?*StackT
+    _ss: ?*signals.SigAltStack,
+    old_ss: ?*signals.SigAltStack
 ) !u32 {
+    const state = arch.Regs.state();
+    const on_stack = signals.onSigStack(state.useresp);
+
     if (old_ss) |oss| {
-        // Report no alternate signal stack configured
-        oss.ss_sp = null;
-        oss.ss_flags = SS_DISABLE;
-        oss.ss_size = 0;
+        var old = krn.task.current.altstack;
+        old.flags = if (old.size == 0)
+            signals.SS_DISABLE
+        else if (on_stack)
+            signals.SS_ONSTACK
+        else
+            0;
+        oss.* = old;
     }
 
-    if (ss) |_| {
-        // TODO: Actually implement alternate signal stack
+    if (_ss) |ss| {
+        if (on_stack)
+            return errors.EPERM;
+
+        const mode = ss.flags;
+        if (mode != signals.SS_DISABLE and mode != signals.SS_ONSTACK and mode != 0)
+            return errors.EINVAL;
+
+        if (mode & signals.SS_DISABLE != 0) {
+            krn.task.current.altstack = .{
+                .sp = 0,
+                .flags = 0,
+                .size = 0
+            };
+        } else {
+            if (ss.size < signals.MINSIGSTKSZ)
+                return errors.ENOMEM;
+            krn.task.current.altstack = .{
+                .sp = ss.sp,
+                .flags = 0,
+                .size = ss.size
+            };
+        }
     }
     return 0;
 }
