@@ -455,8 +455,10 @@ fn setupHandlerFnFrame(
     const ucontext_ptr = siginfo_ptr + @sizeOf(Siginfo);
     setupUcontext(ucontext_ptr, ucontext);
     const _ucontext: *Ucontext = @ptrFromInt(ucontext_ptr);
-    if (krn.errors.fromErrno(regs.eax) == krn.errors.PosixError.ERESTARTSYS) {
-        if (result.action.flags & SA_RESTART != 0 and regs.int_no == arch.idt.SYSCALL_INTERRUPT) {
+    if (regs.int_no == arch.idt.SYSCALL_INTERRUPT and
+        krn.errors.fromErrno(regs.eax) == krn.errors.PosixError.ERESTARTSYS)
+    {
+        if (result.action.flags & SA_RESTART != 0) {
             _ucontext.mcontext.eip -= 2;
             _ucontext.mcontext.eax = @bitCast(regs.orig_eax);
         } else {
@@ -504,17 +506,19 @@ pub fn processSignals(regs: *arch.Regs, mask: sigset_t) *arch.Regs {
                     &ucontext
                 );
             } else {
-                if (krn.errors.fromErrno(regs.eax) == krn.errors.PosixError.ERESTARTSYS) {
-                    if (regs.int_no == arch.idt.SYSCALL_INTERRUPT) {
-                        regs.eax = regs.orig_eax;
-                        regs.eip -= 2;
-                    }
+                if (regs.int_no == arch.idt.SYSCALL_INTERRUPT and
+                    krn.errors.fromErrno(regs.eax) == krn.errors.PosixError.ERESTARTSYS)
+                {
+                    regs.eax = regs.orig_eax;
+                    regs.eip -= 2;
                 }
             }
             // Go to signal handler
             return regs;
         } else {
-            if (krn.errors.fromErrno(regs.eax) == krn.errors.PosixError.ERESTARTSYS) {
+            if (regs.int_no == arch.idt.SYSCALL_INTERRUPT and
+                krn.errors.fromErrno(regs.eax) == krn.errors.PosixError.ERESTARTSYS)
+            {
                 regs.eax = krn.errors.toErrno(krn.errors.PosixError.EINTR);
             }
         }

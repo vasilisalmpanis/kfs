@@ -156,6 +156,10 @@ pub fn errorToCode(err: PosixError) u16 {
 
 pub fn codeToError(code: u16) ?PosixError {
     const err_code: ErrorCode = @enumFromInt(code);
+    switch (err_code) {
+        _ => return null,
+        else => {},
+    }
     const err_name = @tagName(err_code);
 
     inline for (@typeInfo(PosixError).error_set.?) |e| {
