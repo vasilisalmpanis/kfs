@@ -246,7 +246,7 @@ pub fn fstat64(fd: u32, buf: ?*StatLinux) !u32 {
 }
 
 pub fn fstatat64(
-    dir_fd: u32,
+    dir_fd: i32,
     path: ?[*:0]u8,
     buf: ?*StatLinux,
     flags: u32
@@ -262,23 +262,34 @@ pub fn fstatat64(
     if (path_slice.len == 0) {
         return errors.ENOENT;
     }
+    if (dir_fd < 0 and dir_fd != fs.AT_FDCWD) {
+        return errors.EBADF;
+    }
     if (path_slice[0] == '/') {
         return stat64(path, buf);
-    } else if (krn.task.current.files.fds.get(dir_fd)) |file| {
-        file.ref.get();
-        defer file.ref.put();
-        if (!file.inode.mode.isDir()) {
-            return errors.ENOTDIR;
+    }
+
+    var from_path = krn.task.current.fs.pwd.clone();
+    defer from_path.release();
+
+    if (dir_fd != fs.AT_FDCWD) {
+        if (krn.task.current.files.fds.get(@intCast(dir_fd))) |file| {
+            file.ref.get();
+            defer file.ref.put();
+            if (!file.inode.mode.isDir()) {
+                return errors.ENOTDIR;
+            }
+            if (file.path == null)
+                return errors.ENOENT;
+            from_path.release();
+            from_path = file.path.?.clone();
+        } else {
+            return errors.EBADF;
         }
-        if (file.path == null)
-            return errors.ENOENT;
-        const from_path = file.path.?.clone();
-        defer from_path.release();
-        const target = try fs.path.resolveFrom(path_slice, from_path, true);
-        defer target.release();
-        krn.logger.INFO(" target {s} {any}\n", .{target.dentry.name, target.dentry.inode.mode.isDir()});
-        try do_stat(target.dentry.inode, buf.?);
-        return 0;
-    } 
-    return errors.EBADF;
+    }
+
+    const target = try fs.path.resolveFrom(path_slice, from_path, true);
+    defer target.release();
+    try do_stat(target.dentry.inode, buf.?);
+    return 0;
 }
