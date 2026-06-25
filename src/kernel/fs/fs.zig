@@ -37,6 +37,7 @@ pub const FileOps = file.FileOps;
 
 // Pipe
 pub const pipe = @import("./pipe.zig");
+pub const epoll = @import("./epoll.zig");
 
 pub const examplefs = @import("example/filesystem.zig");
 pub const sysfs = @import("sys/filesystem.zig");

@@ -1242,6 +1242,19 @@ pub const kernel = struct {
 
         };
 
+        pub const epoll = struct {
+            pub const EpollEntry = struct {
+                fd : i32,
+                events : u32,
+                data : u64,
+            };
+
+            pub const EpollState = struct {
+                entries : std.array_list.Aligned(kernel.fs.epoll.EpollEntry, null),
+            };
+
+        };
+
         pub const examplefs = struct {
             pub const ExampleFileSystem = struct {
                 base : kernel.fs.filesystem.FileSystem,
@@ -1617,6 +1630,11 @@ pub const kernel = struct {
         };
 
         pub const epoll = struct {
+            pub const EpollEvent = extern struct {
+                events : u32,
+                data : u64,
+            };
+
         };
 
     };

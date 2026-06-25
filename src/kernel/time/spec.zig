@@ -30,6 +30,10 @@ pub const kernel_timespec = extern struct {
         };
     }
 
+    pub inline fn toMSec(self: *const kernel_timespec) usize {
+        return @as(usize, @intCast(self.tv_sec)) * 1000 +| @as(usize, @intCast(self.tv_nsec)) / 1000000;
+    }
+
     pub inline fn sub(
         self: *const kernel_timespec,
         other: *const kernel_timespec
