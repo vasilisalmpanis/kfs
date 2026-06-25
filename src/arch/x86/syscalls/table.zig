@@ -22,7 +22,7 @@ fn notImpl(_: u32, _: u32, _: u32, _: u32, _: u32, _: u32) !u32 {
 }
 
 pub const SyscallTable = brk: {
-    @setEvalBranchQuota(1700);
+    @setEvalBranchQuota(2000);
     break :brk std.EnumMap(Syscall, *const SyscallHandler).init(.{
         .SYS_fallocate                  = &notImpl,
         .SYS_setup                      = &notImpl,
@@ -273,6 +273,12 @@ pub const SyscallTable = brk: {
         .SYS_futex                      = @ptrCast(&krn.syscalls.futex.futex),
         .SYS_set_robust_list            = @ptrCast(&krn.syscalls.robust_list.set_robust_list),
         .SYS_get_robust_list            = @ptrCast(&krn.syscalls.robust_list.get_robust_list),
+        .SYS_epoll_create               = @ptrCast(&krn.syscalls.epoll.epoll_create),
+        .SYS_epoll_create1              = @ptrCast(&krn.syscalls.epoll.epoll_create1),
+        .SYS_epoll_ctl                  = @ptrCast(&krn.syscalls.epoll.epoll_ctl),
+        .SYS_epoll_pwait                = @ptrCast(&krn.syscalls.epoll.epoll_pwait),
+        .SYS_epoll_pwait2               = @ptrCast(&krn.syscalls.epoll.epoll_pwait2),
+        .SYS_epoll_wait                 = @ptrCast(&krn.syscalls.epoll.epoll_wait),
     });
 };
 

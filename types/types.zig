@@ -1616,6 +1616,9 @@ pub const kernel = struct {
 
         };
 
+        pub const epoll = struct {
+        };
+
     };
 
 
