@@ -191,10 +191,14 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
                 defer _tty.lock.unlock();
                 return @intCast(_tty.file_buff.readLineInto(buf[0..size]));
             }
+            if (file.flags & krn.fs.file.O_NONBLOCK != 0) {
+                _tty.lock.unlock();
+                return krn.errors.PosixError.EAGAIN;
+            }
             _tty.lock.unlock();
             _tty.read_queue.wait(true, 0);
             if (krn.task.current.hasPendingSignal())
-                return krn.errors.PosixError.EINTR;
+                return krn.errors.PosixError.ERESTARTSYS;
         }
     } else {
         const vmin: u8 = _tty.term.c_cc[t.VMIN];
@@ -238,11 +242,16 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
                     }
                     return @intCast(n);
                 }
+                if (file.flags & krn.fs.file.O_NONBLOCK != 0) {
+                    if (to_read > 0)
+                        _tty.lock.unlock();
+                    return krn.errors.PosixError.EAGAIN;
+                }
                 if (to_read > 0)
                     _tty.lock.unlock();
                 _tty.read_queue.wait(true, to_sleep);
                 if (krn.task.current.hasPendingSignal())
-                    return krn.errors.PosixError.EINTR;
+                    return krn.errors.PosixError.ERESTARTSYS;
                 continue;
             }
             const to_read = @min(avail, size);

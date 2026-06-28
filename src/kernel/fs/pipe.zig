@@ -80,10 +80,13 @@ pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     while (pipe.rb.isEmpty()) {
         if (pipe.writers == 0)
             return 0;
+        if (base.flags & krn.fs.file.O_NONBLOCK != 0)
+            return krn.errors.PosixError.EAGAIN;
+
         var wq_node = krn.wq.WaitQueueNode.init(krn.task.current);
         wq_node.setup();
-
         pipe.read_queue.addToQueue(&wq_node);
+        
         pipe.lock.unlock();
         pipe.read_queue.waitIfInQueue(&wq_node, true, 0);
         if (krn.task.current.hasPendingSignal()) {
@@ -112,9 +115,11 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     }
 
     while (pipe.rb.isFull()) {
+        if (base.flags & krn.fs.file.O_NONBLOCK != 0)
+            return krn.errors.PosixError.EAGAIN;
+
         var wq_node = krn.wq.WaitQueueNode.init(krn.task.current);
         wq_node.setup();
-
         pipe.write_queue.addToQueue(&wq_node);
         pipe.lock.unlock();
         pipe.write_queue.waitIfInQueue(&wq_node, true, 0);
