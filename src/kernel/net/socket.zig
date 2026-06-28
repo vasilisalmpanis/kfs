@@ -286,6 +286,8 @@ pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
         }
         listener.lock.unlock();
 
+        if (file.flags & krn.fs.file.O_NONBLOCK != 0)
+            return krn.errors.PosixError.EAGAIN;
         listener.accept_wait.wait(true, 0);
         if (krn.task.current.hasPendingSignal())
             return krn.errors.PosixError.ERESTARTSYS;
@@ -341,6 +343,9 @@ pub fn do_connect(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
     listener.accept_wait.wakeUpOne();
 
     while (sock.conn == null) {
+        if (file.flags & krn.fs.file.O_NONBLOCK != 0)
+            return krn.errors.PosixError.EAGAIN;
+
         krn.task.current.wakeup_time = krn.currentMs() + 10;
         krn.task.current.state = .INTERRUPTIBLE_SLEEP;
         krn.sched.reschedule();
@@ -363,6 +368,8 @@ pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
         if (sock.conn == null) {
             return krn.errors.PosixError.ENOTCONN;
         }
+        if (base.flags & krn.fs.file.O_NONBLOCK != 0)
+            return krn.errors.PosixError.EAGAIN;
 
         var wq_node = krn.wq.WaitQueueNode.init(krn.task.current);
         wq_node.setup();
@@ -395,6 +402,9 @@ pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     remote.lock.lock();
     defer remote.lock.unlock();
     while (remote.rb.isFull()) {
+        if (base.flags & krn.fs.file.O_NONBLOCK != 0)
+            return krn.errors.PosixError.EAGAIN;
+
         var wq_node = krn.wq.WaitQueueNode.init(krn.task.current);
         wq_node.setup();
 
