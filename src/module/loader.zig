@@ -221,7 +221,7 @@ pub fn load_module(slice: []u8, name: []const u8) !*Module {
         }
     );
     try place_sections(module, slice, sh_arr[0..ehdr.e_shnum]);
-    
+
     const section_strings: [*]u8 = @ptrCast(&slice[sh_hdr.sh_offset]);
     const section_strings_slice = section_strings[0..sh_hdr.sh_size];
     var sh_symtab: ?*std.elf.Elf32_Shdr = null;

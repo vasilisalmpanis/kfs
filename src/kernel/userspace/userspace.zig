@@ -100,30 +100,6 @@ pub fn validateElfHeader(userspace: []const u8) !void{
     if (ehdr.e_type != .EXEC and ehdr.e_type != .DYN) {
         return ElfValidationError.UnsupportedType;
     }
-
-    if (!checkKernelLoadable32(userspace, ehdr))
-        return ElfValidationError.DynamicLoaderRequired;
-}
-
-fn checkKernelLoadable32(userspace: []const u8, ehdr: *const std.elf.Elf32_Ehdr) bool {
-    var has_interp = false;
-
-    for (0..ehdr.e_phnum) |i| {
-        if (ehdr.e_phoff + (ehdr.e_phentsize * i) + @sizeOf(std.elf.Elf32_Phdr) > userspace.len) {
-            break;
-        }
-
-        const p_hdr: *const std.elf.Elf32_Phdr = @ptrCast(
-            @alignCast(&userspace[ehdr.e_phoff + (ehdr.e_phentsize * i)])
-        );
-
-        const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
-        switch (header_type) {
-            .PT_INTERP => has_interp = true,
-            else => {},
-        }
-    }
-    return !has_interp;
 }
 
 pub fn setEnvironment(
@@ -202,19 +178,53 @@ pub fn setEnvironment(
     }
 }
 
-pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []const []const u8) !void {
+pub fn prepareBinary(
+    elf_binary: []const u8,
+    argv: []const []const u8,
+    envp: []const []const u8
+) !void {
 
     const stack_pages: u32 = 30;
     var heap_start: usize = 0;
+    var final_eip: u32 = 0;
+    var interp_binary: ?[] u8 = null;
 
     const prot: u32 = krn.mm.PROT_RW;
-    const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(userspace));
+    const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(elf_binary));
     const is_pie = ehdr.e_type == .DYN;
     const load_base: usize = if (is_pie) PIE_LOAD_BASE else 0;
+    for (0..ehdr.e_phnum) |i| {
+        const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
+            @constCast(@alignCast(&elf_binary[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
+        );
+        const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
+        if (header_type == PT_TYPE.PT_INTERP) {
+            // Check that there is no other interp
+            if (interp_binary != null)
+                return krn.errors.PosixError.ENOEXEC;
+
+            const interp_name: []const u8 = elf_binary[p_hdr.p_offset..p_hdr.p_offset + p_hdr.p_filesz];
+            const path = try krn.fs.path.resolve(interp_name);
+            defer path.release();
+            const file = try krn.fs.File.new(path);
+            defer file.ref.put();
+            if (!file.inode.mode.canExecute(krn.task.current.uid, krn.task.current.gid))
+                return krn.errors.PosixError.EPERM;
+            interp_binary = krn.mm.kmallocSlice(u8, file.inode.size) orelse
+                return krn.errors.PosixError.ENOMEM;
+            var bytes_read: u32 = 0;
+            while (bytes_read < file.inode.size) {
+                const res: u32 = try file.ops.read(file, interp_binary.?.ptr, interp_binary.?.len - bytes_read);
+                bytes_read += res;
+            }
+            try validateElfHeader(interp_binary.?);
+        }
+    }
+    defer if (interp_binary != null) krn.mm.kfreeSlice(interp_binary.?);
 
     for (0..ehdr.e_phnum) |i| {
         const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
-            @constCast(@alignCast(&userspace[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
+            @constCast(@alignCast(&elf_binary[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
         );
         const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
         if (header_type != PT_TYPE.PT_LOAD) {
@@ -246,7 +256,7 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
         if (p_hdr.p_filesz > 0) {
             @memcpy(
                 section_ptr[0..p_hdr.p_filesz],
-                userspace[p_hdr.p_offset..p_hdr.p_offset + p_hdr.p_filesz]
+                elf_binary[p_hdr.p_offset..p_hdr.p_offset + p_hdr.p_filesz]
             );
         }
         if (p_hdr.p_memsz > p_hdr.p_filesz) {
@@ -305,8 +315,8 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
     setEnvironment(stack_bottom, stack_size, argv, envp, aux_buf[0..aux_count]);
 
     krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack_bottom, stack_bottom + stack_size});
-    const entry = load_base + ehdr.e_entry;
-    krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{entry});
+    final_eip = load_base + ehdr.e_entry;
+    krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{final_eip});
 
     // Also arch specific
     heap_start = arch.pageAlign(heap_start, false);
@@ -316,7 +326,7 @@ pub fn prepareBinary(userspace: []const u8, argv: []const []const u8, envp: []co
     krn.task.current.mm.?.heap = heap_start + HEAP_MMAP_GAP;
     krn.task.current.mm.?.stack_bottom = stack_bottom;
     krn.task.current.mm.?.stack_top = stack_bottom + stack_size;
-    krn.task.current.mm.?.code = entry;
+    krn.task.current.mm.?.code = final_eip;
     krn.task.current.tsktype = .PROCESS;
 }
 
