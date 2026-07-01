@@ -15,6 +15,7 @@ const ELFDATA2LSB = 1;
 const EV_CURRENT = 1;
 
 const PIE_LOAD_BASE: usize = 0x0001_0000; // base addr where to load PIE static binaries
+const INTERP_LOAD_BASE: usize = 0x8000_0000;
 
 const PT_TYPE = enum (u32) {
     PT_NULL = 0,
@@ -23,6 +24,20 @@ const PT_TYPE = enum (u32) {
     PT_INTERP = 3,
     _,
 };
+
+// Elf Program Segment flags
+const PF_X: u32 = 0x1;
+const PF_W: u32 = 0x2;
+const PF_R: u32 = 0x4;
+
+fn PFtoProt(flags: u32) u32 {
+    var res: u32 = 0;
+    if (flags & PF_R != 0)
+        res |= krn.mm.PROT_READ;
+    if (flags & PF_W != 0)
+        res |= krn.mm.PROT_WRITE;
+    return res;
+}
 
 pub const HEAP_MMAP_GAP: usize = 4 * 1024 * 1024;
 
@@ -178,53 +193,19 @@ pub fn setEnvironment(
     }
 }
 
-pub fn prepareBinary(
-    elf_binary: []const u8,
-    argv: []const []const u8,
-    envp: []const []const u8
-) !void {
-
-    const stack_pages: u32 = 30;
-    var heap_start: usize = 0;
-    var final_eip: u32 = 0;
-    var interp_binary: ?[] u8 = null;
-
+/// Returns end address of last mapped segment
+fn loadSegments(elf: []const u8, load_base: usize) !struct{
+    load_addr: usize,
+    end_addr: usize
+} {
+    var load_addr: usize = 0;
+    var end_addr: usize = 0;
+    var load_addr_set: bool = false;
     const prot: u32 = krn.mm.PROT_RW;
-    const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(elf_binary));
-    const is_pie = ehdr.e_type == .DYN;
-    const load_base: usize = if (is_pie) PIE_LOAD_BASE else 0;
+    const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(elf));
     for (0..ehdr.e_phnum) |i| {
         const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
-            @constCast(@alignCast(&elf_binary[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
-        );
-        const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
-        if (header_type == PT_TYPE.PT_INTERP) {
-            // Check that there is no other interp
-            if (interp_binary != null)
-                return krn.errors.PosixError.ENOEXEC;
-
-            const interp_name: []const u8 = elf_binary[p_hdr.p_offset..p_hdr.p_offset + p_hdr.p_filesz];
-            const path = try krn.fs.path.resolve(interp_name);
-            defer path.release();
-            const file = try krn.fs.File.new(path);
-            defer file.ref.put();
-            if (!file.inode.mode.canExecute(krn.task.current.uid, krn.task.current.gid))
-                return krn.errors.PosixError.EPERM;
-            interp_binary = krn.mm.kmallocSlice(u8, file.inode.size) orelse
-                return krn.errors.PosixError.ENOMEM;
-            var bytes_read: u32 = 0;
-            while (bytes_read < file.inode.size) {
-                const res: u32 = try file.ops.read(file, interp_binary.?.ptr, interp_binary.?.len - bytes_read);
-                bytes_read += res;
-            }
-            try validateElfHeader(interp_binary.?);
-        }
-    }
-    defer if (interp_binary != null) krn.mm.kfreeSlice(interp_binary.?);
-
-    for (0..ehdr.e_phnum) |i| {
-        const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
-            @constCast(@alignCast(&elf_binary[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
+            @constCast(@alignCast(&elf[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
         );
         const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
         if (header_type != PT_TYPE.PT_LOAD) {
@@ -244,7 +225,7 @@ pub fn prepareBinary(
         _ = krn.task.current.mm.?.mmap_area(
             page_start,
             aligned_size,
-            prot,
+            prot, // TODO: remap later with PFtoProt(p_hdr.p_flags),
             krn.mm.MAP.anonymous(),
             null,
             0
@@ -256,15 +237,86 @@ pub fn prepareBinary(
         if (p_hdr.p_filesz > 0) {
             @memcpy(
                 section_ptr[0..p_hdr.p_filesz],
-                elf_binary[p_hdr.p_offset..p_hdr.p_offset + p_hdr.p_filesz]
+                elf[p_hdr.p_offset..p_hdr.p_offset + p_hdr.p_filesz]
             );
         }
         if (p_hdr.p_memsz > p_hdr.p_filesz) {
             @memset(section_ptr[p_hdr.p_filesz..p_hdr.p_memsz], 0);
         }
-        if (seg_end > heap_start)
-            heap_start = seg_end;
+        if (!load_addr_set) {
+            load_addr_set = true;
+            load_addr = p_hdr.p_vaddr - p_hdr.p_offset;
+        }
+        if (seg_end > end_addr)
+            end_addr = seg_end;
     }
+    return .{
+        .load_addr = load_addr,
+        .end_addr = end_addr,
+    };
+}
+
+pub fn prepareBinary(
+    elf_binary: []const u8,
+    argv: []const []const u8,
+    envp: []const []const u8
+) !void {
+
+    const stack_pages: u32 = 30;
+    var heap_start: usize = 0;
+    var final_eip: u32 = 0;
+    var interp_binary: ?[] u8 = null;
+    var interp_entry: usize = 0;
+
+    const prot: u32 = krn.mm.PROT_RW;
+    const ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(elf_binary));
+    const is_pie = ehdr.e_type == .DYN;
+    const load_base: usize = if (is_pie) PIE_LOAD_BASE else 0;
+
+    for (0..ehdr.e_phnum) |i| {
+        const p_hdr: *std.elf.Elf32_Phdr = @ptrCast(
+            @constCast(@alignCast(&elf_binary[ehdr.e_phoff + (ehdr.e_phentsize * i)]))
+        );
+        const header_type: PT_TYPE = @enumFromInt(p_hdr.p_type);
+        if (header_type == PT_TYPE.PT_INTERP) {
+            // Check that there is no other interp
+            if (interp_binary != null)
+                return krn.errors.PosixError.ENOEXEC;
+
+            const interp_name: []const u8 = std.mem.span(
+                @as([*:0]const u8, @ptrCast(elf_binary.ptr + p_hdr.p_offset))
+            );
+            const path = try krn.fs.path.resolve(interp_name);
+
+            defer path.release();
+            const file = try krn.fs.File.new(path);
+            defer file.ref.put();
+            if (!file.inode.mode.canExecute(krn.task.current.uid, krn.task.current.gid))
+                return krn.errors.PosixError.EPERM;
+            interp_binary = krn.mm.kmallocSlice(u8, file.inode.size) orelse
+                return krn.errors.PosixError.ENOMEM;
+            var bytes_read: u32 = 0;
+            while (bytes_read < file.inode.size) {
+                const res: u32 = try file.ops.read(
+                    file,
+                    interp_binary.?.ptr + bytes_read,
+                    interp_binary.?.len - bytes_read
+                );
+                bytes_read += res;
+            }
+            try validateElfHeader(interp_binary.?);
+        }
+    }
+    defer if (interp_binary != null) krn.mm.kfreeSlice(interp_binary.?);
+
+    const elf_addrs = try loadSegments(elf_binary, load_base);
+    heap_start = elf_addrs.end_addr;
+    if (interp_binary) |_int_bin| {
+        const int_ehdr: *const std.elf.Elf32_Ehdr = @ptrCast(@alignCast(interp_binary));
+        interp_entry = int_ehdr.e_entry;
+        _ = try loadSegments(_int_bin, INTERP_LOAD_BASE);
+    }
+
     const stack_size: usize = stack_pages * arch.PAGE_SIZE;
     const vdso_code_pages = vdso.imagePages();
     const vdso_total_pages = 1 + vdso_code_pages; // vvar + code
@@ -293,8 +345,8 @@ pub fn prepareBinary(
 
     var aux_buf: [10]AuxEntry = undefined;
     var aux_count: usize = 0;
-    if (is_pie) {
-        aux_buf[aux_count] = .{ .key = AT_PHDR, .val = load_base + ehdr.e_phoff };
+    if (is_pie or interp_binary != null) {
+        aux_buf[aux_count] = .{ .key = AT_PHDR, .val = load_base + elf_addrs.load_addr + ehdr.e_phoff };
         aux_count += 1;
         aux_buf[aux_count] = .{ .key = AT_PHENT, .val = ehdr.e_phentsize };
         aux_count += 1;
@@ -302,7 +354,10 @@ pub fn prepareBinary(
         aux_count += 1;
         aux_buf[aux_count] = .{ .key = AT_ENTRY, .val = load_base + ehdr.e_entry };
         aux_count += 1;
-        aux_buf[aux_count] = .{ .key = AT_BASE, .val = load_base };
+        aux_buf[aux_count] = .{
+                .key = AT_BASE,
+                .val = if (interp_binary != null) INTERP_LOAD_BASE else load_base
+        };
         aux_count += 1;
     }
     aux_buf[aux_count] = .{ .key = AT_SYSINFO_EHDR, .val = vdso_ehdr_addr };
@@ -312,10 +367,18 @@ pub fn prepareBinary(
     aux_buf[aux_count] = .{ .key = AT_NULL, .val = 0 };
     aux_count += 1;
 
-    setEnvironment(stack_bottom, stack_size, argv, envp, aux_buf[0..aux_count]);
+    setEnvironment(
+        stack_bottom,
+        stack_size,
+        argv, envp,
+        aux_buf[0..aux_count]
+    );
 
     krn.logger.INFO("Userspace stack: 0x{X:0>8} 0x{X:0>8}", .{stack_bottom, stack_bottom + stack_size});
-    final_eip = load_base + ehdr.e_entry;
+    final_eip = if (interp_binary != null)
+        INTERP_LOAD_BASE + interp_entry
+    else
+        load_base + ehdr.e_entry;
     krn.logger.INFO("Userspace EIP (_start): 0x{X:0>8}", .{final_eip});
 
     // Also arch specific
