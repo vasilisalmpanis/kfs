@@ -88,6 +88,21 @@ pub const Socket = struct {
         }
         return sock;
     }
+    
+    pub fn getName(self: *Socket, addr: *sockaddr, len: *i32) void {
+        addr.sa_family = AF_UNIX;
+        var addr_un = @as(*sockaddr_un, @ptrCast(addr));
+        if (self.bound_path_len > 0) {
+            @memcpy(
+                addr_un.sun_path[0..self.bound_path_len],
+                self.bound_path[0..self.bound_path_len]
+            );
+            len.* = @intCast(@sizeOf(u16) + self.bound_path_len + 1);
+        } else {
+            addr_un.sun_path[0] = 0;
+            len.* = @sizeOf(u16) + 1;
+        }
+    }
 };
 
 const MAX_BOUND_SOCKETS: usize = 32;
@@ -181,13 +196,7 @@ pub fn do_bind(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
 
     const addr: *const sockaddr_un = @ptrCast(@alignCast(addr_ptr));
 
-    const path_max = addr_len - @offsetOf(sockaddr_un, "sun_path");
-    var path_len: usize = 0;
-    while (path_len < path_max and addr.sun_path[path_len] != 0) : (path_len += 1) {}
-
-    if (path_len == 0) {
-        return krn.errors.PosixError.EINVAL;
-    }
+    const path_len = addr_len - @offsetOf(sockaddr_un, "sun_path");
 
     if (findBoundSocket(addr.sun_path[0..path_len]) != null) {
         return krn.errors.PosixError.EADDRINUSE;

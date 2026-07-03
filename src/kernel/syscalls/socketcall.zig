@@ -2,6 +2,7 @@ const tsk = @import("../sched/task.zig");
 const errors = @import("./error-codes.zig").PosixError;
 const krn = @import("../main.zig");
 const arch = @import("arch");
+const IoVec = @import("./read.zig").IoVec;
 
 const CallType = enum(u8) {
     SYS_SOCKET = 1,	// 1   sys_socket(2)
@@ -187,4 +188,188 @@ pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, add
         return errors.EBADF;
     }
     return 0;
+}
+
+const MsgHdr = struct {
+    name:       ?*krn.socket.sockaddr,
+    namelen:    i32,
+    iov:        ?[*]IoVec,
+    iovlen:     usize,
+    control:    ?*anyopaque,
+    controllen: usize,
+    flags:      u32,
+};
+
+pub fn sendmsg(sockfd: i32, _msg: ?*MsgHdr, flags: i32) !u32 {
+    _ = flags;
+    const msg = _msg orelse
+        return errors.EFAULT;
+    const iov = msg.iov orelse
+        return errors.EFAULT;
+    if (sockfd < 0)
+        return errors.EBADF;
+    if (krn.task.current.files.fds.get(@intCast(sockfd))) |file| {
+        if (!file.mode.isSock())
+            return errors.ENOTSOCK;
+        _ = file.inode.data.sock orelse
+            return errors.ENOTSOCK;
+        var sent: usize = 0;
+        for (iov, 0..msg.iovlen) |*_v, _| {
+            sent += try krn.socket.do_sendto(
+                file,
+                @ptrCast(_v.base),
+                _v.len
+            );
+        }
+        return sent;
+    }
+    return errors.EBADF;
+}
+
+pub fn recvmmsg(sockfd: i32, _msg: ?*MsgHdr, flags: i32) !u32 {
+    _ = flags;
+    const msg = _msg orelse
+        return errors.EFAULT;
+    const iov = msg.iov orelse
+        return errors.EFAULT;
+    if (sockfd < 0)
+        return errors.EBADF;
+    if (krn.task.current.files.fds.get(@intCast(sockfd))) |file| {
+        if (!file.mode.isSock())
+            return errors.ENOTSOCK;
+        _ = file.inode.data.sock orelse
+            return errors.ENOTSOCK;
+        var received: usize = 0;
+        for (iov, 0..msg.iovlen) |*_v, _| {
+            const recv_curr = try krn.socket.do_recvfrom(
+                file,
+                @ptrCast(_v.base),
+                _v.len
+            );
+            received += recv_curr;
+            if (recv_curr < _v.len)
+                break ;
+        }
+        return received;
+    }
+    return errors.EBADF;
+}
+
+pub fn getpeername(
+    sockfd: i32,
+    _addr: ?*krn.socket.sockaddr,
+    _addrlen: ?*i32,
+) !u32 {
+    if (sockfd < 0)
+        return errors.EBADF;
+    const addlen = _addrlen orelse
+        return errors.EINVAL;
+    const addr = _addr orelse
+        return errors.EINVAL;
+    if (addlen.* < 0)
+        return errors.EINVAL;
+    if (krn.task.current.files.fds.get(@intCast(sockfd))) |file| {
+        if (!file.mode.isSock())
+            return errors.ENOTSOCK;
+        const sock = file.inode.data.sock orelse
+            return errors.ENOTSOCK;
+        const peer = sock.conn orelse
+            return errors.ENOTCONN;
+        peer.lock.lock();
+        defer peer.lock.unlock();
+        
+        peer.getName(addr, addlen);
+        return 0;
+    }
+    return errors.EBADF;
+}
+
+pub fn getsockname(
+    sockfd: i32,
+    _addr: ?*krn.socket.sockaddr,
+    _addrlen: ?*i32,
+) !u32 {
+    if (sockfd < 0)
+        return errors.EBADF;
+    const addlen = _addrlen orelse
+        return errors.EINVAL;
+    const addr = _addr orelse
+        return errors.EINVAL;
+    if (addlen.* < 0)
+        return errors.EINVAL;
+    if (krn.task.current.files.fds.get(@intCast(sockfd))) |file| {
+        if (!file.mode.isSock())
+            return errors.ENOTSOCK;
+        const sock = file.inode.data.sock orelse
+            return errors.ENOTSOCK;
+        sock.lock.lock();
+        defer sock.lock.unlock();
+        
+        sock.getName(addr, addlen);
+        return 0;
+    }
+    return errors.EBADF;
+}
+
+pub fn getsockopt(
+    sockfd: i32,
+    level: i32,
+    optname: i32,
+    optval: ?*anyopaque,
+    optlen: ?*i32,
+) !u32 {
+    _ = optlen;
+    _ = optname;
+    _ = level;
+    _ = optval orelse
+        return errors.EFAULT;
+    if (sockfd < 0)
+        return errors.EBADF;
+    if (krn.task.current.files.fds.get(@intCast(sockfd))) |file| {
+        if (!file.mode.isSock())
+            return errors.ENOTSOCK;
+        _ = file.inode.data.sock orelse
+            return errors.ENOTSOCK;
+        return 0;
+    }
+    return errors.EBADF;
+}
+
+pub fn setsockopt(
+    sockfd: i32,
+    level: i32,
+    optname: i32,
+    optval: ?*anyopaque,
+    optlen: i32,
+) !u32 {
+    _ = optlen;
+    _ = optname;
+    _ = level;
+    _ = optval orelse
+        return errors.EFAULT;
+    if (sockfd < 0)
+        return errors.EBADF;
+    if (krn.task.current.files.fds.get(@intCast(sockfd))) |file| {
+        if (!file.mode.isSock())
+            return errors.ENOTSOCK;
+        _ = file.inode.data.sock orelse
+            return errors.ENOTSOCK;
+        return 0;
+    }
+    return errors.EBADF;
+}
+
+pub fn shutdown(sockfd: i32, how: i32) !u32 {
+    _ = how;
+    if (sockfd < 0)
+        return errors.EBADF;
+    if (krn.task.current.files.fds.get(@intCast(sockfd))) |file| {
+        if (!file.mode.isSock())
+            return errors.ENOTSOCK;
+        _ = file.inode.data.sock orelse
+            return errors.ENOTSOCK;
+        return 0;
+    }
+    return errors.EBADF;
+
 }

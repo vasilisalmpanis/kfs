@@ -280,6 +280,13 @@ pub const SyscallTable = brk: {
         .SYS_epoll_pwait2               = @ptrCast(&krn.syscalls.epoll.epoll_pwait2),
         .SYS_epoll_wait                 = @ptrCast(&krn.syscalls.epoll.epoll_wait),
         .SYS_prlimit64                  = @ptrCast(&krn.syscalls.rlimit.prlimit),
+        .SYS_getpeername                = @ptrCast(&krn.syscalls.socketcall.getpeername),
+        .SYS_getsockname                = @ptrCast(&krn.syscalls.socketcall.getsockname),
+        .SYS_getsockopt                 = @ptrCast(&krn.syscalls.socketcall.getsockopt),
+        .SYS_setsockopt                 = @ptrCast(&krn.syscalls.socketcall.setsockopt),
+        .SYS_shutdown                   = @ptrCast(&krn.syscalls.socketcall.shutdown),
+        .SYS_sendmsg                    = @ptrCast(&krn.syscalls.socketcall.sendmsg),
+        .SYS_recvmmsg                   = @ptrCast(&krn.syscalls.socketcall.recvmmsg),
     });
 };
 
