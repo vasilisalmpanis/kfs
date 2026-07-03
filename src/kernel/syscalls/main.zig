@@ -51,3 +51,4 @@ pub const write = @import("write.zig");
 pub const id = @import("id.zig");
 pub const robust_list = @import("robust_list.zig");
 pub const epoll = @import("epoll.zig");
+pub const rlimit = @import("rlimit.zig");

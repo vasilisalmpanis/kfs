@@ -1,13 +1,14 @@
 const kernel = @import("../main.zig");
 
 pub const ThreadData = struct {
-    nr_threads:     usize = 0,
-    threads:        kernel.list.ListHead,
-    ref:            kernel.RefCount,
-    lock:           kernel.Spinlock,
-    pending:        kernel.signals.SigPending,
-    group_exit:     bool = false,
-    group_exit_code: i32 = 0,
+    nr_threads:         usize = 0,
+    threads:            kernel.list.ListHead,
+    ref:                kernel.RefCount,
+    lock:               kernel.Spinlock,
+    pending:            kernel.signals.SigPending,
+    group_exit:         bool = false,
+    group_exit_code:    i32 = 0,
+    rlim:               [kernel.limit.RLIM_NLIMITS]kernel.limit.Rlimit,
 
     fn setup(self: *ThreadData) void {
         self.nr_threads = 0;
@@ -19,6 +20,7 @@ pub const ThreadData = struct {
         self.pending = kernel.signals.SigPending.init();
         self.group_exit = false;
         self.group_exit_code = 0;
+        self.rlim = kernel.limit.default_rlimits;
     }
 
     fn delete(ref: *kernel.RefCount) void {

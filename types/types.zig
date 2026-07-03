@@ -881,6 +881,7 @@ pub const kernel = struct {
             pending : kernel.signals.SigPending,
             group_exit : bool= false,
             group_exit_code : i32= 0,
+            rlim : [16]kernel.limit.Rlimit,
         };
 
     };
@@ -1063,6 +1064,14 @@ pub const kernel = struct {
             accept_wait : kernel.wq.WaitQueueHead,
             rw_queue : kernel.wq.WaitQueueHead,
             pending_link : kernel.list.ListHead,
+        };
+
+    };
+
+    pub const limit = struct {
+        pub const Rlimit = extern struct {
+            rlim_cur : u64,
+            rlim_max : u64,
         };
 
     };
@@ -1635,6 +1644,9 @@ pub const kernel = struct {
                 data : u64,
             };
 
+        };
+
+        pub const rlimit = struct {
         };
 
     };

@@ -117,8 +117,8 @@ pub const SyscallTable = brk: {
         .SYS_sigsuspend                 = &notImpl,
         .SYS_sigpending                 = @ptrCast(&krn.syscalls.sigaction.sigpending),
         .SYS_sethostname                = &notImpl,
-        .SYS_setrlimit                  = &notImpl,
-        .SYS_getrlimit                  = &notImpl,
+        .SYS_setrlimit                  = @ptrCast(&krn.syscalls.rlimit.setrlimit),
+        .SYS_getrlimit                  = @ptrCast(&krn.syscalls.rlimit.getrlimit),
         .SYS_getrusage                  = &notImpl,
         .SYS_gettimeofday               = &notImpl,
         .SYS_settimeofday               = &notImpl,
@@ -238,7 +238,7 @@ pub const SyscallTable = brk: {
         .SYS_getpmsg                    = &notImpl,
         .SYS_putpmsg                    = &notImpl,
         .SYS_vfork                      = @ptrCast(&krn.syscalls.clone.vfork),
-        .SYS_ugetrlimit                 = &notImpl,
+        .SYS_ugetrlimit                 = @ptrCast(&krn.syscalls.rlimit.getrlimit),
         .SYS_mmap2                      = @ptrCast(&krn.syscalls.mmap.mmap2),
         .SYS_socketpair                 = @ptrCast(&krn.syscalls.socketcall.socketpair),
         .SYS_sendto                     = @ptrCast(&krn.syscalls.socketcall.sendto),
@@ -279,6 +279,7 @@ pub const SyscallTable = brk: {
         .SYS_epoll_pwait                = @ptrCast(&krn.syscalls.epoll.epoll_pwait),
         .SYS_epoll_pwait2               = @ptrCast(&krn.syscalls.epoll.epoll_pwait2),
         .SYS_epoll_wait                 = @ptrCast(&krn.syscalls.epoll.epoll_wait),
+        .SYS_prlimit64                  = @ptrCast(&krn.syscalls.rlimit.prlimit),
     });
 };
 
