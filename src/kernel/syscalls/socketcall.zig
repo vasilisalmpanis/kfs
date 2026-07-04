@@ -75,6 +75,8 @@ pub fn socketcall(call: i32, args: [*]u32) !u32 {
         .SYS_ACCEPT4 => return try krn.socket.do_accept4(
             args[0], args[1], args[2], args[3],
         ),
+        .SYS_RECVMSG => return try recvmsg(@bitCast(args[0]), @ptrFromInt(args[1]), @bitCast(args[2])),
+        .SYS_SENDMSG => return try sendmsg(@bitCast(args[0]), @ptrFromInt(args[1]), @bitCast(args[2])),
         else => {
             return errors.EINVAL;
         },
@@ -226,7 +228,7 @@ pub fn sendmsg(sockfd: i32, _msg: ?*MsgHdr, flags: i32) !u32 {
     return errors.EBADF;
 }
 
-pub fn recvmmsg(sockfd: i32, _msg: ?*MsgHdr, flags: i32) !u32 {
+pub fn recvmsg(sockfd: i32, _msg: ?*MsgHdr, flags: i32) !u32 {
     _ = flags;
     const msg = _msg orelse
         return errors.EFAULT;
@@ -304,7 +306,7 @@ pub fn getsockname(
             return errors.ENOTSOCK;
         sock.lock.lock();
         defer sock.lock.unlock();
-        
+
         sock.getName(addr, addlen);
         return 0;
     }
@@ -335,6 +337,8 @@ pub fn getsockopt(
     return errors.EBADF;
 }
 
+const SOL_SOCKET: i32 = 1;
+
 pub fn setsockopt(
     sockfd: i32,
     level: i32,
@@ -342,9 +346,8 @@ pub fn setsockopt(
     optval: ?*anyopaque,
     optlen: i32,
 ) !u32 {
-    _ = optlen;
     _ = optname;
-    _ = level;
+    _ = optlen;
     _ = optval orelse
         return errors.EFAULT;
     if (sockfd < 0)
@@ -354,6 +357,9 @@ pub fn setsockopt(
             return errors.ENOTSOCK;
         _ = file.inode.data.sock orelse
             return errors.ENOTSOCK;
+        krn.logger.INFO("setsockopt\n",.{});
+        if (level != SOL_SOCKET)
+            return errors.EOPNOTSUPP;
         return 0;
     }
     return errors.EBADF;

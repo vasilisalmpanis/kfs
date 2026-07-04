@@ -149,7 +149,6 @@ pub const SyscallTable = brk: {
         .SYS_ioperm                     = &notImpl,
         .SYS_socketcall                 = @ptrCast(&krn.syscalls.socketcall.socketcall),
         .SYS_syslog                     = &notImpl,
-        .SYS_setitimer                  = &notImpl,
         .SYS_getitimer                  = &notImpl,
         .SYS_stat                       = &notImpl,
         .SYS_lstat                      = &notImpl,
@@ -286,7 +285,9 @@ pub const SyscallTable = brk: {
         .SYS_setsockopt                 = @ptrCast(&krn.syscalls.socketcall.setsockopt),
         .SYS_shutdown                   = @ptrCast(&krn.syscalls.socketcall.shutdown),
         .SYS_sendmsg                    = @ptrCast(&krn.syscalls.socketcall.sendmsg),
-        .SYS_recvmmsg                   = @ptrCast(&krn.syscalls.socketcall.recvmmsg),
+        .SYS_recvmsg                    = @ptrCast(&krn.syscalls.socketcall.recvmsg),
+        .SYS_setitimer                  = @ptrCast(&krn.syscalls.clock.setitimer),
+        .SYS_clock_getres               = @ptrCast(&krn.syscalls.clock.getres),
     });
 };
 

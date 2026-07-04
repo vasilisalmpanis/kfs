@@ -9,6 +9,12 @@ pub const AF_LOCAL: u16 = AF_UNIX;
 pub const SOCK_STREAM: u16 = 1;
 pub const SOCK_DGRAM: u16 = 2;
 
+pub const SOCK_TYPE_MASK: u32 = 0xf;
+pub const SOCK_NONBLOCK: u32 = krn.fs.file.O_NONBLOCK;
+pub const SOCK_CLOEXEC: u32 = krn.fs.file.O_CLOEXEC;
+
+pub const SOCK_SUPPORTED: u32 = SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
+
 pub const MAX_UNIX_PATH: usize = 108;
 pub const MAX_BACKLOG: usize = 16;
 const SOCK_BUFFER_SIZE = 4096;
@@ -68,6 +74,7 @@ pub const Socket = struct {
 
     pub fn delete(self: *Socket) void {
         self.lock.lock();
+        self.pending_link.del();
         if (self.conn) |remote| {
             remote.lock.lock();
             remote.conn = null;
@@ -127,6 +134,21 @@ fn unregisterBound(sock: *Socket) void {
     }
 }
 
+// Length of the AF_UNIX name inside sun_path. An abstract socket has
+// sun_path[0] == 0 and its name (including that leading NUL) runs for the
+// full addr_len, so it must NOT be treated as a C string. A pathname socket
+// is NUL-terminated. libxcb connects to the abstract name first, so getting
+// this right is what lets X clients reach the server.
+fn unixNameLen(sun_path: []const u8) usize {
+    if (sun_path.len == 0)
+        return 0;
+    if (sun_path[0] == 0)
+        return sun_path.len;
+    var n: usize = 0;
+    while (n < sun_path.len and sun_path[n] != 0) : (n += 1) {}
+    return n;
+}
+
 pub fn findBoundSocket(path: []const u8) ?*Socket {
     for (bound_sockets) |slot| {
         if (slot) |sock| {
@@ -146,13 +168,13 @@ pub fn do_socket(family: u32, sock_type: u32, protocol: u32) !u32 {
     if (family != AF_UNIX and family != AF_LOCAL) {
         return krn.errors.PosixError.EAFNOSUPPORT;
     }
-    if (sock_type != SOCK_STREAM) {
+
+    if (sock_type & ~SOCK_SUPPORTED != 0) {
         return krn.errors.PosixError.ESOCKTNOSUPPORT;
     }
-
     const sock = Socket.newSocket() orelse return krn.errors.PosixError.ENOMEM;
     errdefer krn.mm.kfree(sock);
-    sock.sock_type = @intCast(sock_type);
+    sock.sock_type = @intCast(sock_type & SOCK_TYPE_MASK);
 
     const inode = try krn.fs.Inode.allocEmpty();
     errdefer krn.mm.kfree(inode);
@@ -165,8 +187,16 @@ pub fn do_socket(family: u32, sock_type: u32, protocol: u32) !u32 {
     file.mode = krn.fs.UMode.socket();
     file.flags |= krn.fs.file.O_RDWR;
 
+
     const fd = try krn.task.current.files.getNextFD();
     errdefer _ = krn.task.current.files.releaseFD(fd);
+
+    if (sock_type & SOCK_NONBLOCK != 0)
+        file.flags |= SOCK_NONBLOCK;
+    if (sock_type & SOCK_CLOEXEC != 0) {
+        krn.task.current.files.closexec.set(fd);
+    }
+    errdefer krn.task.current.files.closexec.unset(fd);
 
     try krn.task.current.files.setFD(fd, file);
     krn.logger.INFO("socket() created fd {d}", .{fd});
@@ -196,7 +226,8 @@ pub fn do_bind(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
 
     const addr: *const sockaddr_un = @ptrCast(@alignCast(addr_ptr));
 
-    const path_len = addr_len - @offsetOf(sockaddr_un, "sun_path");
+    const path_max = addr_len - @offsetOf(sockaddr_un, "sun_path");
+    const path_len = unixNameLen(addr.sun_path[0..path_max]);
 
     if (findBoundSocket(addr.sun_path[0..path_len]) != null) {
         return krn.errors.PosixError.EADDRINUSE;
@@ -272,9 +303,6 @@ pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
                 return krn.errors.PosixError.ENOMEM;
             errdefer krn.mm.kfree(server_sock);
 
-            client_sock.conn = server_sock;
-            server_sock.conn = client_sock;
-
             const new_inode = try krn.fs.Inode.allocEmpty();
             errdefer krn.mm.kfree(new_inode);
             new_inode.fops = &SocketFileOps;
@@ -291,6 +319,10 @@ pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
 
             try krn.task.current.files.setFD(new_fd, new_file);
             krn.logger.INFO("accept() fd {d} -> new fd {d}", .{fd, new_fd});
+
+            client_sock.conn = server_sock;
+            server_sock.conn = client_sock;
+
             return @intCast(new_fd);
         }
         listener.lock.unlock();
@@ -329,8 +361,7 @@ pub fn do_connect(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
     }
 
     const path_max = addr_len - @offsetOf(sockaddr_un, "sun_path");
-    var path_len: usize = 0;
-    while (path_len < path_max and addr.sun_path[path_len] != 0) : (path_len += 1) {}
+    const path_len = unixNameLen(addr.sun_path[0..path_max]);
 
     const listener = findBoundSocket(addr.sun_path[0..path_len]) orelse
         return krn.errors.PosixError.ECONNREFUSED;

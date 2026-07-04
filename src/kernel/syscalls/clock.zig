@@ -18,14 +18,20 @@ pub fn clock_gettime64(clock_id: u32, _tp: ?*krn.time.kernel_timespec64) !u32 {
         return errors.EFAULT;
     };
     switch (clock_id) {
-        CLOCK_REALTIME => {
+        CLOCK_REALTIME, CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE => {
             const curr_seconds: u64 = krn.cmos.toUnixSeconds(krn.cmos);
             const monotonic = krn.getTimeFromStart();
             tp.tv_sec = @intCast(curr_seconds);
             tp.tv_nsec = monotonic.tv_nsec;
             return 0;
         },
-        CLOCK_MONOTONIC => {
+        CLOCK_MONOTONIC,
+        CLOCK_MONOTONIC_RAW,
+        CLOCK_MONOTONIC_COARSE,
+        CLOCK_BOOTTIME,
+        CLOCK_BOOTTIME_ALARM,
+        CLOCK_PROCESS_CPUTIME_ID,
+        CLOCK_THREAD_CPUTIME_ID => {
             const monotonic = krn.getTimeFromStart();
             tp.tv_sec = monotonic.tv_sec;
             tp.tv_nsec = monotonic.tv_nsec;
@@ -47,4 +53,12 @@ pub fn clock_settime(clock_id: u32, _tp: ?*krn.kernel_timespec) !u32 {
         return 0;
     }
     return errors.EINVAL;
+}
+
+pub fn setitimer() !u32 {
+    return 0;
+}
+
+pub fn getres() !u32 {
+    return 0;
 }

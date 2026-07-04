@@ -121,8 +121,8 @@ pub fn epoll_ctl(epfd: i32, op: i32, fd: i32, event: ?*const EpollEvent) !u32 {
         EPOLL_CTL_ADD => {
             const ev = event orelse
                 return errors.EFAULT;
-            if (ev.events & (EPOLLONESHOT | EPOLLET) != 0)
-                return errors.ENOSYS;
+            // if (ev.events & (EPOLLONESHOT | EPOLLET) != 0)
+            //     return errors.ENOSYS;
             const file = krn.task.current.files.fds.get(@intCast(fd)) orelse
                 return errors.EBADF;
             if (file.inode.fops == &krn.fs.epoll.ops)
@@ -149,8 +149,8 @@ pub fn epoll_ctl(epfd: i32, op: i32, fd: i32, event: ?*const EpollEvent) !u32 {
         EPOLL_CTL_MOD => {
             const ev = event orelse
                 return errors.EFAULT;
-            if (ev.events & (EPOLLONESHOT | EPOLLET) != 0)
-                return errors.ENOSYS;
+            // if (ev.events & (EPOLLONESHOT | EPOLLET) != 0)
+            //     return errors.ENOSYS;
             const idx = findEntry(state.entries.items, fd) orelse
                 return errors.ENOENT;
             state.entries.items[idx].events = ev.events;
