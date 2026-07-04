@@ -10,6 +10,8 @@ const cdev = @import("../cdev.zig");
 const FBIOGET_VSCREENINFO: u32 = 0x4600;
 const FBIOPUT_VSCREENINFO: u32 = 0x4601;
 const FBIOGET_FSCREENINFO: u32 = 0x4602;
+const FBIOGETCMAP: u32 = 0x4604;
+const FBIOPUTCMAP: u32 = 0x4605;
 
 const FBBitfield = extern struct {
 	offset: u32 = 0,		// beginning of bitfield
@@ -169,6 +171,8 @@ fn fb_ioctl(base: *krn.fs.File, op: u32, data: usize) !u32{
                 @memcpy(fix_screen_info.id[0..10], "TT Builtin");
             }
         },
+        FBIOGETCMAP => {},
+        FBIOPUTCMAP => {},
         else  => return krn.errors.PosixError.EINVAL,
     }
     return 0;

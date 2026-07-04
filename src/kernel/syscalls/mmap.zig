@@ -50,8 +50,7 @@ pub fn mmap2(
 
     if (prot & ~(mm.PROT_EXEC | mm.PROT_READ | mm.PROT_WRITE | mm.PROT_NONE) > 0)
         return errors.EINVAL;
-    if (off % krn.mm.PAGE_SIZE != 0)
-        return errors.EINVAL;
+    const offset: u32 = off * krn.mm.PAGE_SIZE;
 
     if (!flags.ANONYMOUS and fd >= 0) {
         if (krn.task.current.files.fds.get(@intCast(fd))) |_file| {
@@ -65,7 +64,7 @@ pub fn mmap2(
                 !_file.mode.canWrite(_file.inode.uid, _file.inode.gid)
             )
                 return errors.EACCES;
-            if (off > _file.inode.size)
+            if (offset > _file.inode.size)
                 return errors.EACCES;
 
             file = _file;
@@ -98,7 +97,7 @@ pub fn mmap2(
         prot | mm.PROT_WRITE | mm.PROT_READ,
         flags,
         file,
-        off
+        offset
     );
 }
 
