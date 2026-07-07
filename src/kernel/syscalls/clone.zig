@@ -202,13 +202,17 @@ pub fn clone(
     }
 
     if (flags.SETTLS) {
+        if (tls == 0)
+            return errors.EFAULT;
         const user_desc: *const UserDesc = @ptrFromInt(tls);
-        child.tls = user_desc.base_addr;
-        child.limit = if (user_desc.bits.limit_in_pages != 0) user_desc.limit
-            else 0xFFFFFFFF;
+        child_regs.gs = try arch.syscalls.thread.applyTLSDesc(child, @constCast(user_desc));
     } else {
         child.tls = krn.task.current.tls;
         child.limit = krn.task.current.limit;
+        child.tls_entry_number = krn.task.current.tls_entry_number;
+        child.tls_selector = krn.task.current.tls_selector;
+        child.tls_access = krn.task.current.tls_access;
+        child.tls_gran = krn.task.current.tls_gran;
     }
 
     child.initSelf(
