@@ -1,6 +1,7 @@
 const tsk = @import("kernel").task;
 const krn = @import("kernel");
 const gdt = @import("../gdt.zig");
+const idt = @import("../idt.zig");
 const vmm = @import("../mm/vmm.zig");
 const fpu = @import("../fpu.zig");
 
@@ -100,27 +101,16 @@ pub fn contextSwitch(prev: *tsk.Task, next: *tsk.Task) void {
     }
     vmm.switchToVAS(next.mm.?.vas);
 
-    var access: u8 = 0;
-    access |= 0x10; // S=1
-    access |= 0x60; // DPL=3
-    access |= 0x02; // data, writable
-    access |= 0x80; // P=1  (force present, don't trust user)
-
-    var gran: u8 = 0;
-    gran |= 0x80; // G=1 (pages)
-    gran |= 0x40; // D=1 (32-bit)
-    gran |= 0x10; // AVL=1 (harmless)
     gdt.gdtSetEntry(
-        gdt.GDT_TLS0_INDEX,
+        next.tls_entry_number,
         next.tls,
         next.limit,
-        access,
-        gran,
+        next.tls_access,
+        next.tls_gran,
     );
-    const sel: u16 = @intCast((gdt.GDT_TLS0_INDEX << 3) | 0x3);
     asm volatile (
         "mov %[_sel], %gs"
-        :: [_sel]"r"(sel)
+        :: [_sel]"r"(@as(u16, idt.KERNEL_DATA_SEGMENT))
         : .{ .memory = true}
     );
 

@@ -93,6 +93,10 @@ pub const Task = struct {
     regs:           Regs            = Regs.init(),
     tls:            u32             = 0,
     limit:          u32             = 0,
+    tls_entry_number: u32           = arch.gdt.GDT_TLS0_INDEX,
+    tls_selector:   u16             = arch.idt.USER_DATA_SEGMENT,
+    tls_access:     u8              = 0x72,
+    tls_gran:       u8              = 0,
 
     // FPU state for context switching
     fpu_state:      ?*fpu.FPUState  = null,
@@ -155,6 +159,10 @@ pub const Task = struct {
             .files = undefined,
             .tls = 0,
             .limit = 0,
+            .tls_entry_number = arch.gdt.GDT_TLS0_INDEX,
+            .tls_selector = arch.idt.USER_DATA_SEGMENT,
+            .tls_access = 0x72,
+            .tls_gran = 0,
             .name = .{0} ** 16,
             .should_stop = false,
             .utime = 0,

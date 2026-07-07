@@ -78,6 +78,10 @@ pub fn doFork() !u32 {
     child.kernel_esp = arch.setupSwitchFrame(stack_top, @intFromPtr(&arch.retFromFork));
     child.tls = krn.task.current.tls;
     child.limit = krn.task.current.limit;
+    child.tls_entry_number = krn.task.current.tls_entry_number;
+    child.tls_selector = krn.task.current.tls_selector;
+    child.tls_access = krn.task.current.tls_access;
+    child.tls_gran = krn.task.current.tls_gran;
     child.initSelf(
         .RUNNING,
         stack_top,

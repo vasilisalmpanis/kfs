@@ -67,6 +67,7 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const 
     var stack: usize = undefined;
     const new_task: ?*tsk.Task = km.kmalloc(tsk.Task);
     if (new_task) |task| {
+        task.* = tsk.Task.init(0, 0, 1, .KTHREAD);
         stack = kthreadStackAlloc(STACK_PAGES);
         if (stack == 0) {
             km.kfree(task);
