@@ -292,6 +292,8 @@ pub fn execve(
     };
     errdefer if (!resources_released) file.ref.put();
 
+    arch.syscalls.thread.resetTLS(krn.task.current);
+
     return doExecve(
         file,
         &resources_released,
