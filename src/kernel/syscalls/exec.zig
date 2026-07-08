@@ -224,6 +224,9 @@ pub fn doExecve(
     }
     file.ref.put();
     resources_released.* = true;
+
+    arch.syscalls.thread.resetTLS(krn.task.current);
+
     krn.userspace.goUserspace();
     return 0;
 }
