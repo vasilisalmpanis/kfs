@@ -22,6 +22,13 @@ pub const UserDesc = extern struct{
     bits: UserDescBits,
 };
 
+pub fn resetTLS(self: *krn.task.Task) void {
+    self.tls_entry_number = arch.gdt.GDT_TLS0_INDEX;
+    self.tls_selector = arch.idt.USER_DATA_SEGMENT;
+    self.tls_access = 0x72;
+    self.tls_gran = 0;
+}
+
 fn getAccess(bits: UserDescBits) u8 {
     var access: u8 = 0x10 | 0x60;
     if (bits.seg_not_present == 0)
