@@ -51,7 +51,6 @@ pub fn doExit(error_code: i32) !u32 {
     tsk.current.group_leader.result = error_code;
 
     kernel.fs.procfs.deleteProcess(kernel.task.current);
-    kernel.task.current.refcount.put();
     while (kernel.task.current.refcount.getValue() > 1)
         kernel.sched.reschedule();
 
@@ -76,14 +75,15 @@ pub fn doExit(error_code: i32) !u32 {
 
         tsk.current.state = .ZOMBIE;
         if (act.flags & signals.SA_NOCLDWAIT != 0) {
-            tsk.current.refcount.get();
             tsk.current.finish(true);
         } else if (tsk.current != tsk.current.group_leader) {
-            tsk.current.refcount.get();
             tsk.current.finish(true);
         }
 
-        if (kernel.task.current.group_leader.thread_data.?.nr_threads == 0) {
+        if (
+            act.flags & signals.SA_NOCLDWAIT == 0 and
+            kernel.task.current.group_leader.thread_data.?.nr_threads == 0
+        ) {
             tsk.current.wakeupParent(true);
             if (act.handler.handler != signals.sigIGN)
                 // Check if its the last thread of the thread group
