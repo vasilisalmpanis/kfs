@@ -85,7 +85,7 @@ pub fn doExit(error_code: i32) !u32 {
             kernel.task.current.group_leader.thread_data.?.nr_threads == 0
         ) {
             tsk.current.wakeupParent(true);
-            if (act.handler.handler != signals.sigIGN)
+            if (act.handler.handler != signals.sigDFL and act.handler.handler != signals.sigIGN)
                 // Check if its the last thread of the thread group
                 // and only then send the signal
                 // Additional: instead of checking SIGCHILD check

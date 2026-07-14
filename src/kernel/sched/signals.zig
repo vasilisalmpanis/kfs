@@ -313,8 +313,7 @@ pub const SigPending = struct {
 
 pub const SigHand = struct {
     actions: std.EnumArray(Signal, Sigaction) = blk: {
-        var arr = std.EnumArray(Signal, Sigaction).initFill(default_sigaction);
-        arr.set(.SIGCHLD, ignore_sigaction);
+        const arr = std.EnumArray(Signal, Sigaction).initFill(default_sigaction);
         break :blk arr;
     },
     ref: krn.RefCount = krn.RefCount.init(),
