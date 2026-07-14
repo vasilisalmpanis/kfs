@@ -98,9 +98,9 @@ fn waitChildren(wstatus: ?*i32, opts: WaitStates, pid: u32, pgid: u32) !u32 {
 
             if (res.state == .STOPPED)
                 continue ;
-            
+
             waitable_children = true;
-            
+
             if (opts.isSet(res)) {
                 if (wstatus != null) {
                     wstatus.?.* = opts.status(res);
@@ -119,7 +119,7 @@ pub fn wait4(pid: i32, wstatus: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
     _ = rusage;
     if (options & ~(WNOHANG|WUNTRACED|WCONTINUED|WEXITED|WNOWAIT) != 0)
         return errors.EINVAL;
-    
+
     const opts = WaitStates.init(options);
 
     var _pid: u32 = 0;
@@ -135,18 +135,19 @@ pub fn wait4(pid: i32, wstatus: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
 
     while (true) {
         var res: u32 = 0;
-        
-        if (tsk.current.hasPendingSignal())
-            return errors.ERESTARTSYS;
 
         const lock_state = krn.task.tasks_lock.lock_irq_disable();
         errdefer krn.task.tasks_lock.unlock_irq_enable(lock_state);
 
         res = try waitChildren(wstatus, opts, _pid, _pgid);
-        
+
         krn.task.tasks_lock.unlock_irq_enable(lock_state);
         if (res != 0 or (options & WNOHANG) != 0)
             return res;
+
+        if (tsk.current.hasPendingSignal())
+            return errors.ERESTARTSYS;
+
         tsk.current.wait_wq.wait(true, 0);
     }
     return 0;
