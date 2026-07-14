@@ -288,8 +288,10 @@ pub fn prepareBinary(
             );
             const path = try krn.fs.path.resolve(interp_name);
 
-            defer path.release();
-            const file = try krn.fs.File.new(path);
+            const file = krn.fs.File.new(path) catch |err| {
+                path.release();
+                return err;
+            };
             defer file.ref.put();
             if (!file.inode.mode.canExecute(krn.task.current.uid, krn.task.current.gid))
                 return krn.errors.PosixError.EPERM;
