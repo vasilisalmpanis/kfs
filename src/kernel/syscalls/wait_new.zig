@@ -117,7 +117,7 @@ fn waitChildren(wstatus: ?*i32, opts: WaitStates, pid: u32, pgid: u32) !u32 {
 
 pub fn wait4(pid: i32, wstatus: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
     _ = rusage;
-    if (options & ~(WNOHANG|WUNTRACED|WCONTINUED|WEXITED|WNOWAIT) != 0)
+    if (options & ~(WNOHANG|WUNTRACED|WCONTINUED) != 0)
         return errors.EINVAL;
 
     const opts = WaitStates.init(options);
