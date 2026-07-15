@@ -72,26 +72,27 @@ pub fn doExit(error_code: i32) !u32 {
         const parent = p.entry(tsk.Task, "tree");
         const parent_handlers = parent.getSighandOrPanic();
         const act = parent_handlers.actions.get(.SIGCHLD);
+        const last_thread = kernel.task.current.group_leader.thread_data.?.nr_threads == 0;
 
         tsk.current.state = .ZOMBIE;
-        if (act.flags & signals.SA_NOCLDWAIT != 0) {
-            tsk.current.finish(true);
-        } else if (tsk.current != tsk.current.group_leader) {
-            tsk.current.finish(true);
-        }
-
         if (
-            act.flags & signals.SA_NOCLDWAIT == 0 and
-            kernel.task.current.group_leader.thread_data.?.nr_threads == 0
-        ) {
+            act.flags & signals.SA_NOCLDWAIT != 0
+            or act.handler.handler == signals.sigIGN
+            or tsk.current != tsk.current.group_leader
+        )
+            tsk.current.finish(true);
+        if (act.flags & signals.SA_NOCLDWAIT == 0 and last_thread)
             tsk.current.wakeupParent(true);
-            if (act.handler.handler != signals.sigDFL and act.handler.handler != signals.sigIGN)
-                // Check if its the last thread of the thread group
-                // and only then send the signal
-                // Additional: instead of checking SIGCHILD check
-                // @enumFromInt(task->exit_signal)
-                parent.thread_data.?.pending.setSignal(.SIGCHLD);
-        }
+        if (
+            act.handler.handler != signals.sigDFL
+            and act.handler.handler != signals.sigIGN
+            and last_thread
+        )
+            // Check if its the last thread of the thread group
+            // and only then send the signal
+            // Additional: instead of checking SIGCHILD check
+            // @enumFromInt(task->exit_signal)
+            parent.thread_data.?.pending.setSignal(.SIGCHLD);
     }
     kernel.task.tasks_lock.unlock_irq_enable(lock_state);
     sched.reschedule();
