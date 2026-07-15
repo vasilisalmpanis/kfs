@@ -75,130 +75,80 @@ const WaitStates = struct {
     }
 };
 
-pub fn wait4(pid: i32, stat_addr: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
-    krn.logger.DEBUG(
-        "waiting pid {d} from pid {d} rusage {x}",
-        .{pid, tsk.current.pid, @intFromPtr(rusage)}
-    );
-    const wait_opts = WaitStates.init(options);
-    if (pid > 0) {
-        if (tsk.current.findChildByPid(@intCast(pid))) |task| {
-            errdefer task.refcount.put();
-            while (!wait_opts.isSet(task)) {
-                if (tsk.current.hasPendingSignal())
-                    return errors.ERESTARTSYS;
-                if (options & WNOHANG > 0) {
-                    task.refcount.put();
-                    return 0;
+fn checkPIDPGID(task: *krn.task.Task, pid: u32, pgid: u32) bool {
+    if (pid == 0 and pgid == 0)
+        return true;
+    if (pid > 0 and pid == task.pid)
+        return true;
+    if (pgid > 0 and pgid == task.pgid)
+        return true;
+    return false;
+}
+
+fn waitChildren(wstatus: ?*i32, opts: WaitStates, pid: u32, pgid: u32) !u32 {
+    var waitable_children: bool = false;
+    if (tsk.current.tree.hasChildren()) {
+        var it = tsk.current.tree.child.?.siblingsIterator();
+        while (it.next()) |i| {
+            const res = i.curr.entry(tsk.Task, "tree");
+            const child_pid = res.pid;
+
+            if (!checkPIDPGID(res, pid, pgid))
+                continue ;
+
+            if (res.state == .STOPPED)
+                continue ;
+
+            waitable_children = true;
+
+            if (opts.isSet(res)) {
+                if (wstatus != null) {
+                    wstatus.?.* = opts.status(res);
                 }
-                tsk.current.wait_wq.wait(true, 0);
-            }
-            if (task.state == .STOPPED)
-                return errors.ECHILD;
-            if (stat_addr != null) {
-                stat_addr.?.* = wait_opts.status(task);
-            }
-            task.finish(false);
-            return @intCast(pid);
-        } else {
-            krn.logger.INFO("ERROR\n", .{});
-            return errors.ECHILD;
-        }
-    } else if (pid == 0) {
-        if (!tsk.current.refcountChildren(tsk.current.pgid, true))
-            return errors.ECHILD;
-        defer _ = tsk.current.refcountChildren(tsk.current.pgid, false);
-        if (tsk.current.tree.hasChildren()) {
-            // this is problematic if current == 0 and it has children that are threads.
-            // It will block for ever. We should think about how to make userspace get pid1
-            // and all threads to be direct children of initial_task.
-            while (true) {
-                var it = tsk.current.tree.child.?.siblingsIterator();
-                while (it.next()) |i| {
-                    const res = i.curr.entry(tsk.Task, "tree");
-                    const child_pid = res.pid;
-                    if (wait_opts.isSet(res) and res.pgid == tsk.current.pgid) {
-                        if (stat_addr != null) {
-                            stat_addr.?.* =  wait_opts.status(res);
-                        }
-                        if (res.state == .STOPPED) {
-                            if (i.curr.hasSiblings())
-                                continue ;
-                            return errors.ECHILD;
-                        }
-                        res.finish(false);
-                        return child_pid;
-                    }
-                }
-                if (options & WNOHANG > 0)
-                    break;
-                tsk.current.wait_wq.wait(true, 0);
-                if (tsk.current.hasPendingSignal())
-                    return errors.ERESTARTSYS;
+                res.finish(true);
+                return child_pid;
             }
         }
+    }
+    if (!waitable_children)
+        return errors.ECHILD;
+    return 0;
+}
+
+pub fn wait4(pid: i32, wstatus: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
+    _ = rusage;
+    if (options & ~(WNOHANG|WUNTRACED|WCONTINUED) != 0)
+        return errors.EINVAL;
+
+    const opts = WaitStates.init(options);
+
+    var _pid: u32 = 0;
+    var _pgid: u32 = 0;
+    if (pid < -1) {
+        _pgid = @intCast(-pid);
     } else if (pid == -1) {
-        if (!tsk.current.refcountChildren(0, true))
-            return errors.ECHILD;
-        defer _ = tsk.current.refcountChildren(0, false);
-        if (tsk.current.tree.hasChildren()) {
-            while (true) {
-                var it = tsk.current.tree.child.?.siblingsIterator();
-                while (it.next()) |i| {
-                    const res = i.curr.entry(tsk.Task, "tree");
-                    const child_pid = res.pid;
-                    if (wait_opts.isSet(res)) {
-                        if (stat_addr != null) {
-                            stat_addr.?.* = wait_opts.status(res);
-                        }
-                        if (res.state == .STOPPED) {
-                            if (i.curr.hasSiblings())
-                                continue ;
-                            return errors.ECHILD;
-                        }
-                        res.finish(false);
-                        return child_pid;
-                    }
-                }
-                if (options & WNOHANG > 0)
-                    break;
-                tsk.current.wait_wq.wait(true, 0);
-                if (tsk.current.hasPendingSignal())
-                    return errors.ERESTARTSYS;
-            }
-        }
+    } else if (pid == 0) {
+        _pgid = krn.task.current.pgid;
     } else {
-        const pgid: u32 = @intCast(-pid);
-        if (!tsk.current.refcountChildren(pgid, true))
-            return errors.ECHILD;
-        defer _ = tsk.current.refcountChildren(pgid, false);
-        if (tsk.current.tree.hasChildren()) {
-            while (true) {
-                var it = tsk.current.tree.child.?.siblingsIterator();
-                while (it.next()) |i| {
-                    const res = i.curr.entry(tsk.Task, "tree");
-                    const child_pid = res.pid;
-                    if (wait_opts.isSet(res) and pgid == res.pgid) {
-                        if (stat_addr != null) {
-                            stat_addr.?.* = wait_opts.status(res);
-                        }
-                        if (res.state == .STOPPED) {
-                            if (i.curr.hasSiblings())
-                                continue ;
-                            return errors.ECHILD;
-                        }
-                        res.finish(false);
-                        return child_pid;
-                    }
-                }
-                if (options & WNOHANG > 0)
-                    break;
-                tsk.current.wait_wq.wait(true, 0);
-                if (tsk.current.hasPendingSignal())
-                    return errors.ERESTARTSYS;
-            }
-        } else {
-        }
+        _pid = @intCast(pid);
+    }
+
+    while (true) {
+        var res: u32 = 0;
+
+        const lock_state = krn.task.tasks_lock.lock_irq_disable();
+        errdefer krn.task.tasks_lock.unlock_irq_enable(lock_state);
+
+        res = try waitChildren(wstatus, opts, _pid, _pgid);
+
+        krn.task.tasks_lock.unlock_irq_enable(lock_state);
+        if (res != 0 or (options & WNOHANG) != 0)
+            return res;
+
+        if (tsk.current.hasPendingSignal())
+            return errors.ERESTARTSYS;
+
+        tsk.current.wait_wq.wait(true, 0);
     }
     return 0;
 }
