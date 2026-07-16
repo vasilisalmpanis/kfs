@@ -1696,6 +1696,7 @@ pub const drivers = struct {
         cntl : bool,
         alt : bool,
         caps : bool,
+        mode : u32= 0,
     };
 
 

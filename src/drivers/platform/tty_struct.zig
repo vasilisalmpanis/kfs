@@ -988,7 +988,7 @@ pub const TTY = struct {
             self.insertAtCursor(b);
     }
 
-    fn pushInput(self: *TTY, b: u8) void {
+    pub fn pushInput(self: *TTY, b: u8) void {
         const lock_state = self.lock.lock_irq_disable();
         _ = self.file_buff.push(b);
         self.lock.unlock_irq_enable(lock_state);

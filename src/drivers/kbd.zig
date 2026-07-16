@@ -74,7 +74,20 @@ pub const CtrlType = enum(u8) {
     _
 };
 
+pub const VC_XLATE	: u32 = 0;	// translate keycodes using keymap */
+pub const VC_MEDIUMRAW	: u32 = 1;	// medium raw (keycode) mode */
+pub const VC_RAW	: u32 = 2;	// raw (scancode) mode */
+pub const VC_UNICODE	: u32 = 3;	// Unicode mode */
+pub const VC_OFF	: u32 = 4;	// disabled mode */
+
+pub const K_RAW		:u32 = 0x00;
+pub const K_XLATE	:u32 = 0x01;
+pub const K_MEDIUMRAW	:u32 = 0x02;
+pub const K_UNICODE	:u32 = 0x03;
+pub const K_OFF		:u32 = 0x04;
+
 var input: [256]KeyEvent = undefined;
+var raw_input: [256]u8 = undefined;
 
 pub const Keyboard = struct {
     write_pos: u8 = 0,
@@ -86,6 +99,7 @@ pub const Keyboard = struct {
     cntl: bool,
     alt: bool,
     caps: bool,
+    mode: u32 = VC_XLATE,
 
     pub fn init(keymap: *const std.EnumMap(ScanCode, KeymapEntry)) Keyboard {
         return Keyboard{
@@ -96,6 +110,28 @@ pub const Keyboard = struct {
             .alt = false,
             .caps = false,
         };
+    }
+
+    pub fn setMode(self: *Keyboard, kMode: u32) !u32 {
+        switch (kMode) {
+            K_RAW => { self.mode = VC_RAW; },
+            K_XLATE => { self.mode = VC_XLATE; },
+            K_MEDIUMRAW => { self.mode = VC_MEDIUMRAW; },
+            K_OFF => { self.mode = VC_OFF; },
+            else => return krn.errors.PosixError.EINVAL,
+        }
+        return 0;
+    }
+
+    pub fn getMode(self: *Keyboard) u32 {
+        switch (self.mode) {
+            VC_OFF => return K_OFF,
+            VC_RAW => return K_RAW,
+            VC_MEDIUMRAW => return K_MEDIUMRAW,
+            VC_XLATE => return K_XLATE,
+            else => return 0,
+        }
+        return 0;
     }
 
     pub fn setKeymap(
@@ -203,6 +239,23 @@ pub const Keyboard = struct {
             }
         }
         return null;
+    }
+
+    pub fn getScancodes(self: *Keyboard) ?[] u8 {
+        self.sendCommand(0xAD); // Disable keyboard
+        defer self.sendCommand(0xAE); // Enable keyboard
+        var sc = self.getScancode();
+        if (sc == 0)
+            return null;
+        var pos: u8 = 0;
+        while (sc != 0 and pos < 256) {
+            raw_input[pos] = sc;
+            sc = self.getScancode();
+            pos += 1;
+        }
+        if (pos == 0)
+            return null;
+        return raw_input[0..pos];
     }
 
     pub fn getInput(self: *Keyboard) ?[] const KeyEvent {

@@ -59,7 +59,6 @@ pub const KDSETLED:u32 = 0x4B32;  // set led state [lights, not flags]
 pub const K_HOLE: u16 = 2 << 8 | 0;
 pub const K_NOSUCHMAP: u16 = 2 << 8 | 127;
 
-
 const kbentry = extern struct {
     kb_table: u8,
     kb_index: u8,
@@ -338,10 +337,16 @@ fn kbd_ioctl(_tty: *TTY, op: u32, data: ?*anyopaque) !u32{
             return 0;
         },
         KDGKBMODE => {
-            return 0;
+            if (data != null) {
+                const data_ptr: *u32 = @ptrCast(@alignCast(data));
+                data_ptr.* = kbd.global_keyboard.getMode();
+                return 0;
+            }
+            return krn.errors.PosixError.EINVAL;
         },
         KDSKBMODE => {
-            return 0;
+            const kMode: u32 = if (data != null) @intFromPtr(data) else 0;
+            return try kbd.global_keyboard.setMode(kMode);
         },
         KDGKBENT => {
             if (data) |entry| {
@@ -687,7 +692,14 @@ pub fn tty_serial_thread(arg: ?*const anyopaque) i32 {
 pub fn tty_kbd_thread(_: ?*const anyopaque) i32 {
     while (krn.task.current.should_stop != true) {
         var did_work = false;
-        if (kbd.global_keyboard.getInput()) |input| {
+        if (kbd.global_keyboard.mode == kbd.VC_RAW) {
+            if (kbd.global_keyboard.getScancodes()) |scancodes| {
+                for (scancodes) |code| {
+                    scr.current_tty.?.pushInput(code);
+                }
+            }
+            did_work = true;
+        } else if (kbd.global_keyboard.getInput()) |input| {
             var filtered: [256]kbd.KeyEvent = undefined;
             var filtered_len: usize = 0;
             for (input) |event| {
