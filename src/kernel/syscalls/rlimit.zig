@@ -18,6 +18,9 @@ fn doPrlimit(
     // Exit will not free thread_data while we have refcount on the task
     // so parallel exit with prlimit cannot cause problems in theory.
     const thread_data = task.thread_data orelse return errors.EINVAL;
+    thread_data.lock.lock();
+    defer thread_data.lock.unlock();
+
     const rlimit = &thread_data.rlim[@intCast(resource)];
     if (old_lim) |lim| {
         lim.* = rlimit.*;
