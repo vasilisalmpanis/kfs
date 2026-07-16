@@ -137,9 +137,11 @@ pub fn wait4(pid: i32, wstatus: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
         var res: u32 = 0;
 
         const lock_state = krn.task.tasks_lock.lock_irq_disable();
-        errdefer krn.task.tasks_lock.unlock_irq_enable(lock_state);
 
-        res = try waitChildren(wstatus, opts, _pid, _pgid);
+        res = waitChildren(wstatus, opts, _pid, _pgid) catch |err| {
+            krn.task.tasks_lock.unlock_irq_enable(lock_state);
+            return err;
+        };
 
         krn.task.tasks_lock.unlock_irq_enable(lock_state);
         if (res != 0 or (options & WNOHANG) != 0)
