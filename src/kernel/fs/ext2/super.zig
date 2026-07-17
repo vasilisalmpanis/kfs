@@ -294,116 +294,122 @@ pub const Ext2Super = struct {
         }
     }
 
-    // Helper: resolve logical block number -> physical block number
-    // Returns:
-    //  - Ok(0)    -> sparse hole (no block allocated)
-    //  - Ok(n>0)  -> physical block number on disk
-    //  - Err(...) -> error (e.g. out of range)
-    pub fn resolveLbn(ext2_sb: *Ext2Super, ino: *Ext2Inode, lbn: u64) !u32 {
-        const bs = ext2_sb.base.block_size;
-        const ptrs_per_block = bs / 4; // 4 bytes per block pointer (u32)
-
-        if (lbn <= 11) {
-            // direct
-            return ino.data.i_block[@intCast(lbn)];
+    pub fn getIndirectInfo(
+        _: *Ext2Super,
+        lbn: u32,
+        ptrs: u32,
+    ) struct {
+        root: usize,
+        depth: u32,
+        offset: u32,
+    } {
+        if (lbn < 12) {
+            return .{
+                .root = lbn,
+                .depth = 0,
+                .offset = 0,
+            };
         }
 
-        // single indirect range: 12 .. 12 + ptrs_per_block - 1
-        if (lbn >= 12 and lbn < 12 + ptrs_per_block) {
-            const indirect_block = ino.data.i_block[12];
-            if (indirect_block == 0) return 0; // hole
+        var n = lbn - 12;
+        if (n < ptrs)
+            return .{
+                .root = 12,
+                .depth = 1,
+                .offset = n,
+            };
 
-            const buf = try ext2_sb.readBlocks(indirect_block, 1);
+        n -= ptrs;
+        if (n < ptrs * ptrs)
+            return .{
+                .root = 13,
+                .depth = 2,
+                .offset = n,
+            };
+
+        n -= ptrs * ptrs;
+        return .{
+            .root = 14,
+            .depth = 3,
+            .offset = n,
+        };
+    }
+
+    pub fn getIndexes(
+        _: *Ext2Super,
+        depth: u32,
+        offset: u32,
+        ptrs: u32,
+        indexes: *[3]u32,
+    ) void {
+        var x = offset;
+
+        var i: i32 = @intCast(depth);
+        i -= 1;
+
+        while (i >= 0) {
+            indexes[@intCast(i)] = x % ptrs;
+            x /= ptrs;
+            i -= 1;
+        }
+    }
+
+    /// Resolves a logical block number (LBN) inside a file to its physical
+    /// filesystem block number (PBN).
+    ///
+    /// Ext2 stores file block references using a tree of block pointers:
+    /// - i_block[0..11] contain direct block pointers
+    /// - i_block[12] contains a singly indirect block
+    /// - i_block[13] contains a doubly indirect block
+    /// - i_block[14] contains a triply indirect block
+    ///
+    /// This function walks the required level of indirection and returns the
+    /// final data block referenced by the inode.
+    ///
+    /// Returns:
+    /// - The physical block number containing file data.
+    /// - 0 if the requested logical block is not allocated.
+    ///
+    /// Errors are returned for invalid block numbers or I/O failures while
+    /// reading indirect blocks.
+    pub fn resolveLbn(
+        ext2_sb: *Ext2Super,
+        ino: *Ext2Inode,
+        lbn: u32,
+    ) !u32 {
+        const ptrs = ext2_sb.base.block_size / 4;
+        const info = ext2_sb.getIndirectInfo(lbn, ptrs);
+
+        // direct blocks
+        if (info.depth == 0)
+            return ino.data.i_block[info.root];
+
+        var indexes: [3]u32 = .{0, 0, 0};
+        ext2_sb.getIndexes(
+            info.depth,
+            info.offset,
+            ptrs,
+            &indexes,
+        );
+
+        var block = ino.data.i_block[info.root];
+        var level: u32 = 0;
+
+        while (level < info.depth) {
+
+            if (block == 0)
+                return 0;
+
+            const buf: []u32 = @ptrCast(@alignCast(
+                    try ext2_sb.readBlocks(block, 1),
+            ));
             defer kernel.mm.vfree(buf.ptr);
 
-            // treat buf as array of u32
-            const u32_ptr: [*]u32 = @ptrCast(@alignCast(buf.ptr));
-            const slice_len = buf.len / 4;
-            const slice: []const u32 = u32_ptr[0..slice_len];
-
-            const index: u32 = @intCast(lbn - 12);
-            if (index >= slice_len) return kernel.errors.PosixError.EINVAL;
-
-            return slice[index];
+            block = buf[indexes[level]];
+            level += 1;
         }
 
-        // double indirect range: start at 12 + ptrs_per_block
-        const dbl_start = 12 + ptrs_per_block;
-        const dbl_count = ptrs_per_block * ptrs_per_block;
-        if (lbn >= dbl_start and lbn < dbl_start + dbl_count) {
-            const dbl_block = ino.data.i_block[13];
-            if (dbl_block == 0) return 0; // hole
-
-            // index within the double-indirect space
-            const rel = lbn - dbl_start;
-            const first_index: u32 = @intCast(rel / ptrs_per_block); // index into dbl_block
-            const second_index: u32 = @intCast(rel % ptrs_per_block); // index inside referenced indirect block
-
-            // read double-indirect block (contains ptrs to indirect blocks)
-            const dbl_buf = try ext2_sb.readBlocks(dbl_block, 1);
-            defer kernel.mm.vfree(dbl_buf.ptr);
-            const dbl_u32_ptr: [*]u32 = @ptrCast(@alignCast(dbl_buf.ptr));
-            const dbl_slice_len = dbl_buf.len / 4;
-            if (first_index >= dbl_slice_len) return kernel.errors.PosixError.EINVAL;
-            const indirect_block_num = dbl_u32_ptr[first_index];
-            if (indirect_block_num == 0) return 0; // hole
-
-            // read the indirect block pointed to by double-indirect
-            const ind_buf = try ext2_sb.readBlocks(indirect_block_num, 1);
-            defer kernel.mm.vfree(ind_buf.ptr);
-            const ind_u32_ptr: [*]u32 = @ptrCast(@alignCast(ind_buf.ptr));
-            const ind_slice_len = ind_buf.len / 4;
-            if (second_index >= ind_slice_len) return kernel.errors.PosixError.EINVAL;
-            return ind_u32_ptr[second_index];
-        }
-
-        const trpl_start = dbl_start + dbl_count;
-        const trpl_count = dbl_count * ptrs_per_block;
-        if (lbn >= trpl_start and lbn < trpl_start + trpl_count) {
-            const trpl_block: u32 = ino.data.i_block[14];
-            if (trpl_block == 0) return 0;
-
-            const trpl_ind_buf: []u32 = @ptrCast(@alignCast(
-                try ext2_sb.readBlocks(trpl_block, 1)
-            ));
-
-            defer kernel.mm.vfree(trpl_ind_buf.ptr);
-
-            const rel = lbn - trpl_start;
-            const rem: u32 = @intCast(rel % (ptrs_per_block * ptrs_per_block));
-
-            const first_index: u32 = @intCast(rel / (ptrs_per_block * ptrs_per_block));
-            const second_index: u32 = @intCast(rem / ptrs_per_block);
-            const third_index: u32 = @intCast(rem % ptrs_per_block);
-
-            if (first_index >= trpl_ind_buf.len) {
-                return kernel.errors.PosixError.EINVAL;
-            }
-            const dbl_indirect_block_num = trpl_ind_buf[first_index];
-            if (dbl_indirect_block_num == 0) return 0;
-
-            const dbl_ind_buf: []u32 = @ptrCast(@alignCast(
-                try ext2_sb.readBlocks(dbl_indirect_block_num, 1)
-            ));
-            defer kernel.mm.vfree(dbl_ind_buf.ptr);
-
-            if (second_index >= dbl_ind_buf.len) {
-                return kernel.errors.PosixError.EINVAL;
-            }
-            const indirect_block_num = dbl_ind_buf[second_index];
-            if (indirect_block_num == 0) return 0;
-
-            const ind_buf: []u32 = @ptrCast(@alignCast(
-                try ext2_sb.readBlocks(indirect_block_num, 1)
-            ));
-            defer kernel.mm.vfree(ind_buf.ptr);
-
-            if (third_index >= ind_buf.len) {
-                return kernel.errors.PosixError.EINVAL;
-            }
-            return ind_buf[third_index];
-        }
-        return kernel.errors.PosixError.EINVAL;
+        return block;
     }
 
     pub inline fn freeBlocksCount(self: *Ext2Super) u32 {
@@ -683,6 +689,23 @@ pub const Ext2Super = struct {
         // Free blocks in sb
         // Free Inode in sb
         kernel.mm.kfree(ext2_target_inode);
+    }
+
+    pub fn getBlockDescriptorIndex(self: *Ext2Super, ino: *Ext2Inode) !u32 {
+        var bgdt_idx = (ino.base.i_no - 1) / self.data.s_inodes_per_group;
+        if (self.bgdt[bgdt_idx].bg_free_blocks_count == 0) {
+            bgdt_idx = 0;
+            while (bgdt_idx < self.bgdt.len) {
+                if (self.bgdt[bgdt_idx].bg_free_blocks_count != 0)
+                    break ;
+                bgdt_idx += 1;
+            }
+        }
+        if (bgdt_idx >= self.bgdt.len) {
+            kernel.logger.ERROR("BUG: we got bigger bgdt index than the length of descriptors\n", .{});
+            return kernel.errors.PosixError.ENOSPC;
+        }
+        return bgdt_idx;
     }
 };
 
