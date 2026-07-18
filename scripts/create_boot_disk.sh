@@ -11,8 +11,12 @@ BOOT_TREE=$(dirname "$(dirname "$GRUB_CFG")")
 
 KERNEL_SIZE_K=`du -s "$KERNEL" | awk '{print $1}'`
 BOOT_DIR_SIZE_K=`du -s "$BOOT_TREE" | awk '{print $1}'`
-ROOT_SIZE_K=`du -s "$ROOT_IMG" | awk '{print $1}'`
-ROOT_SIZE_MB=$(( $ROOT_SIZE_K / 1024 ))
+ROOT_SIZE_BYTES=$(
+    stat -c %s "$ROOT_IMG" 2>/dev/null ||
+        stat -f %z "$ROOT_IMG"
+)
+MIB=$((1024 * 1024))
+ROOT_SIZE_MB=$(( (ROOT_SIZE_BYTES + MIB - 1) / MIB ))
 
 CORE_SIZE_MB=1
 BOOT_SIZE_MB=$(( ($KERNEL_SIZE_K + $BOOT_DIR_SIZE_K) / 1024 + 2 ))
@@ -85,3 +89,15 @@ with open('$DISK', 'r+b') as f:
 "
 
 rm -rf "$BOOT_TMP_DIR" "$BOOT_IMG" core.img
+
+EXPECTED_DISK_SIZE=$((DISK_SIZE_MB * MIB))
+ACTUAL_DISK_SIZE=$(
+    stat -c %s "$DISK" 2>/dev/null ||
+        stat -f %z "$DISK"
+)
+if [ "$ACTUAL_DISK_SIZE" -eq "$EXPECTED_DISK_SIZE" ]; then
+    echo "Disk size is correct: $ACTUAL_DISK_SIZE"
+else
+    echo "Disk size is NOT correct: $ACTUAL_DISK_SIZE, should be $EXPECTED_DISK_SIZE !!!"
+    exit 1;
+fi

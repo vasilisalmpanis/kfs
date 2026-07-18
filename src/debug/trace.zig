@@ -19,19 +19,22 @@ const StackFrame = struct {
 /// number specified as argument. Save the current
 /// register stake and print it.
 /// @param maxFrames: maximum amount of frames to trace.
-pub inline fn traceStackTrace(maxFrames : u32 ) void {
-    var stk : ?*StackFrame = @ptrFromInt(arch.cpu.getStackFrameAddr());
-    krn.logger.INFO("Stack Trace:\n",.{});
-    var frame : u32 = 0;
-    // unwind the stack
-    while (frame < maxFrames and stk != null) : (frame += 1) {
-        if (stk != null) {
-            krn.logger.ERROR("  0x{x}: {s}\n", .{
-                stk.?.eip,
-                if(lookupSymbol(stk.?.eip)) |sym| sym else "?"
-            });
-        }
-        stk = stk.?.ebp;
+pub noinline fn traceStackTrace(max_frames: u32) void {
+    var stk: ?*const StackFrame =
+        @ptrFromInt(arch.cpu.getStackFrameAddr());
+
+    krn.logger.INFO("Stack Trace:\n", .{});
+
+    var frame: u32 = 0;
+    while (frame < max_frames and stk != null) : (frame += 1) {
+        const current = stk.?;
+
+        krn.logger.ERROR("  0x{x}: {s}\n", .{
+            current.eip,
+            lookupSymbol(current.eip) orelse "?",
+        });
+
+        stk = current.ebp;
     }
 }
 

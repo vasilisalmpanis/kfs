@@ -468,50 +468,60 @@ pub const Ext2Inode = struct {
         }
     }
 
-    pub fn allocBlock(self: *Ext2Inode) !u32 {
+    pub fn allocBlock(self: *Ext2Inode, lbn: u32) !u32 {
         if (self.base.sb == null)
             return kernel.errors.PosixError.ENOENT;
         const sb = self.base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
+        
+        var block: u32 = 0;
+        var allocated_blocks: bool = false;
+        
+        const ptrs: u32 = sb.base.block_size / @sizeOf(u32);
+        const info = sb.getIndirectInfo(lbn, ptrs);
 
-        // Find free block in i_block
-        var blk_idx: u32 = 0;
-        while (self.data.i_block[blk_idx] != 0) {
-            blk_idx += 1;
-            if (blk_idx > 11) {
-                kernel.logger.ERROR("TODO: allocBlock(): implement indirect blocks", .{});
-                return kernel.errors.PosixError.ENOSPC;
+        var idxs: [3]u32 = .{0, 0, 0};
+        sb.getIndexes(
+            info.depth,
+            info.offset,
+            ptrs,
+            &idxs
+        );
+        
+        block = self.data.i_block[info.root];
+        if (block == 0) {
+            block = try sb.allocPhysBlock(self);
+            allocated_blocks = true;
+            self.data.i_block[info.root] = block;
+            self.data.i_blocks += sb.base.block_size / 512;
+        }
+        for (0..info.depth) |curr_lvl| {
+            const buff = try sb.readBlocks(block, 1);
+            defer kernel.mm.vfree(buff.ptr);
+
+            const pbns: []u32 = @as(
+                [*]u32,
+                @ptrCast(@alignCast(buff.ptr))
+            )[0..ptrs];
+            const idx = idxs[curr_lvl];
+            if (pbns[idx] == 0) {
+                pbns[idx] = try sb.allocPhysBlock(self);
+                allocated_blocks = true;
+                self.data.i_blocks += sb.base.block_size / 512;
+                const written = try sb.writeBuff(block, buff.ptr, buff.len);
+                if (written < buff.len)
+                    return kernel.errors.PosixError.EIO;
             }
-            if (blk_idx >= EXT2_N_BLOCKS) {
-                kernel.logger.ERROR("File size exceeds maximum ext2 inode size\n", .{});
-                return kernel.errors.PosixError.ENOSPC;
-            }
+            block = pbns[idx];
         }
 
-        // Find block group
-        var bgdt_idx = (self.base.i_no - 1) / sb.data.s_inodes_per_group;
-        if (sb.bgdt[bgdt_idx].bg_free_blocks_count == 0) {
-            bgdt_idx = 0;
-            while (bgdt_idx < sb.bgdt.len) {
-                if (sb.bgdt[bgdt_idx].bg_free_blocks_count != 0)
-                    break ;
-                bgdt_idx += 1;
-            }
+        if (allocated_blocks) {
+            const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
+            sb.data.s_wtime = curr_seconds;
+            self.data.i_mtime = curr_seconds;
+            self.base.mtime = curr_seconds;
+            try self.iput();
+            try sb.writeSuper();
         }
-        if (bgdt_idx >= sb.bgdt.len) {
-            kernel.logger.ERROR("BUG: we got bigger bgdt index than the length of descriptors\n", .{});
-            return kernel.errors.PosixError.ENOSPC;
-        }
-
-        const block = try sb.getFreeBlock(bgdt_idx);
-        self.data.i_blocks += sb.base.block_size / 512;
-        self.data.i_block[blk_idx] = @intCast(block);
-        const curr_seconds: u32 = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
-        sb.data.s_wtime = curr_seconds;
-        self.data.i_mtime = curr_seconds;
-        self.base.mtime = curr_seconds;
-        try self.iput();
-        try sb.writeGDTEntry(bgdt_idx);
-        try sb.writeSuper();
         return block;
     }
 
@@ -530,7 +540,7 @@ pub const Ext2Inode = struct {
         while (blk_idx <= 11) {
             var pbn = self.data.i_block[blk_idx];
             if (pbn == 0) {
-                pbn = try self.allocBlock();
+                pbn = try self.allocBlock(blk_idx);
                 blk_idx = 11; // to exit loop
             }
             const blk = try sb.readBlocks(pbn, 1);
@@ -661,6 +671,10 @@ pub const Ext2Inode = struct {
     }
 
     fn symlink(parent: *fs.DEntry, name: []const u8, target: []const u8) !void {
+        const sb: *fs.SuperBlock = if (parent.inode.sb) |_s| _s else
+            return kernel.errors.PosixError.EINVAL;
+        if (target.len > sb.block_size) // TODO: add support for bigger len
+            return kernel.errors.PosixError.EINVAL;
         const new_link =  try parent.inode.ops.create(
             parent.inode,
             name,
@@ -669,7 +683,7 @@ pub const Ext2Inode = struct {
         );
         const ext2_inode = new_link.inode.getImpl(Ext2Inode, "base");
         if (target.len >= 60) {
-            const pbn = try ext2_inode.allocBlock();
+            const pbn = try ext2_inode.allocBlock(0);
             const ext2_super = parent.sb.getImpl(ext2_sb.Ext2Super, "base");
             const res = try ext2_super.writeBuff(pbn, target.ptr, target.len);
             if (res != target.len) {

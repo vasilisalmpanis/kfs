@@ -135,6 +135,17 @@ pub inline fn getESP() u32 {
         : [value] "={eax}" (-> u32),
     );
 }
+
+pub inline fn getEIP() u32 {
+    return asm volatile (
+        \\call 1f
+        \\1: popl %[value]
+        : [value] "=r" (-> u32),
+        :
+        : .{ .memory = true }
+    );
+}
+
 pub fn areIntEnabled() bool {
     const eflags = getEflags();
     if (eflags & (1<<9) == (1<<9))
@@ -241,7 +252,7 @@ pub fn disableInterrupts() void {
     asm volatile ("cli");
 }
 
-pub fn getStackFrameAddr() usize {
+pub inline fn getStackFrameAddr() usize {
     return asm volatile (
         \\ movl %ebp, %[value]
         : [value] "={eax}" (-> usize),

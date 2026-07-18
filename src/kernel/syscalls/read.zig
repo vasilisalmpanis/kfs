@@ -57,8 +57,12 @@ pub fn readv(fd: u32, iov: ?[*]IoVec, iovcnt: u32) !u32 {
     var ret: u32 = 0;
     for (0..iovcnt) |idx| {
         const curr = iovec[idx];
-        if (curr.len > 0)
-            ret += try read(fd, curr.base, curr.len);
+        if (curr.len > 0) {
+            const single_read = try read(fd, curr.base, curr.len);
+            ret += single_read;
+            if (single_read != curr.len)
+                return ret;
+        }
     }
     return ret;
 }

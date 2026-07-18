@@ -48,7 +48,7 @@ pub const Ext2File = struct {
 
         // if pbn == 0 => sparse hole: return zeroed bytes up to block boundary
         if (pbn == 0) {
-            pbn = try ino.allocBlock();
+            pbn = try ino.allocBlock(lbn);
         }
 
         const buff = try ext2_sb.readBlocks(pbn, 1);

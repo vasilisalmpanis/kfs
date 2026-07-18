@@ -412,34 +412,16 @@ pub const Ext2Super = struct {
         return block;
     }
 
-    pub inline fn freeBlocksCount(self: *Ext2Super) u32 {
-        var count: u32 = 0;
-        for (self.bgdt) |bgd| {
-            count += bgd.bg_free_blocks_count;
-        }
-        return count;
-    }
-
-    pub inline fn freeInodesCount(self: *Ext2Super) u32 {
-        var count: u32 = 0;
-        for (self.bgdt) |bgd| {
-            count += bgd.bg_free_inodes_count;
-        }
-        return count;
-    }
-
     pub fn statfs(base: *fs.SuperBlock) !fs.Statfs {
         const ext2_sb = base.getImpl(Ext2Super, "base");
-        const bfree: u32 = ext2_sb.freeBlocksCount();
-        const ffree: u32 = ext2_sb.freeInodesCount();
         return fs.Statfs{
             .type = base.magic,
             .bsize = base.block_size,
             .blocks = ext2_sb.data.s_blocks_count,
-            .bfree = bfree,
-            .bavail = bfree - ext2_sb.data.s_r_blocks_count,
+            .bfree = ext2_sb.data.s_free_blocks_count,
+            .bavail = ext2_sb.data.s_free_blocks_count -| ext2_sb.data.s_r_blocks_count,
             .files = ext2_sb.data.s_inodes_count,
-            .ffree = ffree,
+            .ffree = ext2_sb.data.s_free_inodes_count,
             .namelen = 255,
             .flags = 0,
             .frsize = 0,
@@ -706,6 +688,13 @@ pub const Ext2Super = struct {
             return kernel.errors.PosixError.ENOSPC;
         }
         return bgdt_idx;
+    }
+
+    pub fn allocPhysBlock(self: *Ext2Super, ino: *Ext2Inode) !u32 {
+        const bgdt_idx = try self.getBlockDescriptorIndex(ino);
+        const block = try self.getFreeBlock(bgdt_idx);
+        try self.writeGDTEntry(bgdt_idx);
+        return block;
     }
 };
 
