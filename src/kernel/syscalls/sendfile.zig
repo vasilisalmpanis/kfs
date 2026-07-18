@@ -62,7 +62,7 @@ pub fn sendfile64(out_fd: i32, in_fd: i32, offset: ?*u64, count: u32) !u32 {
     defer krn.mm.kfree(buffer.ptr);
 
     var total_written: u32 = 0;
-    var current_offset: u64 = 0;
+    var current_offset: u64 = in_file.pos;
 
     if (offset) |off| {
         current_offset = off.*;
@@ -93,6 +93,8 @@ pub fn sendfile64(out_fd: i32, in_fd: i32, offset: ?*u64, count: u32) !u32 {
         if (bytes_written == 0) {
             break;
         }
+
+        in_file.pos -= (bytes_read - bytes_written);
 
         total_written += bytes_written;
         current_offset += bytes_written;
