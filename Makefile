@@ -157,7 +157,8 @@ qemu: $(NAME)
 		-drive file=$(NAME),format=raw \
 		-serial stdio \
 		-serial pty \
-		-m 4G
+		-m 4G \
+		-smp 2
 
 debug: $(NAME)
 	$(QEMU) -drive file=$(NAME),format=raw \

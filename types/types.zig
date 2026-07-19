@@ -618,6 +618,46 @@ pub const arch = struct {
 
     };
 
+    pub const smp = struct {
+        pub const acpi = struct {
+            pub const ApicBaseMsr = packed struct {
+                reserved0 : u8= 0,
+                is_bsp : bool= false,
+                reserved1 : u1= 0,
+                x2apic_enable : bool= false,
+                apic_global_enable : bool= false,
+                base_addr : u24= 0,
+                reserved2 : u28= 0,
+            };
+
+            pub const SDT_header = extern struct {
+                Signature : [4]u8,
+                Length : u32,
+                Revision : u8,
+                Checksum : u8,
+                OEMID : [6]u8,
+                OEMTableID : [8]u8,
+                OEMRevision : u32,
+                CreatorID : u32,
+                CreatorRevision : u32,
+            };
+
+            pub const RSDT = extern struct {
+                header : arch.smp.acpi.SDT_header,
+            };
+
+            pub const RSDPDescriptor = extern struct {
+                signature : [8]u8,
+                checksum : u8,
+                oem_id : [6]u8,
+                revision : u8,
+                rsdt_address : u32,
+            };
+
+        };
+
+    };
+
 };
 
 pub const kernel = struct {

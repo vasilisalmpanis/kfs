@@ -22,6 +22,7 @@ const std = @import("std");
 const cpu = @import("arch").cpu;
 const io = @import("arch").io;
 const modules = @import("modules");
+const smp = @import("arch").smp;
 
 pub fn panic(
     msg: []const u8,
@@ -212,6 +213,11 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial.print("[INIT]: CMOS done\n");
     krn.vdso.init(); // Should be initialized after cmos
     krn.serial.print("[INIT]: vDSO done\n");
+    // cpuid.logAllFeatures(cpuid.info);
+    smp.acpi.init();
+    const res = smp.acpi.rdmsr(smp.acpi.IA32_APIC_BASE);
+    krn.logger.INFO("RDMSR result {any}\n", .{@as(smp.acpi.ApicBaseMsr, @bitCast(res))});
+    while (true) {}
 
     // FS
     krn.fs.init();
