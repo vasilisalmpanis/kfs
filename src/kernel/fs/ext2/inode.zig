@@ -472,10 +472,10 @@ pub const Ext2Inode = struct {
         if (self.base.sb == null)
             return kernel.errors.PosixError.ENOENT;
         const sb = self.base.sb.?.getImpl(ext2_sb.Ext2Super, "base");
-        
+
         var block: u32 = 0;
         var allocated_blocks: bool = false;
-        
+
         const ptrs: u32 = sb.base.block_size / @sizeOf(u32);
         const info = sb.getIndirectInfo(lbn, ptrs);
 
@@ -486,7 +486,7 @@ pub const Ext2Inode = struct {
             ptrs,
             &idxs
         );
-        
+
         block = self.data.i_block[info.root];
         if (block == 0) {
             block = try sb.allocPhysBlock(self);
