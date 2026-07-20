@@ -53,6 +53,9 @@ pub const Logger = struct {
             .ERROR => RED,
             .OFF => WHITE,
         };
+        const lock_state = log_lock.lock_irq_disable();
+        defer log_lock.unlock_irq_enable(lock_state);
+        
         const formatted_log = std.fmt.bufPrint(
             buf[0..],
             "{s}[{t}]: " ++
@@ -65,8 +68,6 @@ pub const Logger = struct {
             } ++ args,
         ) catch "[LOGGER]: format error\n";
 
-        const lock_state = log_lock.lock_irq_disable();
-        defer log_lock.unlock_irq_enable(lock_state);
         krn.serial.print(formatted_log);
     }
 

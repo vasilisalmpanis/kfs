@@ -58,6 +58,7 @@ pub fn build(b: *std.Build) !void {
 
     arch_mod.addImport("debug", debug_mod);
     arch_mod.addImport("kernel", kernel_mod);
+    arch_mod.addImport("drivers", drivers_mod);
 
     debug_mod.addImport("arch", arch_mod);
     debug_mod.addImport("drivers", drivers_mod);
@@ -149,6 +150,7 @@ pub fn build(b: *std.Build) !void {
     if (arch == .x86) {
         kernel.setLinkerScript(b.path("./src/arch/x86/linker.ld"));
         kernel.root_module.addAssemblyFile(b.path("./src/arch/x86/boot/boot.s"));
+        kernel.root_module.addAssemblyFile(b.path("./src/arch/x86/boot/trampoline.s"));
     } else if (arch == .x86_64) {
         kernel.setLinkerScript(b.path("./src/arch/x86_64/linker.ld"));
         kernel.root_module.addAssemblyFile(b.path("./src/arch/x86_64/boot/boot.s"));

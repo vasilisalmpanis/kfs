@@ -10,6 +10,7 @@ const tsk = @import("kernel").task;
 const gdt = @import("./gdt.zig");
 const vmm = @import("./mm/vmm.zig");
 const fpu = @import("fpu.zig");
+const smp = @import("./smp/main.zig");
 
 pub const IDT_MAX_DESCRIPTORS   = 256;
 pub const CPU_EXCEPTION_COUNT   = 32;
@@ -68,6 +69,12 @@ pub export fn exceptionHandler(state: *Regs) callconv(.c) *Regs {
 
 pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     @setRuntimeSafety(false);
+    const cpu = smp.cpuID();
+    if (cpu != smp.boot_cpu_apicid) {
+        krn.logger.INFO("interrupt from cpu {d}", .{cpu});
+        smp.apicEOI();
+        return state;
+    }
     if (krn.irq.handlers[state.int_no] != null) {
         if (state.int_no == SYSCALL_INTERRUPT) {
             const handler: *const SyscallHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
@@ -78,10 +85,8 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
             handler(arg);
         }
     }
-    io.outb(0x20, 0x20);
-    if (state.int_no >= 40) {
-        io.outb(0xA0, 0x20);
-    }
+
+    smp.apicEOI();
     if (state.int_no == TIMER_INTERRUPT)
         krn.sched.schedule();
 
@@ -291,6 +296,10 @@ pub inline fn PICRemap() void {
     io.outb(0xA1, 0x0);
 }
 
+pub inline fn PICMask() void {
+    io.outb(0x21, 0xFF);
+    io.outb(0xA1, 0xFF);
+}
 const IdtEntry = packed struct {
     isr_low: u16,       // The lower 16 bits of the ISR's address
     kernel_cs: u16,     // The GDT segment selector that the CPU will load into CS before calling the ISR
@@ -317,6 +326,14 @@ pub fn idtSetDescriptor(vector: u8, isr: *const ISRHandler, flags: u8) void {
     descriptor.reserved       = 0;
 }
 
+pub inline fn idtLoad() void {
+    asm volatile (
+        \\lidt (%[idt_ptr])
+        :
+        : [idt_ptr] "r" (&idtr),
+    );
+}
+
 pub fn idtInit() void {
     idtr.base = @intFromPtr(&idt[0]);
     idtr.limit = idt.len * @sizeOf(IdtEntry) - 1;
@@ -337,12 +354,7 @@ pub fn idtInit() void {
             if (index < CPU_EXCEPTION_COUNT) 0x8E else 0xEE
         );
     }
-
-    asm volatile (
-        \\lidt (%[idt_ptr])
-        :
-        : [idt_ptr] "r" (&idtr),
-    );
-    PICRemap();
+    idtLoad();
+    PICMask();
     krn.exceptions.registerExceptionHandlers();
 }

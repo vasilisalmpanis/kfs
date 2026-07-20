@@ -258,3 +258,16 @@ pub inline fn getStackFrameAddr() usize {
         : [value] "={eax}" (-> usize),
     );
 }
+
+pub fn rdmsr(register: u32) u64 {
+    var eax: u32 = 0;
+    var edx: u32 = 0;
+    asm volatile(
+        \\ rdmsr
+        :   [eax] "={eax}" (eax),
+            [edx] "={edx}" (edx),
+        :   [register] "{ecx}" (register),
+        :   .{ .memory = true }
+    );
+    return (@as(u64, edx) << 32) | @as(u64, eax);
+}

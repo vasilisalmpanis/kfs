@@ -9,6 +9,7 @@ pub const fpu = @import("fpu.zig");
 pub const Regs = @import("system/cpu.zig").Regs;
 pub const cpu = @import("system/cpu.zig");
 pub const cpuid = @import("system/cpuid.zig");
+pub const acpi = @import("system/acpi.zig");
 pub const saveFlagsAndCli = @import("system/cpu.zig").saveFlagsAndCli;
 pub const restoreFlags = @import("system/cpu.zig").restoreFlags;
 pub const setupStack = @import("system/cpu.zig").setupStack;

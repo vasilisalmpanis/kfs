@@ -602,6 +602,33 @@ pub const arch = struct {
 
     };
 
+    pub const acpi = struct {
+        pub const SDTHeader = extern struct {
+            Signature : [4]u8,
+            Length : u32,
+            Revision : u8,
+            Checksum : u8,
+            OEMID : [6]u8,
+            OEMTableID : [8]u8,
+            OEMRevision : u32,
+            CreatorID : u32,
+            CreatorRevision : u32,
+        };
+
+        pub const RSDT = extern struct {
+            header : arch.acpi.SDTHeader,
+        };
+
+        pub const RSDPDescriptor = extern struct {
+            signature : [8]u8,
+            checksum : u8,
+            oem_id : [6]u8,
+            revision : u8,
+            rsdt_address : u32,
+        };
+
+    };
+
     pub const sw = struct {
     };
 
@@ -619,7 +646,8 @@ pub const arch = struct {
     };
 
     pub const smp = struct {
-        pub const acpi = struct {
+
+        pub const apic = struct {
             pub const ApicBaseMsr = packed struct {
                 reserved0 : u8= 0,
                 is_bsp : bool= false,
@@ -630,32 +658,28 @@ pub const arch = struct {
                 reserved2 : u28= 0,
             };
 
-            pub const SDT_header = extern struct {
-                Signature : [4]u8,
-                Length : u32,
-                Revision : u8,
-                Checksum : u8,
-                OEMID : [6]u8,
-                OEMTableID : [8]u8,
-                OEMRevision : u32,
-                CreatorID : u32,
-                CreatorRevision : u32,
+            pub const ProcessorLocalAPIC = extern struct {
+                type : u8,
+                length : u8,
+                acpi_proc_id : u8,
+                apic_id : u8,
+                flags : u32,
             };
 
-            pub const RSDT = extern struct {
-                header : arch.smp.acpi.SDT_header,
+            pub const MADTEntry = extern struct {
+                type : u8,
+                length : u8,
             };
 
-            pub const RSDPDescriptor = extern struct {
-                signature : [8]u8,
-                checksum : u8,
-                oem_id : [6]u8,
-                revision : u8,
-                rsdt_address : u32,
+            pub const MADT = extern struct {
+                header : arch.acpi.SDTHeader,
+                local_address : u32,
+                flags : u32,
             };
 
         };
 
+        pub extern fn apMain()noreturn;
     };
 
 };
@@ -845,6 +869,9 @@ pub const kernel = struct {
     pub const RefCount = struct {
         count : std.atomic.Value(usize),
         dropFn : *const fn(*kernel.RefCount) void,
+    };
+
+    pub const kthread = struct {
     };
 
     pub const task = struct {

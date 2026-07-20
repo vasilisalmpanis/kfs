@@ -23,6 +23,7 @@ const cpu = @import("arch").cpu;
 const io = @import("arch").io;
 const modules = @import("modules");
 const smp = @import("arch").smp;
+const acpi = @import("arch").acpi;
 
 pub fn panic(
     msg: []const u8,
@@ -193,6 +194,9 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial.print("[INIT]: IDT done\n");
     mm.mmInit(&krn.boot_info);
     krn.serial.print("[INIT]: Memory done\n");
+    acpi.init();
+    smp.init();
+    krn.serial.print("[INIT]: ACPI done\n");
     krn.task.initMultitasking();
     krn.serial.print("[INIT]: Multitasking done\n");
     fpu.setTaskSwitched();
@@ -214,10 +218,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.vdso.init(); // Should be initialized after cmos
     krn.serial.print("[INIT]: vDSO done\n");
     // cpuid.logAllFeatures(cpuid.info);
-    smp.acpi.init();
-    const res = smp.acpi.rdmsr(smp.acpi.IA32_APIC_BASE);
-    krn.logger.INFO("RDMSR result {any}\n", .{@as(smp.acpi.ApicBaseMsr, @bitCast(res))});
-    while (true) {}
 
     // FS
     krn.fs.init();
