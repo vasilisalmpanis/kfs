@@ -197,9 +197,12 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     acpi.init();
     smp.init();
     krn.serial.print("[INIT]: ACPI done\n");
+    drv.cmos.init();
+    krn.serial.print("[INIT]: CMOS done\n");
     krn.task.initMultitasking();
     krn.serial.print("[INIT]: Multitasking done\n");
     fpu.setTaskSwitched();
+    irq.mapAll();
     cpu.enableInterrupts();
     krn.serial.print("[INIT]: Interrupts are enabled\n");
     dbg.initSymbolTable(&krn.boot_info);
@@ -213,8 +216,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial.print("[INIT]: Keyboard done\n");
     syscalls.initSyscalls();
     krn.serial.print("[INIT]: Syscalls done\n");
-    drv.cmos.init();
-    krn.serial.print("[INIT]: CMOS done\n");
     krn.vdso.init(); // Should be initialized after cmos
     krn.serial.print("[INIT]: vDSO done\n");
     // cpuid.logAllFeatures(cpuid.info);

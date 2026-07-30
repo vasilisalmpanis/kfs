@@ -100,6 +100,27 @@ pub const KernelAllocator = struct {
     }
 };
 
+pub fn mapPhys(phys: usize, num_pages: usize, flags: arch.vmm.PagingFlags) !usize {
+    const virt_addr: u32 = krn.mm.virt_memory_manager.findFreeSpace(
+        num_pages,
+        0xC0000000,
+        0xFFFFF000,
+        false
+    );
+    if (virt_addr == 0xFFFF_FFFF)
+        return krn.errors.PosixError.ENOMEM;
+    const phys_aligned = arch.pageAlign(phys, true);
+    const offset = phys - phys_aligned;
+    for (0..num_pages) |idx| {
+        krn.mm.virt_memory_manager.mapPage(
+            virt_addr + idx * krn.mm.PAGE_SIZE,
+            phys_aligned + idx * krn.mm.PAGE_SIZE,
+            flags
+        );
+    }
+    return virt_addr + offset;
+}
+
 // get the first availaanle address and put metadata there
 pub fn mmInit(info: *multiboot.Multiboot) void {
     // var i: u32 = 0;

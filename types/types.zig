@@ -658,12 +658,30 @@ pub const arch = struct {
                 reserved2 : u28= 0,
             };
 
-            pub const ProcessorLocalAPIC = extern struct {
+            pub const ProcessorLocalAPIC = packed struct {
                 type : u8,
                 length : u8,
                 acpi_proc_id : u8,
                 apic_id : u8,
                 flags : u32,
+            };
+
+            pub const IOAPIC = packed struct {
+                type : u8,
+                length : u8,
+                io_apic_id : u8,
+                reserved : u8,
+                io_apic_addr : u32,
+                gsi_base : u32,
+            };
+
+            pub const IOAPICInterruptSourceOverride = packed struct {
+                type : u8,
+                length : u8,
+                bus_source : u8,
+                irq_source : u8,
+                gsi : u32,
+                flags : u16,
             };
 
             pub const MADTEntry = extern struct {
@@ -675,6 +693,24 @@ pub const arch = struct {
                 header : arch.acpi.SDTHeader,
                 local_address : u32,
                 flags : u32,
+            };
+
+        };
+
+        pub const ioapic = struct {
+            pub const SourceOverride = struct {
+                gsi : u32,
+                active_low : bool,
+                level_triggered : bool,
+            };
+
+            pub const Controller = struct {
+                io_apic_id : u8,
+                gsi_base : u32,
+                version : u32= 0,
+                redir_entr_count : u32= 0,
+                regs : [*]u32,
+                lock : kernel.Spinlock,
             };
 
         };

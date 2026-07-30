@@ -70,11 +70,6 @@ pub export fn exceptionHandler(state: *Regs) callconv(.c) *Regs {
 pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
     @setRuntimeSafety(false);
     const cpu = smp.cpuID();
-    if (cpu != smp.boot_cpu_apicid) {
-        krn.logger.INFO("interrupt from cpu {d}", .{cpu});
-        smp.apicEOI();
-        return state;
-    }
     if (krn.irq.handlers[state.int_no] != null) {
         if (state.int_no == SYSCALL_INTERRUPT) {
             const handler: *const SyscallHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
@@ -86,7 +81,13 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
         }
     }
 
+    if (cpu != smp.boot_cpu_apicid) {
+        // krn.logger.INFO("interrupt from cpu {d}", .{cpu});
+        smp.apicEOI();
+        return state;
+    }
     smp.apicEOI();
+
     if (state.int_no == TIMER_INTERRUPT)
         krn.sched.schedule();
 

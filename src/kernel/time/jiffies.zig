@@ -34,7 +34,9 @@ pub fn timerHandler() void {
     if (hz_counter == drivers.pit.HZ) {
         hz_counter = 0;
         // Every second
-        krn.cmos.incSec(krn.cmos);
+        if (krn.cmos_ready.*) {
+            krn.cmos.incSec(krn.cmos);
+        }
         vdso.updateTime(1, 0);
     } else {
         vdso.updateTime(0, @intCast(drivers.pit.ns_in_one_tick));

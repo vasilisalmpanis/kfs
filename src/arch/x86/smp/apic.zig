@@ -22,7 +22,15 @@ pub const ApicBaseMsr = packed struct(u64) {
     }
 };
 
-pub const ProcessorLocalAPIC = extern struct {
+pub const MADTTYP_PROC_LAPIC: u8          = 0;
+pub const MADTTYP_IOAPIC: u8              = 1;
+pub const MADTTYP_IOAPIC_ISR: u8          = 2;
+pub const MADTTYP_IOAPIC_NMI_SRC: u8      = 3;
+pub const MADTTYP_LAPIC_NMI: u8           = 4;
+pub const MADTTYP_LAPIC_ADDR_OVERRIDE: u8 = 5;
+pub const MADTTYP_PROC_LX2APIC: u8        = 9;
+
+pub const ProcessorLocalAPIC = packed struct {
     type:           u8, // 0
     length:         u8, // 8
     acpi_proc_id:   u8,
@@ -30,6 +38,24 @@ pub const ProcessorLocalAPIC = extern struct {
     // flags lands at offset 4 with no padding (four u8s precede it).
     // bit 0 = enabled, bit 1 = online-capable.
     flags:          u32,
+};
+
+pub const IOAPIC = packed struct {
+    type:           u8, // 1
+    length:         u8, // 12
+    io_apic_id:     u8,
+    reserved:       u8,
+    io_apic_addr:   u32,
+    gsi_base:       u32,
+};
+
+pub const IOAPICInterruptSourceOverride = packed struct {
+    type:           u8, // 2
+    length:         u8, // 10
+    bus_source:     u8,
+    irq_source:     u8,
+    gsi:            u32,
+    flags:          u16,
 };
 
 pub const MADTEntry = extern struct {
