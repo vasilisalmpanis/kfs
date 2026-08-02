@@ -13,7 +13,7 @@ pub const SyscallHandler = fn (
 ) errors.PosixError!u32;
 
 fn notImpl(_: u32, _: u32, _: u32, _: u32, _: u32, _: u32) !u32 {
-    const state: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
+    const state: *arch.Regs = @ptrFromInt(arch.gdt.tss.ptr().esp0 - @sizeOf(arch.Regs));
     krn.logger.ERROR("syscall {d} {s} is not implemented", .{
         state.eax,
         @tagName(@as(Syscall, @enumFromInt(state.eax)))

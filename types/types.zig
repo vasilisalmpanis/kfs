@@ -50,6 +50,20 @@ pub const arch = struct {
     };
 
     pub const gdt = struct {
+        pub const gdt_ptr = struct {
+        };
+
+        pub const tss = struct {
+        };
+
+        pub const gdt_entries = struct {
+        };
+
+        pub const Gdtr = packed struct {
+            limit : u16= 0,
+            base : u32= 0,
+        };
+
         pub const GdtEntry = packed struct {
             limit_low : u16,
             base_low : u16,

@@ -34,7 +34,7 @@ pub fn goUserspace() void {
     // ring 0 from a lower privilege level (ring 3).
     // For a new task this should always be the top of the kernel stack that was
     // allocated for this new task.
-    gdt.tss.esp0 = krn.task.current.stack_bottom + krn.STACK_SIZE;
+    gdt.tss.ptr().esp0 = krn.task.current.stack_bottom + krn.STACK_SIZE;
     asm volatile(
         \\ cli
         \\ mov $((8 * 4) | 3), %%bx
@@ -149,7 +149,6 @@ pub const push_regs: []const u8 =
 \\    mov %ax, %ds
 \\    mov %ax, %es
 \\    mov %ax, %fs
-\\    mov %ax, %gs
 \\
 ;
 
@@ -177,6 +176,8 @@ pub fn generateIRQStub(comptime n: u8) []const u8 {
         \\ push $0
         \\ push ${d}
         \\ {s}
+        \\ mov $0x{x}, %ax
+        \\ mov %ax, %gs
         \\ mov %esp, %eax
         \\ push %eax
         \\ lea irqHandler, %eax
@@ -192,6 +193,7 @@ pub fn generateIRQStub(comptime n: u8) []const u8 {
             kernel_entry_clear_flags,
             n,
             push_regs,
+            gdt.GS_OFFSET,
             pop_regs
         }
     );
@@ -206,6 +208,8 @@ fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
         \\ {s}
         \\ push ${d}
         \\ {s}
+        \\ mov $0x{x}, %ax
+        \\ mov %ax, %gs
         \\ mov %esp, %eax
         \\ push %eax
         \\ lea exceptionHandler, %eax
@@ -222,6 +226,7 @@ fn generateStub(comptime n: u8, comptime has_error: bool) []const u8 {
             if (has_error) "" else "push $0",
             n,
             push_regs,
+            gdt.GS_OFFSET,
             pop_regs,
         }
     );

@@ -2,6 +2,8 @@ const std = @import("std");
 const modules = @import("modules");
 
 pub export const stack_top: u32 = 0;
+pub export const _percpu_start: u32 = 0;
+pub export const _percpu_end: u32 = 0;
 var allocator: std.mem.Allocator = undefined;
 var visited_registry: std.StringHashMap([]const u8) = undefined;
 

@@ -4,7 +4,7 @@ const KERNEL_CODE_SEGMENT = @import("../idt.zig").KERNEL_CODE_SEGMENT;
 const KERNEL_DATA_SEGMENT = @import("../idt.zig").KERNEL_DATA_SEGMENT;
 const USER_CODE_SEGMENT = @import("../idt.zig").USER_CODE_SEGMENT;
 const USER_DATA_SEGMENT = @import("../idt.zig").USER_DATA_SEGMENT;
-
+const GS_OFFSET = @import("../gdt.zig").GS_OFFSET;
 
 pub const Regs = struct {
     gs: u32,
@@ -30,7 +30,7 @@ pub const Regs = struct {
 
     pub fn init() Regs {
         return Regs{
-            .gs = KERNEL_DATA_SEGMENT,
+            .gs = GS_OFFSET,
             .fs = KERNEL_DATA_SEGMENT,
             .es = KERNEL_DATA_SEGMENT,
             .ds = KERNEL_DATA_SEGMENT,

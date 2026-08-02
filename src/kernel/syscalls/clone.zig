@@ -188,7 +188,7 @@ pub fn clone(
     errdefer if (child_fpu_state) |state| krn.mm.kfree(state);
 
     const stack_top = stack + kthread.STACK_SIZE - @sizeOf(arch.Regs);
-    const parent_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
+    const parent_regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.ptr().esp0 - @sizeOf(arch.Regs));
     var child_regs: *arch.Regs = @ptrFromInt(stack_top);
     child_regs.* = parent_regs.*;
     child_regs.eax = 0;

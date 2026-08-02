@@ -98,14 +98,13 @@ pub fn set_thread_area(ptr: *UserDesc) !u32 {
         .{ptr}
     );
     const sel = try applyTLSDesc(krn.task.current, ptr);
-    arch.gdt.gdtSetEntry(
-        krn.task.current.tls_entry_number,
+    arch.gdt.gdt_entries.ptr()[krn.task.current.tls_entry_number].set(
         krn.task.current.tls,
         krn.task.current.limit,
         krn.task.current.tls_access,
         krn.task.current.tls_gran
     );
-    const regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.esp0 - @sizeOf(arch.Regs));
+    const regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.ptr().esp0 - @sizeOf(arch.Regs));
     regs.gs = sel;
     krn.task.current.regs.gs = sel;
     return 0;

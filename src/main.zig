@@ -186,7 +186,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.boot_info = boot_info;
     krn.serial.print("[INIT]: Multiboot done\n");
 
-    gdt.gdtInit();
+    gdt.init();
     krn.serial.print("[INIT]: GDT done\n");
     krn.pit = PIT.init(1000);
     krn.serial.print("[INIT]: PIT done\n");

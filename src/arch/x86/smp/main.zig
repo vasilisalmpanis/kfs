@@ -4,8 +4,11 @@ pub const ioapic = @import("ioapic.zig");
 const krn = @import("kernel");
 const arch = @import("../main.zig");
 const pit = @import("drivers").pit;
+const percpu = @import("./percpu.zig");
+pub const PerCpu = percpu.PerCpu;
 
 pub var boot_cpu_apicid: u32 = 0xFFFFFFFF;
+pub var cpu_count: usize = 0;
 pub var smp_enabled: bool = false;
 
 pub var cpus_online: u32 = 0;
@@ -87,13 +90,20 @@ fn setupTimer() void {
 }
 
 pub export fn apMain() noreturn {
+    arch.gdt.gdtInit(arch.gdt.gdt_ptr.ptrFromBase(percpu.percpu_curr_addr),
+        arch.gdt.tss.ptrFromBase(percpu.percpu_curr_addr),
+        percpu.percpu_curr_addr,
+        percpu.percpu_size,
+        arch.gdt.gdt_entries.ptrFromBase(percpu.percpu_curr_addr),
+    );
     _ = @atomicRmw(u32, &cpus_online, .Add, 1, .seq_cst);
     arch.idt.idtLoad();
+
     krn.logger.INFO("Hello from cpu\n", .{});
 
     setupTimer();
 
-    arch.cpu.enableInterrupts();
+    // arch.cpu.enableInterrupts();
     while (true) {}
 }
 
@@ -150,8 +160,20 @@ pub fn startCore(proc_apic: *align(1) apic.ProcessorLocalAPIC) void {
             krn.logger.WARN("CPU {d} did not come online\n", .{proc_apic.apic_id});
         } else {
             krn.logger.INFO("CPU {d} online\n", .{proc_apic.apic_id});
+            percpu.percpu_curr_addr += percpu.percpu_size_aligned;
         }
     }
+}
+
+pub fn countCPUs(madt: *apic.MADT) usize {
+    var cpus: usize = 0;
+    var madt_entry: ?*apic.MADTEntry = null;
+    while (madt.getNextEntry(madt_entry)) |entry| {
+        if (entry.type == apic.MADTTYP_PROC_LAPIC)
+            cpus += 1;
+        madt_entry = entry;
+    }
+    return cpus;
 }
 
 pub fn init() void {
@@ -162,6 +184,7 @@ pub fn init() void {
     krn.logger.INFO("APIC HEADER: {any}", .{apic_header});
 
     const madt: *apic.MADT = @ptrCast(apic_header);
+    cpu_count = countCPUs(madt);
 
     const apic_base: u32 = madt.local_address;
     const apic_page = krn.mm.mapPhys(
@@ -179,6 +202,11 @@ pub fn init() void {
     arch.vmm.initial_page_dir[0] = 0x00000083;
     setup_trampoline();
     setupTimer();
+
+    percpu.initPerCPUMemory() catch |e| {
+        krn.logger.INFO("SMP: Cannot bring up secondary cores {any}", .{e});
+        return;
+    };
 
     var madt_entry: ?*apic.MADTEntry = null;
     while (madt.getNextEntry(madt_entry)) |entry| {

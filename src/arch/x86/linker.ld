@@ -10,6 +10,7 @@ PHDRS
     text        PT_LOAD FLAGS(0x5); /* RX */
     ro          PT_LOAD FLAGS(0x4); /* R */
     data        PT_LOAD FLAGS(0x6); /* RW */
+    percpu      PT_LOAD FLAGS(0x6); /* RW */
     bss         PT_LOAD FLAGS(0x6); /* RW */
     debug       PT_LOAD FLAGS(0x4); /* R */
 }
@@ -47,6 +48,14 @@ SECTIONS
     {
         *(.data .data.*)
     }                           :data
+
+    .percpu ALIGN(4K) :         AT(ADDR(.percpu) - VIRT)
+    {
+        _percpu_start = .;
+        LONG(_percpu_start);
+        *(.percpu .percpu.*)
+        _percpu_end = .;
+    }                           :percpu
 
     .bss ALIGN(4K) (NOLOAD) :   AT(ADDR(.bss) - VIRT)
     {
