@@ -22,7 +22,7 @@ fn processTasks() void {
         var end: bool = false;
         const curr = i.curr;
         const task = curr.entry(tsk.Task, "list");
-        if (task == tsk.current or !task.refcount.isFree() or task.state == .ZOMBIE)
+        if (task == tsk.current() or !task.refcount.isFree() or task.state == .ZOMBIE)
             continue;
         if (curr.isEmpty()) {
             end = true;
@@ -44,12 +44,12 @@ fn processTasks() void {
 }
 
 fn findNextTask() *tsk.Task {
-    if (tsk.current.list.isEmpty())
+    if (tsk.current().list.isEmpty())
         return &tsk.initial_task;
     tsk.tasks_lock.lock();
     defer tsk.tasks_lock.unlock();
 
-    var it = tsk.current.list.iterator();
+    var it = tsk.current().list.iterator();
     _ = it.next();
     while (it.next()) |i| {
         const task = i.curr.entry(tsk.Task, "list");
@@ -74,7 +74,7 @@ pub fn schedule() void {
     const flags = arch.cpu.saveFlagsAndCli();
     defer arch.cpu.restoreFlags(flags);
     processTasks();
-    const prev = tsk.current;
+    const prev = tsk.current();
     const next = findNextTask();
     if (prev != next)
         arch.contextSwitch(prev, next);

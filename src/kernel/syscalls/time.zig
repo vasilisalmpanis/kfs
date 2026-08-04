@@ -31,7 +31,7 @@ pub fn utimensat(
     if (!times[1].isValid())
         return errors.EINVAL;
     const span = std.mem.span(path);
-    var from = kernel.task.current.fs.pwd.clone();
+    var from = kernel.task.current().fs.pwd.clone();
     defer from.release();
     if (!fs.path.isRelative(span)) {
     } else if (dirfd < 0 and dirfd != fs.AT_FDCWD) {
@@ -39,7 +39,7 @@ pub fn utimensat(
     } else if (dirfd == fs.AT_FDCWD) {
     } else {
         from.release();
-        if (kernel.task.current.files.fds.get(@intCast(dirfd))) |file| {
+        if (kernel.task.current().files.fds.get(@intCast(dirfd))) |file| {
             file.ref.get();
             defer file.ref.put();
             if (file.path) |file_path| {

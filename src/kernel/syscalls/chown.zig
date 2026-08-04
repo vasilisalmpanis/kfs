@@ -14,7 +14,7 @@ pub fn do_chown(
     flags: u32
 ) !u32 {
     _ = flags;
-    var from = kernel.task.current.fs.pwd.clone();
+    var from = kernel.task.current().fs.pwd.clone();
     defer from.release();
     if (!fs.path.isRelative(path)) {
     } else if (fd < 0 and fd != fs.AT_FDCWD) {
@@ -22,7 +22,7 @@ pub fn do_chown(
     } else if (fd == fs.AT_FDCWD) {
     } else {
         from.release();
-        if (kernel.task.current.files.fds.get(@intCast(fd))) |file| {
+        if (kernel.task.current().files.fds.get(@intCast(fd))) |file| {
             file.ref.get();
             defer file.ref.put();
             if (file.path) |_path| {
@@ -73,7 +73,7 @@ pub fn fchownat(
 }
 
 pub fn fchown32(fd: u32, uid: u32, gid: u32) !u32 {
-    if (kernel.task.current.files.fds.get(fd)) |file| {
+    if (kernel.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         if (file.inode.ops.setattr) |_setattr| {

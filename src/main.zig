@@ -36,12 +36,12 @@ pub fn panic(
     krn.logger.ERROR(
         "\nPANIC: [PID {d}]: {s}",
         .{
-            krn.task.current.pid,
+            krn.task.current().pid,
             msg
         }
     );
-    if (krn.task.current.regs.esp != 0) {
-        const curr_regs: *cpu.Regs = @ptrFromInt(krn.task.current.regs.esp);
+    if (krn.task.current().regs.esp != 0) {
+        const curr_regs: *cpu.Regs = @ptrFromInt(krn.task.current().regs.esp);
         curr_regs.dump();
     } else {
         cpu.Regs.state().dump();
@@ -126,16 +126,16 @@ fn user_thread(_: ?*const anyopaque) i32 {
     while (kernel_ready == false)
         krn.sched.reschedule();
 
-    krn.task.current.fs = krn.task.initial_task.fs.dup() catch
+    krn.task.current().fs = krn.task.initial_task.fs.dup() catch
         @panic("Allocation PID 1: fs.dup() failed");
-    krn.task.current.files = krn.task.initial_task.files.dup() catch
+    krn.task.current().files = krn.task.initial_task.files.dup() catch
         @panic("Allocation PID 1: files.dup() failed");
-    krn.task.current.sighand = krn.signals.SigHand.new() catch
+    krn.task.current().sighand = krn.signals.SigHand.new() catch
         @panic("Allocation PID 1: SigHand.new() failed");
-    krn.task.current.thread_data = krn.thread.ThreadData.new() orelse
+    krn.task.current().thread_data = krn.thread.ThreadData.new() orelse
         @panic("Allocation PID 1: ThreadData.new() failed");
-    krn.task.current.tsktype = .PROCESS;
-    krn.fs.procfs.newProcess(krn.task.current) catch {
+    krn.task.current().tsktype = .PROCESS;
+    krn.fs.procfs.newProcess(krn.task.current()) catch {
         @panic("Could not create PID 1 procfs entries\n");
     };
     krn.serial.print("[INIT]: user_thread: executing /bin/init\n");

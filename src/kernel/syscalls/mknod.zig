@@ -9,7 +9,7 @@ pub fn mknod(
     mode: fs.UMode,
     dev: u32,
 ) !u32 {
-    if (kernel.task.current.uid != 0)
+    if (kernel.task.current().uid != 0)
         return errors.EACCES;
     var name: []const u8 = undefined;
     const path = std.mem.span(pathname);

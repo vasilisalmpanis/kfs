@@ -991,6 +991,9 @@ pub const kernel = struct {
             should_stop : bool= false,
         };
 
+        pub const current_task = struct {
+        };
+
     };
 
     pub const thread = struct {

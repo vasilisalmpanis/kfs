@@ -174,7 +174,7 @@ fn loadavg_open(file: *krn.fs.File, _: *krn.fs.Inode) !void {
     const counters = countTasks();
     const runnable = counters.running;
     const total = counters.total;
-    const last_pid = krn.task.current.pid;
+    const last_pid = krn.task.current().pid;
 
     const buff_size = std.fmt.count("0.00 0.00 0.00 {d}/{d} {d}\n", .{
         runnable,

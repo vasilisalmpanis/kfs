@@ -40,8 +40,8 @@ const FutexKey = struct {
 
     fn init(uaddr: *u32, flags: u32) FutexKey {
         var _vas: usize = 0;
-        if (flags & FLAGS_SHARED == 0 and krn.task.current.mm != null)
-            _vas = krn.task.current.mm.?.vas;
+        if (flags & FLAGS_SHARED == 0 and krn.task.current().mm != null)
+            _vas = krn.task.current().mm.?.vas;
         return .{
             .addr = @intFromPtr(uaddr),
             .vas = _vas,
@@ -165,7 +165,7 @@ fn futexWait(
 
     var waiter = FutexWaiter{
         .lst = lst.ListHead.init(),
-        .task = krn.task.current,
+        .task = krn.task.current(),
         .bitset = bitset,
         .queue = queue,
         .woken = false,
@@ -178,8 +178,8 @@ fn futexWait(
         return errors.EAGAIN;
     }
     queue.waiters.addTail(&waiter.lst);
-    krn.task.current.wakeup_time = deadline;
-    krn.task.current.state = .INTERRUPTIBLE_SLEEP;
+    krn.task.current().wakeup_time = deadline;
+    krn.task.current().state = .INTERRUPTIBLE_SLEEP;
     queue.lock.unlock_irq_enable(lock_state);
 
     krn.sched.reschedule();
@@ -188,7 +188,7 @@ fn futexWait(
 
     if (woke)
         return 0;
-    if (krn.task.current.hasPendingSignal())
+    if (krn.task.current().hasPendingSignal())
         // An untimed FUTEX_WAIT is restartable. A timed wait would need
         // restart_syscall to resume with the remaining timeout (a plain eip
         // rewind would wait the full duration again), so keep it on EINTR.

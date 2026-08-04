@@ -346,7 +346,7 @@ pub const MM = struct {
                 self.vmas = new_vma;
             krn.logger.DEBUG(
                 "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n",
-                .{krn.task.current.pid, hint, end}
+                .{krn.task.current().pid, hint, end}
             );
             return @intCast(hint);
         }
@@ -372,7 +372,7 @@ pub const MM = struct {
                         self.vmas = new_vma;
                     krn.logger.DEBUG(
                         "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n",
-                        .{krn.task.current.pid, hint, end}
+                        .{krn.task.current().pid, hint, end}
                     );
                     return @intCast(hint);
                 }
@@ -402,7 +402,7 @@ pub const MM = struct {
         }
         krn.logger.DEBUG(
             "[PID {d}] mmap done 0x{x:0>8} - 0x{x:0>8}\n",
-            .{krn.task.current.pid, hint, end}
+            .{krn.task.current().pid, hint, end}
         );
         return @intCast(hint);
     }
@@ -483,7 +483,7 @@ pub const MM = struct {
             return ;
 
         if (self.vas != 0) {
-            const curr_vas = krn.task.current.mm.?.vas;
+            const curr_vas = krn.task.current().mm.?.vas;
             self.releaseMappings();
             const lock_state = krn.mm.mem_lock.lock_irq_disable();
             arch.vmm.switchToVAS(self.vas);
@@ -516,7 +516,7 @@ pub const MM = struct {
         self.env_start = 0;
         self.env_end = 0;
 
-        const curr_vas = krn.task.current.mm.?.vas;
+        const curr_vas = krn.task.current().mm.?.vas;
         const is_curr_vas = self.isCurrentMM();
         if (self.vmas) |head| {
             while (!head.list.isEmpty()) {
@@ -548,12 +548,12 @@ pub const MM = struct {
     }
 
     pub inline fn isCurrentMM(self: *MM) bool {
-        return krn.task.current.mm.? == self;
+        return krn.task.current().mm.? == self;
     }
 
     pub fn accessTaskVM(self: *MM, addr: usize, len: usize) ![]u8 {
         if (krn.mm.kmallocSlice(u8, len)) |res| {
-            const curr_vas = krn.task.current.mm.?.vas;
+            const curr_vas = krn.task.current().mm.?.vas;
             if (!self.isCurrentMM()) {
                 arch.cpu.disableInterrupts();
                 arch.vmm.switchToVAS(self.vas);

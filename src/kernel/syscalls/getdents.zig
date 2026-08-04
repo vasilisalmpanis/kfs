@@ -11,7 +11,7 @@ pub fn getdents64(fd: u32, _dirents: ?[*]u8, size: u32) !u32 {
     var dirents = _dirents orelse
         return errors.EINVAL;
     @memset(dirents[0..size], 0);
-    if (krn.task.current.files.fds.get(fd)) |dir_file| {
+    if (krn.task.current().files.fds.get(fd)) |dir_file| {
         dir_file.ref.get();
         defer dir_file.ref.put();
         if (dir_file.inode.mode.isDir()) {

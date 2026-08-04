@@ -76,7 +76,7 @@ pub fn rmdir(path: ?[*:0]u8) !u32 {
     else
         return errors.EFAULT;
 
-    const from = krn.task.current.fs.pwd.clone();
+    const from = krn.task.current().fs.pwd.clone();
     defer from.release();
     return do_rmdir_at(_path, from);
 }

@@ -15,7 +15,7 @@ fn send_signal(_task: *tsk.Task, signal: i32, tid: u32) !u32 {
             return errors.ESRCH;
         }
     }
-    if (tsk.current.uid != task.uid)
+    if (tsk.current().uid != task.uid)
         return errors.EPERM;
     if (signal == 0)
         return 0;
@@ -51,7 +51,7 @@ pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
 
         var it = tsk.initial_task.list.iterator();
         var count: i32 = 0;
-        const pgroup: u32 = if (pid < -1) @intCast(-pid) else tsk.current.pgid;
+        const pgroup: u32 = if (pid < -1) @intCast(-pid) else tsk.current().pgid;
         while (it.next()) |i| {
             const task = i.curr.entry(tsk.Task, "list");
             if (task.pgid == pgroup) {

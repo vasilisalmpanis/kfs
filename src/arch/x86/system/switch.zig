@@ -93,7 +93,7 @@ pub fn contextSwitch(prev: *tsk.Task, next: *tsk.Task) void {
         }
         prev.save_fpu_state = false;
     }
-    tsk.current = next;
+    tsk.current_task.set(next);
     if (next == &tsk.initial_task) {
         gdt.tss.ptr().esp0 = @intFromPtr(&stack_top);
     } else {

@@ -9,7 +9,7 @@ pub fn getcwd(buf: ?[*:0]u8, size: usize) !u32 {
     const buf_s = user_buf[0..size - 1];
     buf_s[0] = '/';
     buf_s[1] = 0;
-    var res = krn.task.current.fs.pwd.getAbsPath(buf_s) catch {
+    var res = krn.task.current().fs.pwd.getAbsPath(buf_s) catch {
         return errors.EFAULT;
     };
     if (res.len > 0)

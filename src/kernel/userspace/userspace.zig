@@ -152,12 +152,12 @@ pub fn setEnvironment(
     var ptr_off: usize = 0;
 
     // Set argc
-    krn.task.current.mm.?.argc = stack_ptr_addr;
+    krn.task.current().mm.?.argc = stack_ptr_addr;
     pointers[ptr_off] = argv.len;
     ptr_off += 1;
 
     // Set argv
-    krn.task.current.mm.?.arg_start = @intFromPtr(strings) + str_off;
+    krn.task.current().mm.?.arg_start = @intFromPtr(strings) + str_off;
     for (argv) |arg| {
         @memcpy(strings[str_off..str_off + arg.len], arg);
         strings[str_off + arg.len] = 0;
@@ -165,13 +165,13 @@ pub fn setEnvironment(
         str_off += arg.len + 1;
         ptr_off += 1;
     }
-    krn.task.current.mm.?.arg_end = @intFromPtr(strings) + str_off;
+    krn.task.current().mm.?.arg_end = @intFromPtr(strings) + str_off;
     pointers[ptr_off] = 0;
     ptr_off += 1;
 
     // Set envp
-    krn.task.current.mm.?.env_start = stack_ptr_addr + argv_ptr_size;
-    krn.task.current.mm.?.env_end = krn.task.current.mm.?.env_start + envp_ptr_size;
+    krn.task.current().mm.?.env_start = stack_ptr_addr + argv_ptr_size;
+    krn.task.current().mm.?.env_end = krn.task.current().mm.?.env_start + envp_ptr_size;
     for (envp) |env| {
         @memcpy(strings[str_off..str_off + env.len], env);
         strings[str_off + env.len] = 0;
@@ -222,7 +222,7 @@ fn loadSegments(elf: []const u8, load_base: usize) !struct{
         const page_end = arch.pageAlign(seg_end, false);  // Round up to page boundary
         const aligned_size = page_end - page_start;
 
-        _ = krn.task.current.mm.?.mmap_area(
+        _ = krn.task.current().mm.?.mmap_area(
             page_start,
             aligned_size,
             prot, // TODO: remap later with PFtoProt(p_hdr.p_flags),
@@ -230,7 +230,7 @@ fn loadSegments(elf: []const u8, load_base: usize) !struct{
             null,
             0
         ) catch {
-            krn.task.current.mm.?.releaseMappings();
+            krn.task.current().mm.?.releaseMappings();
             return krn.errors.PosixError.ENOMEM;
         };
         const section_ptr: [*]u8 = @ptrFromInt(seg_start);
@@ -293,7 +293,7 @@ pub fn prepareBinary(
                 return err;
             };
             defer file.ref.put();
-            if (!file.inode.mode.canExecute(krn.task.current.uid, krn.task.current.gid))
+            if (!file.inode.mode.canExecute(krn.task.current().uid, krn.task.current().gid))
                 return krn.errors.PosixError.EPERM;
             interp_binary = krn.mm.kmallocSlice(u8, file.inode.size) orelse
                 return krn.errors.PosixError.ENOMEM;
@@ -323,7 +323,7 @@ pub fn prepareBinary(
     const vdso_code_pages = vdso.imagePages();
     const vdso_total_pages = 1 + vdso_code_pages; // vvar + code
     var stack_bottom: usize = krn.mm.PAGE_OFFSET - stack_pages * arch.PAGE_SIZE - vdso_total_pages * arch.PAGE_SIZE;
-    stack_bottom = krn.task.current.mm.?.mmap_area(
+    stack_bottom = krn.task.current().mm.?.mmap_area(
         stack_bottom,
         stack_size,
         prot,
@@ -331,7 +331,7 @@ pub fn prepareBinary(
         null,
         0
     ) catch {
-        krn.task.current.mm.?.releaseMappings();
+        krn.task.current().mm.?.releaseMappings();
         return krn.errors.PosixError.ENOMEM;
     };
     const stack_ptr: [*]u8 = @ptrFromInt(stack_bottom);
@@ -340,8 +340,8 @@ pub fn prepareBinary(
     // Map vDSO and vvar pages above the stack
     const vdso_base = stack_bottom + stack_size; // vvar page
     const vdso_ehdr_addr = vdso_base + arch.PAGE_SIZE; // vDSO ELF code
-    vdso.mapIntoUserspace(krn.task.current.mm.?, vdso_base) catch {
-        krn.task.current.mm.?.releaseMappings();
+    vdso.mapIntoUserspace(krn.task.current().mm.?, vdso_base) catch {
+        krn.task.current().mm.?.releaseMappings();
         return krn.errors.PosixError.ENOMEM;
     };
 
@@ -386,13 +386,13 @@ pub fn prepareBinary(
     // Also arch specific
     heap_start = arch.pageAlign(heap_start, false);
     krn.logger.INFO("heap_start 0x{X:0>8}\n", .{heap_start});
-    krn.task.current.mm.?.brk_start = heap_start;
-    krn.task.current.mm.?.brk = heap_start;
-    krn.task.current.mm.?.heap = heap_start + HEAP_MMAP_GAP;
-    krn.task.current.mm.?.stack_bottom = stack_bottom;
-    krn.task.current.mm.?.stack_top = stack_bottom + stack_size;
-    krn.task.current.mm.?.code = final_eip;
-    krn.task.current.tsktype = .PROCESS;
+    krn.task.current().mm.?.brk_start = heap_start;
+    krn.task.current().mm.?.brk = heap_start;
+    krn.task.current().mm.?.heap = heap_start + HEAP_MMAP_GAP;
+    krn.task.current().mm.?.stack_bottom = stack_bottom;
+    krn.task.current().mm.?.stack_top = stack_bottom + stack_size;
+    krn.task.current().mm.?.code = final_eip;
+    krn.task.current().tsktype = .PROCESS;
 }
 
 pub fn goUserspace() void {

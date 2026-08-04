@@ -47,7 +47,7 @@ pub const Exceptions = enum {
 fn hDivisionError(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGFPE.toPosix())
         ) catch {};
         return regs;
@@ -71,7 +71,7 @@ pub fn hBreakpoint(regs: *Regs) *Regs {
 pub fn hOverflow(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGSEGV.toPosix())
         ) catch {};
         return regs;
@@ -82,7 +82,7 @@ pub fn hOverflow(regs: *Regs) *Regs {
 pub fn hBoundRangeExceeded(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGSEGV.toPosix())
         ) catch {};
         return regs;
@@ -95,7 +95,7 @@ pub fn hInvalidOpcode(regs: *Regs) *Regs {
     regs.dump();
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGILL.toPosix())
         ) catch {};
         return regs;
@@ -108,7 +108,7 @@ pub fn hDeviceNotAvailable(regs: *Regs) *Regs {
     if (!fpu.supportsTaskState()) {
         if (regs.isRing3()) {
             _ = kernel.kill(
-                @intCast(kernel.task.current.pid),
+                @intCast(kernel.task.current().pid),
                 @intCast(Signal.SIGILL.toPosix())
             ) catch {};
             return regs;
@@ -128,7 +128,7 @@ pub fn hDoubleFault(regs: *Regs) *Regs {
 pub fn hCoprocessorSegmentOverrun(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGFPE.toPosix())
         ) catch {};
         return regs;
@@ -140,7 +140,7 @@ pub fn hCoprocessorSegmentOverrun(regs: *Regs) *Regs {
 pub fn hInvalidTSS(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGSEGV.toPosix())
         ) catch {};
         return regs;
@@ -152,7 +152,7 @@ pub fn hInvalidTSS(regs: *Regs) *Regs {
 pub fn hSegmentNotPresent(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGBUS.toPosix())
         ) catch {};
         return regs;
@@ -164,7 +164,7 @@ pub fn hSegmentNotPresent(regs: *Regs) *Regs {
 pub fn hStackSegmentFault(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGBUS.toPosix())
         ) catch {};
         return regs;
@@ -176,12 +176,12 @@ pub fn hStackSegmentFault(regs: *Regs) *Regs {
 pub fn hGeneralProtectionFault(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGSEGV.toPosix())
         ) catch {};
         return regs;
     }
-    kernel.logger.ERROR("PID {d}\n", .{kernel.task.current.pid});
+    kernel.logger.ERROR("PID {d}\n", .{kernel.task.current().pid});
     regs.dump();
     dbg.traceStackTrace(20);
     if (true) @panic("hGeneralProtectionFault");
@@ -191,7 +191,7 @@ pub fn hPageFault(regs: *Regs) *Regs {
     kernel.serial.print("========PAGE FAULT========\n");
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGSEGV.toPosix())
         ) catch {};
         return regs;
@@ -199,7 +199,7 @@ pub fn hPageFault(regs: *Regs) *Regs {
     var addr: u32 = 0;
     addr = arch.vmm.getCR2();
     arch.cpu.disableInterrupts();
-    kernel.logger.ERROR("PID {d}\n", .{kernel.task.current.pid});
+    kernel.logger.ERROR("PID {d}\n", .{kernel.task.current().pid});
     kernel.logger.ERROR(
         \\Page Fault at addr: {x}
         \\EIP: {x}
@@ -231,7 +231,7 @@ pub fn hReserved_1(regs: *Regs) *Regs {
 pub fn hx87FloatingPointException(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGFPE.toPosix())
         ) catch {};
         return regs;
@@ -243,7 +243,7 @@ pub fn hx87FloatingPointException(regs: *Regs) *Regs {
 pub fn hAlignmentCheck(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGBUS.toPosix())
         ) catch {};
         return regs;
@@ -260,7 +260,7 @@ pub fn hMachineCheck(regs: *Regs) *Regs {
 pub fn hSIMDFloatingPointException(regs: *Regs) *Regs {
     if (regs.isRing3()) {
         _ = kernel.kill(
-            @intCast(kernel.task.current.pid),
+            @intCast(kernel.task.current().pid),
             @intCast(Signal.SIGFPE.toPosix())
         ) catch {};
         return regs;

@@ -36,7 +36,7 @@ pub fn prlimit(pid: i32,
     new_lim: ?*Rlimit,
     old_lim: ?*Rlimit
 ) !u32 {
-    var task: *Task = kernel.task.current;
+    var task: *Task = kernel.task.current();
     var found: bool = false;
     if (pid < 0)
         return errors.EINVAL;
@@ -63,9 +63,9 @@ pub fn prlimit(pid: i32,
 }
 
 pub fn setrlimit(resource: i32, rlim: ?*Rlimit) !u32 {
-    return doPrlimit(kernel.task.current, resource, rlim, null);
+    return doPrlimit(kernel.task.current(), resource, rlim, null);
 }
 
 pub fn getrlimit(resource: i32, rlim: ?*Rlimit) !u32 {
-    return doPrlimit(kernel.task.current, resource, null, rlim);
+    return doPrlimit(kernel.task.current(), resource, null, rlim);
 }

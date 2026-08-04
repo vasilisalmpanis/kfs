@@ -24,21 +24,21 @@ pub fn doFork() !u32 {
         return errors.ENOMEM;
     }
     errdefer kthread.kthreadStackFree(stack);
-    child.mm = tsk.current.mm.?.dup() orelse {
+    child.mm = tsk.current().mm.?.dup() orelse {
         krn.logger.ERROR("fork: failed to dup mm", .{});
         return errors.ENOMEM;
     };
     errdefer child.mm.?.delete();
-    child.fs = tsk.current.fs.dup() catch {
+    child.fs = tsk.current().fs.dup() catch {
         krn.logger.ERROR("fork: failed to clone fs", .{});
         return errors.ENOMEM;
     };
     errdefer child.fs.ref.put();
 
-    child.files = try krn.task.current.files.dup();
+    child.files = try krn.task.current().files.dup();
     errdefer child.files.ref.put();
 
-    const sighand = krn.task.current.sighand orelse
+    const sighand = krn.task.current().sighand orelse
         @panic("No userspace task should have sighand == NULL\n");
     child.sighand = try sighand.dup();
     errdefer child.sighand.?.ref.put();
@@ -51,18 +51,18 @@ pub fn doFork() !u32 {
     errdefer child.thread_data.?.ref.put();
 
     var child_fpu_state: ?*arch.fpu.FPUState = null;
-    var child_fpu_used = tsk.current.fpu_used;
-    if (tsk.current.fpu_used and tsk.current.fpu_state != null) {
-        if (tsk.current.save_fpu_state) {
-            arch.fpu.saveFPUState(tsk.current.fpu_state.?);
-            tsk.current.save_fpu_state = false;
+    var child_fpu_used = tsk.current().fpu_used;
+    if (tsk.current().fpu_used and tsk.current().fpu_state != null) {
+        if (tsk.current().save_fpu_state) {
+            arch.fpu.saveFPUState(tsk.current().fpu_state.?);
+            tsk.current().save_fpu_state = false;
             arch.fpu.setTaskSwitched();
         }
         child_fpu_state = km.kmalloc(arch.fpu.FPUState) orelse {
             krn.logger.ERROR("fork: failed to alloc child fpu state", .{});
             return errors.ENOMEM;
         };
-        child_fpu_state.?.* = tsk.current.fpu_state.?.*;
+        child_fpu_state.?.* = tsk.current().fpu_state.?.*;
     } else {
         child_fpu_used = false;
     }
@@ -76,21 +76,21 @@ pub fn doFork() !u32 {
     // The switch frame sits below the trap frame so the first switch_to lands
     // on ret_from_fork, which irets to userspace.
     child.kernel_esp = arch.setupSwitchFrame(stack_top, @intFromPtr(&arch.retFromFork));
-    child.tls = krn.task.current.tls;
-    child.limit = krn.task.current.limit;
-    child.tls_entry_number = krn.task.current.tls_entry_number;
-    child.tls_selector = krn.task.current.tls_selector;
-    child.tls_access = krn.task.current.tls_access;
-    child.tls_gran = krn.task.current.tls_gran;
+    child.tls = krn.task.current().tls;
+    child.limit = krn.task.current().limit;
+    child.tls_entry_number = krn.task.current().tls_entry_number;
+    child.tls_selector = krn.task.current().tls_selector;
+    child.tls_access = krn.task.current().tls_access;
+    child.tls_gran = krn.task.current().tls_gran;
     child.initSelf(
         .RUNNING,
         stack_top,
         stack,
-        tsk.current.uid,
-        tsk.current.gid,
-        tsk.current.pgid,
+        tsk.current().uid,
+        tsk.current().gid,
+        tsk.current().pgid,
         .PROCESS,
-        tsk.current.name[0..16],
+        tsk.current().name[0..16],
         child
     ) catch |err| {
         // TODO: understand when error comes from kmalloc allocation of files

@@ -81,7 +81,7 @@ pub fn fstat(fd: u32, buf: ?*OldStat) !u32 {
     if (buf == null) {
         return errors.EFAULT;
     } 
-    if (krn.task.current.files.fds.get(fd)) |file| {
+    if (krn.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         try do_oldstat(file.inode, buf.?);
@@ -236,7 +236,7 @@ pub fn fstat64(fd: u32, buf: ?*StatLinux) !u32 {
     if (buf == null) {
         return errors.EFAULT;
     }
-    if (krn.task.current.files.fds.get(fd)) |file| {
+    if (krn.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         try do_stat(file.inode, buf.?);
@@ -269,11 +269,11 @@ pub fn fstatat64(
         return stat64(path, buf);
     }
 
-    var from_path = krn.task.current.fs.pwd.clone();
+    var from_path = krn.task.current().fs.pwd.clone();
     defer from_path.release();
 
     if (dir_fd != fs.AT_FDCWD) {
-        if (krn.task.current.files.fds.get(@intCast(dir_fd))) |file| {
+        if (krn.task.current().files.fds.get(@intCast(dir_fd))) |file| {
             file.ref.get();
             defer file.ref.put();
             if (!file.inode.mode.isDir()) {

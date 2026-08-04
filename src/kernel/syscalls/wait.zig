@@ -87,8 +87,8 @@ fn checkPIDPGID(task: *krn.task.Task, pid: u32, pgid: u32) bool {
 
 fn waitChildren(wstatus: ?*i32, opts: WaitStates, pid: u32, pgid: u32) !u32 {
     var waitable_children: bool = false;
-    if (tsk.current.tree.hasChildren()) {
-        var it = tsk.current.tree.child.?.siblingsIterator();
+    if (tsk.current().tree.hasChildren()) {
+        var it = tsk.current().tree.child.?.siblingsIterator();
         while (it.next()) |i| {
             const res = i.curr.entry(tsk.Task, "tree");
             const child_pid = res.pid;
@@ -128,7 +128,7 @@ pub fn wait4(pid: i32, wstatus: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
         _pgid = @intCast(-pid);
     } else if (pid == -1) {
     } else if (pid == 0) {
-        _pgid = krn.task.current.pgid;
+        _pgid = krn.task.current().pgid;
     } else {
         _pid = @intCast(pid);
     }
@@ -147,10 +147,10 @@ pub fn wait4(pid: i32, wstatus: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
         if (res != 0 or (options & WNOHANG) != 0)
             return res;
 
-        if (tsk.current.hasPendingSignal())
+        if (tsk.current().hasPendingSignal())
             return errors.ERESTARTSYS;
 
-        tsk.current.wait_wq.wait(true, 0);
+        tsk.current().wait_wq.wait(true, 0);
     }
     return 0;
 }

@@ -97,16 +97,16 @@ pub fn set_thread_area(ptr: *UserDesc) !u32 {
         "set_thread_area ptr: {any}",
         .{ptr}
     );
-    const sel = try applyTLSDesc(krn.task.current, ptr);
-    arch.gdt.gdt_entries.ptr()[krn.task.current.tls_entry_number].set(
-        krn.task.current.tls,
-        krn.task.current.limit,
-        krn.task.current.tls_access,
-        krn.task.current.tls_gran
+    const sel = try applyTLSDesc(krn.task.current(), ptr);
+    arch.gdt.gdt_entries.ptr()[krn.task.current().tls_entry_number].set(
+        krn.task.current().tls,
+        krn.task.current().limit,
+        krn.task.current().tls_access,
+        krn.task.current().tls_gran
     );
     const regs: *arch.Regs = @ptrFromInt(arch.gdt.tss.ptr().esp0 - @sizeOf(arch.Regs));
     regs.gs = sel;
-    krn.task.current.regs.gs = sel;
+    krn.task.current().regs.gs = sel;
     return 0;
 }
 
@@ -116,9 +116,9 @@ pub fn set_tid_address(tidptr: u32) !u32 {
         .{tidptr}
     );
     if (tidptr == 0) {
-        tsk.current.clear_tid = null;
+        tsk.current().clear_tid = null;
     } else {
-        tsk.current.clear_tid = @ptrFromInt(tidptr);
+        tsk.current().clear_tid = @ptrFromInt(tidptr);
     }
-    return tsk.current.pid;
+    return tsk.current().pid;
 }

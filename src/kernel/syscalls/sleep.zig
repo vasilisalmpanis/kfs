@@ -14,10 +14,10 @@ pub fn nanosleep(
     const nsec: u32 = @intCast(dur.tv_nsec);
     const millis: u32 = sec * 1000 +| nsec / 1000_000;
     const start_time = krn.currentMs();
-    krn.task.current.wakeup_time = start_time +| millis;
-    krn.task.current.state = .INTERRUPTIBLE_SLEEP;
+    krn.task.current().wakeup_time = start_time +| millis;
+    krn.task.current().state = .INTERRUPTIBLE_SLEEP;
     krn.sched.reschedule();
-    if (krn.task.current.hasPendingSignal()) {
+    if (krn.task.current().hasPendingSignal()) {
         if (rem) |r| {
             const passed_time = krn.time.kernel_timespec.fromMSec(
                 krn.currentMs() - start_time

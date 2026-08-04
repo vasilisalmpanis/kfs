@@ -173,9 +173,9 @@ pub fn doExecve(
         .Unknown => return errors.ENOEXEC,
     }
 
-    krn.task.current.setName(file.path.?.dentry.name); // TODO: make copy of filename and set name only if we will execute
+    krn.task.current().setName(file.path.?.dentry.name); // TODO: make copy of filename and set name only if we will execute
 
-    if (krn.task.current.mm) |_mm| {
+    if (krn.task.current().mm) |_mm| {
         const old_mm = _mm;
         const new_mm = krn.proc_mm.MM.new() orelse
             return krn.errors.PosixError.ENOMEM;
@@ -183,11 +183,11 @@ pub fn doExecve(
             return krn.errors.PosixError.ENOMEM;
         krn.mm.virt_memory_manager.unmapPage(vas_pair.virt, false);
         arch.vmm.switchToVAS(new_mm.vas);
-        krn.task.current.mm = new_mm;
+        krn.task.current().mm = new_mm;
         old_mm.ref.put();
-        if (krn.task.current.vfork_wq) |wq| {
+        if (krn.task.current().vfork_wq) |wq| {
             wq.wakeUpOne();
-            krn.task.current.vfork_wq = null;
+            krn.task.current().vfork_wq = null;
         }
     }
 
@@ -198,20 +198,20 @@ pub fn doExecve(
     );
 
 
-    krn.task.current.sighand = try krn.signals.SigHand.new();
-    var it = krn.task.current.files.closexec.iterator(
+    krn.task.current().sighand = try krn.signals.SigHand.new();
+    var it = krn.task.current().files.closexec.iterator(
         .{.direction = .forward, .kind = .set}
     );
     while (it.next()) |_fd| {
-        _ = krn.task.current.files.releaseFD(_fd);
+        _ = krn.task.current().files.releaseFD(_fd);
     }
 
-    if (krn.task.current.fpu_state) |state| {
+    if (krn.task.current().fpu_state) |state| {
         krn.mm.kfree(state);
-        krn.task.current.fpu_state = null;
+        krn.task.current().fpu_state = null;
     }
-    krn.task.current.fpu_used = false;
-    krn.task.current.save_fpu_state = false;
+    krn.task.current().fpu_used = false;
+    krn.task.current().save_fpu_state = false;
     arch.fpu.setTaskSwitched();
 
     // Release the file's content buffer since
@@ -225,7 +225,7 @@ pub fn doExecve(
     file.ref.put();
     resources_released.* = true;
 
-    arch.syscalls.thread.resetTLS(krn.task.current);
+    arch.syscalls.thread.resetTLS(krn.task.current());
 
     krn.userspace.goUserspace();
     return 0;

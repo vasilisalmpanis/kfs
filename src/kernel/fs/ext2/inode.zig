@@ -319,8 +319,8 @@ pub const Ext2Inode = struct {
                     .i_ctime = curr_seconds,
                     .i_mtime = curr_seconds,
                     .i_dtime = 0,
-                    .i_uid = kernel.task.current.uid,
-                    .i_gid = kernel.task.current.gid,
+                    .i_uid = kernel.task.current().uid,
+                    .i_gid = kernel.task.current().gid,
                     .i_mode = @bitCast(mode),
                     .i_size = 0,
                     .i_links_count = 1,
@@ -351,8 +351,8 @@ pub const Ext2Inode = struct {
                 const new_inode = (try Ext2Inode.new(&sb.base)).getImpl(Ext2Inode, "base");
                 errdefer kernel.mm.kfree(new_inode);
                 new_inode.base.setCreds(
-                    kernel.task.current.uid,
-                    kernel.task.current.gid,
+                    kernel.task.current().uid,
+                    kernel.task.current().gid,
                     mode
                 );
                 new_inode.data = new_inode_data;

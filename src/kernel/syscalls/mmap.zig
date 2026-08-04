@@ -53,7 +53,7 @@ pub fn mmap2(
     const offset: u32 = off * krn.mm.PAGE_SIZE;
 
     if (!flags.ANONYMOUS and fd >= 0) {
-        if (krn.task.current.files.fds.get(@intCast(fd))) |_file| {
+        if (krn.task.current().files.fds.get(@intCast(fd))) |_file| {
             _file.ref.get();
             defer _file.ref.put();
             if (!_file.mode.canRead(_file.inode.uid, _file.inode.gid))
@@ -84,14 +84,14 @@ pub fn mmap2(
             }
             hint = arch.pmm.pageAlign(hint, false);
         }
-        if (!flags.FIXED and hint < krn.task.current.mm.?.heap)
-            hint = krn.task.current.mm.?.heap;
+        if (!flags.FIXED and hint < krn.task.current().mm.?.heap)
+            hint = krn.task.current().mm.?.heap;
     } else {
         // look through mappings and just give back one.
-        hint = krn.task.current.mm.?.heap;
+        hint = krn.task.current().mm.?.heap;
     }
     // TODO: not adding READ and WRITE flags but implement mprotect
-    return try krn.task.current.mm.?.mmap_area(
+    return try krn.task.current().mm.?.mmap_area(
         hint,
         len,
         prot | mm.PROT_WRITE | mm.PROT_READ,
@@ -176,7 +176,7 @@ pub fn munmap(
         return errors.EINVAL;
     if (start + len > krn.mm.PAGE_OFFSET)
         return errors.EINVAL;
-    if (krn.task.current.mm == null)
+    if (krn.task.current().mm == null)
         return errors.EINVAL;
-    return try do_munmap(krn.task.current.mm.?, start, start + len);
+    return try do_munmap(krn.task.current().mm.?, start, start + len);
 }

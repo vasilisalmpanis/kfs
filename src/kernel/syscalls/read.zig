@@ -4,7 +4,7 @@ const dbg = @import("debug");
 const krn = @import("../main.zig");
 
 pub fn read(fd: u32, buf: ?[*]u8, size: u32) !u32 {
-    if (krn.task.current.files.fds.get(fd)) |file| {
+    if (krn.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         if (file.inode.mode.isDir())
@@ -21,7 +21,7 @@ pub fn read(fd: u32, buf: ?[*]u8, size: u32) !u32 {
 }
 
 pub fn pread(fd: u32, buf: ?[*]u8, size: u32, offset: u32) !u32 {
-    if (krn.task.current.files.fds.get(fd)) |file| {
+    if (krn.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         if (file.inode.mode.isDir())
@@ -72,7 +72,7 @@ pub fn preadv(fd: u32, iov: ?[*]IoVec, iovcnt: u32, offset: u32) !u32 {
         return 0;
     if (iov == null)
         return errors.EFAULT;
-    if (krn.task.current.files.fds.get(fd)) |file| {
+    if (krn.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         const old_pos = file.pos;

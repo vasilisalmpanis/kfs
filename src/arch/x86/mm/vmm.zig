@@ -449,6 +449,6 @@ pub const VMM = struct {
 
             pt_start_idx = 0;
         }
-        switchToVAS(krn.task.current.mm.?.vas);
+        switchToVAS(krn.task.current().mm.?.vas);
     }
 };

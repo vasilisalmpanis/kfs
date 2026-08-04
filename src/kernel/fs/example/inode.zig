@@ -61,8 +61,8 @@ pub const ExampleInode = struct {
         }
         var new_inode = try ExampleInode.new(sb);
         new_inode.setCreds(
-            kernel.task.current.uid,
-            kernel.task.current.gid,
+            kernel.task.current().uid,
+            kernel.task.current().gid,
             mode
         );
         new_inode.links = 2;
@@ -91,8 +91,8 @@ pub const ExampleInode = struct {
             const new_inode = try ExampleInode.new(sb);
             errdefer kernel.mm.kfree(new_inode);
             new_inode.setCreds(
-                kernel.task.current.uid,
-                kernel.task.current.gid,
+                kernel.task.current().uid,
+                kernel.task.current().gid,
                 mode
             );
             var dent = try parent.new(name, new_inode);
@@ -120,8 +120,8 @@ pub const ExampleInode = struct {
         const new_inode = try ExampleInode.new(parent.sb);
         errdefer kernel.mm.kfree(new_inode);
         new_inode.setCreds(
-            kernel.task.current.uid,
-            kernel.task.current.gid,
+            kernel.task.current().uid,
+            kernel.task.current().gid,
             fs.UMode.link()
         );
         const example_inode = new_inode.getImpl(ExampleInode, "base");

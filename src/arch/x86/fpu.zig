@@ -219,7 +219,7 @@ pub fn handleDeviceNotAvailable() void {
         return;
     clearTaskSwitched();
     asm volatile ("fnclex");
-    const current_task = krn.task.current;
+    const current_task = krn.task.current();
 
     if (current_task.fpu_state) |state| {
         if (current_task.fpu_used) {
@@ -234,7 +234,7 @@ pub fn handleDeviceNotAvailable() void {
         const state = krn.mm.kmalloc(FPUState) orelse {
             arch.cpu.disableInterrupts();
             _ = krn.kill(
-                @intCast(krn.task.current.pid),
+                @intCast(krn.task.current().pid),
                 @intCast(krn.signals.Signal.SIGSEGV.toPosix())
             ) catch {};
             return;

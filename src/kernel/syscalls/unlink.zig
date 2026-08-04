@@ -13,10 +13,10 @@ fn do_unlinkat(dirfd: i32, _path: ?[*:0]u8) !u32 {
     const path_span = std.mem.span(path);
     var from: fs.path.Path = undefined;
     if (!fs.path.isRelative(path_span)) {
-        from = krn.task.current.fs.pwd.clone();
+        from = krn.task.current().fs.pwd.clone();
     } else if (dirfd == fs.AT_FDCWD) {
-        from = krn.task.current.fs.pwd.clone();
-    } else if (krn.task.current.files.fds.get(@intCast(dirfd))) |file| {
+        from = krn.task.current().fs.pwd.clone();
+    } else if (krn.task.current().files.fds.get(@intCast(dirfd))) |file| {
         file.ref.get();
         defer file.ref.put();
         if (file.path) |file_path| {

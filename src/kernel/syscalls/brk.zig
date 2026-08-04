@@ -4,7 +4,7 @@ const krn = @import("../main.zig");
 const arch = @import("arch");
 
 pub fn brk(addr: u32) !u32 {
-    const mm = krn.task.current.mm
+    const mm = krn.task.current().mm
         orelse return 0;
     const current_brk = mm.brk;
 

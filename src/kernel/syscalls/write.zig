@@ -4,7 +4,7 @@ const dbg = @import("debug");
 const krn = @import("../main.zig");
 
 pub fn write(fd: u32, buf: ?[*]u8, size: u32) !u32 {
-    if (krn.task.current.files.fds.get(fd)) |file| {
+    if (krn.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         if (!file.canWrite())
@@ -18,7 +18,7 @@ pub fn write(fd: u32, buf: ?[*]u8, size: u32) !u32 {
         }
         return try file.ops.write(file, data, size);
     }
-    krn.logger.INFO("write: error {d} fd: {d}\n", .{krn.task.current.pid, fd});
+    krn.logger.INFO("write: error {d} fd: {d}\n", .{krn.task.current().pid, fd});
     return errors.EBADF;
 }
 

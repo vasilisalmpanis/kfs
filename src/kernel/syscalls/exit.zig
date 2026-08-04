@@ -6,7 +6,7 @@ const errors = @import("./error-codes.zig").PosixError;
 const futex = @import("./futex.zig");
 
 pub fn doExitGroup(error_code: i32) !u32 {
-    const td = kernel.task.current.thread_data.?;
+    const td = kernel.task.current().thread_data.?;
     const lock_state = td.lock.lock_irq_disable();
 
     if (td.group_exit) {
@@ -31,7 +31,7 @@ pub fn doExitGroup(error_code: i32) !u32 {
         prev = node.curr;
 
         const task = node.curr.entry(kernel.task.Task, "thread_node");
-        if (task == tsk.current)
+        if (task == tsk.current())
             continue;
 
         task.sigpending.setSignal(kernel.signals.Signal.SIGKILL);
@@ -45,16 +45,16 @@ pub fn doExitGroup(error_code: i32) !u32 {
 }
 
 pub fn doExit(error_code: i32) !u32 {
-    if (tsk.current == &tsk.initial_task)
+    if (tsk.current() == &tsk.initial_task)
         return errors.EINVAL;
 
-    tsk.current.group_leader.result = error_code;
+    tsk.current().group_leader.result = error_code;
 
-    kernel.fs.procfs.deleteProcess(kernel.task.current);
-    while (kernel.task.current.refcount.getValue() > 1)
+    kernel.fs.procfs.deleteProcess(kernel.task.current());
+    while (kernel.task.current().refcount.getValue() > 1)
         kernel.sched.reschedule();
 
-    if (tsk.current.clear_tid) |ctid| {
+    if (tsk.current().clear_tid) |ctid| {
         ctid.* = 0;
         _ = futex.futex(
             ctid,
@@ -62,27 +62,27 @@ pub fn doExit(error_code: i32) !u32 {
             1,
             null, null, 0
         ) catch {};
-        tsk.current.clear_tid = null;
+        tsk.current().clear_tid = null;
     }
 
-    tsk.current.releaseSharedResources();
+    tsk.current().releaseSharedResources();
     const lock_state = kernel.task.tasks_lock.lock_irq_disable();
 
-    if (tsk.current.group_leader.tree.parent) |p| {
+    if (tsk.current().group_leader.tree.parent) |p| {
         const parent = p.entry(tsk.Task, "tree");
         const parent_handlers = parent.getSighandOrPanic();
         const act = parent_handlers.actions.get(.SIGCHLD);
-        const last_thread = kernel.task.current.group_leader.thread_data.?.nr_threads == 0;
+        const last_thread = kernel.task.current().group_leader.thread_data.?.nr_threads == 0;
 
-        tsk.current.state = .ZOMBIE;
+        tsk.current().state = .ZOMBIE;
         if (
             act.flags & signals.SA_NOCLDWAIT != 0
             or act.handler.handler == signals.sigIGN
-            or tsk.current != tsk.current.group_leader
+            or tsk.current() != tsk.current().group_leader
         )
-            tsk.current.finish(true);
+            tsk.current().finish(true);
         if (act.flags & signals.SA_NOCLDWAIT == 0 and last_thread)
-            tsk.current.wakeupParent(true);
+            tsk.current().wakeupParent(true);
         if (
             act.handler.handler != signals.sigDFL
             and act.handler.handler != signals.sigIGN

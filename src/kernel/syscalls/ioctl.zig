@@ -10,7 +10,7 @@ pub fn ioctl(fd: u32, op: u32, args: u32) !u32 {
         "ioctl fd: {d}, op: 0x{x}, args: {x}",
         .{fd, op, args}
     );
-    if (krn.task.current.files.fds.get(fd)) |file| {
+    if (krn.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         if (file.ops.ioctl) |_ioctl| {

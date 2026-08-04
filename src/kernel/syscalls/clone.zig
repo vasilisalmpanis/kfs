@@ -97,7 +97,7 @@ pub fn clone(
     child.* = krn.task.Task.init(0, 0, 0, .PROCESS);
     try child.assignPID();
     if (flags.THREAD) {
-        child.tgid = krn.task.current.group_leader.pid;
+        child.tgid = krn.task.current().group_leader.pid;
     } else {
         child.tgid = child.pid;
     }
@@ -110,10 +110,10 @@ pub fn clone(
     errdefer kthread.kthreadStackFree(stack);
 
     if (flags.VM) {
-        krn.task.current.mm.?.ref.get();
-        child.mm = krn.task.current.mm;
+        krn.task.current().mm.?.ref.get();
+        child.mm = krn.task.current().mm;
     } else {
-        child.mm = krn.task.current.mm.?.dup() orelse {
+        child.mm = krn.task.current().mm.?.dup() orelse {
             krn.logger.ERROR("clone: failed to dup mm", .{});
             return errors.ENOMEM;
         };
@@ -124,10 +124,10 @@ pub fn clone(
     };
 
     if (flags.FS) {
-        krn.task.current.fs.ref.get();
-        child.fs = krn.task.current.fs;
+        krn.task.current().fs.ref.get();
+        child.fs = krn.task.current().fs;
     } else {
-        child.fs = krn.task.current.fs.dup() catch {
+        child.fs = krn.task.current().fs.dup() catch {
             krn.logger.ERROR("clone: failed to clone fs", .{});
             return errors.ENOMEM;
         };
@@ -136,7 +136,7 @@ pub fn clone(
 
     // Not sure if second test is necessary not userspace task is supposed
     // to have sighand == NULL. Maybe assert that its not NULL.
-    const sighand = krn.task.current.sighand orelse
+    const sighand = krn.task.current().sighand orelse
         @panic("No userspace task should have sighand == NULL\n");
 
     if (flags.SIGHAND) {
@@ -148,8 +148,8 @@ pub fn clone(
     errdefer child.sighand.?.ref.put();
 
     if (flags.THREAD) {
-        krn.task.current.thread_data.?.ref.get();
-        child.thread_data = krn.task.current.thread_data;
+        krn.task.current().thread_data.?.ref.get();
+        child.thread_data = krn.task.current().thread_data;
         // Add child to list of threads
     } else {
         const thread_data = krn.thread.ThreadData.new() orelse {
@@ -162,26 +162,26 @@ pub fn clone(
 
 
     if (flags.FILES) {
-        krn.task.current.files.ref.get();
-        child.files = krn.task.current.files;
+        krn.task.current().files.ref.get();
+        child.files = krn.task.current().files;
     } else {
-        child.files = try krn.task.current.files.dup();
+        child.files = try krn.task.current().files.dup();
     }
     errdefer child.files.ref.put();
 
     var child_fpu_state: ?*arch.fpu.FPUState = null;
-    var child_fpu_used = krn.task.current.fpu_used;
-    if (krn.task.current.fpu_used and krn.task.current.fpu_state != null) {
-        if (krn.task.current.save_fpu_state) {
-            arch.fpu.saveFPUState(krn.task.current.fpu_state.?);
-            krn.task.current.save_fpu_state = false;
+    var child_fpu_used = krn.task.current().fpu_used;
+    if (krn.task.current().fpu_used and krn.task.current().fpu_state != null) {
+        if (krn.task.current().save_fpu_state) {
+            arch.fpu.saveFPUState(krn.task.current().fpu_state.?);
+            krn.task.current().save_fpu_state = false;
             arch.fpu.setTaskSwitched();
         }
         child_fpu_state = krn.mm.kmalloc(arch.fpu.FPUState) orelse {
             krn.logger.ERROR("clone: failed to alloc child fpu state", .{});
             return errors.ENOMEM;
         };
-        child_fpu_state.?.* = krn.task.current.fpu_state.?.*;
+        child_fpu_state.?.* = krn.task.current().fpu_state.?.*;
     } else {
         child_fpu_used = false;
     }
@@ -207,24 +207,24 @@ pub fn clone(
         const user_desc: *const UserDesc = @ptrFromInt(tls);
         child_regs.gs = try arch.syscalls.thread.applyTLSDesc(child, @constCast(user_desc));
     } else {
-        child.tls = krn.task.current.tls;
-        child.limit = krn.task.current.limit;
-        child.tls_entry_number = krn.task.current.tls_entry_number;
-        child.tls_selector = krn.task.current.tls_selector;
-        child.tls_access = krn.task.current.tls_access;
-        child.tls_gran = krn.task.current.tls_gran;
+        child.tls = krn.task.current().tls;
+        child.limit = krn.task.current().limit;
+        child.tls_entry_number = krn.task.current().tls_entry_number;
+        child.tls_selector = krn.task.current().tls_selector;
+        child.tls_access = krn.task.current().tls_access;
+        child.tls_gran = krn.task.current().tls_gran;
     }
 
     child.initSelf(
         .UNINTERRUPTIBLE_SLEEP,
         stack_top,
         stack,
-        krn.task.current.uid,
-        krn.task.current.gid,
-        krn.task.current.pgid,
+        krn.task.current().uid,
+        krn.task.current().gid,
+        krn.task.current().pgid,
         .PROCESS,
-        krn.task.current.name[0..16],
-        if (flags.THREAD) krn.task.current.group_leader else child
+        krn.task.current().name[0..16],
+        if (flags.THREAD) krn.task.current().group_leader else child
     ) catch |err| {
         krn.logger.ERROR("clone: failed to init child task: {t}", .{err});
         return errors.ENOMEM;
@@ -238,7 +238,7 @@ pub fn clone(
     if (flags.VFORK) {
         var vfork_head: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init();
         vfork_head.setup();
-        var vfork_node = krn.wq.WaitQueueNode.init(krn.task.current);
+        var vfork_node = krn.wq.WaitQueueNode.init(krn.task.current());
         vfork_node.setup();
         child.vfork_wq = &vfork_head;
         vfork_head.addToQueue(&vfork_node);

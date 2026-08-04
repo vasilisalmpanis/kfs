@@ -79,7 +79,7 @@ pub const Ucontext = extern struct {
         // TODO this code is ARCH dependent and restoring of oldmask depends on it
         // move to arch together with sigreturn and use it to reflect changes of
         // userspace.
-	self.mcontext.oldmask = krn.task.current.sigmask._bits[0];
+	self.mcontext.oldmask = krn.task.current().sigmask._bits[0];
         self.mcontext.cr2 = arch.vmm.getCR2();
     }
 };
@@ -349,17 +349,17 @@ pub const SigHand = struct {
     }
 
     pub fn deliverSignal(self: *SigHand) ?SigRes {
-        const lock_state = krn.task.current.thread_data.?.lock.lock_irq_disable();
-        defer krn.task.current.thread_data.?.lock.unlock_irq_enable(lock_state);
+        const lock_state = krn.task.current().thread_data.?.lock.lock_irq_disable();
+        defer krn.task.current().thread_data.?.lock.unlock_irq_enable(lock_state);
 
-        const static_bit: std.StaticBitSet(NSIG) = krn.task.current.getRealPending();
+        const static_bit: std.StaticBitSet(NSIG) = krn.task.current().getRealPending();
         var iterator = static_bit.iterator(.{});
 
         while (iterator.next()) |i| {
-            if (krn.task.current.sigpending.set.isSet(i)) {
-                krn.task.current.sigpending.set.toggle(i);
+            if (krn.task.current().sigpending.set.isSet(i)) {
+                krn.task.current().sigpending.set.toggle(i);
             } else {
-                krn.task.current.thread_data.?.pending.set.toggle(i);
+                krn.task.current().thread_data.?.pending.set.toggle(i);
             }
             const signal = Signal.fromInt(i);
             const action = self.actions.get(signal);
@@ -401,26 +401,26 @@ fn setupUcontext(ptr: u32, ucontext: ?*Ucontext) void {
     if (ucontext) |u| {
         _ucontext.* = u.*;
     } else {
-        _ucontext.mask._bits[0] = krn.task.current.sigmask._bits[0];
-        _ucontext.mask._bits[1] = krn.task.current.sigmask._bits[1];
+        _ucontext.mask._bits[0] = krn.task.current().sigmask._bits[0];
+        _ucontext.mask._bits[1] = krn.task.current().sigmask._bits[1];
     }
 }
 
 pub fn onSigStack(sp: u32) bool {
-    const alt = krn.task.current.altstack;
+    const alt = krn.task.current().altstack;
     if (alt.size == 0)
         return false;
     return sp > alt.sp and (sp - alt.sp) <= @as(u32, @intCast(alt.size));
 }
 
 fn altStackFlags(sp: u32) u32 {
-    if (krn.task.current.altstack.size == 0)
+    if (krn.task.current().altstack.size == 0)
         return SS_DISABLE;
     return if (onSigStack(sp)) SS_ONSTACK else 0;
 }
 
 fn sigFrameTop(regs: *arch.Regs, action: Sigaction) u32 {
-    const alt = krn.task.current.altstack;
+    const alt = krn.task.current().altstack;
     if (action.flags & SA_ONSTACK != 0
         and alt.size != 0
         and !onSigStack(regs.useresp))
@@ -477,7 +477,7 @@ pub fn processSignals(regs: *arch.Regs, mask: sigset_t) *arch.Regs {
         return regs;
     }
 
-    const task = krn.task.current;
+    const task = krn.task.current();
     if (task.sighand) |sighand| {
         if (task.hasPendingSignal()) {
             const result = sighand.deliverSignal() orelse
@@ -494,10 +494,10 @@ pub fn processSignals(regs: *arch.Regs, mask: sigset_t) *arch.Regs {
                 ucontext.stack.size = task.altstack.size;
                 ucontext.stack.flags = altStackFlags(regs.useresp);
 
-                tsk.current.sigmask._bits[0] |= result.action.mask._bits[0];
-                tsk.current.sigmask._bits[1] |= result.action.mask._bits[1];
+                tsk.current().sigmask._bits[0] |= result.action.mask._bits[0];
+                tsk.current().sigmask._bits[1] |= result.action.mask._bits[1];
                 if (result.action.flags & SA_NODEFER == 0) {
-                    tsk.current.sigmask.sigAddSet(Signal.fromInt(result.signal));
+                    tsk.current().sigmask.sigAddSet(Signal.fromInt(result.signal));
                 }
                 setupHandlerFnFrame(
                     regs,
@@ -526,7 +526,7 @@ pub fn processSignals(regs: *arch.Regs, mask: sigset_t) *arch.Regs {
 }
 
 fn defaultHandler(signal: Signal, regs: *arch.Regs) *arch.Regs {
-    const task = krn.task.current;
+    const task = krn.task.current();
     switch (signal) {
         .SIGSTOP,
         .SIGTSTP,

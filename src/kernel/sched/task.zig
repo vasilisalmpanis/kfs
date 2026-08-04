@@ -13,6 +13,7 @@ const signal = @import("./signals.zig");
 const ThreadHandler = @import("./kthread.zig").ThreadHandler;
 const mm = @import("../mm/init.zig");
 const errors = @import("../syscalls/error-codes.zig").PosixError;
+const smp = arch.smp;
 
 var pid_bitset = std.bit_set.ArrayBitSet(
     usize,
@@ -235,14 +236,14 @@ pub const Task = struct {
         const tmp = Task.init(uid, gid, pgid, tp);
         self.uid = tmp.uid;
         self.gid = tmp.gid;
-        self.groups_count = current.groups_count;
+        self.groups_count = current().groups_count;
         @memcpy(
             self.groups[0..MAX_GROUPS],
-            current.groups[0..MAX_GROUPS]
+            current().groups[0..MAX_GROUPS]
         );
         self.pgid = tmp.pgid;
-        self.sid = current.sid;
-        self.ctty = current.ctty;
+        self.sid = current().sid;
+        self.ctty = current().ctty;
         if (self.ctty) |ctty| {
             ctty.ref.get();
         }
@@ -274,7 +275,7 @@ pub const Task = struct {
         self.group_leader = group_leader;
 
         self.setName(name);
-        self.sigmask = current.sigmask;
+        self.sigmask = current().sigmask;
         self.altstack = tmp.altstack;
         self.wait_wq = krn.wq.WaitQueueHead.init();
         self.wait_wq.setup();
@@ -293,9 +294,9 @@ pub const Task = struct {
 
         if (self.group_leader == self) {
             // Process not thread
-            current.group_leader.tree.addChild(&self.tree);
+            current().group_leader.tree.addChild(&self.tree);
         }
-        current.list.addTail(&self.list);
+        current().list.addTail(&self.list);
     }
 
     fn zombifyChildren(self: *Task) void {
@@ -424,9 +425,9 @@ pub const Task = struct {
 
         self.removeThread();
 
-        if (krn.task.current.vfork_wq) |wq| {
+        if (krn.task.current().vfork_wq) |wq| {
             wq.wakeUpOne();
-            krn.task.current.vfork_wq = null;
+            krn.task.current().vfork_wq = null;
         }
         if (self.fpu_state) |state| {
             self.fpu_used = false;
@@ -570,15 +571,19 @@ pub const Task = struct {
 };
 
 pub fn sleep(millis: usize) void {
-    if (current == &initial_task)
+    if (current() == &initial_task)
         return ;
     current.wakeup_time = currentMs() + millis;
     current.state = .UNINTERRUPTIBLE_SLEEP;
     reschedule();
 }
 
+pub inline fn current() *Task {
+    return current_task.get();
+}
+
 pub var initial_task = Task.init(0, 0, 1, .KTHREAD);
-pub var current = &initial_task;
+pub const current_task = smp.PerCpu(*Task, &initial_task, opaque{});
 pub var tasks_lock: krn.Spinlock = krn.Spinlock.init();
 pub var stopped_tasks: ?*lst.ListHead = null;
 

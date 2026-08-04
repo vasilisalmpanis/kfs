@@ -133,19 +133,19 @@ pub fn statx(dirfd: i32, path: ?[*:0]u8, flags: u32, mask: u32, statxbuf: ?*Stat
         if (dirfd < 0) {
             return errors.EFAULT;
         }
-        if (krn.task.current.files.fds.get(@intCast(dirfd))) |file| {
+        if (krn.task.current().files.fds.get(@intCast(dirfd))) |file| {
             file.ref.get();
             defer file.ref.put();
             return try do_statx(file.inode, statxbuf.?);
         }
         return errors.EBADF;
     }
-    var from_path = krn.task.current.fs.pwd.clone();
+    var from_path = krn.task.current().fs.pwd.clone();
     defer from_path.release();
     if (path_s[0] != '/') {
         if (dirfd == fs.AT_FDCWD) {
 
-        } else if (krn.task.current.files.fds.get(@intCast(dirfd))) |file| {
+        } else if (krn.task.current().files.fds.get(@intCast(dirfd))) |file| {
             file.ref.get();
             defer file.ref.put();
             if (!file.inode.mode.isDir())

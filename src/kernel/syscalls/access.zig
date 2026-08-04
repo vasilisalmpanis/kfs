@@ -19,8 +19,8 @@ pub fn do_access(path: []const u8, mode: i32) !u32 {
 
     const inode = resolved_path.dentry.inode;
 
-    const real_uid: u32 = kernel.task.current.uid;
-    const real_gid: u32 = kernel.task.current.gid;
+    const real_uid: u32 = kernel.task.current().uid;
+    const real_gid: u32 = kernel.task.current().gid;
 
     if (mode < 0 or mode > (F_OK | R_OK | W_OK | X_OK)) {
         return errors.EINVAL;

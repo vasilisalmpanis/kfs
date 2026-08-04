@@ -34,7 +34,7 @@ pub fn goUserspace() void {
     // ring 0 from a lower privilege level (ring 3).
     // For a new task this should always be the top of the kernel stack that was
     // allocated for this new task.
-    gdt.tss.ptr().esp0 = krn.task.current.stack_bottom + krn.STACK_SIZE;
+    gdt.tss.ptr().esp0 = krn.task.current().stack_bottom + krn.STACK_SIZE;
     asm volatile(
         \\ cli
         \\ mov $((8 * 4) | 3), %%bx
@@ -54,8 +54,8 @@ pub fn goUserspace() void {
         \\ iret
         \\
         ::
-        [uc] "r" (krn.task.current.mm.?.code),
-        [us] "r" (krn.task.current.mm.?.argc),
+        [uc] "r" (krn.task.current().mm.?.code),
+        [us] "r" (krn.task.current().mm.?.argc),
     );
 }
 
@@ -97,8 +97,8 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
 }
 
 pub export fn processSignalsHelper(regs: *Regs) callconv(.c) *Regs {
-    if (tsk.current.tsktype != .KTHREAD) {
-        return signals.processSignals(regs, krn.task.current.sigmask);
+    if (tsk.current().tsktype != .KTHREAD) {
+        return signals.processSignals(regs, krn.task.current().sigmask);
     }
     return regs;
 }

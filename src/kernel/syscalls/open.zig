@@ -12,11 +12,11 @@ pub fn do_open(
     flags: u32,
     mode: fs.UMode
 ) !u32 {
-    const fd = tsk.current.files.getNextFD() catch {
+    const fd = tsk.current().files.getNextFD() catch {
         return errors.EMFILE;
     };
     var new_mode = mode;
-    errdefer _ = tsk.current.files.releaseFD(fd);
+    errdefer _ = tsk.current().files.releaseFD(fd);
     const parent_inode: *fs.Inode = parent_dir.dentry.inode;
     var target_path = parent_dir.clone();
     var target_path_owned = true;
@@ -42,7 +42,7 @@ pub fn do_open(
                 new_mode,
                 parent_dir.dentry
             ) catch |err| {
-                tsk.current.files.unsetFD(fd);
+                tsk.current().files.unsetFD(fd);
                 switch (err) {
                     error.OutOfMemory => { return errors.ENOMEM; },
                     error.Access => { return errors.EACCES; },
@@ -71,12 +71,12 @@ pub fn do_open(
         new_file.ref.put();
         return errors.ENOENT;
     };
-    kernel.task.current.files.fds.put(fd, new_file) catch {
+    kernel.task.current().files.fds.put(fd, new_file) catch {
         new_file.ref.put();
         return errors.ENOENT;
     };
     if (flags & fs.file.O_CLOEXEC != 0)
-        kernel.task.current.files.closexec.set(fd);
+        kernel.task.current().files.closexec.set(fd);
     kernel.logger.DEBUG("opened {s} with fd {d}", .{name, fd});
     return fd;
 }
@@ -125,7 +125,7 @@ pub fn openat(
         return try open(path, flags, mode);
     }
     if (dirfd == fs.AT_FDCWD) {
-        const cwd = kernel.task.current.fs.pwd.clone();
+        const cwd = kernel.task.current().fs.pwd.clone();
         defer cwd.release();
         var file_segment: []const u8 = "";
         const parent_dir = try fs.path.dir_resolve_from(
@@ -140,7 +140,7 @@ pub fn openat(
             flags,
             mode
         );
-    } else if (kernel.task.current.files.fds.get(@intCast(dirfd))) |dir| {
+    } else if (kernel.task.current().files.fds.get(@intCast(dirfd))) |dir| {
         dir.ref.get();
         defer dir.ref.put();
         if (!dir.inode.mode.isDir())

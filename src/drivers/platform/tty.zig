@@ -141,7 +141,7 @@ fn isActiveConsole(file: *krn.fs.File) bool {
 // file ops
 fn getTTY(file: *krn.fs.File) !*TTY {
     if (isControllingTTY(file)) {
-        const ctty_file = krn.task.current.controllingTTY() orelse
+        const ctty_file = krn.task.current().controllingTTY() orelse
             return krn.errors.PosixError.ENXIO;
         if (ctty_file == file)
             return krn.errors.PosixError.ENXIO;
@@ -163,9 +163,9 @@ fn tty_open(file: *krn.fs.File, _: *krn.fs.Inode) !void {
     _ = try getTTY(file);
     if (
         (file.flags & krn.fs.file.O_NOCTTY) == 0
-        and krn.task.current.controllingTTY() == null
+        and krn.task.current().controllingTTY() == null
     ) {
-        krn.task.current.setControllingTTY(file);
+        krn.task.current().setControllingTTY(file);
     }
 }
 
@@ -175,9 +175,9 @@ fn tty_close(base: *krn.fs.File) void {
 
 fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     var _tty = try getTTY(file);
-    if (krn.task.current.pgid != _tty.fg_pgid) {
+    if (krn.task.current().pgid != _tty.fg_pgid) {
         _ = krn.kill(
-            -@as(i32, @intCast(krn.task.current.pgid)),
+            -@as(i32, @intCast(krn.task.current().pgid)),
             @intCast(krn.signals.Signal.SIGTTIN.toPosix())
         ) catch {
         };
@@ -196,7 +196,7 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
             }
             _tty.lock.unlock();
             _tty.read_queue.wait(true, 0);
-            if (krn.task.current.hasPendingSignal())
+            if (krn.task.current().hasPendingSignal())
                 return krn.errors.PosixError.ERESTARTSYS;
         }
     } else {
@@ -249,7 +249,7 @@ fn tty_read(file: *krn.fs.File, buf: [*]u8, size: usize) !usize {
                 if (to_read > 0)
                     _tty.lock.unlock();
                 _tty.read_queue.wait(true, to_sleep);
-                if (krn.task.current.hasPendingSignal())
+                if (krn.task.current().hasPendingSignal())
                     return krn.errors.PosixError.ERESTARTSYS;
                 continue;
             }
@@ -519,30 +519,30 @@ fn tty_ioctl(
         },
         TIOCSCTTY => {
             const force = data != 0;
-            if (krn.task.current.pid != krn.task.current.sid) {
+            if (krn.task.current().pid != krn.task.current().sid) {
                 return krn.errors.PosixError.EPERM;
             }
             if (
                 !force
-                and krn.task.current.controllingTTY() != null
-                and krn.task.current.controllingTTY().? != file
+                and krn.task.current().controllingTTY() != null
+                and krn.task.current().controllingTTY().? != file
             ) {
                 return krn.errors.PosixError.EPERM;
             }
             if (
                 !force
                 and _tty.session_id != 0
-                and _tty.session_id != krn.task.current.sid
+                and _tty.session_id != krn.task.current().sid
             ) {
                 return krn.errors.PosixError.EPERM;
             }
             _tty.is_controlling = true;
-            _tty.session_id = @intCast(krn.task.current.sid);
-            _tty.fg_pgid = krn.task.current.pgid;
-            krn.task.current.setControllingTTY(file);
+            _tty.session_id = @intCast(krn.task.current().sid);
+            _tty.fg_pgid = krn.task.current().pgid;
+            krn.task.current().setControllingTTY(file);
             krn.logger.DEBUG(
                 "tty_ioctl TIOCSCTTY: set fg_pgid to {d} (PID {d})\n",
-                .{_tty.fg_pgid, krn.task.current.pid}
+                .{_tty.fg_pgid, krn.task.current().pid}
             );
             return 0;
         },
@@ -550,10 +550,10 @@ fn tty_ioctl(
             krn.logger.DEBUG("tty_ioctl TIOCNOTTY\n", .{});
             _tty.is_controlling = false;
             if (
-                krn.task.current.controllingTTY() != null
-                and krn.task.current.controllingTTY().? == file
+                krn.task.current().controllingTTY() != null
+                and krn.task.current().controllingTTY().? == file
             ) {
-                krn.task.current.clearControllingTTY();
+                krn.task.current().clearControllingTTY();
             }
             return 0;
         },
@@ -682,7 +682,7 @@ pub fn tty_serial_thread(arg: ?*const anyopaque) i32 {
         return 0;
     const ser: *serial.Serial = @ptrCast(@alignCast(data));
 
-    while (krn.task.current.should_stop != true) {
+    while (krn.task.current().should_stop != true) {
         _ = pollSerialTTYInput(cur_tty);
         ser.wait_queue.wait(false, 0);
     }
@@ -690,7 +690,7 @@ pub fn tty_serial_thread(arg: ?*const anyopaque) i32 {
 }
 
 pub fn tty_kbd_thread(_: ?*const anyopaque) i32 {
-    while (krn.task.current.should_stop != true) {
+    while (krn.task.current().should_stop != true) {
         var did_work = false;
         if (kbd.global_keyboard.mode == kbd.VC_RAW) {
             if (kbd.global_keyboard.getScancodes()) |scancodes| {

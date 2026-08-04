@@ -27,14 +27,14 @@ pub noinline fn traceStackTrace(max_frames: u32) void {
 
     var frame: u32 = 0;
     while (frame < max_frames and stk != null) : (frame += 1) {
-        const current = stk.?;
+        const current_frame = stk.?;
 
         krn.logger.ERROR("  0x{x}: {s}\n", .{
-            current.eip,
-            lookupSymbol(current.eip) orelse "?",
+            current_frame.eip,
+            lookupSymbol(current_frame.eip) orelse "?",
         });
 
-        stk = current.ebp;
+        stk = current_frame.ebp;
     }
 }
 
@@ -54,7 +54,7 @@ pub fn formatKernelStackTraceForTask(out: []u8, maxFrames: u32, task: *krn.task.
         return 0;
     }
 
-    const start_ebp: usize = if (task == krn.task.current)
+    const start_ebp: usize = if (task == krn.task.current())
         arch.cpu.getStackFrameAddr()
     else
         @intCast(task.regs.ebp);

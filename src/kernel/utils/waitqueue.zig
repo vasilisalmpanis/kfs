@@ -50,7 +50,7 @@ pub const WaitQueueHead = struct {
         interruptable: bool,
         timeout: u32
     ) void {
-        const tsk = krn.task.current;
+        const tsk = krn.task.current();
         var node = WaitQueueNode.init(tsk);
         node.setup();
         var lock_state = self.lock.lock_irq_disable();

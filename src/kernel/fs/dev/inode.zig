@@ -61,8 +61,8 @@ pub const DevInode = struct {
             }
             var new_inode = try DevInode.new(sb);
             new_inode.setCreds(
-                kernel.task.current.uid,
-                kernel.task.current.gid,
+                kernel.task.current().uid,
+                kernel.task.current().gid,
                 mode
             );
             new_inode.mode.type |= kernel.fs.S_IFDIR;
@@ -116,8 +116,8 @@ pub const DevInode = struct {
             // new_inode.dev_id = 0;
             errdefer kernel.mm.kfree(new_inode);
             new_inode.setCreds(
-                kernel.task.current.uid,
-                kernel.task.current.gid,
+                kernel.task.current().uid,
+                kernel.task.current().gid,
                 mode
             );
             var dent = try parent.new(name, new_inode);

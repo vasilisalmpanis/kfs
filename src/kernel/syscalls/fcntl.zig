@@ -30,7 +30,7 @@ pub fn fcntl(fd: u32, op: i32, arg: u32) !u32 {
 }
 
 pub fn fcntl64(fd: u32, cmd: u32, arg: u32) !u32 {
-    if (krn.task.current.files.fds.get(fd)) |file| {
+    if (krn.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         krn.logger.DEBUG(
@@ -44,20 +44,20 @@ pub fn fcntl64(fd: u32, cmd: u32, arg: u32) !u32 {
         );
         switch (cmd) {
             F_DUPFD, F_DUPFD_CLOEXEC => {
-                const new_fd = try krn.task.current.files.getNextFromFD(arg);
+                const new_fd = try krn.task.current().files.getNextFromFD(arg);
                 const dup_fd = try dup2(fd, new_fd);
                 if (cmd == F_DUPFD_CLOEXEC)
-                    krn.task.current.files.closexec.set(dup_fd);
+                    krn.task.current().files.closexec.set(dup_fd);
                 return dup_fd;
             },
             F_GETFD => {
-                if (krn.task.current.files.closexec.isSet(fd))
+                if (krn.task.current().files.closexec.isSet(fd))
                     return FD_CLOEXEC;
                 return 0;
             },
             F_SETFD => {
                 if (arg & FD_CLOEXEC != 0)
-                    krn.task.current.files.closexec.set(fd);
+                    krn.task.current().files.closexec.set(fd);
                 return 0;
             },
             F_GETFL => {

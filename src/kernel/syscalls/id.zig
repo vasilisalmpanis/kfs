@@ -4,39 +4,39 @@ const errors = krn.errors.PosixError;
 const std = @import("std");
 
 pub fn getPID() !u32 {
-    return @intCast(tsk.current.tgid);
+    return @intCast(tsk.current().tgid);
 }
 
 pub fn getTID() !u32 {
-    return @intCast(tsk.current.pid);
+    return @intCast(tsk.current().pid);
 }
 
 pub fn getPPID() !u32 {
     var pid: u16 = 0;
-    if (tsk.current.group_leader.tree.parent != null) {
-        const p: *tsk.Task = tsk.current.group_leader.tree.parent.?.entry(tsk.Task, "tree");
+    if (tsk.current().group_leader.tree.parent != null) {
+        const p: *tsk.Task = tsk.current().group_leader.tree.parent.?.entry(tsk.Task, "tree");
         pid = p.tgid;
     }
     return @intCast(pid);
 }
 
 pub fn getUID() !u32 {
-    return tsk.current.uid;
+    return tsk.current().uid;
 }
 
 pub fn setUID(uid: u16) !u32 {
     // TODO implement correctly
-    tsk.current.uid = uid;
+    tsk.current().uid = uid;
     return 0;
 }
 
 pub fn getGID() !u32 {
-    return @intCast(tsk.current.gid);
+    return @intCast(tsk.current().gid);
 }
 
 pub fn setGID(gid: u16) !u32 {
     // TODO implement correctly
-    tsk.current.gid = gid;
+    tsk.current().gid = gid;
     return 0;
 }
 
@@ -44,8 +44,8 @@ pub fn getPGID(pid: i32) !u32 {
     if (pid < 0)
         return errors.EEXIST;
     if (pid == 0)
-        return tsk.current.pgid;
-    if (tsk.current.findByPid(@intCast(pid))) |task| {
+        return tsk.current().pgid;
+    if (tsk.current().findByPid(@intCast(pid))) |task| {
         defer task.refcount.put();
         return task.pgid;
     }
@@ -53,15 +53,15 @@ pub fn getPGID(pid: i32) !u32 {
 }
 
 pub fn getPGRP() !u32 {
-    return tsk.current.pgid;
+    return tsk.current().pgid;
 }
 
 pub fn getSID(pid: i32) !u32 {
     if (pid < 0)
         return errors.EINVAL;
     if (pid == 0)
-        return tsk.current.sid;
-    if (tsk.current.findByPid(@intCast(pid))) |task| {
+        return tsk.current().sid;
+    if (tsk.current().findByPid(@intCast(pid))) |task| {
         defer task.refcount.put();
         return task.sid;
     }
@@ -69,12 +69,12 @@ pub fn getSID(pid: i32) !u32 {
 }
 
 pub fn setSID() !u32 {
-    if (tsk.current.pgid == tsk.current.pid)
+    if (tsk.current().pgid == tsk.current().pid)
         return errors.EPERM;
-    tsk.current.sid = tsk.current.pid;
-    tsk.current.pgid = tsk.current.pid;
-    tsk.current.clearControllingTTY();
-    return tsk.current.sid;
+    tsk.current().sid = tsk.current().pid;
+    tsk.current().pgid = tsk.current().pid;
+    tsk.current().clearControllingTTY();
+    return tsk.current().sid;
 }
 
 pub fn setPGID(pid: i32, pgid: i32) !u32 {
@@ -85,8 +85,8 @@ pub fn setPGID(pid: i32, pgid: i32) !u32 {
         return errors.ESRCH;
     var _task: ?*tsk.Task = null;
     if (pid == 0) {
-        _task = tsk.current;
-    } else if (tsk.current.findByPid(@intCast(pid))) |task| {
+        _task = tsk.current();
+    } else if (tsk.current().findByPid(@intCast(pid))) |task| {
         defer task.refcount.put();
         _task = task;
     }
@@ -102,23 +102,23 @@ pub fn setPGID(pid: i32, pgid: i32) !u32 {
 }
 
 pub fn getEUID() !u32 {
-    return krn.task.current.uid;
+    return krn.task.current().uid;
 }
 
 pub fn getEUID32() !u32 {
-    return krn.task.current.uid;
+    return krn.task.current().uid;
 }
 
 pub fn getEGID() !u32 {
-    return krn.task.current.gid;
+    return krn.task.current().gid;
 }
 
 pub fn getEGID32() !u32 {
-    return krn.task.current.gid;
+    return krn.task.current().gid;
 }
 
 pub fn getresuid() !u32 {
-    return krn.task.current.uid;
+    return krn.task.current().uid;
 }
 
 pub fn setresuid() !u32 {
@@ -126,7 +126,7 @@ pub fn setresuid() !u32 {
 }
 
 pub fn getresgid() !u32 {
-    return krn.task.current.gid;
+    return krn.task.current().gid;
 }
 
 pub fn setresgid() !u32 {
@@ -134,27 +134,27 @@ pub fn setresgid() !u32 {
 }
 
 pub fn setgroups32(size: u32, list: ?[*]const u32) !u32 {
-    if (tsk.current.uid != 0)
+    if (tsk.current().uid != 0)
         return errors.EPERM;
     const groups_size: usize = size;
     if (groups_size > tsk.MAX_GROUPS)
         return errors.EINVAL;
     if (groups_size == 0) {
-        tsk.current.groups_count = 0;
+        tsk.current().groups_count = 0;
         return 0;
     }
     const user_list = list orelse
         return errors.EFAULT;
     var idx: usize = 0;
     while (idx < groups_size) : (idx += 1) {
-        tsk.current.groups[idx] = @intCast(user_list[idx]);
+        tsk.current().groups[idx] = @intCast(user_list[idx]);
     }
-    tsk.current.groups_count = @intCast(groups_size);
+    tsk.current().groups_count = @intCast(groups_size);
     return 0;
 }
 
 pub fn getgroups32(size: u32, list: ?[*]u32) !u32 {
-    const groups_count: usize = tsk.current.groups_count;
+    const groups_count: usize = tsk.current().groups_count;
     if (size == 0)
         return @intCast(groups_count);
     if (@as(usize, size) < groups_count)
@@ -163,13 +163,13 @@ pub fn getgroups32(size: u32, list: ?[*]u32) !u32 {
         return errors.EFAULT;
     var idx: usize = 0;
     while (idx < groups_count) : (idx += 1) {
-        user_list[idx] = tsk.current.groups[idx];
+        user_list[idx] = tsk.current().groups[idx];
     }
     return @intCast(groups_count);
 }
 
 pub fn setgroups(size: u32, list: ?[*]const u16) !u32 {
-    if (tsk.current.uid != 0)
+    if (tsk.current().uid != 0)
         return errors.EPERM;
     if (size == 0)
         return setgroups32(0, null);
@@ -187,7 +187,7 @@ pub fn setgroups(size: u32, list: ?[*]const u16) !u32 {
 }
 
 pub fn getgroups(size: u32, list: ?[*]u16) !u32 {
-    const groups_count: usize = tsk.current.groups_count;
+    const groups_count: usize = tsk.current().groups_count;
     if (size == 0)
         return @intCast(groups_count);
     if (@as(usize, size) < groups_count)
@@ -196,7 +196,7 @@ pub fn getgroups(size: u32, list: ?[*]u16) !u32 {
         return errors.EFAULT;
     var idx: usize = 0;
     while (idx < groups_count) : (idx += 1) {
-        user_list[idx] = tsk.current.groups[idx];
+        user_list[idx] = tsk.current().groups[idx];
     }
     return @intCast(groups_count);
 }

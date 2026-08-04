@@ -5,7 +5,7 @@ const krn = @import("../main.zig");
 
 pub fn ftruncate64(fd: u32, length: u32, length_high: u32) !u32 {
     _ = length_high;
-    if (krn.task.current.files.fds.get(fd)) |file| {
+    if (krn.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         if (file.inode.mode.isDir())

@@ -83,13 +83,13 @@ pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
         if (base.flags & krn.fs.file.O_NONBLOCK != 0)
             return krn.errors.PosixError.EAGAIN;
 
-        var wq_node = krn.wq.WaitQueueNode.init(krn.task.current);
+        var wq_node = krn.wq.WaitQueueNode.init(krn.task.current());
         wq_node.setup();
         pipe.read_queue.addToQueue(&wq_node);
         
         pipe.lock.unlock();
         pipe.read_queue.waitIfInQueue(&wq_node, true, 0);
-        if (krn.task.current.hasPendingSignal()) {
+        if (krn.task.current().hasPendingSignal()) {
             pipe.lock.lock();
             return krn.errors.PosixError.ERESTARTSYS;
         }
@@ -108,7 +108,7 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     defer pipe.lock.unlock();
     if (pipe.readers == 0) {
         _ = try krn.kill(
-            @intCast(krn.task.current.pid),
+            @intCast(krn.task.current().pid),
             @intCast(krn.signals.Signal.SIGPIPE.toPosix())
         );
         return krn.errors.PosixError.EPIPE;
@@ -118,19 +118,19 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
         if (base.flags & krn.fs.file.O_NONBLOCK != 0)
             return krn.errors.PosixError.EAGAIN;
 
-        var wq_node = krn.wq.WaitQueueNode.init(krn.task.current);
+        var wq_node = krn.wq.WaitQueueNode.init(krn.task.current());
         wq_node.setup();
         pipe.write_queue.addToQueue(&wq_node);
         pipe.lock.unlock();
         pipe.write_queue.waitIfInQueue(&wq_node, true, 0);
-        if (krn.task.current.hasPendingSignal()) {
+        if (krn.task.current().hasPendingSignal()) {
             pipe.lock.lock();
             return krn.errors.PosixError.ERESTARTSYS;
         }
         pipe.lock.lock();
         if (pipe.readers == 0) {
             _ = try krn.kill(
-                @intCast(krn.task.current.pid),
+                @intCast(krn.task.current().pid),
                 @intCast(krn.signals.Signal.SIGPIPE.toPosix())
             );
             return krn.errors.PosixError.EPIPE;

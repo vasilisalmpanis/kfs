@@ -63,8 +63,8 @@ pub const ProcInode = struct {
         }
         var new_inode = try ProcInode.new(sb);
         new_inode.setCreds(
-            kernel.task.current.uid,
-            kernel.task.current.gid,
+            kernel.task.current().uid,
+            kernel.task.current().gid,
             mode
         );
         new_inode.links = 2;
@@ -133,8 +133,8 @@ pub const ProcInode = struct {
             const new_inode = try ProcInode.new(sb);
             errdefer kernel.mm.kfree(new_inode);
             new_inode.setCreds(
-                kernel.task.current.uid,
-                kernel.task.current.gid,
+                kernel.task.current().uid,
+                kernel.task.current().gid,
                 mode
             );
             var dent = try parent.new(name, new_inode);

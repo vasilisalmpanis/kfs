@@ -11,7 +11,7 @@ fn do_sigaction(sig: u32, act: ?*signals.Sigaction, oact: ?*signals.Sigaction) !
     const signal = signals.Signal.fromPosix(@intCast(sig));
     if (signal == .SIGKILL or signal == .SIGSTOP)
         return errors.EINVAL;
-    const sighand = krn.task.current.getSighandOrPanic();
+    const sighand = krn.task.current().getSighandOrPanic();
     if (oact) |old_act| {
         old_act.* = sighand.actions.get(signal);
     }
@@ -40,12 +40,12 @@ fn restoreAltStack(uss: *const signals.SigAltStack) void {
     if (signals.onSigStack(arch.Regs.state().useresp))
         return;
     if (uss.flags & signals.SS_DISABLE != 0) {
-        tsk.current.altstack = .{ .sp = 0, .flags = 0, .size = 0 };
+        tsk.current().altstack = .{ .sp = 0, .flags = 0, .size = 0 };
         return;
     }
     if (uss.size < signals.MINSIGSTKSZ)
         return;
-    tsk.current.altstack = .{ .sp = uss.sp, .flags = 0, .size = uss.size };
+    tsk.current().altstack = .{ .sp = uss.sp, .flags = 0, .size = uss.size };
 }
 
 fn restoreRegs(ctx: *signals.Ucontext, regs: *arch.cpu.Regs) void {
@@ -81,8 +81,8 @@ pub fn sigreturn() !u32 {
     const ucontext: *signals.Ucontext = @ptrFromInt(ucontext_addr);
 
     restoreRegs(ucontext, signal_regs);
-    tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
-    tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
+    tsk.current().sigmask._bits[0] = ucontext.mask._bits[0];
+    tsk.current().sigmask._bits[1] = ucontext.mask._bits[1];
     return @bitCast(signal_regs.eax);
 }
 
@@ -99,8 +99,8 @@ pub fn rt_sigreturn() !u32 {
     const ucontext: *signals.Ucontext = @ptrFromInt(ucontext_addr);
 
     restoreRegs(ucontext, signal_regs);
-    tsk.current.sigmask._bits[0] = ucontext.mask._bits[0];
-    tsk.current.sigmask._bits[1] = ucontext.mask._bits[1];
+    tsk.current().sigmask._bits[0] = ucontext.mask._bits[0];
+    tsk.current().sigmask._bits[1] = ucontext.mask._bits[1];
     restoreAltStack(&ucontext.stack);
     return @bitCast(signal_regs.eax);
 }
@@ -125,7 +125,7 @@ pub fn sigprocmask(
     set: ?*signals.sigset_t,
     oset: ?*signals.sigset_t,
 ) !u32 {
-    const oldset: u64 = tsk.current.sigmask.toU64();
+    const oldset: u64 = tsk.current().sigmask.toU64();
     if (set) |_set| {
         const newset: u64 = _set.toU64();
         var blocked: u64 = oldset;
@@ -146,7 +146,7 @@ pub fn sigprocmask(
         var new_blocked = signals.sigset_t.fromU64(blocked);
         new_blocked.sigDelSet(signals.Signal.SIGKILL);
         new_blocked.sigDelSet(signals.Signal.SIGSTOP);
-        tsk.current.sigmask = new_blocked;
+        tsk.current().sigmask = new_blocked;
     }
     if (oset) |_oset| {
         _oset.* = signals.sigset_t.fromU64(oldset);
@@ -164,10 +164,10 @@ pub fn rt_sigpending(
 }
 
 pub fn sigpending(uset: ?*signals.sigset_t) u32 {
-    const task_raw = krn.task.current.sigpending.getRaw();
-    const thread_raw = krn.task.current.thread_data.?.pending.getRaw();
+    const task_raw = krn.task.current().sigpending.getRaw();
+    const thread_raw = krn.task.current().thread_data.?.pending.getRaw();
     const set = signals.sigset_t.fromU64(
-        (task_raw | thread_raw) & krn.task.current.sigmask.toU64()
+        (task_raw | thread_raw) & krn.task.current().sigmask.toU64()
     );
     if (uset) |_uset| {
         _uset.* = set;
@@ -181,17 +181,17 @@ pub fn rt_sigsuspend(_mask: ?*signals.sigset_t) !u32 {
         return errors.EFAULT;
     krn.logger.INFO("sigsuspend mask {b:0>32}", .{mask._bits[0]});
 
-    const oldmask = krn.task.current.sigmask;
+    const oldmask = krn.task.current().sigmask;
 
-    krn.task.current.sigmask = mask.*;
+    krn.task.current().sigmask = mask.*;
 
-    if (krn.task.current.hasPendingSignal()) {
+    if (krn.task.current().hasPendingSignal()) {
         state.eax = krn.errors.toErrno(errors.EINTR);
         _ = signals.processSignals(state, oldmask);
         return errors.EINTR;
     }
 
-    krn.task.current.state = .INTERRUPTIBLE_SLEEP;
+    krn.task.current().state = .INTERRUPTIBLE_SLEEP;
     krn.sched.reschedule();
 
     state.eax = krn.errors.toErrno(errors.EINTR);
@@ -244,17 +244,17 @@ pub fn rt_sigtimedwait(
     const start_time = krn.currentMs();
 
     while (true) {
-        const task_raw = krn.task.current.sigpending.getRaw();
-        const thread_raw = krn.task.current.thread_data.?.pending.getRaw();
+        const task_raw = krn.task.current().sigpending.getRaw();
+        const thread_raw = krn.task.current().thread_data.?.pending.getRaw();
         const all_pending: std.StaticBitSet(signals.NSIG) = @bitCast(task_raw | thread_raw);
         var iterator = all_pending.iterator(.{});
         while (iterator.next()) |sig| {
             const signal = signals.Signal.fromInt(sig);
             if (wait_set.sigIsSet(signal)) {
-                if (krn.task.current.sigpending.set.isSet(sig)) {
-                    krn.task.current.sigpending.set.toggle(sig);
+                if (krn.task.current().sigpending.set.isSet(sig)) {
+                    krn.task.current().sigpending.set.toggle(sig);
                 } else {
-                    krn.task.current.thread_data.?.pending.set.toggle(sig);
+                    krn.task.current().thread_data.?.pending.set.toggle(sig);
                 }
                 if (info) |i| {
                     i.signo = @intCast(sig + 1);
@@ -276,12 +276,12 @@ pub fn rt_sigtimedwait(
                 return errors.EAGAIN;
             }
 
-            tsk.current.wakeup_time = start_time + ms;
+            tsk.current().wakeup_time = start_time + ms;
         } else {
-            tsk.current.wakeup_time = 0;
+            tsk.current().wakeup_time = 0;
         }
 
-        tsk.current.state = .INTERRUPTIBLE_SLEEP;
+        tsk.current().state = .INTERRUPTIBLE_SLEEP;
         krn.sched.reschedule();
     }
 }
@@ -294,7 +294,7 @@ pub fn sigaltstack(
     const on_stack = signals.onSigStack(state.useresp);
 
     if (old_ss) |oss| {
-        var old = krn.task.current.altstack;
+        var old = krn.task.current().altstack;
         old.flags = if (old.size == 0)
             signals.SS_DISABLE
         else if (on_stack)
@@ -313,7 +313,7 @@ pub fn sigaltstack(
             return errors.EINVAL;
 
         if (mode & signals.SS_DISABLE != 0) {
-            krn.task.current.altstack = .{
+            krn.task.current().altstack = .{
                 .sp = 0,
                 .flags = 0,
                 .size = 0
@@ -321,7 +321,7 @@ pub fn sigaltstack(
         } else {
             if (ss.size < signals.MINSIGSTKSZ)
                 return errors.ENOMEM;
-            krn.task.current.altstack = .{
+            krn.task.current().altstack = .{
                 .sp = ss.sp,
                 .flags = 0,
                 .size = ss.size

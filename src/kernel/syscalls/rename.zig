@@ -8,14 +8,14 @@ const AT_RENAME_EXCHANGE	        = 0x0002;
 const AT_RENAME_WHITEOUT	        = 0x0004;
 
 fn resolveat(dirfd: i32, path: []const u8, name: *[]const u8) !kernel.fs.path.Path {
-    var from: kernel.fs.path.Path = kernel.task.current.fs.pwd.clone();
+    var from: kernel.fs.path.Path = kernel.task.current().fs.pwd.clone();
     defer from.release();
     if (path[0] == '/') {
     } else if (dirfd < 0 and dirfd != fs.AT_FDCWD) {
         return errors.EBADF;
     } else if (dirfd == fs.AT_FDCWD) {
     } else {
-        if (kernel.task.current.files.fds.get(@intCast(dirfd))) |dir| {
+        if (kernel.task.current().files.fds.get(@intCast(dirfd))) |dir| {
             dir.ref.get();
             defer dir.ref.put();
             if (!dir.inode.mode.isDir())

@@ -249,15 +249,15 @@ pub const UMode = packed struct {
     }
 
     pub fn canRead(self: *const UMode, uid: u32, gid: u32) bool {
-        if (kernel.task.current.uid == 0) 
+        if (kernel.task.current().uid == 0) 
             return true;
-        if (kernel.task.current.uid == uid) {
+        if (kernel.task.current().uid == uid) {
             if (self.isUReadable()) {
                 return true;
             }
             return false;
         }
-        if (kernel.task.current.inGroup(gid)) {
+        if (kernel.task.current().inGroup(gid)) {
             if (self.isGReadable()) {
                 return true;
             }
@@ -270,15 +270,15 @@ pub const UMode = packed struct {
     }
 
     pub fn canWrite(self: *const UMode, uid: u32, gid: u32) bool {
-        if (kernel.task.current.uid == 0) 
+        if (kernel.task.current().uid == 0) 
             return true;
-        if (kernel.task.current.uid == uid) {
+        if (kernel.task.current().uid == uid) {
             if (self.isUWriteable()) {
                 return true;
             }
             return false;
         }
-        if (kernel.task.current.inGroup(gid)) {
+        if (kernel.task.current().inGroup(gid)) {
             if (self.isGWriteable()) {
                 return true;
             }
@@ -291,15 +291,15 @@ pub const UMode = packed struct {
     }
 
     pub fn canExecute(self: *const UMode, uid: u32, gid: u32) bool {
-        if (kernel.task.current.uid == 0) 
+        if (kernel.task.current().uid == 0) 
             return true;
-        if (kernel.task.current.uid == uid) {
+        if (kernel.task.current().uid == uid) {
             if (self.isUExecutable()) {
                 return true;
             }
             return false;
         }
-        if (kernel.task.current.inGroup(gid)) {
+        if (kernel.task.current().inGroup(gid)) {
             if (self.isGExecutable()) {
                 return true;
             }
@@ -382,10 +382,10 @@ pub const UMode = packed struct {
             .other = 0o7,
             .type = S_IFDIR,
         };
-        if (kernel.task.current == &kernel.task.initial_task) {
+        if (kernel.task.current() == &kernel.task.initial_task) {
             ret.applyUmask(0o22);
         } else {
-            ret.applyUmask(kernel.task.current.fs.umask);
+            ret.applyUmask(kernel.task.current().fs.umask);
         }
         return ret;
     }
@@ -397,10 +397,10 @@ pub const UMode = packed struct {
             .other = 0o6,
             .type = S_IFREG,
         };
-        if (kernel.task.current == &kernel.task.initial_task) {
+        if (kernel.task.current() == &kernel.task.initial_task) {
             ret.applyUmask(0o22);
         } else {
-            ret.applyUmask(kernel.task.current.fs.umask);
+            ret.applyUmask(kernel.task.current().fs.umask);
         }
         return ret;
     }

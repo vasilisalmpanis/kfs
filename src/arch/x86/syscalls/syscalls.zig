@@ -7,7 +7,7 @@ const errors = krn.errors;
 pub const thread = @import("thread.zig");
 
 pub fn syscallsManager(state: *arch.Regs) void {
-    tsk.current.regs = state.*;
+    tsk.current().regs = state.*;
     arch.cpu.enableInterrupts();
     defer arch.cpu.disableInterrupts();
     if (state.eax < 0) {
@@ -24,7 +24,7 @@ pub fn syscallsManager(state: *arch.Regs) void {
         and sys != .SYS_ioctl
     ) {
         krn.logger.INFO("[PID {d:<2}]: {d:>4} {t}", .{
-            tsk.current.pid,
+            tsk.current().pid,
             state.eax,
             sys
         });
@@ -42,7 +42,7 @@ pub fn syscallsManager(state: *arch.Regs) void {
                 krn.errors.PosixError.EINTR,
                 krn.errors.PosixError.ECHILD, => {},
                 else => krn.logger.ERROR("[PID {d:<2}]: {t}: {t}\n", .{
-                    tsk.current.pid,
+                    tsk.current().pid,
                     sys,
                     err
                 }),
@@ -54,7 +54,7 @@ pub fn syscallsManager(state: *arch.Regs) void {
         state.eax = @bitCast(result);
     } else {
         krn.logger.ERROR("[PID: {d:<2}]: not implemented: {t}", .{
-            tsk.current.pid, sys
+            tsk.current().pid, sys
         });
         state.eax = errors.toErrno(errors.PosixError.ENOSYS);
         return ;

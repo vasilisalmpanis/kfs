@@ -28,7 +28,7 @@ pub const Mount = struct {
         target: []const u8, // directory
         fs_type: *fs.FileSystem
     ) !*Mount {
-        if (krn.task.current.uid != 0)
+        if (krn.task.current().uid != 0)
             return krn.errors.PosixError.EACCES;
         var blk_dev: ?*device.Device = null;
         var dummy_file: ?*fs.File = null;

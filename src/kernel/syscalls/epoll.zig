@@ -24,7 +24,7 @@ fn getState(epfd: i32) !*krn.fs.epoll.EpollState {
     if (epfd < 0)
         return errors.EBADF;
 
-    const file = krn.task.current.files.fds.get(@intCast(epfd)) orelse
+    const file = krn.task.current().files.fds.get(@intCast(epfd)) orelse
         return errors.EBADF;
     if (file.ops != &krn.fs.epoll.ops)
         return errors.EINVAL;
@@ -94,12 +94,12 @@ pub fn epoll_create1(flags: u32) !u32 {
     file.flags |= krn.fs.file.O_RDWR;
     file.data = state;
 
-    const fd = try krn.task.current.files.getNextFD();
-    errdefer _ = krn.task.current.files.releaseFD(fd);
+    const fd = try krn.task.current().files.getNextFD();
+    errdefer _ = krn.task.current().files.releaseFD(fd);
 
-    try krn.task.current.files.setFD(fd, file);
+    try krn.task.current().files.setFD(fd, file);
     if (flags & cloexec != 0)
-        krn.task.current.files.closexec.set(fd);
+        krn.task.current().files.closexec.set(fd);
     return @intCast(fd);
 }
 
@@ -123,7 +123,7 @@ pub fn epoll_ctl(epfd: i32, op: i32, fd: i32, event: ?*const EpollEvent) !u32 {
                 return errors.EFAULT;
             // if (ev.events & (EPOLLONESHOT | EPOLLET) != 0)
             //     return errors.ENOSYS;
-            const file = krn.task.current.files.fds.get(@intCast(fd)) orelse
+            const file = krn.task.current().files.fds.get(@intCast(fd)) orelse
                 return errors.EBADF;
             if (file.inode.fops == &krn.fs.epoll.ops)
                 return errors.ELOOP;
@@ -136,7 +136,7 @@ pub fn epoll_ctl(epfd: i32, op: i32, fd: i32, event: ?*const EpollEvent) !u32 {
             });
             krn.logger.DEBUG(
                 "[epoll_ctl ADD] pid={d} epfd={d} fd={d} events=0x{x}",
-                .{ krn.task.current.pid, epfd, fd, ev.events },
+                .{ krn.task.current().pid, epfd, fd, ev.events },
             );
         },
         EPOLL_CTL_DEL => {
@@ -157,7 +157,7 @@ pub fn epoll_ctl(epfd: i32, op: i32, fd: i32, event: ?*const EpollEvent) !u32 {
             state.entries.items[idx].data = ev.data;
             krn.logger.DEBUG(
                 "[epoll_ctl MOD] pid={d} epfd={d} fd={d} events=0x{x}",
-                .{ krn.task.current.pid, epfd, fd, ev.events },
+                .{ krn.task.current().pid, epfd, fd, ev.events },
             );
         },
         else => return errors.EINVAL,
@@ -190,7 +190,7 @@ pub fn epoll_wait(epfd: i32, events: ?[*]EpollEvent, maxevents: i32, timeout_ms:
 
             var ready_events: u32 = 0;
             if (entry.fd >= 0) {
-                if (krn.task.current.files.fds.get(@intCast(entry.fd))) |file| {
+                if (krn.task.current().files.fds.get(@intCast(entry.fd))) |file| {
                     file.ref.get();
                     defer file.ref.put();
 
@@ -229,7 +229,7 @@ pub fn epoll_wait(epfd: i32, events: ?[*]EpollEvent, maxevents: i32, timeout_ms:
 
         poll_table_added = true;
         if (timeout_ms < 0) {
-            krn.task.current.wakeup_time = 0;
+            krn.task.current().wakeup_time = 0;
         } else {
             const curr_time = krn.currentMs();
             const elapsed = curr_time - start_time;
@@ -237,12 +237,12 @@ pub fn epoll_wait(epfd: i32, events: ?[*]EpollEvent, maxevents: i32, timeout_ms:
             if (to_sleep == 0) {
                 return 0;
             }
-            krn.task.current.wakeup_time = curr_time + to_sleep;
+            krn.task.current().wakeup_time = curr_time + to_sleep;
         }
 
-        krn.task.current.state = .INTERRUPTIBLE_SLEEP;
+        krn.task.current().state = .INTERRUPTIBLE_SLEEP;
         krn.sched.reschedule();
-        if (krn.task.current.hasPendingSignal()) {
+        if (krn.task.current().hasPendingSignal()) {
             return errors.EINTR;
         }
     }

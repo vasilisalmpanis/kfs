@@ -98,7 +98,7 @@ pub const Inode = struct {
     }
 
     pub fn canAccess(self: *Inode, flags: u32) bool {
-        if (kernel.task.current.uid == 0) {
+        if (kernel.task.current().uid == 0) {
             return true;
         }
         if (((flags & 0b11 == 0) and self.canRead()))

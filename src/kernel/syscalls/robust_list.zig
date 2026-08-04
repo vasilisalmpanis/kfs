@@ -21,8 +21,8 @@ pub fn get_robust_list(pid: i32, _head: ?*?*RobustListHead, _len: ?*usize) !u32 
     if (pid < 0) {
         return errors.ESRCH;
     } else if (pid == 0) {
-        krn.task.current.refcount.get();
-        task = krn.task.current;
+        krn.task.current().refcount.get();
+        task = krn.task.current();
     } else {
         const lock_state = krn.task.tasks_lock.lock_irq_disable();
         defer krn.task.tasks_lock.unlock_irq_enable(lock_state);
@@ -51,7 +51,7 @@ pub fn get_robust_list(pid: i32, _head: ?*?*RobustListHead, _len: ?*usize) !u32 
 pub fn set_robust_list(head: *RobustListHead, len: usize) !u32 {
     if (len != @sizeOf(RobustListHead))
         return errors.EINVAL;
-    krn.task.current.robust_list = head;
+    krn.task.current().robust_list = head;
     @panic("Implement robust list care in exit and exec!");
     // return 0;
 }

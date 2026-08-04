@@ -62,7 +62,7 @@ pub const Regs = struct {
     }
 
     pub fn state() *Regs{
-        const stack_bottom = krn.task.current.stack_bottom;
+        const stack_bottom = krn.task.current().stack_bottom;
         return @ptrFromInt(stack_bottom + krn.STACK_SIZE - @sizeOf(Regs));
     }
 

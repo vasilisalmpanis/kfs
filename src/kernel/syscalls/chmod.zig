@@ -11,13 +11,13 @@ pub fn chmod(path: ?[*:0]const u8, mode: fs.UMode) !u32 {
     const resolved = try fs.path.resolve(_path);
     defer resolved.release();
     if (
-        krn.task.current.uid != 0 and
-        resolved.dentry.inode.uid != krn.task.current.uid
+        krn.task.current().uid != 0 and
+        resolved.dentry.inode.uid != krn.task.current().uid
     )
         return errors.EPERM;
     if (
-        krn.task.current.uid != 0 and
-        !krn.task.current.inGroup(resolved.dentry.inode.gid)
+        krn.task.current().uid != 0 and
+        !krn.task.current().inGroup(resolved.dentry.inode.gid)
     )
         _mode.unSetSGID();
     const mask: u7 = fs.S_ISGID | fs.S_ISUID | fs.S_ISVTX;
@@ -32,18 +32,18 @@ pub fn chmod(path: ?[*:0]const u8, mode: fs.UMode) !u32 {
 }
 
 pub fn fchmod(fd: u32, mode: fs.UMode) !u32 {
-    if (krn.task.current.files.fds.get(fd)) |file| {
+    if (krn.task.current().files.fds.get(fd)) |file| {
         file.ref.get();
         defer file.ref.put();
         var _mode = mode;
         if (
-            krn.task.current.uid != 0 and
-            file.inode.uid != krn.task.current.uid
+            krn.task.current().uid != 0 and
+            file.inode.uid != krn.task.current().uid
         )
             return errors.EPERM;
         if (
-            krn.task.current.uid != 0 and
-            !krn.task.current.inGroup(file.inode.gid)
+            krn.task.current().uid != 0 and
+            !krn.task.current().inGroup(file.inode.gid)
         )
             _mode.unSetSGID();
         const mask: u7 = fs.S_ISGID | fs.S_ISUID | fs.S_ISVTX;
