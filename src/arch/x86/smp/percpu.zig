@@ -23,14 +23,26 @@ pub fn PerCpu(comptime T: type, comptime init: T, comptime _: type) type {
     return struct {
         var value: T linksection(".percpu.data") = init;
 
+        const gs_direct = switch (@typeInfo(T)) {
+            .int, .bool => @sizeOf(T) <= @sizeOf(usize),
+            .pointer => |p| p.size != .slice,
+            .optional => |o| switch (@typeInfo(o.child)) {
+                .pointer => |p| p.size != .slice,
+                else => false,
+            },
+            .@"struct" => |s| s.layout == .@"packed" and @sizeOf(T) <= @sizeOf(usize),
+            else => false,
+        };
+
         pub inline fn ptr() *T {
             // TODO: think about preemption
             const offset = @intFromPtr(&value) - @intFromPtr(&_percpu_start);
             return @ptrFromInt(thisCpuBase() + offset);
         }
 
-        /// Works only with scalar types
         pub inline fn get() T {
+            if (comptime !gs_direct)
+                return ptr().*;
             const offset = @intFromPtr(&value) - @intFromPtr(&_percpu_start);
             return asm volatile (
                 \\ mov %%gs:(%[offset]), %[ret]
@@ -41,8 +53,11 @@ pub fn PerCpu(comptime T: type, comptime init: T, comptime _: type) type {
             );
         }
 
-        /// Works only with scalar types
         pub inline fn set(v: T) void {
+            if (comptime !gs_direct) {
+                ptr().* = v;
+                return;
+            }
             const offset = @intFromPtr(&value) - @intFromPtr(&_percpu_start);
             asm volatile (
                 \\ mov %[val], %%gs:(%[offset])
@@ -66,7 +81,7 @@ pub fn PerCpu(comptime T: type, comptime init: T, comptime _: type) type {
         /// Use only in BSP core
         pub inline fn getRawPtr() *T {
             return &value;
-        } 
+        }
     };
 }
 

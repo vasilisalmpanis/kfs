@@ -6,16 +6,14 @@ const printf = @import("./printf.zig").printf;
 pub fn printGDT() void {
     krn.logger.INFO("GDT base: {x} limit: {d}\n", .{gdt.gdt_ptr.ptr().base, gdt.gdt_ptr.ptr().limit});
     krn.logger.INFO("N offset [limit low]    [base low]      [bas mid] [access] [gran] [bas hig]\n", .{});
-    const entries = gdt.gdt_entries.ptr();
-    const len = gdt.GDT_ENTRIES_COUNT;
-    for (0..len) |idx| {
+    for (gdt.gdt_entries.get()) |entry| {
         krn.logger.INFO("{b:0>16} {b:0>16} {b:0>8} {b:0>8} {b:0>8} {b:0>8}\n", .{
-            entries[idx].limit_low,
-            entries[idx].base_low,
-            entries[idx].base_middle,
-            entries[idx].access,
-            entries[idx].granularity,
-            entries[idx].base_high,
+            entry.limit_low,
+            entry.base_low,
+            entry.base_middle,
+            entry.access,
+            entry.granularity,
+            entry.base_high,
         });
     }
 }
