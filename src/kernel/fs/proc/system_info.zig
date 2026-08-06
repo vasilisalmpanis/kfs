@@ -16,7 +16,7 @@ fn countTasks() TaskCounters {
     const lock_state = krn.task.tasks_lock.lock_irq_disable();
     defer krn.task.tasks_lock.unlock_irq_enable(lock_state);
 
-    var it = krn.task.initial_task.list.iterator();
+    var it = krn.task.initial_task.ptr().list.iterator();
     while (it.next()) |node| {
         const task = node.curr.entry(krn.task.Task, "list");
         if (task.state == .STOPPED or task.state == .ZOMBIE)

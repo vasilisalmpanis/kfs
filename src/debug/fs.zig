@@ -32,5 +32,5 @@ fn mountTreeHelper(mnt: *krn.fs.Mount, level: u32, last_child: bool) void {
 }
 
 pub fn printMountTree() void {
-    mountTreeHelper(krn.task.initial_task.fs.root.mnt, 0, false);
+    mountTreeHelper(krn.task.initial_task.ptr().fs.root.mnt, 0, false);
 }

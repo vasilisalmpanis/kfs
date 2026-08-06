@@ -27,8 +27,6 @@ const ExceptionHandler  = fn (regs: *Regs) *Regs;
 const SyscallHandler    = fn (regs: *Regs) void;
 const ISRHandler        = fn (arg: ?*anyopaque) callconv(.c) void;
 
-extern const stack_top: u32;
-
 pub fn goUserspace() void {
     // TSS.esp0 represents the kernel stack pointer to switch to when the CPU enters
     // ring 0 from a lower privilege level (ring 3).

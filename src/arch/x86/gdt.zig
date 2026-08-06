@@ -49,7 +49,7 @@ pub const GDT_PERCPU_INDEX: u32 = 9;
 pub const GS_OFFSET: u32 = GDT_PERCPU_INDEX * @sizeOf(GdtEntry);
 
 
-extern const stack_top: u32;
+extern const bsp_stack_top: u32;
 extern const _percpu_start: u32;
 extern const _percpu_end: u32;
 
@@ -104,17 +104,16 @@ pub fn gdtInit(
 }
 
 pub fn init() void {
-
     percpu.percpu_start_addr = @intFromPtr(&percpu._percpu_start);
     percpu.percpu_end_addr = @intFromPtr(&percpu._percpu_end);
     const tss_ptr = tss.getRawPtr();
     tss_ptr.ss0 = idt.KERNEL_DATA_SEGMENT;
-    tss_ptr.esp0 = @intFromPtr(&stack_top);
     gdtInit(
         gdt_ptr.getRawPtr(),
         tss_ptr,
         percpu.percpu_start_addr,
         percpu.percpu_end_addr - percpu.percpu_start_addr,
-        gdt_entries.getRawPtr()
+        gdt_entries.getRawPtr(),
     );
+    tss_ptr.esp0 = @intFromPtr(&bsp_stack_top);
 }

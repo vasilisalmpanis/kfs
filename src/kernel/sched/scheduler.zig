@@ -45,7 +45,7 @@ fn processTasks() void {
 
 fn findNextTask() *tsk.Task {
     if (tsk.current().list.isEmpty())
-        return &tsk.initial_task;
+        return tsk.initial_task.ptr();
     tsk.tasks_lock.lock();
     defer tsk.tasks_lock.unlock();
 
@@ -65,11 +65,11 @@ fn findNextTask() *tsk.Task {
         if (task.state == .RUNNING)
             return task;
     }
-    return &tsk.initial_task;
+    return tsk.initial_task.ptr();
 }
 
 pub fn schedule() void {
-    if (tsk.initial_task.list.isEmpty())
+    if (tsk.initial_task.ptr().list.isEmpty())
         return;
     const flags = arch.cpu.saveFlagsAndCli();
     defer arch.cpu.restoreFlags(flags);

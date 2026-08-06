@@ -991,8 +991,15 @@ pub const kernel = struct {
             should_stop : bool= false,
         };
 
+        pub const initial_task = struct {
+        };
+
         pub const current_task = struct {
         };
+
+        pub const stack_top = struct {
+        };
+
 
     };
 

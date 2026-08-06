@@ -5,8 +5,6 @@ const idt = @import("../idt.zig");
 const vmm = @import("../mm/vmm.zig");
 const fpu = @import("../fpu.zig");
 
-extern const stack_top: u32;
-
 // switch_to(prev_save: *u32, next_sp: u32)
 //
 // prev_save: pointer to the per_task kernel_esp
@@ -94,8 +92,8 @@ pub fn contextSwitch(prev: *tsk.Task, next: *tsk.Task) void {
         prev.save_fpu_state = false;
     }
     tsk.current_task.set(next);
-    if (next == &tsk.initial_task) {
-        gdt.tss.ptr().esp0 = @intFromPtr(&stack_top);
+    if (next == tsk.initial_task.ptr()) {
+        gdt.tss.ptr().esp0 = krn.task.stack_top.get();
     } else {
         gdt.tss.ptr().esp0 = next.stack_bottom + krn.STACK_SIZE;
     }

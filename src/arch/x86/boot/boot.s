@@ -59,11 +59,11 @@ multiboot2_header_end:
 # Allocate the initial stack.
 .section .bootstrap_stack, "aw", @nobits
 .align 16
-.globl stack_bottom
-stack_bottom:
+.globl bsp_stack_bottom
+bsp_stack_bottom:
 .skip 4096 * 1024
-.globl stack_top
-stack_top:
+.globl bsp_stack_top
+bsp_stack_top:
 
 # Preallocate pages used for paging. Don't hard-code addresses and assume they
 # are available, as the bootloader might have loaded its multiboot structures or
@@ -103,7 +103,7 @@ _start:
 higher_half:
 
 	# Set up the stack.
-	mov $stack_top, %esp
+	mov $bsp_stack_top, %esp
 	xor %ebp, %ebp
 
 	# call print

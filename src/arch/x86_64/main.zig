@@ -178,7 +178,7 @@ pub const idt = struct {
     pub const KERNEL_CODE_SEGMENT = 0;
     pub const KERNEL_DATA_SEGMENT = 0;
     pub fn switchTo(_: *krn.task.Task, _: *krn.task.Task, _: *Regs) *Regs{
-        return &krn.task.initial_task.regs;
+        return &krn.task.initial_task.ptr().regs;
     }
     pub fn goUserspace() void {}
 };

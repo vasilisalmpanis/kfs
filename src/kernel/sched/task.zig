@@ -571,7 +571,7 @@ pub const Task = struct {
 };
 
 pub fn sleep(millis: usize) void {
-    if (current() == &initial_task)
+    if (current() == initial_task.ptr())
         return ;
     current.wakeup_time = currentMs() + millis;
     current.state = .UNINTERRUPTIBLE_SLEEP;
@@ -582,33 +582,53 @@ pub inline fn current() *Task {
     return current_task.get();
 }
 
-pub var initial_task = Task.init(0, 0, 1, .KTHREAD);
-pub const current_task = smp.PerCpu(*Task, &initial_task, opaque{});
+pub const initial_task = smp.PerCpu(Task, undefined, opaque {});
+pub const current_task = smp.PerCpu(*Task, undefined, opaque{});
+
 pub var tasks_lock: krn.Spinlock = krn.Spinlock.init();
 pub var stopped_tasks: ?*lst.ListHead = null;
 
-extern const stack_top: u32;
-extern const stack_bottom: u32;
+extern const bsp_stack_top: u32;
+extern const bsp_stack_bottom: u32;
 
-var inital_fpu_state = arch.fpu.FPUState{};
+pub const stack_top = smp.PerCpu(usize, undefined, opaque {});
+pub const stack_bottom = smp.PerCpu(usize, undefined, opaque {});
+const inital_fpu_state = smp.PerCpu(arch.fpu.FPUState, undefined, opaque {});
 
-pub fn initMultitasking() void {
-    pid_it = pid_bitset.iterator(.{
-        .direction = .forward,
-        .kind = .unset,
-    });
-    initial_task.setup(
-        @intFromPtr(&stack_top),
-        @intFromPtr(&stack_bottom),
+pub fn initCpuLocal(
+    _stack_top: *const usize,
+    _stack_bottom: *const usize,
+) void {
+    initial_task.set(Task.init(0, 0, 1, .KTHREAD));
+    current_task.set(initial_task.ptr());
+    stack_top.set(_stack_top.*);
+    stack_bottom.set(_stack_bottom.*);
+    inital_fpu_state.set(arch.fpu.FPUState{});
+
+    initial_task.ptr().setup(
+        @intFromPtr(_stack_top),
+        @intFromPtr(_stack_bottom),
         "swapper"
     ) catch |err| {
         krn.logger.ERROR("initMultitasking(): {t}", .{err});
         @panic("Failed to setup initial task!");
     };
-    initial_task.refcount.get();
-    initial_task.mm.?.vas = @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET;
-    initial_task.fpu_state = &inital_fpu_state;
-    initial_task.group_leader = &initial_task;
-    krn.irq.registerHandler(0, &krn.timerHandler, null);
+    initial_task.ptr().refcount.get();
+    initial_task.ptr().mm.?.vas = @intFromPtr(&vmm.initial_page_dir) - krn.mm.PAGE_OFFSET;
+    initial_task.ptr().fpu_state = inital_fpu_state.ptr();
+    initial_task.ptr().group_leader = initial_task.ptr();
     arch.system.enableWriteProtect();
+}
+
+pub fn init() void {
+    pid_it = pid_bitset.iterator(.{
+        .direction = .forward,
+        .kind = .unset,
+    });
+
+    initCpuLocal(
+        @ptrCast(&bsp_stack_top),
+        @ptrCast(&bsp_stack_bottom),
+    );
+    krn.irq.registerHandler(0, &krn.timerHandler, null);
 }

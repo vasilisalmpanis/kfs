@@ -49,7 +49,8 @@ pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
         const lock_state = tsk.tasks_lock.lock_irq_disable();
         defer tsk.tasks_lock.unlock_irq_enable(lock_state);
 
-        var it = tsk.initial_task.list.iterator();
+        // TODO: iterate over all tasks, not only one core list
+        var it = tsk.initial_task.ptr().list.iterator();
         var count: i32 = 0;
         const pgroup: u32 = if (pid < -1) @intCast(-pid) else tsk.current().pgid;
         while (it.next()) |i| {
@@ -64,7 +65,8 @@ pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
         const lock_state = tsk.tasks_lock.lock_irq_disable();
         defer tsk.tasks_lock.unlock_irq_enable(lock_state);
 
-        var it = tsk.initial_task.list.iterator();
+        // TODO: iterate over all tasks, not only one core list
+        var it = tsk.initial_task.ptr().list.iterator();
         var count: i32 = 0;
         while (it.next()) |i| {
             const task = i.curr.entry(tsk.Task, "list");
@@ -84,7 +86,7 @@ pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
             }
         }
         return if (count == 0) errors.ESRCH else 0;
-    } else if (tsk.initial_task.findByPid(@intCast(pid))) |task| {
+    } else if (tsk.initial_task.ptr().findByPid(@intCast(pid))) |task| {
         defer task.refcount.put();
         return try send_signal(task, sig, tid);
     }

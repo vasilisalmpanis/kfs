@@ -93,9 +93,16 @@ pub export fn apMain() noreturn {
     arch.gdt.gdtInit(arch.gdt.gdt_ptr.ptrFromBase(percpu.percpu_curr_addr),
         arch.gdt.tss.ptrFromBase(percpu.percpu_curr_addr),
         percpu.percpu_curr_addr,
-        percpu.percpu_size,
+        percpu.percpu_size - 1,
         arch.gdt.gdt_entries.ptrFromBase(percpu.percpu_curr_addr),
     );
+    arch.gdt.tss.ptr().esp0 = ap_stack;
+    const stack_bottom: usize = @intCast(ap_stack - krn.kthread.STACK_SIZE);
+    krn.task.initCpuLocal(
+        @as(*usize, @ptrCast(&ap_stack)),
+        &stack_bottom,
+    );
+
     _ = @atomicRmw(u32, &cpus_online, .Add, 1, .seq_cst);
     arch.idt.idtLoad();
 
@@ -130,7 +137,7 @@ pub fn startCore(proc_apic: *align(1) apic.ProcessorLocalAPIC) void {
     apic_regs[ICR_LOW] = INIT | TRIGGER_LEVEL;
     waitCPU();
     pit.mdelay(10); // 10ms after INIT per Intel MP spec
-    // SIPI x2
+    // SIPI
     for (0..1) |_| {
         apic_regs[ERROR_STATUS_REGISTER] = 0;
         apic_regs[ICR_HIGH] = dest_id << 24;
@@ -197,11 +204,11 @@ pub fn init() void {
 
     boot_cpu_apicid = cpuID();
     krn.logger.INFO("boot_cpu_apicid: {d}", .{boot_cpu_apicid});
+    setupTimer();
 
     // map first 4 megabytes
     arch.vmm.initial_page_dir[0] = 0x00000083;
     setup_trampoline();
-    setupTimer();
 
     percpu.initPerCPUMemory() catch |e| {
         krn.logger.INFO("SMP: Cannot bring up secondary cores {any}", .{e});
@@ -238,7 +245,7 @@ pub fn init() void {
         }
         madt_entry = entry;
     }
-    while (@atomicLoad(u32, &cpus_online, .seq_cst) == 1) {}
+    while (cpu_count > 1 and @atomicLoad(u32, &cpus_online, .seq_cst) == 1) {}
     if (ioapic.controller) |*cntr|
         cntr.maskAll();
     smp_enabled = true;

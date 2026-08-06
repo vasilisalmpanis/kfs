@@ -28,7 +28,8 @@ pub fn get_robust_list(pid: i32, _head: ?*?*RobustListHead, _len: ?*usize) !u32 
         defer krn.task.tasks_lock.unlock_irq_enable(lock_state);
 
         const _pid: u16 = @intCast(pid);
-        var it = krn.task.initial_task.list.iterator();
+        // TODO: iterate over all tasks, not only one core list
+        var it = krn.task.initial_task.ptr().list.iterator();
         while (it.next()) |i| {
             const curr = i.curr.entry(krn.task.Task, "list");
             if (curr.pid == _pid) {

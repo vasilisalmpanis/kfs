@@ -45,7 +45,7 @@ pub fn doExitGroup(error_code: i32) !u32 {
 }
 
 pub fn doExit(error_code: i32) !u32 {
-    if (tsk.current() == &tsk.initial_task)
+    if (tsk.current() == tsk.initial_task.ptr())
         return errors.EINVAL;
 
     tsk.current().group_leader.result = error_code;

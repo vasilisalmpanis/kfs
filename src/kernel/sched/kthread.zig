@@ -82,7 +82,6 @@ pub fn kthreadCreate(f: ThreadHandler, arg: ?*const anyopaque, name: [*:0]const 
         task.mm = &mm.proc_mm.init_mm;
         if (task.mm) |_mm|
             _mm.ref.get();
-        task.fs = krn.task.initial_task.fs;
         try task.assignPID();
         task.tgid = task.pid;
         task.initSelf(

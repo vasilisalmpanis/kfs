@@ -33,7 +33,7 @@ fn printTask(task: *tsk.Task) void {
 }
 
 pub fn ps() void {
-    var it = tsk.initial_task.list.iterator();
+    var it = tsk.initial_task.ptr().list.iterator();
     while (it.next()) |i| {
         printTask(i.curr.entry(tsk.Task, "list"));
     }
@@ -73,5 +73,5 @@ fn psTreeHelper(task: *tsk.Task, level: u32, last_child: bool) void {
 }
 
 pub fn psTree() void {
-    psTreeHelper(&krn.task.initial_task, 0, false);
+    psTreeHelper(krn.task.initial_task.ptr(), 0, false);
 }

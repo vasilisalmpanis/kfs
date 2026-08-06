@@ -103,11 +103,11 @@ fn move_root() void {
         const sysfs = krn.fs.path.resolve("/sys") catch {
             @panic("Failed moving dev\n");
         };
-        krn.task.initial_task.fs.root = krn.fs.path.Path.init(
+        krn.task.initial_task.ptr().fs.root = krn.fs.path.Path.init(
             point,
             point.sb.root,
         );
-        krn.task.initial_task.fs.pwd = krn.fs.path.Path.init(
+        krn.task.initial_task.ptr().fs.pwd = krn.fs.path.Path.init(
             point,
             point.sb.root,
         );
@@ -126,9 +126,9 @@ fn user_thread(_: ?*const anyopaque) i32 {
     while (kernel_ready == false)
         krn.sched.reschedule();
 
-    krn.task.current().fs = krn.task.initial_task.fs.dup() catch
+    krn.task.current().fs = krn.task.initial_task.ptr().fs.dup() catch
         @panic("Allocation PID 1: fs.dup() failed");
-    krn.task.current().files = krn.task.initial_task.files.dup() catch
+    krn.task.current().files = krn.task.initial_task.ptr().files.dup() catch
         @panic("Allocation PID 1: files.dup() failed");
     krn.task.current().sighand = krn.signals.SigHand.new() catch
         @panic("Allocation PID 1: SigHand.new() failed");
@@ -195,20 +195,21 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     mm.mmInit(&krn.boot_info);
     krn.serial.print("[INIT]: Memory done\n");
     acpi.init();
-    smp.init();
     krn.serial.print("[INIT]: ACPI done\n");
     drv.cmos.init();
     krn.serial.print("[INIT]: CMOS done\n");
-    krn.task.initMultitasking();
+    krn.task.init();
     krn.serial.print("[INIT]: Multitasking done\n");
-    fpu.setTaskSwitched();
+    // Get PID1
+    init_userspace();
+    smp.init();
+    krn.serial.print("[INIT]: SMP done\n");
+    fpu.setTaskSwitched(); // TODO: do for all the cores
     irq.mapAll();
     cpu.enableInterrupts();
     krn.serial.print("[INIT]: Interrupts are enabled\n");
     dbg.initSymbolTable(&krn.boot_info);
     krn.serial.print("[INIT]: Symbol Table done\n");
-    // Get PID1
-    init_userspace();
 
     screen.initScreen(&krn.scr, &krn.boot_info);
     krn.serial.print("[INIT]: Screen done\n");

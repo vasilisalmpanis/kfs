@@ -246,7 +246,7 @@ pub fn printMapped() void {
 
 
 pub fn printTaskVMAs(pid: u16) void {
-    if (krn.task.initial_task.findByPid(pid)) |tsk| {
+    if (krn.task.initial_task.ptr().findByPid(pid)) |tsk| {
         if (tsk.mm.?.vmas) |vma| {
             var it = vma.list.iterator();
             while (it.next()) |i| {

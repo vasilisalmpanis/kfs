@@ -21,7 +21,7 @@ pub fn timerHandler() void {
     hz_counter += 1;
 
     const current = krn.task.current();
-    if (current == &krn.task.initial_task) {
+    if (current == krn.task.initial_task.ptr()) {
         cpu_idle_ticks += 1;
     } else if (current.regs.isRing3()) {
         cpu_user_ticks += 1;
