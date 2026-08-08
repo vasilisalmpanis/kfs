@@ -94,6 +94,23 @@ fn setupTimer() void {
     apic_regs[APIC_TMRINITCNT] = 100;
 }
 
+// If we reach idle that means we have no tasks to run
+// we halt
+// some other cpu puts a task on our list
+// it tries to wake us up.
+// (how ?) IPI?
+// idle does schedule -> runnable task runs
+
+fn idle() noreturn {
+    while (true) {
+        if (!arch.cpu.areIntEnabled()) {
+            arch.cpu.cpuRelax();
+        }
+        arch.cpu.halt();
+        krn.sched.schedule();
+    }
+}
+
 pub export fn apMain() noreturn {
     const stack_top: u32 = ap_stack;
     const stack_bottom: usize = @intCast(stack_top - krn.kthread.STACK_SIZE);
@@ -144,8 +161,8 @@ pub export fn apMain() noreturn {
 
     setupTimer();
 
-    // arch.cpu.enableInterrupts();
-    while (true) {}
+    arch.cpu.enableInterrupts();
+    idle();
 }
 
 pub fn startCore(proc_apic: *align(1) apic.ProcessorLocalAPIC) void {

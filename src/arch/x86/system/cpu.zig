@@ -271,3 +271,11 @@ pub fn rdmsr(register: u32) u64 {
     );
     return (@as(u64, edx) << 32) | @as(u64, eax);
 }
+
+pub inline fn halt() void {
+    asm volatile ("hlt");
+}
+
+pub inline fn cpuRelax() void {
+    asm volatile ("pause");
+}
