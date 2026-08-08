@@ -8,7 +8,6 @@ pub var percpu_start_addr: u32 = undefined;
 pub var percpu_end_addr: u32 = undefined;
 
 pub var percpu_mem_addr: u32 = undefined;
-pub var percpu_curr_addr: u32 = undefined;
 pub var percpu_size_aligned: u32 = undefined;
 pub var percpu_size: u32 = undefined;
 
@@ -17,6 +16,12 @@ pub inline fn thisCpuBase() usize {
         \\ mov %%gs:0, %[ret]
         : [ret] "=r" (-> usize)
     );
+}
+
+pub inline fn cpuBase(logical_id: u32) u32 {
+    if (logical_id == 0) // BSP
+        return percpu_start_addr;
+    return percpu_mem_addr + ((logical_id - 1) * percpu_size_aligned);
 }
 
 pub fn PerCpu(comptime T: type, comptime init: T, comptime _: type) type {
@@ -68,8 +73,8 @@ pub fn PerCpu(comptime T: type, comptime init: T, comptime _: type) type {
             );
         }
 
-        pub inline fn ptrOn(cpu: u32) *T {
-            _ = cpu;
+        pub inline fn ptrOn(logical_id: u32) *T {
+            return ptrFromBase(cpuBase(logical_id));
         }
 
         pub inline fn ptrFromBase(base: u32) *T {
@@ -100,7 +105,6 @@ pub fn initPerCPUMemory() !void {
 
     if (percpu_mem_addr % 64 != 0)
         percpu_mem_addr += (64 - percpu_mem_addr % 64);
-    percpu_curr_addr = percpu_mem_addr;
     const orig_percpu_mem: [*]u8 = @ptrFromInt(percpu_start_addr);
     var offset: u32 = 0;
     for (0..smp.cpu_count - 1) |_| {

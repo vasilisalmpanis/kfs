@@ -596,18 +596,18 @@ pub const stack_bottom = smp.PerCpu(usize, undefined, opaque {});
 const inital_fpu_state = smp.PerCpu(arch.fpu.FPUState, undefined, opaque {});
 
 pub fn initCpuLocal(
-    _stack_top: *const usize,
-    _stack_bottom: *const usize,
+    _stack_top: usize,
+    _stack_bottom: usize,
 ) void {
     initial_task.set(Task.init(0, 0, 1, .KTHREAD));
     current_task.set(initial_task.ptr());
-    stack_top.set(_stack_top.*);
-    stack_bottom.set(_stack_bottom.*);
+    stack_top.set(_stack_top);
+    stack_bottom.set(_stack_bottom);
     inital_fpu_state.set(arch.fpu.FPUState{});
 
     initial_task.ptr().setup(
-        @intFromPtr(_stack_top),
-        @intFromPtr(_stack_bottom),
+        _stack_top,
+        _stack_bottom,
         "swapper"
     ) catch |err| {
         krn.logger.ERROR("initMultitasking(): {t}", .{err});
@@ -627,8 +627,8 @@ pub fn init() void {
     });
 
     initCpuLocal(
-        @ptrCast(&bsp_stack_top),
-        @ptrCast(&bsp_stack_bottom),
+        @intFromPtr(&bsp_stack_top),
+        @intFromPtr(&bsp_stack_bottom),
     );
     krn.irq.registerHandler(0, &krn.timerHandler, null);
 }

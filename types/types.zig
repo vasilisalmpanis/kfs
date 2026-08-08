@@ -729,6 +729,10 @@ pub const arch = struct {
 
         };
 
+        pub const logical_id = struct {
+        };
+
+
         pub extern fn apMain()noreturn;
     };
 

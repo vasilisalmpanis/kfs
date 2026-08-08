@@ -5,13 +5,18 @@ const krn = @import("kernel");
 const arch = @import("../main.zig");
 const pit = @import("drivers").pit;
 const percpu = @import("./percpu.zig");
+const std = @import("std");
 pub const PerCpu = percpu.PerCpu;
 
 pub var boot_cpu_apicid: u32 = 0xFFFFFFFF;
 pub var cpu_count: usize = 0;
 pub var smp_enabled: bool = false;
 
-pub var cpus_online: u32 = 0;
+pub const logical_id = PerCpu(u32, 0xFFFFFFFF, opaque{});
+pub const physical_id = PerCpu(u32, 0xFFFFFFFF, opaque{});
+
+pub var cpu_logical_ids: std.AutoHashMap(u32, u32) = undefined;
+pub var cpus_online: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
 
 const APIC_ID: u32 = 0x20 / 4;
 
@@ -52,8 +57,8 @@ var apic_regs: [*] volatile u32 = undefined;
 fn enable_apic() void {
     apic_regs[SPURIOUS_IVR] = apic_regs[SPURIOUS_IVR] | 0x1FF;
     apic_regs[APIC_DFR] = 0xFFFFFFFF;
-    const logical_id: u32 = @as(u32, 1) << @intCast(cpuID() & 0x7);
-    apic_regs[APIC_LDR] = logical_id << 24;
+    const curr_physical_id: u32 = @as(u32, 1) << @intCast(cpuID() & 0x7);
+    apic_regs[APIC_LDR] = curr_physical_id << 24;
     apic_regs[APIC_TPR] = 0x0;
 }
 
@@ -90,23 +95,52 @@ fn setupTimer() void {
 }
 
 pub export fn apMain() noreturn {
-    arch.gdt.gdtInit(arch.gdt.gdt_ptr.ptrFromBase(percpu.percpu_curr_addr),
-        arch.gdt.tss.ptrFromBase(percpu.percpu_curr_addr),
-        percpu.percpu_curr_addr,
+    const stack_top: u32 = ap_stack;
+    const stack_bottom: usize = @intCast(stack_top - krn.kthread.STACK_SIZE);
+    _ = cpus_online.fetchAdd(1, .monotonic);
+
+    const curr_phys_id: u32 = cpuID();
+    const curr_logical_id: u32 = cpu_logical_ids.get(curr_phys_id) orelse {
+        @panic("AP: Bug, physical ID doesn't exist in hashmap");
+    };
+    const percpu_addr: u32 = percpu.cpuBase(curr_logical_id);
+
+    arch.gdt.gdtInit(
+        arch.gdt.gdt_ptr.ptrFromBase(percpu_addr),
+        arch.gdt.tss.ptrFromBase(percpu_addr),
+        percpu_addr,
         percpu.percpu_size - 1,
-        arch.gdt.gdt_entries.ptrFromBase(percpu.percpu_curr_addr),
+        arch.gdt.gdt_entries.ptrFromBase(percpu_addr),
     );
-    arch.gdt.tss.ptr().esp0 = ap_stack;
-    const stack_bottom: usize = @intCast(ap_stack - krn.kthread.STACK_SIZE);
+    // Percpu variables can be used
+
+    logical_id.set(curr_logical_id);
+    physical_id.set(curr_phys_id);
+
+    arch.gdt.tss.ptr().esp0 = stack_top; // TODO: Remove this and use a hashmap
     krn.task.initCpuLocal(
-        @as(*usize, @ptrCast(&ap_stack)),
-        &stack_bottom,
+        stack_top,
+        stack_bottom,
     );
 
-    _ = @atomicRmw(u32, &cpus_online, .Add, 1, .seq_cst);
     arch.idt.idtLoad();
 
-    krn.logger.INFO("Hello from cpu\n", .{});
+    krn.logger.INFO(
+        \\
+        \\- --------------
+        \\AP:           {d}
+        \\Logical ID:   {d}
+        \\Stack Top:    {x}
+        \\Percpu Base:  {x}
+        \\---------------
+        \\
+        ,.{
+            physical_id.get(),
+            logical_id.get(),
+            krn.task.stack_top.get(),
+            percpu.cpuBase(logical_id.get()),
+        }
+    );
 
     setupTimer();
 
@@ -126,7 +160,7 @@ pub fn startCore(proc_apic: *align(1) apic.ProcessorLocalAPIC) void {
     // Stack grows down: point esp at the top of the allocation.
     ap_stack = stack_base + krn.kthread.STACK_SIZE;
 
-    const before = @atomicLoad(u32, &cpus_online, .seq_cst);
+    const before = cpus_online.load(.monotonic);
     var accept_status: u32 = 0;
     // INIT assert (level-triggered, asserted).
     apic_regs[ICR_HIGH] = dest_id << 24;
@@ -159,7 +193,7 @@ pub fn startCore(proc_apic: *align(1) apic.ProcessorLocalAPIC) void {
         // disabled during bringup, so the scheduler never runs and
         // a sleep would hang forever.
         var timeout: u32 = 2000; // 2000 * 100us = 200ms
-        while (@atomicLoad(u32, &cpus_online, .seq_cst) == before and timeout > 0) {
+        while (cpus_online.load(.seq_cst) == before and timeout > 0) {
             pit.udelay(100);
             timeout -= 1;
         }
@@ -167,8 +201,30 @@ pub fn startCore(proc_apic: *align(1) apic.ProcessorLocalAPIC) void {
             krn.logger.WARN("CPU {d} did not come online\n", .{proc_apic.apic_id});
         } else {
             krn.logger.INFO("CPU {d} online\n", .{proc_apic.apic_id});
-            percpu.percpu_curr_addr += percpu.percpu_size_aligned;
         }
+    }
+}
+
+fn logicalIdsSetup(madt: *apic.MADT) !void {
+    cpu_logical_ids = std.AutoHashMap(u32, u32).init(
+        krn.mm.kernel_allocator.allocator()
+    );
+    cpu_logical_ids.put(boot_cpu_apicid, 0) catch {
+        return krn.errors.PosixError.ENOMEM;
+    };
+    var current_id: u32 = 1;
+    var madt_entry: ?*apic.MADTEntry = null;
+    while (madt.getNextEntry(madt_entry)) |entry| {
+        if (entry.type == apic.MADTTYP_PROC_LAPIC) {
+            const proc_apic: *align(1) apic.ProcessorLocalAPIC = @ptrCast(entry);
+            if (proc_apic.apic_id == boot_cpu_apicid) {
+
+            } else if ((proc_apic.flags & 0b11) != 0) {
+                try cpu_logical_ids.put(proc_apic.apic_id, current_id);
+                current_id += 1;
+            }
+        }
+        madt_entry = entry;
     }
 }
 
@@ -176,8 +232,11 @@ pub fn countCPUs(madt: *apic.MADT) usize {
     var cpus: usize = 0;
     var madt_entry: ?*apic.MADTEntry = null;
     while (madt.getNextEntry(madt_entry)) |entry| {
-        if (entry.type == apic.MADTTYP_PROC_LAPIC)
-            cpus += 1;
+        if (entry.type == apic.MADTTYP_PROC_LAPIC) {
+            const proc_apic: *align(1) apic.ProcessorLocalAPIC = @ptrCast(entry);
+            if ((proc_apic.flags & 0b11) != 0)
+                cpus += 1;
+        }
         madt_entry = entry;
     }
     return cpus;
@@ -201,10 +260,16 @@ pub fn init() void {
     ) catch
         return;
     apic_regs = @ptrFromInt(apic_page);
+    setupTimer();
 
     boot_cpu_apicid = cpuID();
     krn.logger.INFO("boot_cpu_apicid: {d}", .{boot_cpu_apicid});
-    setupTimer();
+
+    logicalIdsSetup(madt) catch |e| {
+        krn.logger.WARN("SMP: failure to create logical cpu ids map {any}", .{e});
+        return;
+    };
+
 
     // map first 4 megabytes
     arch.vmm.initial_page_dir[0] = 0x00000083;
@@ -214,6 +279,9 @@ pub fn init() void {
         krn.logger.INFO("SMP: Cannot bring up secondary cores {any}", .{e});
         return;
     };
+
+    logical_id.set(0);
+    physical_id.set(boot_cpu_apicid);
 
     var madt_entry: ?*apic.MADTEntry = null;
     while (madt.getNextEntry(madt_entry)) |entry| {
@@ -228,7 +296,7 @@ pub fn init() void {
                 } else if (proc_apic.apic_id != boot_cpu_apicid) {
                     startCore(proc_apic);
                 } else {
-                    _ = @atomicRmw(u32, &cpus_online, .Add, 1, .seq_cst);
+                    _ = cpus_online.fetchAdd(1, .seq_cst);
                 }
             },
             apic.MADTTYP_IOAPIC => {
@@ -245,9 +313,10 @@ pub fn init() void {
         }
         madt_entry = entry;
     }
-    while (cpu_count > 1 and @atomicLoad(u32, &cpus_online, .seq_cst) == 1) {}
+    while (cpu_count > 1 and cpus_online.load(.seq_cst) == 1) {}
     if (ioapic.controller) |*cntr|
         cntr.maskAll();
     smp_enabled = true;
-    krn.logger.INFO("Number of online cpus {d}\n", .{@atomicLoad(u32, &cpus_online, .seq_cst)});
+    krn.logger.INFO("Number of online cpus {d}\n", .{cpus_online.load(.seq_cst)});
+    cpu_logical_ids.deinit();
 }
