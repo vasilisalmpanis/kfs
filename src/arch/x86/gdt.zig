@@ -100,6 +100,7 @@ pub fn gdtInit(
     asm volatile (
         \\ mov $(8 * 5), %ax
         \\ ltr %ax
+        ::: .{ .eax = true, .memory = true }
     );
 }
 

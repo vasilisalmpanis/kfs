@@ -1,4 +1,5 @@
 pub const kernel = @import("../main.zig");
+const arch = @import("arch");
 // SuperBlock
 pub const SuperBlock = @import("./super.zig").SuperBlock;
 pub const Statfs = @import("./super.zig").Statfs;
@@ -498,23 +499,29 @@ pub fn init() void {
             kernel.logger.ERROR("Failed to mount root: {t}\n",.{err});
             @panic("Failed to mount root\n");
         };
-        kernel.task.initial_task.ptr().fs = FSInfo.new() catch |err| {
+        const initial_fs = FSInfo.new() catch |err| {
             kernel.logger.ERROR(
                 "Failed to alloc FSInfo for initial task: {t}\n",
                 .{err}
             );
             @panic("Initial task must have a root,pwd\n");
         };
-        kernel.task.initial_task.ptr().fs.root = path.Path.init(
+        const initial_root = path.Path.init(
             root_mount,
             root_mount.sb.root
         );
-        kernel.task.initial_task.ptr().fs.pwd = path.Path.init(
+        const initial_pwd = path.Path.init(
             root_mount,
             root_mount.sb.root
         );
         if (TaskFiles.new()) |files| {
-            kernel.task.initial_task.ptr().files = files;
+            for (0..arch.smp.cpu_count) |logical_id| {
+                const idle_task = kernel.task.initial_task.ptrOn(logical_id);
+                idle_task.files = files;
+                idle_task.fs = initial_fs;
+                idle_task.fs.pwd = initial_root;
+                idle_task.fs.root = initial_pwd;
+            }
         } else {
             kernel.logger.ERROR(
                 "Failed to alloc TaskFiles for initial task\n",

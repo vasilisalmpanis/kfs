@@ -114,12 +114,12 @@ fn idle() noreturn {
 pub export fn apMain() noreturn {
     const stack_top: u32 = ap_stack;
     const stack_bottom: usize = @intCast(stack_top - krn.kthread.STACK_SIZE);
-    _ = cpus_online.fetchAdd(1, .monotonic);
 
     const curr_phys_id: u32 = cpuID();
     const curr_logical_id: u32 = cpu_logical_ids.get(curr_phys_id) orelse {
         @panic("AP: Bug, physical ID doesn't exist in hashmap");
     };
+    _ = cpus_online.fetchAdd(1, .monotonic);
     const percpu_addr: u32 = percpu.cpuBase(curr_logical_id);
 
     arch.gdt.gdtInit(
@@ -161,6 +161,8 @@ pub export fn apMain() noreturn {
 
     setupTimer();
 
+    arch.fpu.initFPU();
+    arch.fpu.setTaskSwitched();
     arch.cpu.enableInterrupts();
     idle();
 }

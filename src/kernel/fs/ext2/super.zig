@@ -76,6 +76,7 @@ pub const Ext2Super = struct {
     data: Ext2SuperData,
     bgdt: []BGDT,
     base: fs.SuperBlock,
+    lock: kernel.Spinlock,
 
     pub fn allocInode(_: *fs.SuperBlock) !*fs.Inode {
         return error.NotImplemented;
@@ -87,6 +88,7 @@ pub const Ext2Super = struct {
         const file: *fs.File = dev_file.?;
         if (kernel.mm.kmalloc(Ext2Super)) |sb| {
             errdefer kernel.mm.kfree(sb);
+            sb.lock = kernel.Spinlock.init();
             sb.base.dev_file = file;
             sb.base.magic = EXT2_MAGIC;
             sb.bgdt.len = 0;
@@ -233,8 +235,10 @@ pub const Ext2Super = struct {
         if (kernel.mm.vmallocArray(u8, alloc_size)) |raw_buff| {
             errdefer kernel.mm.vfree(raw_buff);
             @memset(raw_buff[0..alloc_size], 0);
-            arch.cpu.disableInterrupts();
-            defer arch.cpu.enableInterrupts();
+
+            const lock_state = sb.lock.lock_irq_disable();
+            defer sb.lock.unlock_irq_enable(lock_state);
+
             sb.base.dev_file.?.pos = sb.base.block_size * block;
             var read: usize = 0;
             while (read < alloc_size) {
@@ -263,8 +267,10 @@ pub const Ext2Super = struct {
         offset: usize
     ) !usize {
         var to_write: usize = size;
-        arch.cpu.disableInterrupts();
-        defer arch.cpu.enableInterrupts();
+
+        const lock_state = sb.lock.lock_irq_disable();
+        defer sb.lock.unlock_irq_enable(lock_state);
+
         sb.base.dev_file.?.pos = sb.base.block_size * block + offset;
         var written: usize = 0;
         while (written < size) {

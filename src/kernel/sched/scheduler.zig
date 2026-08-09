@@ -12,10 +12,11 @@ const krn = @import("../main.zig");
 const arch = @import("arch");
 
 fn processTasks() void {
-    if (tsk.stopped_tasks == null)
-        return;
     tsk.tasks_lock.lock();
     defer tsk.tasks_lock.unlock();
+    
+    if (tsk.stopped_tasks == null)
+        return;
 
     var it = tsk.stopped_tasks.?.iterator();
     while (it.next()) |i| {

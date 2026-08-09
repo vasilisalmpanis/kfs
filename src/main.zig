@@ -103,14 +103,19 @@ fn move_root() void {
         const sysfs = krn.fs.path.resolve("/sys") catch {
             @panic("Failed moving dev\n");
         };
-        krn.task.initial_task.ptr().fs.root = krn.fs.path.Path.init(
+        const root_path = krn.fs.path.Path.init(
             point,
             point.sb.root,
         );
-        krn.task.initial_task.ptr().fs.pwd = krn.fs.path.Path.init(
+        const pwd_path = krn.fs.path.Path.init(
             point,
             point.sb.root,
         );
+        for (0..smp.cpu_count) |logical_id| {
+            const _tsk = krn.task.initial_task.ptrOn(logical_id);
+            _tsk.fs.root = root_path;
+            _tsk.fs.pwd = pwd_path;
+        }
         defer sysfs.dentry.ref.put();
         defer devfs.dentry.ref.put();
         devfs.mnt.remove();
@@ -200,11 +205,11 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial.print("[INIT]: CMOS done\n");
     krn.task.init();
     krn.serial.print("[INIT]: Multitasking done\n");
+    smp.init();
     // Get PID1
     init_userspace();
-    smp.init();
     krn.serial.print("[INIT]: SMP done\n");
-    fpu.setTaskSwitched(); // TODO: do for all the cores
+    fpu.setTaskSwitched();
     irq.mapAll();
     cpu.enableInterrupts();
     krn.serial.print("[INIT]: Interrupts are enabled\n");

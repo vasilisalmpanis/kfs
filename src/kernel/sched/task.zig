@@ -190,8 +190,9 @@ pub const Task = struct {
         return false;
     }
 
+    /// Use only for initial idle tasks (sets pid to 0)
     pub fn setup(self: *Task, task_stack_top: usize, task_stack_bottom: usize, name: []const u8) !void {
-        try self.assignPID();
+        self.pid = 0;
         self.tgid = self.pid;
         self.uid = 0;
         self.regs.setStackPointer(task_stack_top);
@@ -296,7 +297,8 @@ pub const Task = struct {
             // Process not thread
             current().group_leader.tree.addChild(&self.tree);
         }
-        current().list.addTail(&self.list);
+        const cpu_to_run = self.pid % arch.smp.cpu_count;
+        initial_task.ptrOn(cpu_to_run).list.add(&self.list);
     }
 
     fn zombifyChildren(self: *Task) void {
@@ -625,6 +627,7 @@ pub fn init() void {
         .direction = .forward,
         .kind = .unset,
     });
+    _ = allocPid() catch {};
 
     initCpuLocal(
         @intFromPtr(&bsp_stack_top),
