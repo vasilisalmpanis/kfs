@@ -14,17 +14,21 @@ const arch = @import("arch");
 fn processTasks() void {
     tsk.tasks_lock.lock();
     defer tsk.tasks_lock.unlock();
-    
+
     if (tsk.stopped_tasks == null)
         return;
 
     var it = tsk.stopped_tasks.?.iterator();
-    while (it.next()) |i| {
+    top_level: while (it.next()) |i| {
         var end: bool = false;
         const curr = i.curr;
         const task = curr.entry(tsk.Task, "list");
         if (task == tsk.current() or !task.refcount.isFree() or task.state == .ZOMBIE)
             continue;
+        for (0..arch.smp.cpu_count) |logical_id| {
+            if (krn.task.current_task.ptrOn(logical_id).* == task)
+                continue: top_level;
+        }
         if (curr.isEmpty()) {
             end = true;
             tsk.stopped_tasks = null;
@@ -45,6 +49,8 @@ fn processTasks() void {
 }
 
 fn findNextTask() *tsk.Task {
+    if (tsk.current().state == .STOPPED)
+        return tsk.initial_task.ptr();
     if (tsk.current().list.isEmpty())
         return tsk.initial_task.ptr();
     tsk.tasks_lock.lock();
@@ -70,8 +76,6 @@ fn findNextTask() *tsk.Task {
 }
 
 pub fn schedule() void {
-    if (tsk.initial_task.ptr().list.isEmpty())
-        return;
     const flags = arch.cpu.saveFlagsAndCli();
     defer arch.cpu.restoreFlags(flags);
     processTasks();

@@ -55,7 +55,7 @@ pub const Logger = struct {
         };
         const lock_state = log_lock.lock_irq_disable();
         defer log_lock.unlock_irq_enable(lock_state);
-        
+
         const formatted_log = std.fmt.bufPrint(
             buf[0..],
             "{s}[{t}]: " ++

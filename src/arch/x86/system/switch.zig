@@ -4,6 +4,7 @@ const gdt = @import("../gdt.zig");
 const idt = @import("../idt.zig");
 const vmm = @import("../mm/vmm.zig");
 const fpu = @import("../fpu.zig");
+const smp = @import("../smp/main.zig");
 
 // switch_to(prev_save: *u32, next_sp: u32)
 //
@@ -91,7 +92,6 @@ pub fn contextSwitch(prev: *tsk.Task, next: *tsk.Task) void {
         }
         prev.save_fpu_state = false;
     }
-    tsk.current_task.set(next);
     if (next == tsk.initial_task.ptr()) {
         gdt.tss.ptr().esp0 = krn.task.stack_top.get();
     } else {
@@ -105,5 +105,6 @@ pub fn contextSwitch(prev: *tsk.Task, next: *tsk.Task) void {
         next.tls_access,
         next.tls_gran,
     );
+    tsk.current_task.set(next);
     switch_to(&prev.kernel_esp, next.kernel_esp);
 }
