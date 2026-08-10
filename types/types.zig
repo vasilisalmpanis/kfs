@@ -887,6 +887,11 @@ pub const kernel = struct {
             prev : ?*kernel.tree.TreeNode= null,
         };
 
+        pub const TreeIterator = struct {
+            root : *kernel.tree.TreeNode,
+            next_node : ?*kernel.tree.TreeNode,
+        };
+
         pub const Iterator = struct {
             curr : *kernel.tree.TreeNode,
             head : ?*kernel.tree.TreeNode,

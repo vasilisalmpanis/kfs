@@ -96,8 +96,46 @@ pub const TreeNode = struct {
         return Iterator.init(self);
     }
 
+    pub fn treeIterator(self: *TreeNode) TreeIterator {
+        return TreeIterator.init(self);
+    }
+
     pub fn entry(self: *TreeNode, comptime T: type, comptime member: []const u8) *T {
         return @alignCast(@fieldParentPtr(member, self));
+    }
+};
+
+pub const TreeIterator = struct {
+    root: *TreeNode,
+    next_node: ?*TreeNode,
+
+    pub fn init(root: *TreeNode) TreeIterator {
+        return .{
+            .root = root,
+            .next_node = root.child,
+        };
+    }
+
+    pub fn next(self: *TreeIterator) ?*TreeNode {
+        const current = self.next_node orelse
+            return null;
+
+        if (current.child) |child| {
+            self.next_node = child;
+            return current;
+        }
+
+        var node = current;
+        self.next_node = null;
+        while (node != self.root) {
+            const parent = node.parent.?;
+            if (node.next.? != parent.child.?) {
+                self.next_node = node.next;
+                break;
+            }
+            node = parent;
+        }
+        return current;
     }
 };
 
@@ -148,3 +186,33 @@ pub const Iterator = struct {
         }
     }
 };
+
+test "descendants iterator traverses depth first" {
+    const testing = @import("std").testing;
+
+    var nodes: [6]TreeNode = .{TreeNode.init()} ** 6;
+    for (&nodes) |*node| {
+        node.setup();
+    }
+
+    nodes[0].addChild(&nodes[1]);
+    nodes[0].addChild(&nodes[2]);
+    nodes[1].addChild(&nodes[3]);
+    nodes[1].addChild(&nodes[4]);
+    nodes[2].addChild(&nodes[5]);
+
+    const expected = [_]*TreeNode{
+        &nodes[1],
+        &nodes[3],
+        &nodes[4],
+        &nodes[2],
+        &nodes[5],
+    };
+    var index: usize = 0;
+    var it = nodes[0].treeIterator();
+    while (it.next()) |node| : (index += 1) {
+        try testing.expect(index < expected.len);
+        try testing.expectEqual(expected[index], node);
+    }
+    try testing.expectEqual(expected.len, index);
+}
