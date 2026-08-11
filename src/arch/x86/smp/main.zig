@@ -9,7 +9,7 @@ const std = @import("std");
 pub const PerCpu = percpu.PerCpu;
 
 pub var boot_cpu_apicid: u32 = 0xFFFFFFFF;
-pub var cpu_count: usize = 0;
+pub var cpu_count: usize = 1;
 pub var smp_enabled: bool = false;
 
 pub const logical_id = PerCpu(u32, 0xFFFFFFFF, opaque{});
@@ -17,6 +17,8 @@ pub const physical_id = PerCpu(u32, 0xFFFFFFFF, opaque{});
 
 pub var cpu_logical_ids: std.AutoHashMap(u32, u32) = undefined;
 pub var cpus_online: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
+
+var lapic_ticks_per_jiffies: u32 = 0;
 
 const APIC_ID: u32 = 0x20 / 4;
 
@@ -42,6 +44,9 @@ const APIC_LDR: u32             = 0xD0 / 4;
 const APIC_DFR: u32             = 0xE0 / 4;
 
 const APIC_TIMER_PERIODIC: u32 = 0x20000;
+const LVT_MASKED: u32 = 0x10000;
+const TMRDIV_BY_16: u32 = 0x3;
+const DEFAULT_TMRINITCNT: u32 = 100_000;
 
 const DELIVERY_STATUS: u32 = 1 << 12; // ICR low bit 12: send pending
 
@@ -87,11 +92,41 @@ fn setup_trampoline() void {
     @memcpy(dest[0..size], trampoline[0..size]);
 }
 
+fn calibrateApicTimer() void {
+    enable_apic();
+    apic_regs[APIC_TMRDIV]     = TMRDIV_BY_16;
+    apic_regs[APIC_LVT_TMR]    = LVT_MASKED;
+    apic_regs[APIC_TMRINITCNT] = 0xFFFFFFFF;
+
+    pit.setupPit2();
+    const p_start = pit.readPit2();
+    const a_start = apic_regs[APIC_TMRCURRCNT];
+
+    // ~30 ms
+    while (((@as(u32, p_start) -% @as(u32, pit.readPit2())) & 0xFFFF) < 35_000) {}
+
+    const a_end = apic_regs[APIC_TMRCURRCNT];
+    const p_end = pit.readPit2();
+
+    const p_ticks: u32 = (@as(u32, p_start) -% @as(u32, p_end)) & 0xFFFF;
+    const apic_elapsed: u64 = @as(u64, a_start) - @as(u64, a_end);
+    const us: u64 = @as(u64, p_ticks) * 1_000_000 / pit.CLOCK_FREQ;
+    if (us == 0)
+        return;
+    const per_sec: u64 = apic_elapsed * 1_000_000 / us;
+    lapic_ticks_per_jiffies = @intCast(per_sec / pit.HZ);
+    if (lapic_ticks_per_jiffies == 0)
+        lapic_ticks_per_jiffies = 1;
+}
+
 fn setupTimer() void {
     enable_apic();
-    apic_regs[APIC_LVT_TMR] = 0x20 | APIC_TIMER_PERIODIC;
-    apic_regs[APIC_TMRDIV] = 0x3;
-    apic_regs[APIC_TMRINITCNT] = 100;
+    apic_regs[APIC_LVT_TMR] = arch.idt.TIMER_INTERRUPT | APIC_TIMER_PERIODIC;
+    apic_regs[APIC_TMRDIV] = TMRDIV_BY_16;
+    apic_regs[APIC_TMRINITCNT] = if (lapic_ticks_per_jiffies == 0)
+        DEFAULT_TMRINITCNT
+    else
+        lapic_ticks_per_jiffies;
 }
 
 // If we reach idle that means we have no tasks to run
@@ -262,6 +297,7 @@ pub fn countCPUs(madt: *apic.MADT) usize {
 }
 
 pub fn init() void {
+    logical_id.set(0);
     const rsdt = acpi.rsdt orelse
         return ;
     const apic_header = rsdt.getEntery("APIC") orelse
@@ -276,9 +312,12 @@ pub fn init() void {
         apic_base,
         1,
         .{ .present = true, .writable = true, .cache_disable = true}
-    ) catch
+    ) catch {
+        cpu_count = 1;
         return;
+    };
     apic_regs = @ptrFromInt(apic_page);
+    calibrateApicTimer();
     setupTimer();
 
     boot_cpu_apicid = cpuID();
@@ -286,6 +325,7 @@ pub fn init() void {
 
     logicalIdsSetup(madt) catch |e| {
         krn.logger.WARN("SMP: failure to create logical cpu ids map {any}", .{e});
+        cpu_count = 1;
         return;
     };
 
@@ -296,10 +336,10 @@ pub fn init() void {
 
     percpu.initPerCPUMemory() catch |e| {
         krn.logger.INFO("SMP: Cannot bring up secondary cores {any}", .{e});
+        cpu_count = 1;
         return;
     };
 
-    logical_id.set(0);
     physical_id.set(boot_cpu_apicid);
 
     var madt_entry: ?*apic.MADTEntry = null;

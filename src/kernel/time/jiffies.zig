@@ -1,10 +1,13 @@
+const std = @import("std");
 const drivers = @import("drivers");
 const krn = @import("../main.zig");
 const vdso = @import("../vdso.zig");
+const arch = @import("arch");
+
 pub var jiffies: u32 = 0;
-pub var cpu_user_ticks: u64 = 0;
-pub var cpu_system_ticks: u64 = 0;
-pub var cpu_idle_ticks: u64 = 0;
+pub const cpu_user_ticks = arch.smp.PerCpu(u64, 0, opaque {});
+pub const cpu_system_ticks = arch.smp.PerCpu(u64, 0, opaque {});
+pub const cpu_idle_ticks = arch.smp.PerCpu(u64, 0, opaque {});
 
 pub const CpuTicks = struct {
     user: u64,
@@ -12,36 +15,61 @@ pub const CpuTicks = struct {
     idle: u64,
 };
 
-var fb_counter: u8 = 0;
+var fb_counter: u32 = 0;
 var hz_counter: u32 = 0;
 
-pub fn timerHandler() void {
-    jiffies += 1;
-    fb_counter += 1;
-    hz_counter += 1;
+var boot_tsc: u64 = 0;
+var cycles_per_tick: u64 = 0;
 
+pub fn initTimebase() void {
+    cycles_per_tick = drivers.pit.tsc_per_ms * 1000 / drivers.pit.HZ;
+    boot_tsc = arch.cpu.rdtsc();
+}
+
+pub fn accountTick(regs: *arch.Regs) void {
     const current = krn.task.current();
     if (current == krn.task.initial_task.ptr()) {
-        cpu_idle_ticks += 1;
-    } else if (current.regs.isRing3()) {
-        cpu_user_ticks += 1;
+        cpu_idle_ticks.ptr().* += 1;
+    } else if (regs.isRing3()) {
+        cpu_user_ticks.ptr().* += 1;
         current.utime += 1;
     } else {
-        cpu_system_ticks += 1;
+        cpu_system_ticks.ptr().* += 1;
         current.stime += 1;
     }
+}
 
-    if (hz_counter == drivers.pit.HZ) {
-        hz_counter = 0;
-        // Every second
-        if (krn.cmos_ready.*) {
-            krn.cmos.incSec(krn.cmos);
-        }
-        vdso.updateTime(1, 0);
-    } else {
-        vdso.updateTime(0, @intCast(drivers.pit.ns_in_one_tick));
+pub fn timerHandler() void {
+    if (arch.smp.logical_id.get() != 0)
+        return ;
+
+    if (cycles_per_tick == 0) {
+        jiffies += 1;
+        return ;
     }
-    if (fb_counter == 30) {
+
+    const now: u32 = @truncate((arch.cpu.rdtsc() -% boot_tsc) / cycles_per_tick);
+    const prev = jiffies;
+    jiffies = now;
+    const elapsed: u32 = now -% prev;
+    if (elapsed == 0)
+        return ;
+
+    hz_counter += elapsed;
+    if (hz_counter >= drivers.pit.HZ) {
+        const seconds = hz_counter / drivers.pit.HZ;
+        hz_counter %= drivers.pit.HZ;
+        if (krn.cmos_ready.*) {
+            for (0..seconds) |_|
+                krn.cmos.incSec(krn.cmos);
+        }
+        vdso.updateTime(@intCast(seconds), 0);
+    } else {
+        vdso.updateTime(0, @intCast(elapsed * drivers.pit.ns_in_one_tick));
+    }
+
+    fb_counter += elapsed;
+    if (fb_counter >= 30) {
         fb_counter = 0;
         if (krn.screen.framebuffer.has_dirty)
             drivers.framebuffer.render_queue.wakeUpOne();
@@ -53,8 +81,9 @@ pub fn getSecondsFromStart() u32 {
 }
 
 pub fn getTimeFromStart() krn.time.kernel_timespec {
-    const seconds: i32 = @intCast(jiffies / drivers.pit.HZ);
-    const sub_jiffies: u32 = jiffies % drivers.pit.HZ;
+    const _jiffies = jiffies;
+    const seconds: i32 = @intCast(_jiffies / drivers.pit.HZ);
+    const sub_jiffies: u32 = _jiffies % drivers.pit.HZ;
     const nanoseconds: i32 = @intCast(sub_jiffies * (1_000_000_000 / drivers.pit.HZ));
     return krn.time.kernel_timespec{
         .tv_sec = seconds,
@@ -71,9 +100,17 @@ pub fn currentMs() u32 {
 }
 
 pub fn getCpuTicks() CpuTicks {
+    var _cpu_user_ticks: u64 = 0;
+    var _cpu_system_ticks: u64 = 0;
+    var _cpu_idle_ticks: u64 = 0;
+    for (0..arch.smp.cpu_count) |logical_id| {
+        _cpu_user_ticks += cpu_user_ticks.ptrOn(logical_id).*;
+        _cpu_idle_ticks += cpu_idle_ticks.ptrOn(logical_id).*;
+        _cpu_system_ticks += cpu_system_ticks.ptrOn(logical_id).*;
+    }
     return .{
-        .user = cpu_user_ticks,
-        .system = cpu_system_ticks,
-        .idle = cpu_idle_ticks,
+        .user = _cpu_user_ticks,
+        .system = _cpu_system_ticks,
+        .idle = _cpu_idle_ticks,
     };
 }

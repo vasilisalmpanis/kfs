@@ -211,6 +211,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.serial.print("[INIT]: SMP done\n");
     fpu.setTaskSwitched();
     irq.mapAll();
+    krn.jiffies.initTimebase();
     cpu.enableInterrupts();
     krn.serial.print("[INIT]: Interrupts are enabled\n");
     dbg.initSymbolTable(&krn.boot_info);

@@ -12,7 +12,7 @@ pub var args: [arch.IDT_MAX_DESCRIPTORS] ?*anyopaque = .{null} ** arch.IDT_MAX_D
 
 pub fn mapAll() void {
     if (arch.smp.ioapic.controller) |*cntr| {
-        for (0..arch.IDT_MAX_DESCRIPTORS - arch.CPU_EXCEPTION_COUNT) |irq_num| {
+        for (1..arch.IDT_MAX_DESCRIPTORS - arch.CPU_EXCEPTION_COUNT) |irq_num| {
             if (handlers[irq_num + arch.CPU_EXCEPTION_COUNT] != null)
                 cntr.setIRQ(
                     irq_num,

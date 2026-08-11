@@ -80,8 +80,10 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
 
     smp.apicEOI();
 
-    if (state.int_no == TIMER_INTERRUPT)
+    if (state.int_no == TIMER_INTERRUPT) {
+        krn.jiffies.accountTick(state);
         krn.sched.schedule();
+    }
 
     _ = processSignalsHelper(state);
 

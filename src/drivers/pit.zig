@@ -1,16 +1,21 @@
 const io = @import("arch").io;
-const krn = @import("kernel");
+const cpu = @import("arch").cpu;
 
 pub var HZ: u32 = 1000;
 pub var ns_in_one_tick: u32 = undefined;
 
+pub const CLOCK_FREQ: u32 = 1193182;
+
+pub var tsc_per_ms: u64 = 0;
+
 pub const PIT = struct {
-    clock_freq: u32 = 1193182,
+    clock_freq: u32 = CLOCK_FREQ,
 
     pub fn init(frequency: u32) PIT {
         var pit = PIT{};
         pit.setFrequency(frequency);
         calibrate();
+        calibrateTsc();
         return pit;
     }
 
@@ -94,7 +99,7 @@ pub fn mdelay(ms: u32) void {
 
 // --- calibration via PIT channel 2 (no interrupts required) ---
 
-fn setupPit2() void {
+pub fn setupPit2() void {
     // Speaker off (bit1=0), gate on (bit0=1) so channel 2 actually counts.
     const p: u8 = (io.inb(0x61) & 0xFC) | 0x01;
     io.outb(0x61, p);
@@ -106,7 +111,7 @@ fn setupPit2() void {
     io.outb(0x42, 0xFF);
 }
 
-fn readPit2() u16 {
+pub fn readPit2() u16 {
     io.outb(0x43, 0x80); // counter-latch, channel 2
     const lo: u16 = @as(u16, io.inb(0x42));
     const hi: u16 = @as(u16, io.inb(0x42));
@@ -126,11 +131,29 @@ pub fn calibrate() void {
         const ticks: u32 = (@as(u32, start) -% @as(u32, end)) & 0xFFFF;
         // Big enough sample to be accurate, small enough to not wrap (~54 ms).
         if (ticks >= 10_000) {
-            const time_us: u64 = @as(u64, ticks) * 1_000_000 / krn.pit.clock_freq;
+            const time_us: u64 = @as(u64, ticks) * 1_000_000 / CLOCK_FREQ;
             if (time_us != 0)
                 loops_per_us = @intCast(@as(u64, loops) / time_us);
             break;
         }
     }
     if (loops_per_us == 0) loops_per_us = 1;
+}
+
+pub fn calibrateTsc() void {
+    setupPit2();
+    const p_start = readPit2();
+    const t_start = cpu.rdtsc();
+
+    while (((@as(u32, p_start) -% @as(u32, readPit2())) & 0xFFFF) < 35_000) {}
+
+    const t_end = cpu.rdtsc();
+    const p_end = readPit2();
+
+    const p_ticks: u64 = (@as(u32, p_start) -% @as(u32, p_end)) & 0xFFFF;
+    const time_us: u64 = p_ticks * 1_000_000 / CLOCK_FREQ;
+    if (time_us != 0)
+        tsc_per_ms = (t_end -% t_start) * 1_000 / time_us;
+    if (tsc_per_ms == 0)
+        tsc_per_ms = 1;
 }

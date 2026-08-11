@@ -272,6 +272,17 @@ pub fn rdmsr(register: u32) u64 {
     return (@as(u64, edx) << 32) | @as(u64, eax);
 }
 
+pub inline fn rdtsc() u64 {
+    var low: u32 = 0;
+    var high: u32 = 0;
+    asm volatile (
+        \\ rdtsc
+        :   [low] "={eax}" (low),
+            [high] "={edx}" (high),
+    );
+    return (@as(u64, high) << 32) | @as(u64, low);
+}
+
 pub inline fn halt() void {
     asm volatile ("hlt");
 }
