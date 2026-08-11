@@ -117,19 +117,47 @@ pub const Controller = struct {
         self.write(low_reg, @truncate(raw));
     }
 
-    pub fn maskIrq(self: *Controller, irq: u32, vector: u8) !void {
-        if (irq >= self.gsi_base and irq < self.gsi_base + self.redir_entr_count) {
-            const pin = irq - self.gsi_base;
-            self.setRoute(
-                pin,
-                vector,
-                false,
-                false,
-                true,
-            );
-            return;
+    const ResolvedIrq = struct {
+        pin: u32,
+        active_low: bool,
+        level_triggered: bool,
+    };
+
+    fn resolve(self: *const Controller, irq: u32) !ResolvedIrq {
+        var gsi: u32 = irq;
+        var active_low: bool = false;
+        var level_triggered: bool = false;
+
+        if (gsi < overrides.len) {
+            if (overrides[gsi]) |ovr| {
+                gsi = ovr.gsi;
+                active_low = ovr.active_low;
+                level_triggered = ovr.level_triggered;
+            }
         }
-        return krn.errors.PosixError.EINVAL;
+
+        if (gsi < self.gsi_base)
+            return krn.errors.PosixError.EINVAL;
+        const pin = gsi - self.gsi_base;
+        if (pin >= self.redir_entr_count)
+            return krn.errors.PosixError.EINVAL;
+
+        return .{
+            .pin = pin,
+            .active_low = active_low,
+            .level_triggered = level_triggered,
+        };
+    }
+
+    pub fn maskIrq(self: *Controller, irq: u32, vector: u8) !void {
+        const res = try self.resolve(irq);
+        self.setRoute(
+            res.pin,
+            vector,
+            res.active_low,
+            res.level_triggered,
+            true,
+        );
     }
 
     pub fn maskAll(self: *Controller) void {
@@ -144,29 +172,12 @@ pub const Controller = struct {
 
 
     pub fn setIRQ(self: *Controller, irq: u32, vector: u8) !void {
-        var gsi: u32 = irq;
-        if (gsi < self.gsi_base)
-            return krn.errors.PosixError.EINVAL;
-        if (gsi >= self.gsi_base + self.redir_entr_count)
-            return krn.errors.PosixError.EINVAL;
-
-        var level_triggered: bool = false;
-        var active_low: bool = false;
-        const pin = gsi - self.gsi_base;
-
-        if (gsi < overrides.len) {
-            if (overrides[gsi]) |ovr| {
-                gsi = ovr.gsi;
-                active_low = ovr.active_low;
-                level_triggered = ovr.level_triggered;
-            }
-        }
-
+        const res = try self.resolve(irq);
         self.setRoute(
-            pin,
+            res.pin,
             vector,
-            active_low,
-            level_triggered,
+            res.active_low,
+            res.level_triggered,
             false
         );
     }

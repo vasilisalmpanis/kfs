@@ -1166,6 +1166,11 @@ pub const kernel = struct {
     };
 
     pub const jiffies = struct {
+        pub const cpu_user_ticks = struct {
+        };
+
+
+
         pub const CpuTicks = struct {
             user : u64,
             system : u64,
