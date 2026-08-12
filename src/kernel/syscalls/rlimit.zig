@@ -45,10 +45,9 @@ pub fn prlimit(pid: i32,
     if (pid != 0) {
         const lock_state = kernel.task.tasks_lock.lock_irq_disable();
         defer kernel.task.tasks_lock.unlock_irq_enable(lock_state);
-        // TODO: iterate over all tasks, not only one core list
-        var it = kernel.task.initial_task.ptr().list.iterator();
+        var it = kernel.task.initial_task.ptr().tree.treeIterator();
         while (it.next()) |node| {
-            const curr_task: *Task = node.curr.entry(Task, "list");
+            const curr_task: *Task = node.entry(Task, "tree");
             if (curr_task.pid == pid) {
                 curr_task.refcount.get();
                 task = curr_task;

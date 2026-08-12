@@ -33,14 +33,14 @@ fn printTask(task: *tsk.Task) void {
 }
 
 pub fn ps() void {
-    var it = tsk.initial_task.ptr().list.iterator();
+    var it = tsk.initial_task.ptr().tree.treeIterator();
     while (it.next()) |i| {
-        printTask(i.curr.entry(tsk.Task, "list"));
+        printTask(i.entry(tsk.Task, "tree"));
     }
     if (tsk.stopped_tasks) |stopped| {
         printf("===STOPPED===\n", .{});
-        it = stopped.iterator();
-        while (it.next()) |i| {
+        var _it = stopped.iterator();
+        while (_it.next()) |i| {
             printTask(i.curr.entry(tsk.Task, "list"));
         }
     }

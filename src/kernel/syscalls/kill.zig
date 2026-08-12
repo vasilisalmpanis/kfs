@@ -49,7 +49,6 @@ pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
         const lock_state = tsk.tasks_lock.lock_irq_disable();
         defer tsk.tasks_lock.unlock_irq_enable(lock_state);
 
-        // TODO: iterate over all tasks, not only one core list
         var it = tsk.initial_task.ptrOn(0).tree.treeIterator();
         var count: i32 = 0;
         const pgroup: u32 = if (pid < -1) @intCast(-pid) else tsk.current().pgid;
@@ -65,7 +64,6 @@ pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
         const lock_state = tsk.tasks_lock.lock_irq_disable();
         defer tsk.tasks_lock.unlock_irq_enable(lock_state);
 
-        // TODO: iterate over all tasks, not only one core list
         var it = tsk.initial_task.ptrOn(0).tree.treeIterator();
         var count: i32 = 0;
         while (it.next()) |i| {
