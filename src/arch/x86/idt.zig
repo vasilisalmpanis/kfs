@@ -13,10 +13,12 @@ const fpu = @import("fpu.zig");
 const smp = @import("./smp/main.zig");
 
 pub const IDT_MAX_DESCRIPTORS   = 256;
+pub const MAX_SYSTEM_INTERRUPTS = 240;
 pub const CPU_EXCEPTION_COUNT   = 32;
 
 pub const SYSCALL_INTERRUPT = 0x80;
 pub const TIMER_INTERRUPT   = 0x20;
+pub const TLB_INTERRUPT     = 0xF0;
 
 pub const KERNEL_CODE_SEGMENT   = 0x08;
 pub const KERNEL_DATA_SEGMENT   = 0x10;
@@ -78,14 +80,16 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
         }
     }
 
-    smp.apicEOI();
+    if (state.int_no < MAX_SYSTEM_INTERRUPTS) {
+        smp.apicEOI();
 
-    if (state.int_no == TIMER_INTERRUPT) {
-        krn.jiffies.accountTick(state);
-        krn.sched.schedule();
+        if (state.int_no == TIMER_INTERRUPT) {
+            krn.jiffies.accountTick(state);
+            krn.sched.schedule();
+        }
+
+        _ = processSignalsHelper(state);
     }
-
-    _ = processSignalsHelper(state);
 
     return state;
 }
@@ -351,7 +355,10 @@ pub fn idtInit() void {
         idtSetDescriptor(
             @intCast(index),
             isr_stub_table[index],
-            if (index < CPU_EXCEPTION_COUNT) 0x8E else 0xEE
+            if (index < CPU_EXCEPTION_COUNT or index == TLB_INTERRUPT)
+                0x8E
+            else
+                0xEE
         );
     }
     idtLoad();

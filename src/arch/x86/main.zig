@@ -24,6 +24,7 @@ pub const isPageAligned = @import("mm/pmm.zig").isPageAligned;
 
 pub const PAGE_SIZE = @import("mm/pmm.zig").PAGE_SIZE;
 pub const IDT_MAX_DESCRIPTORS = @import("idt.zig").IDT_MAX_DESCRIPTORS;
+pub const MAX_SYSTEM_INTERRUPTS = @import("idt.zig").MAX_SYSTEM_INTERRUPTS;
 pub const CPU_EXCEPTION_COUNT = @import("idt.zig").CPU_EXCEPTION_COUNT;
 pub const SYSCALL_INTERRUPT = @import("idt.zig").SYSCALL_INTERRUPT;
 

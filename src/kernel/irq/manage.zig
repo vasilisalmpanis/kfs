@@ -12,7 +12,7 @@ pub var args: [arch.IDT_MAX_DESCRIPTORS] ?*anyopaque = .{null} ** arch.IDT_MAX_D
 
 pub fn mapAll() void {
     if (arch.smp.ioapic.controller) |*cntr| {
-        for (1..arch.IDT_MAX_DESCRIPTORS - arch.CPU_EXCEPTION_COUNT) |irq_num| {
+        for (1..arch.MAX_SYSTEM_INTERRUPTS - arch.CPU_EXCEPTION_COUNT) |irq_num| {
             if (handlers[irq_num + arch.CPU_EXCEPTION_COUNT] != null)
                 cntr.setIRQ(
                     irq_num,
@@ -23,7 +23,7 @@ pub fn mapAll() void {
 }
 
 pub fn registerHandler(irq_num: u32, hndl: *const ISRHandler, arg: ?*anyopaque) callconv(.c) void {
-    if (irq_num >= arch.IDT_MAX_DESCRIPTORS - arch.CPU_EXCEPTION_COUNT)
+    if (irq_num >= arch.MAX_SYSTEM_INTERRUPTS - arch.CPU_EXCEPTION_COUNT)
         @panic("Wrong IRQ number provided");
     handlers[irq_num + arch.CPU_EXCEPTION_COUNT] = hndl;
     args[irq_num + arch.CPU_EXCEPTION_COUNT] = arg;
@@ -37,7 +37,7 @@ pub fn registerHandler(irq_num: u32, hndl: *const ISRHandler, arg: ?*anyopaque) 
 }
 
 pub fn unregisterHandler(irq_num: u32) callconv(.c) void {
-    if (irq_num >= arch.IDT_MAX_DESCRIPTORS - arch.CPU_EXCEPTION_COUNT)
+    if (irq_num >= arch.MAX_SYSTEM_INTERRUPTS - arch.CPU_EXCEPTION_COUNT)
         @panic("Wrong IRQ number provided");
     handlers[irq_num + arch.CPU_EXCEPTION_COUNT] = null;
     args[irq_num + arch.CPU_EXCEPTION_COUNT] = null;
@@ -48,6 +48,12 @@ pub fn unregisterHandler(irq_num: u32) callconv(.c) void {
                 @intCast(arch.CPU_EXCEPTION_COUNT + irq_num)
             ) catch {};
     }
+}
+
+pub fn registerIPIHandler(raw_irq_num: u32) callconv(.c) void {
+    if (raw_irq_num < arch.MAX_SYSTEM_INTERRUPTS)
+        @panic("Wrong IRQ number provided");
+
 }
 
 pub fn registerExceptionHandler(int_num: u32, hndl: *const ExceptionHandler) void {
