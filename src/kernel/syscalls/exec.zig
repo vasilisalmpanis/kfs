@@ -174,6 +174,7 @@ pub fn doExecve(
     }
 
     krn.task.current().setName(file.path.?.dentry.name); // TODO: make copy of filename and set name only if we will execute
+    // TODO: KIll other threads and only proceed when they have already finished
 
     if (krn.task.current().mm) |_mm| {
         const old_mm = _mm;

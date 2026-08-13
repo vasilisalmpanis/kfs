@@ -80,16 +80,12 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
         }
     }
 
-    if (state.int_no < MAX_SYSTEM_INTERRUPTS) {
-        smp.apicEOI();
-
-        if (state.int_no == TIMER_INTERRUPT) {
-            krn.jiffies.accountTick(state);
-            krn.sched.schedule();
-        }
-
-        _ = processSignalsHelper(state);
+    smp.apicEOI();
+    if (state.int_no == TIMER_INTERRUPT) {
+        krn.jiffies.accountTick(state);
+        krn.sched.schedule();
     }
+    _ = processSignalsHelper(state);
 
     return state;
 }

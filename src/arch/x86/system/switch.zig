@@ -97,6 +97,10 @@ pub fn contextSwitch(prev: *tsk.Task, next: *tsk.Task) void {
     } else {
         gdt.tss.ptr().esp0 = next.stack_bottom + krn.STACK_SIZE;
     }
+    if (prev.mm) |_mm| {
+        _mm.cpus_cores.unset(smp.logical_id.get());
+    }
+
     vmm.switchToVAS(next.mm.?.vas);
 
     gdt.gdt_entries.ptr()[next.tls_entry_number].set(
@@ -106,5 +110,8 @@ pub fn contextSwitch(prev: *tsk.Task, next: *tsk.Task) void {
         next.tls_gran,
     );
     tsk.current_task.set(next);
+    if (next.mm) |_mm| {
+        _mm.cpus_cores.set(smp.logical_id.get());
+    }
     switch_to(&prev.kernel_esp, next.kernel_esp);
 }

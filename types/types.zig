@@ -734,6 +734,7 @@ pub const arch = struct {
 
 
         pub extern fn apMain()noreturn;
+        pub extern fn shootdownTLB()void;
     };
 
 };
@@ -806,6 +807,7 @@ pub const kernel = struct {
                 brk : u32= 0,
                 vas : u32= 0,
                 vmas : ?*kernel.mm.proc_mm.VMA= null,
+                cpus_cores : std.bit_set.IntegerBitSet(32),
                 ref : kernel.RefCount,
             };
 
@@ -824,6 +826,7 @@ pub const kernel = struct {
     pub const irq = struct {
         pub extern fn registerHandler(u32, *const anyopaque, ?*anyopaque)void;
         pub extern fn unregisterHandler(u32)void;
+        pub extern fn registerIPIHandler(u32, *const anyopaque)void;
     };
 
     pub const exceptions = struct {

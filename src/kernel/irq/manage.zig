@@ -50,10 +50,16 @@ pub fn unregisterHandler(irq_num: u32) callconv(.c) void {
     }
 }
 
-pub fn registerIPIHandler(raw_irq_num: u32) callconv(.c) void {
-    if (raw_irq_num < arch.MAX_SYSTEM_INTERRUPTS)
+pub fn registerIPIHandler(raw_irq_num: u32, hndl: *const ISRHandler) callconv(.c) void {
+    if (raw_irq_num < arch.MAX_SYSTEM_INTERRUPTS or raw_irq_num >= arch.idt.IDT_MAX_DESCRIPTORS)
         @panic("Wrong IRQ number provided");
+    handlers[raw_irq_num] = hndl;
+}
 
+pub fn unregisterIPIHandler(raw_irq_num: u32) void {
+    if (raw_irq_num < arch.MAX_SYSTEM_INTERRUPTS or raw_irq_num >= arch.idt.IDT_MAX_DESCRIPTORS)
+        @panic("Wrong IRQ number provided");
+    handlers[raw_irq_num] = null;
 }
 
 pub fn registerExceptionHandler(int_num: u32, hndl: *const ExceptionHandler) void {

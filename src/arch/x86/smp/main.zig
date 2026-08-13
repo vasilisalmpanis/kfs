@@ -67,6 +67,32 @@ fn enable_apic() void {
     apic_regs[APIC_TPR] = 0x0;
 }
 
+pub fn sendIPIMaskButSelf(
+    set: std.bit_set.IntegerBitSet(32),
+    vector: u8
+) void {
+    var it = set.iterator(.{ .direction = .forward, .kind = .set });
+    const current_id = logical_id.get();
+    while (it.next()) |_logical_id| {
+        if (_logical_id ==  current_id)
+            continue;
+        sendIPI(physical_id.ptrOn(_logical_id).*, vector);
+    }
+}
+
+pub fn sendIPIAllButSelf(vector: u8) void {
+    for (0..cpu_count) |_logical_id| {
+        sendIPI(physical_id.ptrOn(_logical_id).*, vector);
+    }
+}
+
+pub fn sendIPI(apic_id: u32, vector: u8) void {
+    waitCPU();
+    apic_regs[ICR_HIGH] = @as(u32, apic_id) << 24;
+    apic_regs[ICR_LOW] = @as(u32, vector) | LEVEL_ASSERT;
+    waitCPU();
+}
+
 pub fn waitCPU() void {
     while ((apic_regs[ICR_LOW] & DELIVERY_STATUS) != 0) {}
 }
@@ -296,6 +322,10 @@ pub fn countCPUs(madt: *apic.MADT) usize {
     return cpus;
 }
 
+pub export fn shootdownTLB() void {
+    arch.vmm.switchToVAS(arch.vmm.getCR3());
+}
+
 pub fn init() void {
     logical_id.set(0);
     const rsdt = acpi.rsdt orelse
@@ -378,4 +408,6 @@ pub fn init() void {
     smp_enabled = true;
     krn.logger.INFO("Number of online cpus {d}\n", .{cpus_online.load(.seq_cst)});
     cpu_logical_ids.deinit();
+
+    krn.irq.registerIPIHandler(arch.idt.TLB_INTERRUPT, shootdownTLB);
 }

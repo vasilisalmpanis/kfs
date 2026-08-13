@@ -1,3 +1,5 @@
+const smp = @import("../smp/main.zig");
+const idt = @import("../idt.zig");
 const printf = @import("debug").printf;
 const PMM = @import("./pmm.zig").PMM;
 const krn = @import("kernel");
@@ -33,13 +35,19 @@ pub const current_page_dir: [*]PageEntry = @ptrFromInt(0xFFFFF000);
 pub const first_page_table: [*]PageEntry = @ptrFromInt(0xFFC00000);
 
 pub inline fn switchToVAS(vas: u32) void {
-    asm volatile("mov %[pd], %cr3"::[pd] "r" (vas));
+    asm volatile(
+        "mov %[pd], %cr3"
+        :
+        :[pd] "r" (vas),
+        : .{ .memory = true }
+    );
 }
 
 pub inline fn invalidatePage(page: usize) void {
     asm volatile ("invlpg (%eax)"
         :
         : [pg] "{eax}" (page),
+        : .{ .memory = true }
     );
 }
 
@@ -195,10 +203,13 @@ pub const VMM = struct {
         const pt_index = (virt >> 12) & 0x3FF;
         const pt: [*]PageEntry = first_page_table + (0x400 * pd_index);
         const pfn: u32 = @as(u32, pt[pt_index].address) << 12;
-        if (free_pfn)
-            self.pmm.freePage(pfn);
         pt[pt_index].erase();
         invalidatePage(virt);
+        smp.sendIPIAllButSelf(
+            idt.TLB_INTERRUPT
+        );
+        if (free_pfn)
+            self.pmm.freePage(pfn);
     }
 
     pub fn mapPage(
@@ -435,16 +446,31 @@ pub const VMM = struct {
             for (pt_start_idx .. pt_end) |pt_idx| {
                 if (pt[pt_idx] != 0) {
                     const phys: u32 = (pt[pt_idx] >> 12) << 12;
-                    self.pmm.freePage(phys);
                     pt[pt_idx] = 0; // Clear the PTE
+                    invalidatePage(
+                        self.pageTableToAddr(pd_idx, pt_idx),
+                    );
+                    if (krn.task.current().mm) |_mm| {
+                        smp.sendIPIMaskButSelf(
+                            _mm.cpus_cores,
+                            idt.TLB_INTERRUPT
+                        );
+                    }
+                    self.pmm.freePage(phys);
                 }
             }
             if (std.mem.allEqual(u32, pt[0..1024], 0)) {
-                self.pmm.freePage((pd[pd_idx] >> 12) << 12);
                 pd[pd_idx] = 0;
                 invalidatePage(
                     self.pageTableToAddr(pd_idx, 0)
                 );
+                if (krn.task.current().mm) |_mm| {
+                    smp.sendIPIMaskButSelf(
+                        _mm.cpus_cores,
+                        idt.TLB_INTERRUPT
+                    );
+                }
+                self.pmm.freePage((pd[pd_idx] >> 12) << 12);
             }
 
             pt_start_idx = 0;

@@ -3,6 +3,7 @@ const mm = @import("init.zig");
 const arch = @import("arch");
 const errors = @import("../syscalls/error-codes.zig").PosixError;
 const krn = @import("../main.zig");
+const std = @import("std");
 
 const STACK_SIZE = mm.PAGE_SIZE * 2000;
 const STACK_TOP = mm.PAGE_OFFSET;
@@ -216,6 +217,7 @@ pub const MM = struct {
     brk: usize = 0,
     vas: usize = 0,
     vmas: ?*VMA = null,
+    cpus_cores: std.bit_set.IntegerBitSet(32) = std.bit_set.IntegerBitSet(32).initEmpty(),
     ref: krn.RefCount = krn.RefCount.init(),
 
     pub fn init() MM {
@@ -225,6 +227,7 @@ pub const MM = struct {
             .stack_top = STACK_TOP,
             .stack_bottom = STACK_BOTTOM,
             .vmas = null,
+            .cpus_cores = std.bit_set.IntegerBitSet(32).initEmpty(),
         };
         _mm.ref.get();
         _mm.ref.dropFn = MM.release;
