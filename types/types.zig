@@ -811,6 +811,7 @@ pub const kernel = struct {
                 brk_start : u32= 0,
                 brk : u32= 0,
                 vas : u32= 0,
+                lock : kernel.Spinlock,
                 vmas : ?*kernel.mm.proc_mm.VMA= null,
                 cpus_cores : std.bit_set.IntegerBitSet(32),
                 ref : kernel.RefCount,

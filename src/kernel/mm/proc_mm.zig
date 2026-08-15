@@ -216,6 +216,7 @@ pub const MM = struct {
     brk_start: usize = 0,
     brk: usize = 0,
     vas: usize = 0,
+    lock: krn.Spinlock = krn.Spinlock.init(),
     vmas: ?*VMA = null,
     cpus_cores: std.bit_set.IntegerBitSet(32) = std.bit_set.IntegerBitSet(32).initEmpty(),
     ref: krn.RefCount = krn.RefCount.init(),
@@ -570,6 +571,20 @@ pub const MM = struct {
             return res;
         }
         return krn.errors.PosixError.ENOMEM;
+    }
+
+    pub fn setCPU(self: *MM, cpuid: u32) void {
+        self.lock.lock();
+        defer self.lock.unlock();
+
+        self.cpus_cores.set(cpuid);
+    }
+
+    pub fn unsetCPU(self: *MM, cpuid: u32) void {
+        self.lock.lock();
+        defer self.lock.unlock();
+
+        self.cpus_cores.unset(cpuid);
     }
 };
 
