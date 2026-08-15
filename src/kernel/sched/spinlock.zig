@@ -30,8 +30,19 @@ pub const Spinlock = struct {
         const lock_state = arch.cpu.areIntEnabled();
         if (lock_state)
             arch.cpu.disableInterrupts();
+
         while (self.locked.swap(true, .acquire)) {
+            // After failing to acquire the lock, remaining with
+            // interrupts disabled doesn't allow the current cpu
+            // to unblock other waits e.g when sending IPIs and
+            // requiring ack. Reenable interrupts before noop and
+            // disable them again when trying to swap to allow
+            // a context switch to happen.
+            if (lock_state)
+                arch.cpu.enableInterrupts();
             std.atomic.spinLoopHint();
+            if (lock_state)
+                arch.cpu.disableInterrupts();
         }
         return lock_state;
     }

@@ -318,6 +318,9 @@ pub const arch = struct {
             phys : u32= 0,
         };
 
+        pub const tlb_ack = struct {
+        };
+
         pub extern fn shootdownTLB()void;
         pub const VMM = struct {
             pmm : *arch.pmm.PMM,

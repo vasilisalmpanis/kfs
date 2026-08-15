@@ -55,6 +55,7 @@ pub fn sendIPIMaskButSelf(
         while (it.next()) |_logical_id| {
             if (_logical_id ==  current_id)
                 continue;
+            // krn.logger.INFO("SENDING IPI {d} current id {d}\n", .{_logical_id, current_id});
             _sendIPI(physical_id.ptrOn(_logical_id).*, vector);
         }
     }
@@ -62,7 +63,10 @@ pub fn sendIPIMaskButSelf(
 
 pub fn sendIPIAllButSelf(vector: u8) void {
     if (arch.cpu.operations.sendIPI) |_sendIPI| {
+        const current_id = logical_id.get();
         for (0..cpu_count) |_logical_id| {
+            if (_logical_id == current_id)
+                continue;
             _sendIPI(physical_id.ptrOn(_logical_id).*, vector);
         }
     }
@@ -85,13 +89,15 @@ fn setup_trampoline() void {
     @memcpy(dest[0..size], trampoline[0..size]);
 }
 
-fn idle() noreturn {
+pub fn idle() noreturn {
     while (true) {
         if (!arch.cpu.areIntEnabled()) {
             arch.cpu.cpuRelax();
         }
         arch.cpu.halt();
         krn.sched.schedule();
+
+        krn.sched.processTasks();
     }
 }
 

@@ -11,16 +11,18 @@ const gdt = @import("arch").gdt;
 const krn = @import("../main.zig");
 const arch = @import("arch");
 
-fn processTasks() void {
-    tsk.tasks_lock.lock();
-    defer tsk.tasks_lock.unlock();
+pub fn processTasks() void {
+    const state = tsk.tasks_lock.lock_irq_disable();
 
-    if (tsk.stopped_tasks == null)
+    var task_to_free: ?*krn.task.Task = null;
+
+    if (tsk.stopped_tasks == null) {
+        tsk.tasks_lock.unlock_irq_enable(state);
         return;
+    }
 
     var it = tsk.stopped_tasks.?.iterator();
     top_level: while (it.next()) |i| {
-        var end: bool = false;
         const curr = i.curr;
         const task = curr.entry(tsk.Task, "list");
         if (task == tsk.current() or !task.refcount.isFree() or task.state == .ZOMBIE)
@@ -30,7 +32,6 @@ fn processTasks() void {
                 continue: top_level;
         }
         if (curr.isEmpty()) {
-            end = true;
             tsk.stopped_tasks = null;
         } else {
             it = curr.next.?.iterator();
@@ -39,12 +40,18 @@ fn processTasks() void {
         }
         curr.del();
         task.delFromTree(); // Already done in task finish but safe
-        if (task.mm) |_mm| _mm.delete();
-        kthreadStackFree(task.stack_bottom);
+        task_to_free = task;
         tsk.releasePid(task.pid);
-        km.kfree(task);
-        if (end)
-            break;
+        break;
+    }
+    tsk.tasks_lock.unlock_irq_enable(state);
+
+    if (task_to_free) |to_free| {
+        if (to_free.mm) |_mm| {
+            _mm.delete();
+        }
+        kthreadStackFree(to_free.stack_bottom);
+        km.kfree(to_free);
     }
 }
 
@@ -78,7 +85,6 @@ fn findNextTask() *tsk.Task {
 pub fn schedule() void {
     const flags = arch.cpu.saveFlagsAndCli();
     defer arch.cpu.restoreFlags(flags);
-    processTasks();
     const prev = tsk.current();
     const next = findNextTask();
     if (prev != next)

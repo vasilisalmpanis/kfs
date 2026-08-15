@@ -1,5 +1,6 @@
 const smp = @import("../smp/main.zig");
 const idt = @import("../idt.zig");
+const cpu = @import("../system/cpu.zig");
 const printf = @import("debug").printf;
 const PMM = @import("./pmm.zig").PMM;
 const krn = @import("kernel");
@@ -34,6 +35,57 @@ pub extern var initial_page_dir: [1024]u32;
 pub const current_page_dir: [*]PageEntry = @ptrFromInt(0xFFFFF000);
 pub const first_page_table: [*]PageEntry = @ptrFromInt(0xFFC00000);
 
+pub const tlb_ack = smp.PerCpu(std.atomic.Value(u32), std.atomic.Value(u32).init(0), opaque{});
+
+noinline fn flushTLBAllButSelf() void {
+    var cpu_cores = std.bit_set.IntegerBitSet(32).initEmpty();
+    cpu_cores.setRangeValue(
+        .{
+            .start = 0,
+            .end = smp.cpu_count,
+        },
+        true
+    );
+    flushTLB(cpu_cores);
+}
+
+fn flushTLB(cpus_cores: std.bit_set.IntegerBitSet(32)) void {
+    if (!smp.smp_enabled)
+        return ;
+    const _sendIPI = cpu.operations.sendIPI orelse
+        return ;
+    var it = cpus_cores.iterator(.{
+        .direction = .forward,
+        .kind = .set
+    });
+    while (it.next()) |logical_id| {
+        if (logical_id == smp.logical_id.get())
+            continue;
+        const counter = tlb_ack.ptrOn(logical_id);
+        _ = counter.fetchAdd(1, .seq_cst);
+        const phys_id = smp.physical_id.ptrOn(logical_id).*;
+        _sendIPI(phys_id, idt.TLB_INTERRUPT);
+    }
+    while (true) {
+        var ack_it = cpus_cores.iterator(.{
+            .direction = .forward,
+            .kind = .set
+        });
+        var all_acknowledged: bool = true;
+        while (ack_it.next()) |logical_id| {
+            if (logical_id == smp.logical_id.get())
+                continue;
+            const counter = tlb_ack.ptrOn(logical_id);
+            if (counter.load(.seq_cst) != 0) {
+                all_acknowledged = false;
+                break;
+            }
+        }
+        if (all_acknowledged)
+            break;
+    }
+}
+
 pub inline fn switchToVAS(vas: u32) void {
     asm volatile(
         "mov %[pd], %cr3"
@@ -53,6 +105,7 @@ pub inline fn invalidatePage(page: usize) void {
 
 pub export fn shootdownTLB() void {
     switchToVAS(getCR3());
+    tlb_ack.ptr().store(0, .seq_cst); // ACK
 }
 
 pub inline fn getCR0() u32 {
@@ -209,9 +262,7 @@ pub const VMM = struct {
         const pfn: u32 = @as(u32, pt[pt_index].address) << 12;
         pt[pt_index].erase();
         invalidatePage(virt);
-        smp.sendIPIAllButSelf(
-            idt.TLB_INTERRUPT
-        );
+        flushTLBAllButSelf();
         if (free_pfn)
             self.pmm.freePage(pfn);
     }
@@ -460,10 +511,7 @@ pub const VMM = struct {
                     invalidatePage(
                         self.pageTableToAddr(pd_idx, pt_idx),
                     );
-                    smp.sendIPIMaskButSelf(
-                        cpus_cores,
-                        idt.TLB_INTERRUPT
-                    );
+                    flushTLB(cpus_cores);
                     self.pmm.freePage(phys);
                 }
             }
@@ -472,10 +520,7 @@ pub const VMM = struct {
                 invalidatePage(
                     self.pageTableToAddr(pd_idx, 0)
                 );
-                smp.sendIPIMaskButSelf(
-                    cpus_cores,
-                    idt.TLB_INTERRUPT
-                );
+                flushTLB(cpus_cores);
                 self.pmm.freePage((pd[pd_idx] >> 12) << 12);
             }
 

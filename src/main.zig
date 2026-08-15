@@ -244,8 +244,6 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     kernel_ready = true;
     krn.serial.print("[INIT]: == READY ==\n");
 
-    while (true) {
-        system.halt();
-    }
+    smp.idle();
     @panic("You shouldn't be here");
 }
