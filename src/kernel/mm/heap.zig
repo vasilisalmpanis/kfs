@@ -1,3 +1,4 @@
+const arch = @import("arch");
 const pmm = @import("arch").pmm.PMM;
 const vmm = @import("arch").vmm.VMM;
 const Mutex = @import("../sched/mutex.zig").Mutex;
@@ -16,9 +17,41 @@ pub const FreeListNode = extern struct {
 pub const AllocHeader = extern struct {
     block_size: usize,
     head: ?*FreeList,
-    unused_1: usize = 0,
-    unused_2: usize = 0,
+    list: krn.list.ListHead = .{ .next = null, .prev = null },
 };
+
+const deferred_list = arch.smp.PerCpu(
+    krn.list.ListHead,
+    krn.list.ListHead{ .next = null, .prev = null },
+    opaque {}
+);
+
+pub fn deferredFreeReset() void {
+    deferred_list.ptr().setup();
+}
+
+pub fn deferredFreeOne() bool {
+    var addr: usize = 0;
+    var freed: bool = false;
+    arch.cpu.disableInterrupts();
+    const head = deferred_list.ptr();
+    if (!head.isEmpty()) {
+        const first = head.next.?;
+        first.del();
+        addr = @intFromPtr(first.entry(AllocHeader, "list")) + @sizeOf(AllocHeader);
+    }
+    arch.cpu.enableInterrupts();
+    if (addr == 0)
+        return freed;
+    if (krn.mm.kheap.isAddrInRange(addr)) {
+        krn.mm.kheap.free(addr);
+        freed = true;
+    } else if (krn.mm.vheap.isAddrInRange(addr)) {
+        krn.mm.vheap.free(addr);
+        freed = true;
+    }
+    return freed;
+}
 
 pub const FreeList = struct {
     start_addr: usize,
@@ -169,7 +202,15 @@ pub const FreeList = struct {
         return header;
     }
 
+    fn deferFree(self: *FreeList, addr: usize) void {
+        const header: *AllocHeader = self.getAllocHeader(addr) orelse return;
+        header.list.setup();
+        deferred_list.ptr().addTail(&header.list);
+    }
+
     pub fn free(self: *FreeList, addr: usize) void {
+        if (!arch.cpu.areIntEnabled())
+            return self.deferFree(addr);
         var prev: ?*FreeListNode = undefined;
         const lock_state = krn.mm.mem_lock.lock_irq_disable();
         defer krn.mm.mem_lock.unlock_irq_enable(lock_state);
@@ -374,5 +415,9 @@ pub const FreeList = struct {
         if (header == null)
             return 0;
         return header.?.block_size - @sizeOf(AllocHeader);
+    }
+
+    pub fn isAddrInRange(self: *FreeList, addr: usize) bool {
+        return addr >= self.start_addr and addr < self.end_addr;
     }
 };
