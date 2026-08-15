@@ -318,6 +318,7 @@ pub const arch = struct {
             phys : u32= 0,
         };
 
+        pub extern fn shootdownTLB()void;
         pub const VMM = struct {
             pmm : *arch.pmm.PMM,
         };
@@ -406,6 +407,11 @@ pub const arch = struct {
             ldt : u16,
             trace : u16,
             bitmap : u16,
+        };
+
+        pub const Operations = struct {
+            sendEOI : *const fn(u32) void,
+            sendIPI : ?*const fn(u32, u8) void= null,
         };
 
     };
@@ -734,7 +740,6 @@ pub const arch = struct {
 
 
         pub extern fn apMain()noreturn;
-        pub extern fn shootdownTLB()void;
     };
 
 };

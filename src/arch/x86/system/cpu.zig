@@ -1,5 +1,5 @@
-
 const krn = @import("kernel");
+const io = @import("../io.zig");
 const KERNEL_CODE_SEGMENT = @import("../idt.zig").KERNEL_CODE_SEGMENT;
 const KERNEL_DATA_SEGMENT = @import("../idt.zig").KERNEL_DATA_SEGMENT;
 const USER_CODE_SEGMENT = @import("../idt.zig").USER_CODE_SEGMENT;
@@ -242,6 +242,23 @@ pub const TSS = packed struct {
             ._padding3 = 0,
         };
     }
+};
+
+fn legacySendEOI(int_num: u32) void {
+    io.outb(0x20, 0x20);
+    if (int_num >= 40) {
+        io.outb(0xA0, 0x20);
+    }
+}
+
+pub var operations: Operations = Operations{
+    .sendEOI = legacySendEOI,
+    .sendIPI = null,
+};
+
+pub const Operations = struct {
+    sendEOI: *const fn (int_num: u32) void,
+    sendIPI: ?*const fn (apic_id: u32, vector: u8) void = null,
 };
 
 pub fn enableInterrupts() void {

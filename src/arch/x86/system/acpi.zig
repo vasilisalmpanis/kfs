@@ -24,7 +24,7 @@ pub const RSDT = extern struct {
         return RSDTentries[0..num_entries];
     }
 
-    pub fn getEntery(self: *RSDT, signamture: []const u8) ?*SDTHeader {
+    pub fn getEntry(self: *RSDT, signamture: []const u8) ?*SDTHeader {
         for (self.entries()) |ent_addr| {
             const header: *SDTHeader = @ptrFromInt(rsdt_page + ent_addr % krn.mm.PAGE_SIZE);
             if (std.mem.eql(u8, header.Signature[0..4], signamture)) {

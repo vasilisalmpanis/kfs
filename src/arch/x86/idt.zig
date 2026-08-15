@@ -4,6 +4,7 @@ const dbg = @import("debug");
 const drv = @import("drivers");
 const krn = @import("kernel");
 const printf = @import("debug").printf;
+const cpu = @import("system/cpu.zig");
 const Regs = @import("system/cpu.zig").Regs;
 const signals = @import("kernel").signals;
 const tsk = @import("kernel").task;
@@ -80,7 +81,7 @@ pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {
         }
     }
 
-    smp.apicEOI();
+    cpu.operations.sendEOI(state.int_no);
     if (state.int_no == TIMER_INTERRUPT) {
         krn.jiffies.accountTick(state);
         krn.sched.schedule();
@@ -300,6 +301,7 @@ pub inline fn PICMask() void {
     io.outb(0x21, 0xFF);
     io.outb(0xA1, 0xFF);
 }
+
 const IdtEntry = packed struct {
     isr_low: u16,       // The lower 16 bits of the ISR's address
     kernel_cs: u16,     // The GDT segment selector that the CPU will load into CS before calling the ISR
@@ -358,6 +360,6 @@ pub fn idtInit() void {
         );
     }
     idtLoad();
-    PICMask();
+    PICRemap();
     krn.exceptions.registerExceptionHandlers();
 }

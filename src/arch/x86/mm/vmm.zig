@@ -51,6 +51,10 @@ pub inline fn invalidatePage(page: usize) void {
     );
 }
 
+pub export fn shootdownTLB() void {
+    switchToVAS(getCR3());
+}
+
 pub inline fn getCR0() u32 {
     return asm volatile (
         \\mov %cr0, %[value]
