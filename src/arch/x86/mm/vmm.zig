@@ -406,7 +406,13 @@ pub const VMM = struct {
         }
     }
 
-    pub fn releaseArea(self: *VMM, start: u32, end: u32, area_type: krn.mm.MAP_TYPE) void {
+    pub fn releaseArea(
+        self: *VMM,
+        start: u32,
+        end: u32,
+        area_type: krn.mm.MAP_TYPE,
+        cpus_cores: std.bit_set.IntegerBitSet(32)
+    ) void {
         if (area_type == .SHARED) {
             // FIXME: accounting for shared mappings
             krn.logger.INFO("We should somehow refcount pages and only free when the last user frees\n", .{});
@@ -454,12 +460,10 @@ pub const VMM = struct {
                     invalidatePage(
                         self.pageTableToAddr(pd_idx, pt_idx),
                     );
-                    if (krn.task.current().mm) |_mm| {
-                        smp.sendIPIMaskButSelf(
-                            _mm.cpus_cores,
-                            idt.TLB_INTERRUPT
-                        );
-                    }
+                    smp.sendIPIMaskButSelf(
+                        cpus_cores,
+                        idt.TLB_INTERRUPT
+                    );
                     self.pmm.freePage(phys);
                 }
             }
@@ -468,12 +472,10 @@ pub const VMM = struct {
                 invalidatePage(
                     self.pageTableToAddr(pd_idx, 0)
                 );
-                if (krn.task.current().mm) |_mm| {
-                    smp.sendIPIMaskButSelf(
-                        _mm.cpus_cores,
-                        idt.TLB_INTERRUPT
-                    );
-                }
+                smp.sendIPIMaskButSelf(
+                    cpus_cores,
+                    idt.TLB_INTERRUPT
+                );
                 self.pmm.freePage((pd[pd_idx] >> 12) << 12);
             }
 

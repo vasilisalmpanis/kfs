@@ -154,7 +154,15 @@ pub const VMA = struct {
                 var read: usize = 0;
                 while (read < _vma.end - _vma.start) {
                     const ret = _file.ops.read(_file, @ptrCast(&buffer[read]), _vma.end - _vma.start - read) catch {
-                        mm.virt_memory_manager.releaseArea(_vma.start, _vma.end, _vma.flags.TYPE);
+                        const state = owner.lock.lock_irq_disable();
+                        const cpus_cores = owner.cpus_cores;
+                        owner.lock.unlock_irq_enable(state);
+                        mm.virt_memory_manager.releaseArea(
+                            _vma.start,
+                            _vma.end,
+                            _vma.flags.TYPE,
+                            cpus_cores
+                        );
                         krn.mm.kfree(_vma);
                         return null;
                     };
@@ -522,6 +530,11 @@ pub const MM = struct {
 
         const curr_vas = krn.task.current().mm.?.vas;
         const is_curr_vas = self.isCurrentMM();
+
+        const state = self.lock.lock_irq_disable();
+        const cpus_cores = self.cpus_cores;
+        self.lock.unlock_irq_enable(state);
+
         if (self.vmas) |head| {
             while (!head.list.isEmpty()) {
                 const vma: *VMA = head.list.next.?.entry(VMA, "list");
@@ -530,7 +543,12 @@ pub const MM = struct {
                     const lock_state = krn.mm.mem_lock.lock_irq_disable();
                     if (!is_curr_vas)
                         arch.vmm.switchToVAS(self.vas);
-                    mm.virt_memory_manager.releaseArea(vma.start, vma.end, vma.flags.TYPE);
+                    mm.virt_memory_manager.releaseArea(
+                        vma.start,
+                        vma.end,
+                        vma.flags.TYPE,
+                        cpus_cores
+                    );
                     if (!is_curr_vas)
                         arch.vmm.switchToVAS(curr_vas);
                     krn.mm.mem_lock.unlock_irq_enable(lock_state);
@@ -541,7 +559,12 @@ pub const MM = struct {
                 const lock_state = krn.mm.mem_lock.lock_irq_disable();
                 if (!is_curr_vas)
                     arch.vmm.switchToVAS(self.vas);
-                mm.virt_memory_manager.releaseArea(head.start, head.end, head.flags.TYPE);
+                mm.virt_memory_manager.releaseArea(
+                    head.start,
+                    head.end,
+                    head.flags.TYPE,
+                    cpus_cores
+                );
                 if (!is_curr_vas)
                     arch.vmm.switchToVAS(curr_vas);
                 krn.mm.mem_lock.unlock_irq_enable(lock_state);

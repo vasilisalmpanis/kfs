@@ -105,6 +105,9 @@ pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
     if (task_mm.vmas) |head| {
         var current_node: ?*krn.list.ListHead = &head.list;
 
+        const state = task_mm.lock.lock_irq_disable();
+        const cpus_cores = task_mm.cpus_cores;
+        task_mm.lock.unlock_irq_enable(state);
         while (current_node) |node| {
             const vma = node.entry(krn.mm.VMA, "list");
             if (vma.start > end)
@@ -128,7 +131,12 @@ pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
                 }
 
                 node.del();
-                krn.mm.virt_memory_manager.releaseArea(vma.start, vma.end, vma.flags.TYPE);
+                krn.mm.virt_memory_manager.releaseArea(
+                    vma.start,
+                    vma.end,
+                    vma.flags.TYPE,
+                    cpus_cores
+                );
                 krn.mm.kfree(vma);
             } else if (vma.start < start and vma.end > end) {
                 // 2. Split mapping into 2 parts.
@@ -143,15 +151,30 @@ pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
                 vma.end = start;
                 node.add(&new_vma.?.list);
 
-                krn.mm.virt_memory_manager.releaseArea(start, end, vma.flags.TYPE);
+                krn.mm.virt_memory_manager.releaseArea(
+                    start,
+                    end,
+                    vma.flags.TYPE,
+                    cpus_cores
+                );
             } else if (vma.start < start and vma.end > start) {
                 // 3. Partially remove mapping from the end.
-                krn.mm.virt_memory_manager.releaseArea(start, vma.end, vma.flags.TYPE);
+                krn.mm.virt_memory_manager.releaseArea(
+                    start,
+                    vma.end,
+                    vma.flags.TYPE,
+                    cpus_cores
+                );
                 vma.end = start;
 
             } else if (vma.start < end and vma.end > end) {
                 // 4. Partially remove mapping from the beginning.
-                krn.mm.virt_memory_manager.releaseArea(vma.start, end, vma.flags.TYPE);
+                krn.mm.virt_memory_manager.releaseArea(
+                    vma.start,
+                    end,
+                    vma.flags.TYPE,
+                    cpus_cores
+                );
                 vma.start = end;
             }
 
