@@ -98,6 +98,7 @@ pub fn idle() noreturn {
         krn.sched.schedule();
 
         krn.sched.processTasks();
+        while (krn.mm.deferredFreeOne()) {}
     }
 }
 
@@ -121,6 +122,7 @@ pub export fn apMain() noreturn {
     );
     // Percpu variables can be used
 
+    krn.mm.deferredFreeReset();
     logical_id.set(curr_logical_id);
     physical_id.set(curr_phys_id);
 
