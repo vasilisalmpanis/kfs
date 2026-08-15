@@ -78,10 +78,12 @@ pub fn start(proc_apic: *align(1) smp.apic.ProcessorLocalAPIC) void {
 }
 
 fn sendIPI(apic_id: u32, vector: u8) void {
+    arch.cpu.disableInterrupts();
     wait();
     smp.apic_regs[ICR_HIGH_REGISTER] = @as(u32, apic_id) << 24;
     smp.apic_regs[ICR_LOW_REGISTER] = @as(u32, vector) | LEVEL_ASSERT;
     wait();
+    arch.cpu.enableInterrupts();
 }
 
 
