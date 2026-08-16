@@ -447,16 +447,6 @@ pub const Task = struct {
         const lock_state = if (!tasks_locked) tasks_lock.lock_irq_disable() else false;
         defer if (!tasks_locked) tasks_lock.unlock_irq_enable(lock_state);
 
-        if (self.mm) |_mm| {
-            const mm_ref = _mm.ref.getValue();
-            defer {
-                if (mm_ref > 1) {
-                    self.mm = null;
-                }
-            }
-            _mm.ref.put();
-        }
-
         self.list.del();
         self.refcount.put();
         if (self == self.group_leader) {

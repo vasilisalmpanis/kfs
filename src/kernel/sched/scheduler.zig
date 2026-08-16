@@ -48,7 +48,8 @@ pub fn processTasks() void {
 
     if (task_to_free) |to_free| {
         if (to_free.mm) |_mm| {
-            _mm.delete();
+            if (_mm.ref.putAndTest())
+                _mm.delete();
         }
         kthreadStackFree(to_free.stack_bottom);
         km.kfree(to_free);
