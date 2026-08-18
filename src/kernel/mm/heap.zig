@@ -249,6 +249,9 @@ pub const FreeList = struct {
         contig: bool,
         user: bool
     ) !usize {
+        if (!arch.cpu.areIntEnabled() and arch.smp.smp_enabled) {
+            @panic("Fix code that allocates in atomic context\n");
+        }
         // Total size of the block to allocate (including header)
         const total_size = self.alignToPtr(size + @sizeOf(AllocHeader));
 

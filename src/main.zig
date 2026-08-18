@@ -206,13 +206,16 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     krn.task.init();
     krn.serial.print("[INIT]: Multitasking done\n");
     smp.init();
-    // Get PID1
-    init_userspace();
     krn.serial.print("[INIT]: SMP done\n");
-    fpu.setTaskSwitched();
+
     irq.mapAll();
     krn.jiffies.initTimebase();
     cpu.enableInterrupts();
+
+    // Get PID1
+    init_userspace();
+
+    fpu.setTaskSwitched();
     krn.serial.print("[INIT]: Interrupts are enabled\n");
     dbg.initSymbolTable(&krn.boot_info);
     krn.serial.print("[INIT]: Symbol Table done\n");
