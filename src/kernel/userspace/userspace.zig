@@ -57,12 +57,14 @@ const AuxEntry = struct {
 };
 
 const AT_NULL = 0;
-const AT_PHDR = 3;  // address of program headers in memory
-const AT_PHENT = 4; // size of one program header
-const AT_PHNUM = 5; // number of program headers
+const AT_PHDR = 3;      // address of program headers in memory
+const AT_PHENT = 4;     // size of one program header
+const AT_PHNUM = 5;     // number of program headers
 const AT_PAGESZ = 6;
-const AT_BASE = 7;  // load base for PIE
-const AT_ENTRY = 9; // entry point address
+const AT_BASE = 7;      // load base for PIE
+const AT_ENTRY = 9;     // entry point address
+const AT_HWCAP = 16;    // Musl check AT_HWCAP for ldmxcsr
+// https://elixir.bootlin.com/musl/v1.2.6/source/src/fenv/i386/fenv.s#L1
 const AT_SYSINFO_EHDR = 33; // vDSO ELF header address
 
 const vdso = @import("../vdso.zig");
@@ -363,6 +365,11 @@ pub fn prepareBinary(
     aux_buf[aux_count] = .{ .key = AT_SYSINFO_EHDR, .val = vdso_ehdr_addr };
     aux_count += 1;
     aux_buf[aux_count] = .{ .key = AT_PAGESZ, .val = krn.mm.PAGE_SIZE };
+    aux_count += 1;
+    aux_buf[aux_count] = .{
+        .key = AT_HWCAP,
+        .val = @as(u32, @bitCast(arch.cpuid.info.features.edx)),
+    };
     aux_count += 1;
     aux_buf[aux_count] = .{ .key = AT_NULL, .val = 0 };
     aux_count += 1;
