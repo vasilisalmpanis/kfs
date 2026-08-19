@@ -816,7 +816,7 @@ pub const kernel = struct {
                 vas : u32= 0,
                 lock : kernel.Spinlock,
                 vmas : ?*kernel.mm.proc_mm.VMA= null,
-                cpus_cores : std.bit_set.IntegerBitSet(32),
+                cpus_cores : std.atomic.Value(u32),
                 ref : kernel.RefCount,
             };
 

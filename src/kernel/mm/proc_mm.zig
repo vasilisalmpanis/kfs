@@ -222,7 +222,7 @@ pub const MM = struct {
     vas: usize = 0,
     lock: krn.Spinlock = krn.Spinlock.init(),
     vmas: ?*VMA = null,
-    cpus_cores: std.bit_set.IntegerBitSet(32) = std.bit_set.IntegerBitSet(32).initEmpty(),
+    cpus_cores: std.atomic.Value(u32) = std.atomic.Value(u32).init(0),
     ref: krn.RefCount = krn.RefCount.init(),
 
     pub fn init() MM {
@@ -232,7 +232,7 @@ pub const MM = struct {
             .stack_top = STACK_TOP,
             .stack_bottom = STACK_BOTTOM,
             .vmas = null,
-            .cpus_cores = std.bit_set.IntegerBitSet(32).initEmpty(),
+            .cpus_cores = std.atomic.Value(u32).init(0),
         };
         _mm.ref.get();
         _mm.ref.dropFn = MM.release;
@@ -597,17 +597,15 @@ pub const MM = struct {
     }
 
     pub fn setCPU(self: *MM, cpuid: u32) void {
-        self.lock.lock();
-        defer self.lock.unlock();
-
-        self.cpus_cores.set(cpuid);
+        _ = self.cpus_cores.bitSet(@intCast(cpuid), .seq_cst);
     }
 
     pub fn unsetCPU(self: *MM, cpuid: u32) void {
-        self.lock.lock();
-        defer self.lock.unlock();
+        _ = self.cpus_cores.bitReset(@intCast(cpuid), .seq_cst);
+    }
 
-        self.cpus_cores.unset(cpuid);
+    pub fn cpuMask(self: *MM) std.bit_set.IntegerBitSet(32) {
+        return .{ .mask = self.cpus_cores.load(.seq_cst) };
     }
 };
 

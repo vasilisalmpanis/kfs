@@ -511,7 +511,7 @@ pub const VMM = struct {
                     invalidatePage(
                         self.pageTableToAddr(pd_idx, pt_idx),
                     );
-                    flushTLB(vma.mm.?.cpus_cores);
+                    flushTLB(vma.mm.?.cpuMask());
                     self.pmm.freePage(phys);
                 }
             }
@@ -520,7 +520,7 @@ pub const VMM = struct {
                 invalidatePage(
                     self.pageTableToAddr(pd_idx, 0)
                 );
-                flushTLB(vma.mm.?.cpus_cores);
+                flushTLB(vma.mm.?.cpuMask());
                 self.pmm.freePage((pd[pd_idx] >> 12) << 12);
             }
 

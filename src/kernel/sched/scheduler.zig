@@ -98,10 +98,8 @@ fn findNextTask() *tsk.Task {
 }
 
 pub fn schedule() void {
-    if (!isPreemtionEnabled()) {
-        krn.logger.INFO("cpu {d} preemted: {d}", .{arch.smp.logical_id.get(), preemtion_enabled.get()});
+    if (!isPreemtionEnabled())
         return ;
-    }
     const flags = arch.cpu.saveFlagsAndCli();
     defer arch.cpu.restoreFlags(flags);
     const prev = tsk.current();
