@@ -11,6 +11,20 @@ const gdt = @import("arch").gdt;
 const krn = @import("../main.zig");
 const arch = @import("arch");
 
+const preemtion_enabled = arch.smp.PerCpu(u32, 0, opaque {});
+
+pub fn preemtionEnable() void {
+    preemtion_enabled.ptr().* -|= 1;
+}
+
+pub fn preemtionDisable() void {
+    preemtion_enabled.ptr().* += 1;
+}
+
+pub inline fn isPreemtionEnabled() bool {
+    return preemtion_enabled.get() == 0;
+}
+
 pub fn processTasks() void {
     const state = tsk.tasks_lock.lock_irq_disable();
 
@@ -84,6 +98,10 @@ fn findNextTask() *tsk.Task {
 }
 
 pub fn schedule() void {
+    if (!isPreemtionEnabled()) {
+        krn.logger.INFO("cpu {d} preemted: {d}", .{arch.smp.logical_id.get(), preemtion_enabled.get()});
+        return ;
+    }
     const flags = arch.cpu.saveFlagsAndCli();
     defer arch.cpu.restoreFlags(flags);
     const prev = tsk.current();

@@ -61,11 +61,12 @@ pub fn goUserspace() void {
 }
 
 pub export fn exceptionHandler(state: *Regs) callconv(.c) *Regs {
+    var regs = state;
     if (krn.irq.handlers[state.int_no] != null) {
         const handler: *const ExceptionHandler = @ptrCast(krn.irq.handlers[state.int_no].?);
-        return handler(state);
+        regs = handler(state);
     }
-    return state;
+    return processSignalsHelper(regs);
 }
 
 pub export fn irqHandler(state: *Regs) callconv(.c) *Regs {

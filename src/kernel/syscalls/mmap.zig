@@ -102,12 +102,12 @@ pub fn mmap2(
 }
 
 pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
+    task_mm.lock.lock();
+    defer task_mm.lock.unlock();
+
     if (task_mm.vmas) |head| {
         var current_node: ?*krn.list.ListHead = &head.list;
 
-        const state = task_mm.lock.lock_irq_disable();
-        const cpus_cores = task_mm.cpus_cores;
-        task_mm.lock.unlock_irq_enable(state);
         while (current_node) |node| {
             const vma = node.entry(krn.mm.VMA, "list");
             if (vma.start > end)
@@ -134,8 +134,7 @@ pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
                 krn.mm.virt_memory_manager.releaseArea(
                     vma.start,
                     vma.end,
-                    vma.flags.TYPE,
-                    cpus_cores
+                    vma,
                 );
                 krn.mm.kfree(vma);
             } else if (vma.start < start and vma.end > end) {
@@ -144,7 +143,6 @@ pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
                 if (new_vma == null) return errors.ENOMEM;
                 new_vma.?.start = end;
                 new_vma.?.end = vma.end;
-                new_vma.?.mm = task_mm;
                 new_vma.?.prot = vma.prot;
                 new_vma.?.flags = vma.flags;
                 new_vma.?.mm = task_mm;
@@ -154,16 +152,14 @@ pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
                 krn.mm.virt_memory_manager.releaseArea(
                     start,
                     end,
-                    vma.flags.TYPE,
-                    cpus_cores
+                    vma,
                 );
             } else if (vma.start < start and vma.end > start) {
                 // 3. Partially remove mapping from the end.
                 krn.mm.virt_memory_manager.releaseArea(
                     start,
                     vma.end,
-                    vma.flags.TYPE,
-                    cpus_cores
+                    vma,
                 );
                 vma.end = start;
 
@@ -172,8 +168,7 @@ pub fn do_munmap(task_mm: *krn.mm.MM, start: u32, end: u32) !u32 {
                 krn.mm.virt_memory_manager.releaseArea(
                     vma.start,
                     end,
-                    vma.flags.TYPE,
-                    cpus_cores
+                    vma,
                 );
                 vma.start = end;
             }

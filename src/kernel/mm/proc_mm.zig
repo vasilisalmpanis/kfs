@@ -154,14 +154,10 @@ pub const VMA = struct {
                 var read: usize = 0;
                 while (read < _vma.end - _vma.start) {
                     const ret = _file.ops.read(_file, @ptrCast(&buffer[read]), _vma.end - _vma.start - read) catch {
-                        const state = owner.lock.lock_irq_disable();
-                        const cpus_cores = owner.cpus_cores;
-                        owner.lock.unlock_irq_enable(state);
                         mm.virt_memory_manager.releaseArea(
                             _vma.start,
                             _vma.end,
-                            _vma.flags.TYPE,
-                            cpus_cores
+                            _vma,
                         );
                         krn.mm.kfree(_vma);
                         return null;
@@ -329,8 +325,8 @@ pub const MM = struct {
         flags: MAP,
         file: ?*krn.fs.File,
         offset: usize,
-    ) !usize
-    {
+    ) !usize {
+
         // 1. check if this addr is taken.
         //  - if free or map fixed, create mappings or replace mappings
         //  - if not free and map fixed replace
@@ -345,6 +341,8 @@ pub const MM = struct {
                 @intCast(end)
             ) catch {};
 
+            self.lock.lock();
+            defer self.lock.unlock();
             new_vma = try self.add_vma(
                 if (self.vmas == null) null else self.findInsertPoint(hint),
                 hint,
@@ -362,6 +360,10 @@ pub const MM = struct {
             );
             return @intCast(hint);
         }
+
+        self.lock.lock();
+        defer self.lock.unlock();
+
         if (self.vmas) |list| {
             var it = list.list.iterator();
             while (it.next()) |node| {
@@ -453,6 +455,10 @@ pub const MM = struct {
                 mm.kfree(_mmap);
                 return null;
             }
+
+            self.lock.lock();
+            defer self.lock.unlock();
+
             if (self.vmas) |head| {
                 var it = head.list.iterator();
                 while (it.next()) |entry| {
@@ -531,10 +537,6 @@ pub const MM = struct {
         const curr_vas = krn.task.current().mm.?.vas;
         const is_curr_vas = self.isCurrentMM();
 
-        const state = self.lock.lock_irq_disable();
-        const cpus_cores = self.cpus_cores;
-        self.lock.unlock_irq_enable(state);
-
         if (self.vmas) |head| {
             while (!head.list.isEmpty()) {
                 const vma: *VMA = head.list.next.?.entry(VMA, "list");
@@ -546,8 +548,7 @@ pub const MM = struct {
                     mm.virt_memory_manager.releaseArea(
                         vma.start,
                         vma.end,
-                        vma.flags.TYPE,
-                        cpus_cores
+                        vma,
                     );
                     if (!is_curr_vas)
                         arch.vmm.switchToVAS(curr_vas);
@@ -562,8 +563,7 @@ pub const MM = struct {
                 mm.virt_memory_manager.releaseArea(
                     head.start,
                     head.end,
-                    head.flags.TYPE,
-                    cpus_cores
+                    head,
                 );
                 if (!is_curr_vas)
                     arch.vmm.switchToVAS(curr_vas);

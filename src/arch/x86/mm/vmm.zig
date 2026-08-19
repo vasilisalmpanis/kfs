@@ -461,9 +461,9 @@ pub const VMM = struct {
         self: *VMM,
         start: u32,
         end: u32,
-        area_type: krn.mm.MAP_TYPE,
-        cpus_cores: std.bit_set.IntegerBitSet(32)
+        vma: *krn.proc_mm.VMA,
     ) void {
+        const area_type = vma.flags.TYPE;
         if (area_type == .SHARED) {
             // FIXME: accounting for shared mappings
             krn.logger.INFO("We should somehow refcount pages and only free when the last user frees\n", .{});
@@ -511,7 +511,7 @@ pub const VMM = struct {
                     invalidatePage(
                         self.pageTableToAddr(pd_idx, pt_idx),
                     );
-                    flushTLB(cpus_cores);
+                    flushTLB(vma.mm.?.cpus_cores);
                     self.pmm.freePage(phys);
                 }
             }
@@ -520,7 +520,7 @@ pub const VMM = struct {
                 invalidatePage(
                     self.pageTableToAddr(pd_idx, 0)
                 );
-                flushTLB(cpus_cores);
+                flushTLB(vma.mm.?.cpus_cores);
                 self.pmm.freePage((pd[pd_idx] >> 12) << 12);
             }
 

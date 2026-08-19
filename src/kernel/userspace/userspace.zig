@@ -347,21 +347,19 @@ pub fn prepareBinary(
 
     var aux_buf: [10]AuxEntry = undefined;
     var aux_count: usize = 0;
-    if (is_pie or interp_binary != null) {
-        aux_buf[aux_count] = .{ .key = AT_PHDR, .val = load_base + elf_addrs.load_addr + ehdr.e_phoff };
-        aux_count += 1;
-        aux_buf[aux_count] = .{ .key = AT_PHENT, .val = ehdr.e_phentsize };
-        aux_count += 1;
-        aux_buf[aux_count] = .{ .key = AT_PHNUM, .val = ehdr.e_phnum };
-        aux_count += 1;
-        aux_buf[aux_count] = .{ .key = AT_ENTRY, .val = load_base + ehdr.e_entry };
-        aux_count += 1;
-        aux_buf[aux_count] = .{
-                .key = AT_BASE,
-                .val = if (interp_binary != null) INTERP_LOAD_BASE else load_base
-        };
-        aux_count += 1;
-    }
+    aux_buf[aux_count] = .{ .key = AT_PHDR, .val = load_base + elf_addrs.load_addr + ehdr.e_phoff };
+    aux_count += 1;
+    aux_buf[aux_count] = .{ .key = AT_PHENT, .val = ehdr.e_phentsize };
+    aux_count += 1;
+    aux_buf[aux_count] = .{ .key = AT_PHNUM, .val = ehdr.e_phnum };
+    aux_count += 1;
+    aux_buf[aux_count] = .{ .key = AT_ENTRY, .val = load_base + ehdr.e_entry };
+    aux_count += 1;
+    aux_buf[aux_count] = .{
+        .key = AT_BASE,
+        .val = if (interp_binary != null) INTERP_LOAD_BASE else 0
+    };
+    aux_count += 1;
     aux_buf[aux_count] = .{ .key = AT_SYSINFO_EHDR, .val = vdso_ehdr_addr };
     aux_count += 1;
     aux_buf[aux_count] = .{ .key = AT_PAGESZ, .val = krn.mm.PAGE_SIZE };
