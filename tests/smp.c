@@ -603,6 +603,25 @@ static int test_tlb_shootdown(void)
     unsigned stable_cpu_count = 0;
     unsigned i;
 
+    reset_cpu_seen();
+    atomic_store(&tlb_phase, 0);
+    atomic_store(&tlb_ready, 0);
+    atomic_store(&tlb_initial_errors, 0);
+    memset(tlb_seen, 0, sizeof(tlb_seen));
+    memset(tlb_cpu_before, 0, sizeof(tlb_cpu_before));
+    memset(tlb_cpu_after, 0, sizeof(tlb_cpu_after));
+
+    /*
+     * Create the workers before mapping the test region otherwise the test
+     * might fail with exit code 11 due to trying to unmap regions where thread
+     * stacks live.
+     */
+    for (i = 0; i < TLB_WORKERS; i++) {
+        if (pthread_create(&threads[i], NULL, tlb_worker,
+                           (void *)(uintptr_t)i) != 0)
+            return failf("could not create TLB worker %u", i);
+    }
+
     region = mmap(NULL, 3 * TEST_PAGE_SIZE, PROT_READ | PROT_WRITE,
                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (region == MAP_FAILED)
@@ -618,18 +637,6 @@ static int test_tlb_shootdown(void)
     if (munmap(region + 2 * TEST_PAGE_SIZE, TEST_PAGE_SIZE) != 0)
         return failf("could not make remap guard hole: %s", strerror(errno));
 
-    reset_cpu_seen();
-    atomic_store(&tlb_phase, 0);
-    atomic_store(&tlb_ready, 0);
-    atomic_store(&tlb_initial_errors, 0);
-    memset(tlb_seen, 0, sizeof(tlb_seen));
-    memset(tlb_cpu_before, 0, sizeof(tlb_cpu_before));
-    memset(tlb_cpu_after, 0, sizeof(tlb_cpu_after));
-    for (i = 0; i < TLB_WORKERS; i++) {
-        if (pthread_create(&threads[i], NULL, tlb_worker,
-                           (void *)(uintptr_t)i) != 0)
-            return failf("could not create TLB worker %u", i);
-    }
     atomic_store_explicit(&tlb_phase, 1, memory_order_release);
     while (atomic_load_explicit(&tlb_ready, memory_order_acquire) !=
            TLB_WORKERS)
