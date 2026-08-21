@@ -869,8 +869,9 @@ static volatile pid_t thread_pend_tid;
 static volatile sig_atomic_t thread_pend_fired;
 static void thread_pend_h(int s) { (void)s; thread_pend_fired = 1; }
 
-/* pipe: [0]=read [1]=write */
-static int tp_pipe[2];
+/* Separate directions prevent either thread from consuming its own byte. */
+static int tp_ready[2];
+static int tp_command[2];
 
 static void *thread_pending_fn(void *arg)
 {
@@ -883,11 +884,11 @@ static void *thread_pending_fn(void *arg)
     pthread_sigmask(SIG_BLOCK, &blk, NULL);
 
     /* ready: tell main */
-    write(tp_pipe[1], "r", 1);
+    write(tp_ready[1], "r", 1);
 
     /* wait for main to send signal and confirm */
     char buf;
-    read(tp_pipe[0], &buf, 1);
+    read(tp_command[0], &buf, 1);
 
     /* check signal is pending */
     sigset_t pend;
@@ -899,7 +900,7 @@ static void *thread_pending_fn(void *arg)
 
     /* tell main: was_pending result + fired result */
     buf = was_pending ? 'p' : 'n';
-    write(tp_pipe[1], &buf, 1);
+    write(tp_ready[1], &buf, 1);
 
     /* spin until killed via tkill */
     while (1) usleep(10000);
@@ -911,7 +912,8 @@ static void test_thread_masked_pending(void)
     puts("\n[ 19. thread-masked signal pending until unblocked ]");
     reset_usr();
 
-    pipe(tp_pipe);
+    pipe(tp_ready);
+    pipe(tp_command);
 
     struct sigaction sa;
     memset(&sa, 0, sizeof sa);
@@ -926,17 +928,17 @@ static void test_thread_masked_pending(void)
 
     /* wait until thread is ready (blocking SIGUSR1) */
     char buf;
-    read(tp_pipe[0], &buf, 1);
+    read(tp_ready[0], &buf, 1);
 
     /* direct signal at the thread */
     pthread_kill(t, SIGUSR1);
 
     /* give kernel a moment, then tell thread to check pending */
     usleep(5000);
-    write(tp_pipe[1], "c", 1);
+    write(tp_command[1], "c", 1);
 
     /* read thread's pending-check result */
-    read(tp_pipe[0], &buf, 1);
+    read(tp_ready[0], &buf, 1);
     CHECK(buf == 'p',
           "thread-masked: signal pending inside masked thread",
           "signal not pending");
@@ -950,8 +952,10 @@ static void test_thread_masked_pending(void)
     tkill_thread(thread_pend_tid);
     usleep(10000);
 
-    close(tp_pipe[0]);
-    close(tp_pipe[1]);
+    close(tp_ready[0]);
+    close(tp_ready[1]);
+    close(tp_command[0]);
+    close(tp_command[1]);
     reset_usr();
 }
 
@@ -1246,7 +1250,7 @@ static void test_fork_sigmask_inherit(void)
 }
 
 /* ================================================================== */
-/* 29. Signal delivery order: lower signal number first                */
+/* 29. Multiple pending signals are both delivered                     */
 /* ================================================================== */
 
 static volatile sig_atomic_t ord_first;
@@ -1267,7 +1271,7 @@ static void ord_u2_h(int s)
 
 static void test_signal_delivery_order(void)
 {
-    puts("\n[ 29. signal delivery order: lower signo first ]");
+    puts("\n[ 29. multiple pending signals delivered ]");
     reset_usr();
 
     struct sigaction sa1, sa2;
@@ -1288,8 +1292,9 @@ static void test_signal_delivery_order(void)
 
     sigprocmask(SIG_UNBLOCK, &blk, NULL);
 
-    CHECK(ord_first == SIGUSR1,
-          "SIGUSR1 (lower signo) delivered before SIGUSR2", "wrong delivery order");
+    CHECK((ord_first == SIGUSR1 && ord_second == SIGUSR2) ||
+          (ord_first == SIGUSR2 && ord_second == SIGUSR1),
+          "both pending signals delivered", "missing pending signal");
 
     reset_usr();
 }

@@ -1,0 +1,2 @@
+::sysinit:/bin/mount -t procfs procfs /proc
+ttyS1::once:/bin/sh /test-run.sh
