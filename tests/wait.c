@@ -670,17 +670,12 @@ static void test_sa_nocldwait(void)
 	sa.sa_handler = sigchld_simple_handler;
 	sa.sa_flags = SA_NOCLDWAIT;
 	sigemptyset(&sa.sa_mask);
-	printf("Sigaction\n");
-	sleep(5);
 	sigaction(SIGCHLD, &sa, NULL);
 	g_sigchld_hits = 0;
 
-	sleep(5);
-	printf("Fork\n");
 	pid_t pid = fork();
 	if (pid == 0) {
 		usleep(50000);
-		printf("Child exit\n");
 		exit(0);
 	}
 	/* bounded WNOHANG poll, same reasoning as the SIG_IGN test */
@@ -690,7 +685,6 @@ static void test_sa_nocldwait(void)
 	for (int i = 0; i < 300 && res == 0; i++) {
 		usleep(10000);
 		errno = 0;
-		printf("Wait\n");
 		res = waitpid(pid, &status, WNOHANG);
 	}
 	CHECK(res == -1 && errno == ECHILD,
@@ -700,7 +694,6 @@ static void test_sa_nocldwait(void)
 		usleep(10000);
 	CHECK(g_sigchld_hits == 1, "SA_NOCLDWAIT: SIGCHLD still delivered",
 			"handler did not run");
-	sleep(100);
 	reset_sig(SIGCHLD);
 }
 
@@ -896,10 +889,8 @@ int main(void)
 
     puts("=== wait test suite ===");
 
-    for (size_t i = 0; i < sizeof(g_tests) / sizeof(g_tests[0]); i++) {
+    for (size_t i = 0; i < sizeof(g_tests) / sizeof(g_tests[0]); i++)
         run_test(&g_tests[i]);
-	sleep(1);
-    }
 
     printf("\n=== %d passed, %d failed ===\n", g_passed, g_failed);
     return g_failed == 0 ? 0 : 1;

@@ -9,6 +9,12 @@ GRUB_CFG			= $(BOOT_GRUB_DIR)/grub.cfg
 MOD_SRC_DIR			= modules
 MODULES				= example keyboard time
 
+TEST_DIR			= tests
+TEST_BUILD_DIR		= $(BUILD_DIR)/tests
+TEST_ROOTFS_DIR		= $(BUILD_DIR)/rootfs-test
+TEST_SRC			= $(wildcard $(TEST_DIR)/*.c)
+TEST_BIN			= $(patsubst $(TEST_DIR)/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRC))
+
 ROOTFS_FULL_DIR		= rootfs_full
 ROOTFS_MIN_DIR		= rootfs_min
 
@@ -30,6 +36,10 @@ KFS_MIN				= $(RELEASE_DIR)/kfs-min.img
 KFS_FULL			= $(RELEASE_DIR)/kfs-full.img
 KERNEL_BOOT_IMAGE	= $(RELEASE_DIR)/kfs-kernel.iso
 KERNEL_ARTIFACT		= $(RELEASE_DIR)/kfs.bin
+TEST_ROOTFS_IMG		= $(BUILD_DIR)/rootfs-test.img
+TEST_DISK			= $(BUILD_DIR)/kfs-test.img
+
+CORES				?= 2
 
 MOD_TARGET_DIR		= $(ROOTFS_FULL_DIR)/modules
 
@@ -53,7 +63,9 @@ ifeq ($(shell uname -s),Darwin)
 endif
 
 KVM := $(shell \
-	if command -v lsmod >/dev/null 2>&1 && lsmod | grep kvm >/dev/null 2>&1; then \
+	if command -v lsmod >/dev/null 2>&1 \
+		&& lsmod | grep kvm >/dev/null 2>&1 \
+		&& [ -r /dev/kvm ] && [ -w /dev/kvm ]; then \
 		echo -enable-kvm; \
 	else \
 		echo; \
@@ -125,6 +137,28 @@ $(ROOTFS_MIN_IMG): $(ROOTFS_MIN_DIR)
 		$(ROOTFS_MIN_IMG) \
 		$$(du -s $(ROOTFS_MIN_DIR) | awk '{print int($$1 * 1.1) + 1024 "K"}')
 
+$(TEST_BUILD_DIR)/%: $(TEST_DIR)/%.c | $(TEST_BUILD_DIR)
+	zig cc -target x86-linux-musl -static -O2 -pthread \
+		-o $@ $< -lm
+
+$(TEST_BUILD_DIR):
+	@mkdir -p $(TEST_BUILD_DIR)
+
+$(TEST_ROOTFS_IMG): $(ROOTFS_MIN_DIR) $(TEST_BIN) scripts/test-run.sh scripts/test-inittab | $(BUILD_DIR)
+	rm -rf $(TEST_ROOTFS_DIR)
+	cp -a $(ROOTFS_MIN_DIR) $(TEST_ROOTFS_DIR)
+	mkdir -p $(TEST_ROOTFS_DIR)/tests
+	cp $(TEST_BIN) $(TEST_ROOTFS_DIR)/tests/
+	cp scripts/test-run.sh $(TEST_ROOTFS_DIR)/test-run.sh
+	cp scripts/test-inittab $(TEST_ROOTFS_DIR)/etc/inittab
+	yes | mke2fs -L '' -N 0 -O ^64bit \
+		-d $(TEST_ROOTFS_DIR) \
+		-m 5 -r 1 \
+		-t ext2 \
+		-b 8192 \
+		$(TEST_ROOTFS_IMG) \
+		$$(du -s $(TEST_ROOTFS_DIR) | awk '{print int($$1 * 1.1) + 1024 "K"}')
+
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
@@ -151,6 +185,10 @@ release-kernel: $(KERNEL) | $(RELEASE_DIR)
 
 release-all: release-full release-min release-kernel
 
+$(TEST_DISK): $(KERNEL) $(GRUB_CFG) $(TEST_ROOTFS_IMG) scripts/create_boot_disk.sh | $(BUILD_DIR)
+	DISK=$(TEST_DISK) KERNEL=$(KERNEL) ROOT_IMG=$(TEST_ROOTFS_IMG) GRUB_CFG=$(GRUB_CFG) \
+	sh scripts/create_boot_disk.sh $(TEST_DISK)
+
 # === Runtime ===
 qemu: $(NAME)
 	$(QEMU) $(KVM) \
@@ -159,6 +197,18 @@ qemu: $(NAME)
 		-serial pty \
 		-m 4G \
 		-smp 2
+
+
+test: $(TEST_DISK)
+	$(QEMU) $(KVM) \
+		-drive file=$(TEST_DISK),format=raw \
+		-display none \
+		-monitor none \
+		-serial null \
+		-serial stdio \
+		-no-reboot \
+		-m 4G \
+		-smp $(CORES)
 
 debug: $(NAME)
 	$(QEMU) -drive file=$(NAME),format=raw \
@@ -279,7 +329,7 @@ install-tools:
 	fi
 	@$(MAKE) check-tools
 
-.PHONY: all clean fclean qemu debug modules build-image \
+.PHONY: all clean fclean qemu debug test modules build-image \
 	prepare-rootfs \
 	release-full release-min release-kernel release-all \
 	check-tools \
