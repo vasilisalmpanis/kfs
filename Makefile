@@ -200,6 +200,7 @@ qemu: $(NAME)
 
 
 test: $(TEST_DISK)
+	timeout --foreground -k 10 900 \
 	$(QEMU) $(KVM) \
 		-drive file=$(TEST_DISK),format=raw \
 		-display none \
