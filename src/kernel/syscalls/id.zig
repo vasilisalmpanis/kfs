@@ -25,6 +25,8 @@ pub fn getUID() !u32 {
 }
 
 pub fn setUID(uid: u16) !u32 {
+    if (tsk.current().uid != 0)
+        return errors.EPERM;
     // TODO implement correctly
     tsk.current().uid = uid;
     return 0;
@@ -42,7 +44,7 @@ pub fn setGID(gid: u16) !u32 {
 
 pub fn getPGID(pid: i32) !u32 {
     if (pid < 0)
-        return errors.EEXIST;
+        return errors.ESRCH;
     if (pid == 0)
         return tsk.current().pgid;
     if (tsk.initial_task.ptr().findByPid(@intCast(pid))) |task| {

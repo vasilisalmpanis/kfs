@@ -53,6 +53,7 @@ pub const File = struct {
         self.inode.ref.get();
         self.data = null;
         self.mode = fs.UMode{};
+        self.flags = 0;
     }
 
     pub fn release(ref: *kernel.RefCount) void {
@@ -240,7 +241,7 @@ pub const TaskFiles = struct {
             .direction = .forward,
         });
         while (it.next()) |index| {
-            if (index > from_fd) {
+            if (index >= from_fd) {
                 self.map.set(index);
                 return index;
             }

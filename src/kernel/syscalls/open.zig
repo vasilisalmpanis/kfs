@@ -24,6 +24,7 @@ pub fn do_open(
     target_path.stepInto(name, true) catch {
         if (flags & fs.file.O_CREAT != 0) {
             new_mode.type = kernel.fs.S_IFREG;
+            new_mode.applyUmask(tsk.current().fs.umask);
             if (
                 !target_path.dentry.inode.mode.canExecute(
                     target_path.dentry.inode.uid,

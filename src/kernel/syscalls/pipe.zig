@@ -51,6 +51,10 @@ pub fn pipe2(pipefd: ?*[2]i32, flags: i32) !u32 {
 
         try krn.task.current().files.setFD(read_fd, read_file);
         try krn.task.current().files.setFD(write_fd, write_file);
+        if (flags & @as(i32, @intCast(fs.file.O_CLOEXEC)) != 0) {
+            krn.task.current().files.closexec.set(read_fd);
+            krn.task.current().files.closexec.set(write_fd);
+        }
 
         fds[0] = @intCast(read_fd);
         fds[1] = @intCast(write_fd);

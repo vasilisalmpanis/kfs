@@ -128,8 +128,12 @@ pub fn socketpair(family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) !u3
             inode2.data.sock = sock_b;
             file1 = try krn.fs.File.pseudo(inode1);
             errdefer file1.ref.put();
+            file1.mode = krn.fs.UMode.socket();
+            file1.flags = krn.fs.file.O_RDWR;
             file2 = try krn.fs.File.pseudo(inode2);
             errdefer file2.ref.put();
+            file2.mode = krn.fs.UMode.socket();
+            file2.flags = krn.fs.file.O_RDWR;
             try krn.task.current().files.setFD(fd1, file1);
             try krn.task.current().files.setFD(fd2, file2);
             usockvec[0] = @intCast(fd1);
