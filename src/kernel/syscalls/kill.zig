@@ -88,7 +88,7 @@ pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
         defer task.refcount.put();
         return try send_signal(task, sig, tid);
     }
-    return errors.EPERM;
+    return errors.ESRCH;
 }
 
 pub fn kill(pid: i32, sig: i32) !u32 {

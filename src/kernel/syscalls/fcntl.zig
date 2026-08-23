@@ -56,8 +56,12 @@ pub fn fcntl64(fd: u32, cmd: u32, arg: u32) !u32 {
                 return 0;
             },
             F_SETFD => {
-                if (arg & FD_CLOEXEC != 0)
+                if (arg & FD_CLOEXEC != 0) {
                     krn.task.current().files.closexec.set(fd);
+                } else {
+                    // F_SETFD should cleat cloexec if flag is not set
+                    krn.task.current().files.closexec.unset(fd);
+                }
                 return 0;
             },
             F_GETFL => {

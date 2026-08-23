@@ -21,7 +21,7 @@ pub fn lseek(fd: u32, offset: isize, whence: u32) !usize {
         file.pos = @intCast(new_pos);
         return file.pos;
     }
-    return errors.PosixError.ENOENT;
+    return errors.PosixError.EBADF;
 }
 
 pub fn llseek(fd: u32, offset_high: u32, offset_low: u32, result: *u64, whence: u32) !usize{

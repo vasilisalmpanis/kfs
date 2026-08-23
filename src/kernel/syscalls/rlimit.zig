@@ -39,7 +39,7 @@ pub fn prlimit(pid: i32,
     var task: *Task = kernel.task.current();
     var found: bool = false;
     if (pid < 0)
-        return errors.EINVAL;
+        return errors.ESRCH;
 
     // If pid is 0, then the call applies to the calling process
     if (pid != 0) {

@@ -48,6 +48,9 @@ pub fn mmap2(
             flags.STACK, flags.GROWSDOWN, flags.EXECUTABLE
     });
 
+    if (length == 0)
+        return errors.EINVAL;
+
     if (prot & ~(mm.PROT_EXEC | mm.PROT_READ | mm.PROT_WRITE | mm.PROT_NONE) > 0)
         return errors.EINVAL;
     const offset: u32 = off * krn.mm.PAGE_SIZE;

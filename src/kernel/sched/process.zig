@@ -47,6 +47,13 @@ pub fn doFork() !u32 {
         krn.logger.ERROR("fork: failed to allocate thread data", .{});
         return errors.ENOMEM;
     };
+
+    const parent_thread_data = tsk.current().thread_data orelse
+        @panic("No userspace task should have thread_data == NULL\n");
+    parent_thread_data.lock.lock();
+    thread_data.rlim = parent_thread_data.rlim;
+    parent_thread_data.lock.unlock();
+
     child.thread_data = thread_data;
     errdefer child.thread_data.?.ref.put();
 

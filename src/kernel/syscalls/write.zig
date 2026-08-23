@@ -8,7 +8,7 @@ pub fn write(fd: u32, buf: ?[*]u8, size: u32) !u32 {
         file.ref.get();
         defer file.ref.put();
         if (!file.canWrite())
-            return errors.EACCES;
+            return errors.EBADF;
         if (size == 0)
             return 0;
         const data = buf orelse
