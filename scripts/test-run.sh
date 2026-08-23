@@ -15,7 +15,7 @@ for test_path in /tests/*; do
 	test_name=${test_path##*/}
 
 	printf '\n\n=== TEST_RUN %s ===\n' "$test_name"
-	"$test_path"
+	busybox timeout -k 3 60 "$test_path"
 	status=$?
 	if [ "$status" -eq 0 ]; then
 		printf '=== TEST_PASS %s ===\n' "$test_name"
