@@ -34,21 +34,21 @@ pub const Spinlock = struct {
     // Can be take in process context.
     pub fn lock_irq_disable(self: *Spinlock) bool {
         const lock_state = arch.cpu.areIntEnabled();
-        if (lock_state)
-            arch.cpu.disableInterrupts();
-
-        while (self.locked.swap(true, .acquire)) {
-            // After failing to acquire the lock, remaining with
-            // interrupts disabled doesn't allow the current cpu
-            // to unblock other waits e.g when sending IPIs and
-            // requiring ack. Reenable interrupts before noop and
-            // disable them again when trying to swap to allow
-            // a context switch to happen.
-            if (lock_state)
-                arch.cpu.enableInterrupts();
-            std.atomic.spinLoopHint();
+         
+        while (true) {
             if (lock_state)
                 arch.cpu.disableInterrupts();
+            if (!self.locked.swap(true, .acquire))
+                return lock_state;
+            if (lock_state)                
+                arch.cpu.enableInterrupts();
+            
+            // We need to spin with interrupts enabled,
+            // else we are stuck here - one pause command
+            // with interrupts enabled is not enought no
+            // get IPI interrupt without KVM
+            while (self.locked.load(.monotonic))
+                std.atomic.spinLoopHint();
         }
         return lock_state;
     }
