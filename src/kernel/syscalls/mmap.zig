@@ -8,15 +8,25 @@ const mmap_struct = extern struct {
 	len: u32,
 	prot: u32,
 	flags: u32,
-	fd: u32,
+	fd: i32,
 	offset: u32,
 };
 
 pub fn mmap(
     arg: ?*mmap_struct
 ) !u32 {
-    krn.logger.INFO("length {x}\n", .{arg.?.len});
-    return try mmap2(@ptrFromInt(arg.?.addr), arg.?.len, arg.?.prot, @bitCast(arg.?.flags), -1, 0);
+    const _arg = arg orelse
+        return errors.EINVAL;
+    if (_arg.offset % krn.mm.PAGE_SIZE != 0)
+        return errors.EINVAL;
+    return try mmap2(
+        @ptrFromInt(_arg.addr),
+        _arg.len,
+        _arg.prot,
+        @bitCast(_arg.flags),
+        _arg.fd,
+        _arg.offset / krn.mm.PAGE_SIZE
+    );
 }
 
 pub fn mmap2(
@@ -55,7 +65,11 @@ pub fn mmap2(
         return errors.EINVAL;
     const offset: u32 = off * krn.mm.PAGE_SIZE;
 
-    if (!flags.ANONYMOUS and fd >= 0) {
+    if (!flags.ANONYMOUS) {
+        if (fd < 0)
+            return errors.EBADF;
+        if (flags.TYPE != .SHARED and flags.TYPE != .SHARED_VALIDATE and flags.TYPE != .PRIVATE)
+            return errors.EINVAL;
         if (krn.task.current().files.fds.get(@intCast(fd))) |_file| {
             _file.ref.get();
             defer _file.ref.put();
@@ -76,6 +90,8 @@ pub fn mmap2(
         }
     }
 
+    if (flags.TYPE != .SHARED and flags.TYPE != .DROPPABLE and flags.TYPE != .PRIVATE)
+        return errors.EINVAL;
     // addr specifies the wanted virtual address (suggestion)
     // length is the size of the mapping
     const len: u32 = arch.pageAlign(length, false);
