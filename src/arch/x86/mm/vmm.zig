@@ -450,6 +450,10 @@ pub const VMM = struct {
                     },
                     .SHARED, .SHARED_VALIDATE => {
                         new_pt[pt_idx] = old_pt[pt_idx];
+                    },
+                    else => {
+                        // TODO
+                        return krn.errors.PosixError.ENOSYS;
                     }
                 }
             }

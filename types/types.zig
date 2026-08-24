@@ -762,6 +762,7 @@ pub const kernel = struct {
                 SHARED = 1,
                 PRIVATE = 2,
                 SHARED_VALIDATE = 3,
+                DROPPABLE = 8,
             };
 
 

@@ -199,7 +199,16 @@ pub fn doExecve(
     );
 
 
-    krn.task.current().sighand = try krn.signals.SigHand.new();
+    const old_sighand = krn.task.current().sighand.?;
+    const new_sighand = try krn.signals.SigHand.new();
+    for (0..krn.signals.NSIG) |_sig| {
+        const sig = krn.signals.Signal.fromInt(_sig);
+        const val = old_sighand.actions.getPtr(sig);
+        if (val.handler.handler == krn.signals.sigIGN)
+            new_sighand.actions.getPtr(sig).handler.handler = krn.signals.sigIGN;
+    }
+
+    krn.task.current().sighand = new_sighand;
     var it = krn.task.current().files.closexec.iterator(
         .{.direction = .forward, .kind = .set}
     );

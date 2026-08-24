@@ -35,6 +35,11 @@ pub fn do_chown(
     defer target.release();
 
     if (target.dentry.inode.ops.setattr) |_setattr| {
+        if (!target.dentry.inode.mode.canWrite(
+            target.dentry.inode.uid,
+            target.dentry.inode.gid,
+        ))
+            return errors.EPERM;
         const attr = fs.InodeAttrs{
             .uid = uid,
             .gid = gid,
@@ -77,6 +82,11 @@ pub fn fchown32(fd: u32, uid: u32, gid: u32) !u32 {
         file.ref.get();
         defer file.ref.put();
         if (file.inode.ops.setattr) |_setattr| {
+            if (!file.inode.mode.canWrite(
+                file.inode.uid,
+                file.inode.gid,
+            ))
+                return errors.EPERM;
             const attr = fs.InodeAttrs{
                 .uid = uid,
                 .gid = gid,
