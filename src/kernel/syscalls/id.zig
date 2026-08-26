@@ -47,7 +47,7 @@ pub fn getPGID(pid: i32) !u32 {
         return errors.ESRCH;
     if (pid == 0)
         return tsk.current().pgid;
-    if (tsk.initial_task.ptr().findByPid(@intCast(pid))) |task| {
+    if (tsk.processTreeRoot().findByPid(@intCast(pid))) |task| {
         defer task.refcount.put();
         return task.pgid;
     }
@@ -63,7 +63,7 @@ pub fn getSID(pid: i32) !u32 {
         return errors.EINVAL;
     if (pid == 0)
         return tsk.current().sid;
-    if (tsk.initial_task.ptr().findByPid(@intCast(pid))) |task| {
+    if (tsk.processTreeRoot().findByPid(@intCast(pid))) |task| {
         defer task.refcount.put();
         return task.sid;
     }
@@ -80,7 +80,6 @@ pub fn setSID() !u32 {
 }
 
 pub fn setPGID(pid: i32, pgid: i32) !u32 {
-    krn.logger.INFO("setPGID pid: {d}, pgid: {d}", .{pid, pgid});
     if (pgid < 0)
         return errors.EINVAL;
     if (pid < 0)
@@ -88,7 +87,7 @@ pub fn setPGID(pid: i32, pgid: i32) !u32 {
     var _task: ?*tsk.Task = null;
     if (pid == 0) {
         _task = tsk.current();
-    } else if (tsk.initial_task.ptr().findByPid(@intCast(pid))) |task| {
+    } else if (tsk.processTreeRoot().findByPid(@intCast(pid))) |task| {
         defer task.refcount.put();
         _task = task;
     }

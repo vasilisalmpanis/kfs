@@ -145,9 +145,52 @@ pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     return size;
 }
 
+fn pipe_poll(
+    base: *krn.fs.File,
+    pollfd: *krn.poll.PollFd,
+    poll_table: ?*krn.poll.PollTable,
+) !u32 {
+    const pipe = base.inode.data.pipe orelse return 0;
+    var read_ready: bool = false;
+    var write_ready: bool = false;
+
+    if (pollfd.events & krn.poll.POLLIN != 0) {
+        pipe.lock.lock();
+        const avail = pipe.rb.available();
+        const pollhup: bool = if (pipe.writers == 0) true else false;
+        pipe.lock.unlock();
+        if (avail > 0) {
+            pollfd.revents |= krn.poll.POLLIN;
+            read_ready = true;
+        }
+        if (pollhup) {
+            pollfd.revents |= krn.poll.POLLHUP;
+            read_ready = true;
+        }
+    }
+    if (pollfd.events & krn.poll.POLLOUT != 0) {
+        if (!pipe.rb.isFull()) {
+            pollfd.revents |= krn.poll.POLLOUT;
+            write_ready = true;
+        }
+        if (pipe.readers == 0) {
+            pollfd.revents |= krn.poll.POLLERR;
+            write_ready = true;
+        }
+    }
+    if (poll_table) |pt| {
+        if (!read_ready and pollfd.events & krn.poll.POLLIN != 0)
+            try pt.addNode(&pipe.read_queue);
+        if (!write_ready and pollfd.events & krn.poll.POLLOUT != 0)
+            try pt.addNode(&pipe.write_queue);
+    }
+    return if (write_ready or read_ready) 1 else 0;
+}
+
 pub const PipeFileOps: krn.fs.FileOps = krn.fs.FileOps {
     .open = open,
     .close = close,
     .write = write,
     .read = read,
+    .poll = pipe_poll,
 };
