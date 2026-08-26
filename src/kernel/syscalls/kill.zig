@@ -49,7 +49,7 @@ pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
         const lock_state = tsk.tasks_lock.lock_irq_disable();
         defer tsk.tasks_lock.unlock_irq_enable(lock_state);
 
-        var it = tsk.initial_task.ptrOn(0).tree.treeIterator();
+        var it = tsk.processTreeRoot().tree.treeIterator();
         var count: i32 = 0;
         const pgroup: u32 = if (pid < -1) @intCast(-pid) else tsk.current().pgid;
         while (it.next()) |i| {
@@ -64,7 +64,7 @@ pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
         const lock_state = tsk.tasks_lock.lock_irq_disable();
         defer tsk.tasks_lock.unlock_irq_enable(lock_state);
 
-        var it = tsk.initial_task.ptrOn(0).tree.treeIterator();
+        var it = tsk.processTreeRoot().tree.treeIterator();
         var count: i32 = 0;
         while (it.next()) |i| {
             const task = i.entry(tsk.Task, "tree");
@@ -84,7 +84,7 @@ pub fn doKill(pid: i32, sig: i32, tid: u32) !u32 {
             }
         }
         return if (count == 0) errors.ESRCH else 0;
-    } else if (tsk.initial_task.ptrOn(0).findByPid(@intCast(pid))) |task| {
+    } else if (tsk.processTreeRoot().findByPid(@intCast(pid))) |task| {
         defer task.refcount.put();
         return try send_signal(task, sig, tid);
     }

@@ -577,6 +577,11 @@ pub inline fn current() *Task {
 pub const initial_task = smp.PerCpu(Task, undefined, opaque {});
 pub const current_task = smp.PerCpu(*Task, undefined, opaque{});
 
+// The user process tree hangs off CPU0's initial task.
+pub inline fn processTreeRoot() *Task {
+    return initial_task.ptrOn(0);
+}
+
 pub var tasks_lock: krn.Spinlock = krn.Spinlock.init();
 pub var stopped_tasks: ?*lst.ListHead = null;
 

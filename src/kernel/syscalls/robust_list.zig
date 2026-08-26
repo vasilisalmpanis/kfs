@@ -28,7 +28,7 @@ pub fn get_robust_list(pid: i32, _head: ?*?*RobustListHead, _len: ?*usize) !u32 
         defer krn.task.tasks_lock.unlock_irq_enable(lock_state);
 
         const _pid: u16 = @intCast(pid);
-        var it = krn.task.initial_task.ptr().tree.treeIterator();
+        var it = krn.task.processTreeRoot().tree.treeIterator();
         while (it.next()) |i| {
             const curr = i.entry(krn.task.Task, "tree");
             if (curr.pid == _pid) {
