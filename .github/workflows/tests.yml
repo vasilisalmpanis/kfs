@@ -1,23 +1,18 @@
 name: QEMU Tests
 
 on:
-  push:
-    branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  test:
-    name: QEMU (${{ matrix.cores }} cores)
+  build:
+    name: Build test disk
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        cores: [1, 2, 8]
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -31,8 +26,71 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            grub-pc-bin grub-common gdisk e2fsprogs wget python3 \
-            qemu-system-x86
+            grub-pc-bin grub-common gdisk e2fsprogs wget python3
+
+      - name: Build test disk
+        run: make release/build/kfs-test.img
+
+      - name: Upload test disk
+        uses: actions/upload-artifact@v4
+        with:
+          name: kfs-test-disk
+          path: release/build/kfs-test.img
+          retention-days: 1
+
+  test:
+    name: QEMU (${{ matrix.cores }} cores)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        cores: [1, 2, 8]
+
+    steps:
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86
+
+      - name: Download test disk
+        uses: actions/download-artifact@v4
+        with:
+          name: kfs-test-disk
+          path: release/build
 
       - name: Run tests
-        run: make test CORES=${{ matrix.cores }}
+        run: |
+          set +e
+
+          timeout --foreground -k 10 900 \
+            qemu-system-i386 \
+              -drive file=release/build/kfs-test.img,format=raw \
+              -display none \
+              -monitor none \
+              -serial null \
+              -serial stdio \
+              -no-reboot \
+              -m 4G \
+              -smp ${{ matrix.cores }} \
+            | tee test.log
+
+          qemu_status=${PIPESTATUS[0]}
+
+          if [ "$qemu_status" -eq 124 ]; then
+            echo "QEMU tests timed out"
+            exit 124
+          fi
+
+          failed=$(sed -n 's/.*TEST_COMPLETE failed=\([0-9][0-9]*\).*/\1/p' test.log | tail -1)
+
+          if [ -z "$failed" ]; then
+            echo "TEST_COMPLETE line not found"
+            exit 1
+          fi
+
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+

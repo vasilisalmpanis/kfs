@@ -196,7 +196,7 @@ qemu: $(NAME)
 		-serial stdio \
 		-serial pty \
 		-m 4G \
-		-smp 2
+		-smp $(CORES)
 
 
 test: $(TEST_DISK)
@@ -214,6 +214,7 @@ test: $(TEST_DISK)
 debug: $(NAME)
 	$(QEMU) -drive file=$(NAME),format=raw \
 		-m 1G \
+		-smp $(CORES) \
 		-s -S &
 	gdb $(KERNEL) -ex "target remote localhost:1234" \
 		-ex "layout split src asm" \
