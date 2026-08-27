@@ -45,6 +45,7 @@ pub const errors = @import("./syscalls/error-codes.zig");
 
 pub const socket = @import("./net/socket.zig");
 pub const limit = @import("./sched/rlimit.zig");
+pub const random = @import("./random.zig");
 
 pub var keyboard: *kbd.Keyboard = &kbd.keyboard;
 pub var pit: PIT = undefined;

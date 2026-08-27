@@ -3,6 +3,7 @@ pub const driver = @import("./driver.zig");
 pub const device = @import("./device.zig");
 pub const serial = @import("./serial.zig");
 pub const nulldev = @import("./null.zig");
+pub const random = @import("./random.zig");
 pub const tty = @import("./tty.zig");
 pub const fb = @import("fb.zig");
 pub const mouse = @import("input/mouse.zig");

@@ -1234,6 +1234,9 @@ pub const kernel = struct {
 
     };
 
+    pub const random = struct {
+    };
+
 
     pub const fs = struct {
 
@@ -1807,6 +1810,12 @@ pub const kernel = struct {
         pub const rlimit = struct {
         };
 
+        pub const random = struct {
+        };
+
+        pub const affinity = struct {
+        };
+
     };
 
 
@@ -2223,6 +2232,9 @@ pub const drivers = struct {
         };
 
         pub const nulldev = struct {
+        };
+
+        pub const random = struct {
         };
 
         pub const tty = struct {

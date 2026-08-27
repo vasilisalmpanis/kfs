@@ -52,3 +52,5 @@ pub const id = @import("id.zig");
 pub const robust_list = @import("robust_list.zig");
 pub const epoll = @import("epoll.zig");
 pub const rlimit = @import("rlimit.zig");
+pub const random = @import("random.zig");
+pub const affinity = @import("affinity.zig");
