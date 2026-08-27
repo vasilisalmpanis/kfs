@@ -63,6 +63,7 @@ pub fn init() void {
     storage.bus.init();
 
     platform.nulldev.init();
+    platform.random.init();
     platform.serial.init();
     platform.tty.init();
     platform.fb.init();
