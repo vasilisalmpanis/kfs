@@ -7,7 +7,6 @@ pub fn getdents(_: u32, _: [*]u8, _: u32) !u32 {
 }
 
 pub fn getdents64(fd: u32, _dirents: ?[*]u8, size: u32) !u32 {
-    krn.logger.INFO("called with {d}\n", .{fd});
     var dirents = _dirents orelse
         return errors.EINVAL;
     @memset(dirents[0..size], 0);
@@ -16,7 +15,10 @@ pub fn getdents64(fd: u32, _dirents: ?[*]u8, size: u32) !u32 {
         defer dir_file.ref.put();
         if (dir_file.inode.mode.isDir()) {
             if (dir_file.ops.readdir) |readdir| {
-                if (krn.mm.kmallocSlice(u8, size)) |buf_slice| {
+                // Dirent64 entries are up to 1.6x larger than LinuxDirent ones,
+                // readdir advances file.pos so every entry it returns must fit.
+                const ksize: u32 = @max(size * 5 / 8, @sizeOf(krn.fs.LinuxDirent) + 1);
+                if (krn.mm.kmallocSlice(u8, ksize)) |buf_slice| {
                     defer krn.mm.kfree(buf_slice.ptr);
                     const ret =  try readdir(dir_file, buf_slice);
                     var offset: u32 = 0;
