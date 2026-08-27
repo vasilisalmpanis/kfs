@@ -467,12 +467,8 @@ pub const VMM = struct {
         end: u32,
         vma: *krn.proc_mm.VMA,
     ) void {
-        const area_type = vma.flags.TYPE;
-        if (area_type == .SHARED) {
-            // FIXME: accounting for shared mappings
-            krn.logger.INFO("We should somehow refcount pages and only free when the last user frees\n", .{});
-            return;
-        }
+        // FIXME: shared frames need refcounting; unmap them but never free
+        const free_phys = vma.flags.TYPE != .SHARED;
         const pd: [*]u32 = @ptrCast(current_page_dir);
 
         // Calculate page-aligned boundaries for exclusive end
@@ -516,16 +512,18 @@ pub const VMM = struct {
                         self.pageTableToAddr(pd_idx, pt_idx),
                     );
                     flushTLB(vma.mm.?.cpuMask());
-                    self.pmm.freePage(phys);
+                    if (free_phys)
+                        self.pmm.freePage(phys);
                 }
             }
             if (std.mem.allEqual(u32, pt[0..1024], 0)) {
+                const pt_phys: u32 = (pd[pd_idx] >> 12) << 12;
                 pd[pd_idx] = 0;
                 invalidatePage(
                     self.pageTableToAddr(pd_idx, 0)
                 );
                 flushTLB(vma.mm.?.cpuMask());
-                self.pmm.freePage((pd[pd_idx] >> 12) << 12);
+                self.pmm.freePage(pt_phys);
             }
 
             pt_start_idx = 0;
