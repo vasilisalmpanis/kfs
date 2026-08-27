@@ -160,7 +160,8 @@ fn user_thread(_: ?*const anyopaque) i32 {
         &file_was_unref,
         krn.userspace.argv_init,
         krn.userspace.envp_init,
-        false
+        false,
+        "/bin/init",
     ) catch |err| {
         if (!file_was_unref)
             file.ref.put();
