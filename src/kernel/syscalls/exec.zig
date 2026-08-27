@@ -48,6 +48,7 @@ fn handlerShbang(
     free_arg_env: bool,
     file: *krn.fs.File,
     resources_released: *bool,
+    filename: []const u8,
 ) anyerror!u32 {
     const new_line_idx = std.mem.indexOf(u8, binary, "\n") orelse binary.len;
     const shebang_line = binary[2..new_line_idx];
@@ -90,8 +91,8 @@ fn handlerShbang(
         arg_idx += 1;
     }
 
-    for (argv) |arg| {
-        new_argv[arg_idx] = dupString(arg) orelse {
+    for (argv, 0..) |arg, i| {
+        new_argv[arg_idx] = dupString(if (i == 0) filename else arg) orelse {
             return krn.errors.PosixError.ENOMEM;
         };
         arg_idx += 1;
@@ -121,7 +122,8 @@ fn handlerShbang(
         &new_resources_released,
         new_argv,
         new_envp,
-        true
+        true,
+        new_argv[0],
     );
 }
 
@@ -131,6 +133,7 @@ pub fn doExecve(
     argv: []const []const u8,
     envp: []const []const u8,
     free_arg_env: bool,
+    filename: []const u8,
 ) !u32 {
     // TODO:
     // - check suid / sgid and change euid / egid if needed
@@ -167,7 +170,8 @@ pub fn doExecve(
                 envp,
                 free_arg_env,
                 file,
-                resources_released
+                resources_released,
+                filename,
             );
         },
         .Unknown => return errors.ENOEXEC,
@@ -311,5 +315,6 @@ pub fn execve(
         argv_slice,
         envp_slice,
         true,
+        user_filename,
     );
 }
