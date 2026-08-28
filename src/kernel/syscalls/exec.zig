@@ -240,6 +240,8 @@ pub fn doExecve(
     resources_released.* = true;
 
     arch.syscalls.thread.resetTLS(krn.task.current());
+    krn.task.current().clear_tid = null;
+    krn.task.current().robust_list = null;
 
     krn.userspace.goUserspace();
     return 0;
