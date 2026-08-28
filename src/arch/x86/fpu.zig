@@ -217,30 +217,26 @@ pub inline fn restoreFPUState(state: *const FPUState) void {
 pub fn handleDeviceNotAvailable() void {
     if (!supportsTaskState())
         return;
-    clearTaskSwitched();
-    asm volatile ("fnclex");
     const current_task = krn.task.current();
 
-    if (current_task.fpu_state) |state| {
-        if (current_task.fpu_used) {
-            restoreFPUState(state);
-        } else {
-            // If this task hasn't used FPU before, initialize it
-            initFPUState();
-            current_task.fpu_used = true;
-        }
-    } else {
+    if (current_task.fpu_state == null) {
         arch.cpu.enableInterrupts();
-        const state = krn.mm.kmalloc(FPUState) orelse {
-            arch.cpu.disableInterrupts();
+        const state = krn.mm.kmalloc(FPUState);
+        arch.cpu.disableInterrupts();
+        current_task.fpu_state = state orelse {
             _ = krn.kill(
-                @intCast(krn.task.current().pid),
+                @intCast(current_task.pid),
                 @intCast(krn.signals.Signal.SIGSEGV.toPosix())
             ) catch {};
             return;
         };
-        arch.cpu.disableInterrupts();
-        current_task.fpu_state = state;
+    }
+
+    clearTaskSwitched();
+    asm volatile ("fnclex");
+    if (current_task.fpu_used) {
+        restoreFPUState(current_task.fpu_state.?);
+    } else {
         initFPUState();
         current_task.fpu_used = true;
     }
