@@ -432,6 +432,7 @@ pub const Task = struct {
             krn.task.current().vfork_wq = null;
         }
         if (self.fpu_state) |state| {
+            fpu.unloadFPUState(self);
             self.fpu_used = false;
             krn.mm.kfree(state);
             self.fpu_state = null;

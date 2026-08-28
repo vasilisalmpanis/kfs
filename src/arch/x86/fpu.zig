@@ -242,3 +242,14 @@ pub fn handleDeviceNotAvailable() void {
     }
     current_task.save_fpu_state = true;
 }
+
+pub fn unloadFPUState(task: *krn.task.Task) void {
+    const flags = arch.cpu.saveFlagsAndCli();
+    defer arch.cpu.restoreFlags(flags);
+    if (task.save_fpu_state) {
+        if (task.fpu_state) |state|
+            saveFPUState(state);
+        task.save_fpu_state = false;
+        setTaskSwitched();
+    }
+}

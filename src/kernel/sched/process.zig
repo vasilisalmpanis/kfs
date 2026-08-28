@@ -60,11 +60,7 @@ pub fn doFork() !u32 {
     var child_fpu_state: ?*arch.fpu.FPUState = null;
     var child_fpu_used = tsk.current().fpu_used;
     if (tsk.current().fpu_used and tsk.current().fpu_state != null) {
-        if (tsk.current().save_fpu_state) {
-            arch.fpu.saveFPUState(tsk.current().fpu_state.?);
-            tsk.current().save_fpu_state = false;
-            arch.fpu.setTaskSwitched();
-        }
+        arch.fpu.unloadFPUState(tsk.current());
         child_fpu_state = km.kmalloc(arch.fpu.FPUState) orelse {
             krn.logger.ERROR("fork: failed to alloc child fpu state", .{});
             return errors.ENOMEM;
