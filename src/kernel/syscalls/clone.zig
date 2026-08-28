@@ -179,11 +179,7 @@ pub fn clone(
     var child_fpu_state: ?*arch.fpu.FPUState = null;
     var child_fpu_used = krn.task.current().fpu_used;
     if (krn.task.current().fpu_used and krn.task.current().fpu_state != null) {
-        if (krn.task.current().save_fpu_state) {
-            arch.fpu.saveFPUState(krn.task.current().fpu_state.?);
-            krn.task.current().save_fpu_state = false;
-            arch.fpu.setTaskSwitched();
-        }
+        arch.fpu.unloadFPUState(krn.task.current());
         child_fpu_state = krn.mm.kmalloc(arch.fpu.FPUState) orelse {
             krn.logger.ERROR("clone: failed to alloc child fpu state", .{});
             return errors.ENOMEM;
