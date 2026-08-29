@@ -383,7 +383,12 @@ pub const VMM = struct {
         @memcpy(to_copy[0..PAGE_SIZE], from_copy[0..PAGE_SIZE]);
         const page_flags: u12 = @truncate(old_pt[pt_idx] & 0xFFF);
         new_pt[pt_idx] = new_page | page_flags;
-        self.unmapPage(virt, false);
+
+        // This pt mapping is only accessed by this mem_lock protected copy,
+        // so no other core can have a cache for it - no TLB shutdown needed
+        const tmp_pt: [*]PageEntry = first_page_table + 0x400 * (virt >> 22);
+        tmp_pt[(virt >> 12) & 0x3FF].erase();
+        invalidatePage(virt);
     }
 
     pub fn dupArea(self: *VMM, start: u32, end: u32, pair: VASpair, area_type: krn.mm.MAP_TYPE) !void{
