@@ -1391,6 +1391,7 @@ pub const kernel = struct {
                 map : std.bit_set.DynamicBitSet,
                 closexec : std.bit_set.DynamicBitSet,
                 fds : std.hash_map.HashMap(usize, *kernel.fs.file.File, std.hash_map.AutoContext(usize), 80),
+                lock : kernel.Spinlock,
                 ref : kernel.RefCount,
             };
 
