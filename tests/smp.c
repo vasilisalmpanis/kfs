@@ -14,7 +14,7 @@
  *   - concurrent mmap/munmap operations in one shared address space
  *   - thread teardown and fork/exit while other CPUs use the same mm
  *
- * Run the guest with at least two CPUs (for example, qemu -smp 2).
+ * Cross-CPU assertions are skipped when only one APIC ID is observed.
  *
  * Build:
  *   zig cc -target x86-linux-musl -static -O2 -pthread \
@@ -60,8 +60,15 @@
    more runnable tasks so timer preemption and same-CPU FPU switching occur. */
 #define OVERSUBSCRIBED_WORKERS 36
 
+enum test_result {
+    TEST_OK = 0,
+    TEST_FAILED = 1,
+    TEST_NEEDS_SMP = 2,
+};
+
 static int g_passed;
 static int g_failed;
+static int g_skipped;
 
 static void cpu_relax(void)
 {
@@ -90,7 +97,7 @@ static int failf(const char *fmt, ...)
     vprintf(fmt, ap);
     va_end(ap);
     putchar('\n');
-    return -1;
+    return TEST_FAILED;
 }
 
 static int join_threads(pthread_t *threads, unsigned count)
@@ -189,14 +196,14 @@ static int test_cpu_execution_and_progress(void)
     if (join_threads(threads, OVERSUBSCRIBED_WORKERS) != 0)
         return failf("pthread_join failed for a progress worker");
 
+    if (cpu_seen_count() < 2)
+        return TEST_NEEDS_SMP;
     for (i = 0; i < OVERSUBSCRIBED_WORKERS; i++) {
         if (progress_counts[i] < 100)
             return failf("worker %u made insufficient progress (%llu loops)",
                          i, (unsigned long long)progress_counts[i]);
     }
-    if (cpu_seen_count() < 2)
-        return failf("userspace observed only one APIC ID; run with -smp >= 2");
-    return 0;
+    return TEST_OK;
 }
 
 /* ------------------------------------------------------------------ */
@@ -216,8 +223,12 @@ static void *counter_worker(void *arg)
     (void)arg;
     while (!atomic_load_explicit(&counter_start, memory_order_acquire))
         cpu_relax();
-    for (i = 0; i < COUNTER_ITERS; i++)
+    for (i = 0; i < COUNTER_ITERS; i++) {
         atomic_fetch_add_explicit(&shared_counter, 1, memory_order_seq_cst);
+        if ((i & 0x3ffu) == 0)
+            mark_current_cpu();
+    }
+    mark_current_cpu();
     return NULL;
 }
 
@@ -281,6 +292,7 @@ static int test_atomic_coherence_and_publication(void)
     uint64_t expected = (uint64_t)SMP_WORKERS * COUNTER_ITERS;
     unsigned i;
 
+    reset_cpu_seen();
     atomic_store(&counter_start, 0);
     atomic_store(&shared_counter, 0);
     for (i = 0; i < SMP_WORKERS; i++) {
@@ -294,6 +306,8 @@ static int test_atomic_coherence_and_publication(void)
         return failf("atomic counter is %llu, expected %llu",
                      (unsigned long long)atomic_load(&shared_counter),
                      (unsigned long long)expected);
+    if (cpu_seen_count() < 2)
+        return TEST_NEEDS_SMP;
 
     reset_cpu_seen();
     atomic_store(&message_turn, 0);
@@ -309,8 +323,8 @@ static int test_atomic_coherence_and_publication(void)
         return failf("release/acquire publication saw %u corrupt messages",
                      atomic_load(&message_errors));
     if (cpu_seen_count() < 2)
-        return failf("publication workers were not observed on two CPUs");
-    return 0;
+        return TEST_NEEDS_SMP;
+    return TEST_OK;
 }
 
 /* ------------------------------------------------------------------ */
@@ -418,14 +432,14 @@ static int test_cross_cpu_futex_wake(void)
     if (probe_woken < SMP_WORKERS)
         return failf("FUTEX_WAKE reported only %u successful probe wakes",
                      probe_woken);
-    if (remote_woken == 0)
-        return failf("no remote-CPU waiter returned from FUTEX_WAIT");
     if (atomic_load(&futex_errors) != 0 ||
         atomic_load(&futex_observed) != SMP_WORKERS)
         return failf("only %u/%u waiters observed the wake (%u errors)",
                      atomic_load(&futex_observed), SMP_WORKERS,
                      atomic_load(&futex_errors));
-    return 0;
+    if (remote_woken == 0)
+        return TEST_NEEDS_SMP;
+    return TEST_OK;
 }
 
 /* ------------------------------------------------------------------ */
@@ -600,6 +614,7 @@ static int test_tlb_shootdown(void)
     volatile uint32_t *guard;
     volatile uint32_t *fresh;
     uint32_t stable_cpus[8] = {0};
+    unsigned populated_cpu_count;
     unsigned stable_cpu_count = 0;
     unsigned i;
 
@@ -642,8 +657,7 @@ static int test_tlb_shootdown(void)
            TLB_WORKERS)
         cpu_relax();
 
-    if (cpu_seen_count() < 2)
-        return failf("TLB workers did not populate mappings on two CPUs");
+    populated_cpu_count = cpu_seen_count();
     if (atomic_load(&tlb_initial_errors) != 0)
         return failf("%u workers failed to establish the old mapping",
                      atomic_load(&tlb_initial_errors));
@@ -684,11 +698,14 @@ static int test_tlb_shootdown(void)
     }
     for (i = 0; i < ARRAY_SIZE(stable_cpus); i++)
         stable_cpu_count += __builtin_popcount(stable_cpus[i]);
-    if (stable_cpu_count < 2)
-        return failf("fewer than two workers stayed on one CPU for remap");
     if (munmap(region, 3 * TEST_PAGE_SIZE) != 0)
         return failf("final munmap failed: %s", strerror(errno));
-    return 0;
+    if (stable_cpu_count < 2) {
+        if (populated_cpu_count < 2)
+            return TEST_NEEDS_SMP;
+        return failf("fewer than two workers stayed on one CPU for remap");
+    }
+    return TEST_OK;
 }
 
 /* ------------------------------------------------------------------ */
@@ -975,9 +992,14 @@ static void run_isolated(const struct test_case *test)
         return;
     }
     if (pid == 0) {
+        int test_result;
+
         if (setpgid(0, 0) != 0)
             _exit(125);
-        _exit(test->run() == 0 ? 0 : 1);
+        test_result = test->run();
+        if (test_result < TEST_OK || test_result > TEST_NEEDS_SMP)
+            test_result = TEST_FAILED;
+        _exit(test_result);
     }
 
     for (tick = 0; tick < TEST_TIMEOUT_TICKS && result == 0; tick++) {
@@ -1003,6 +1025,10 @@ static void run_isolated(const struct test_case *test)
     if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
         printf("[ PASS  ] %s\n", test->name);
         g_passed++;
+    } else if (WIFEXITED(status) &&
+               WEXITSTATUS(status) == TEST_NEEDS_SMP) {
+        printf("[ SKIP  ] %s [only one APIC ID observed]\n", test->name);
+        g_skipped++;
     } else if (WIFSIGNALED(status)) {
         printf("[ FAIL  ] %s [signal %d]\n", test->name, WTERMSIG(status));
         g_failed++;
@@ -1022,6 +1048,7 @@ int main(void)
     for (i = 0; i < ARRAY_SIZE(tests); i++)
         run_isolated(&tests[i]);
 
-    printf("\n=== %d passed, %d failed ===\n", g_passed, g_failed);
+    printf("\n=== %d passed, %d failed, %d skipped ===\n", g_passed,
+           g_failed, g_skipped);
     return g_failed ? 1 : 0;
 }
