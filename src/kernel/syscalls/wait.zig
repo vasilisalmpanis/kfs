@@ -143,14 +143,22 @@ pub fn wait4(pid: i32, wstatus: ?*i32, options: u32, rusage: ?*Rusage) !u32 {
             return err;
         };
 
-        krn.task.tasks_lock.unlock_irq_enable(lock_state);
-        if (res != 0 or (options & WNOHANG) != 0)
+        if (res != 0 or (options & WNOHANG) != 0) {
+            krn.task.tasks_lock.unlock_irq_enable(lock_state);
             return res;
+        }
 
-        if (tsk.current().hasPendingSignal())
+        if (tsk.current().hasPendingSignal()) {
+            krn.task.tasks_lock.unlock_irq_enable(lock_state);
             return errors.ERESTARTSYS;
+        }
 
-        tsk.current().wait_wq.wait(true, 0);
+        tsk.current().wait_wq.waitAndUnlock(
+            true,
+            0,
+            &krn.task.tasks_lock,
+            lock_state,
+        );
     }
     return 0;
 }
