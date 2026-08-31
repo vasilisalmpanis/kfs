@@ -7,10 +7,8 @@ ROOT_IMG=${ROOT_IMG:-rootfs.img}
 GRUB_CFG=${GRUB_CFG:-boot/grub/grub.cfg}
 GRUB_THEME=${GRUB_THEME:-boot/grub/theme}
 
-BOOT_TREE=$(dirname "$(dirname "$GRUB_CFG")")
-
 KERNEL_SIZE_K=`du -s "$KERNEL" | awk '{print $1}'`
-BOOT_DIR_SIZE_K=`du -s "$BOOT_TREE" | awk '{print $1}'`
+BOOT_DIR_SIZE_K=$(( `du -s "$GRUB_THEME" | awk '{print $1}'` + `du -s "$GRUB_CFG" | awk '{print $1}'` ))
 ROOT_SIZE_BYTES=$(
     stat -c %s "$ROOT_IMG" 2>/dev/null ||
         stat -f %z "$ROOT_IMG"
