@@ -4,7 +4,14 @@ KERNEL				= zig-out/bin/kfs.bin
 SRC_DIR				= src
 BOOT_DIR			= boot
 BOOT_GRUB_DIR		= $(BOOT_DIR)/grub
-GRUB_CFG			= $(BOOT_GRUB_DIR)/grub.cfg
+GRUB_CFG_IN			= $(BOOT_GRUB_DIR)/grub.cfg.in
+GRUB_CFG			= $(BUILD_DIR)/grub.cfg
+
+# Filter out opt=val that is not meant for grub but for MAKE
+MAKE_ONLY_VARS		= CORES NAME QEMU KVM ROOTFS_IMG OS
+ROOT_DEV		= root=/dev/sda3
+KCMDLINE		= $(strip $(ROOT_DEV) $(filter-out $(addsuffix =%,$(MAKE_ONLY_VARS)),$(MAKEOVERRIDES)))
+CMDLINE_STAMP		= $(BUILD_DIR)/cmdline.stamp
 
 MOD_SRC_DIR			= modules
 MODULES				= example keyboard time
@@ -161,6 +168,12 @@ $(TEST_ROOTFS_IMG): $(ROOTFS_MIN_DIR) $(TEST_BIN) scripts/test-run.sh scripts/te
 
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
+
+$(CMDLINE_STAMP): FORCE | $(BUILD_DIR)
+	@echo '$(KCMDLINE)' | cmp -s - $@ || echo '$(KCMDLINE)' > $@
+
+$(GRUB_CFG): $(GRUB_CFG_IN) $(CMDLINE_STAMP)
+	sed 's|@CMDLINE@|$(KCMDLINE)|' $< > $@
 
 $(RELEASE_DIR):
 	@mkdir -p $(RELEASE_DIR)
@@ -331,7 +344,7 @@ install-tools:
 	fi
 	@$(MAKE) check-tools
 
-.PHONY: all clean fclean qemu debug test modules build-image \
+.PHONY: FORCE all clean fclean qemu debug test modules build-image \
 	prepare-rootfs \
 	release-full release-min release-kernel release-all \
 	check-tools \
