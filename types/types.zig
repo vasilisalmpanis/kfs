@@ -1820,6 +1820,9 @@ pub const kernel = struct {
     };
 
 
+    pub const cmdline = struct {
+    };
+
 };
 
 pub const debug = struct {
