@@ -164,8 +164,8 @@ fn kernel_stack_trace_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usi
         errdefer kernel.mm.kfree(kbuf.ptr);
 
         arch.cpu.disableInterrupts();
-        defer arch.cpu.enableInterrupts();
         const n = dbg.formatKernelStackTraceForTask(kbuf, kstack_max_frames, task);
+        arch.cpu.enableInterrupts();
 
         try generic_ops.assignSlice(file, kbuf[0..n]);
     }
