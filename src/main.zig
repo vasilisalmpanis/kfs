@@ -52,18 +52,21 @@ pub fn panic(
 }
 
 fn getRootDevice() []const u8 {
-    if (krn.boot_info.getTag(multiboot.TagBootCommandLine)) |tag| {
-        const _cmdline: [*:0]const u8 = @ptrFromInt(@intFromPtr(tag) + 8);
-        const cmdline: []const u8 = std.mem.span(_cmdline);
-        if (std.mem.indexOf(u8, cmdline, "root=")) |pos| {
-            const rest = cmdline[pos + 5..];
-            const end = std.mem.indexOfScalar(u8, rest, ' ') orelse rest.len;
-            const root_dev = rest[0..end];
-            krn.logger.INFO("Boot cmdline root device: {s}", .{root_dev});
-            return root_dev;
-        }
+    if (krn.cmdline.get("root")) |root_dev| {
+        krn.logger.INFO("Boot cmdline root device: {s}", .{root_dev});
+        return root_dev;
     }
     return "/dev/sda";
+}
+
+fn getLoggerLevel() dbg.log.LogLevel {
+    if (krn.cmdline.get("logger")) |arg_level| {
+        inline for (@typeInfo(dbg.log.LogLevel).@"enum".fields) |field| {
+            if (std.ascii.eqlIgnoreCase(field.name, arg_level))
+                return @field(dbg.log.LogLevel, field.name);
+        }
+    }
+    return .DEBUG;
 }
 
 fn move_root() void {
@@ -186,9 +189,12 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
     fpu.initFPU();
     drv.platform.serial.init_ports();
     krn.serial.print("[INIT]: Serial done\n");
-    krn.logger = Logger.init(.DEBUG);
+
+    var boot_info = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
+    krn.cmdline.init(&boot_info);
+    krn.logger = Logger.init(getLoggerLevel());
     krn.serial.print("[INIT]: Logger done\n");
-    const boot_info = multiboot.Multiboot.init(address + mm.PAGE_OFFSET);
+
     krn.boot_info = boot_info;
     krn.serial.print("[INIT]: Multiboot done\n");
 
