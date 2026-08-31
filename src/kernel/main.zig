@@ -73,3 +73,5 @@ pub const doExecve = @import("./syscalls/exec.zig").doExecve;
 pub const poll = @import("./syscalls/poll.zig");
 pub const syscalls = @import("syscalls/main.zig");
 pub const exit = syscalls.exit;
+
+pub const cmdline = @import("cmdline.zig");
