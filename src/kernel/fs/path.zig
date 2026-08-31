@@ -221,7 +221,10 @@ pub fn resolveFrom(path: []const u8, from: Path, follow: bool) !Path {
     var res = try dir_resolve_from(path, from, &last);
     errdefer res.release();
     if (last.len > 0) {
-        try res.stepInto(last, follow);
+        const trailing = path[path.len - 1] == '/';
+        try res.stepInto(last, follow or trailing);
+        if (trailing and !res.dentry.inode.mode.isDir())
+            return krn.errors.PosixError.ENOTDIR;
     }
     return res;
 }
@@ -231,7 +234,10 @@ pub fn resolve(path: []const u8) !Path {
     var res = try dir_resolve(path, &last);
     errdefer res.release();
     if (last.len > 0) {
+        const trailing = path[path.len - 1] == '/';
         try res.stepInto(last, true);
+        if (trailing and !res.dentry.inode.mode.isDir())
+            return krn.errors.PosixError.ENOTDIR;
     }
     return res;
 }
