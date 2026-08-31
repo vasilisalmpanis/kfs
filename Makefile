@@ -9,8 +9,8 @@ GRUB_CFG			= $(BUILD_DIR)/grub.cfg
 
 # Filter out opt=val that is not meant for grub but for MAKE
 MAKE_ONLY_VARS		= CORES NAME QEMU KVM ROOTFS_IMG OS
-ROOT_DEV		= root=/dev/sda3
-KCMDLINE		= $(strip $(ROOT_DEV) $(filter-out $(addsuffix =%,$(MAKE_ONLY_VARS)),$(MAKEOVERRIDES)))
+ROOT_DEV			= root=/dev/sda3
+KCMDLINE			= $(strip $(ROOT_DEV) $(filter-out $(addsuffix =%,$(MAKE_ONLY_VARS)),$(MAKEOVERRIDES)))
 CMDLINE_STAMP		= $(BUILD_DIR)/cmdline.stamp
 
 MOD_SRC_DIR			= modules
