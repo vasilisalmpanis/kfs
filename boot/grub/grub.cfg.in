@@ -12,33 +12,31 @@ set default=1
 set timeout=5
 
 menuentry "2560x1440" {
-	multiboot2 /kfs.bin root=/dev/sda3
+	multiboot2 /kfs.bin @CMDLINE@
 	set gfxpayload=2560x1440x32
 	boot
 }
 
 menuentry "1920x1080" {
-	multiboot2 /kfs.bin root=/dev/sda3
-	# If booting from image with no partitions:
-	# multiboot2 /kfs.bin root=/dev/sda
+	multiboot2 /kfs.bin @CMDLINE@
 	set gfxpayload=1920x1080x32
 	boot
 }
 
 menuentry "1600x1200" {
-	multiboot2 /kfs.bin root=/dev/sda3
+	multiboot2 /kfs.bin @CMDLINE@
 	set gfxpayload=1600x1200x32
 	boot
 }
 
 menuentry "1440x900" {
-	multiboot2 /kfs.bin root=/dev/sda3
+	multiboot2 /kfs.bin @CMDLINE@
 	set gfxpayload=1440x900x32
 	boot
 }
 
 menuentry "800x600" {
-	multiboot2 /kfs.bin root=/dev/sda3
+	multiboot2 /kfs.bin @CMDLINE@
 	set gfxpayload=800x600x32
 	boot
 }
