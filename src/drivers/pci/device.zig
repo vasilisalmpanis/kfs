@@ -156,6 +156,24 @@ pub const PCIDevice = struct {
     pub fn write(self: *const PCIDevice, offset: u8, value: u32) void {
         writePCI(self.pci_cmd, offset, value);
     }
+
+    pub fn getBarSize(self: *const PCIDevice, bar_offset: u8) u32 {
+        var size: u32 = 0;
+        const orig: u32 = self.read(bar_offset);
+        const cmd: u32 = self.read(0x04);
+        // disable mem and IO decoding
+        self.write(0x04, cmd & ~@as(u8, 0x3));
+        self.write(bar_offset, 0xFFFF_FFFF);
+        const mask: u32 = self.read(bar_offset);
+        self.write(bar_offset, orig);
+        self.write(0x04, cmd);
+        if (orig & 1 == 1) {
+            size = ~(mask & 0xFFFF_FFFC) + 1;
+        } else {
+            size = ~(mask & 0xFFFF_FFF0) + 1;
+        }
+        return size;
+    }
 };
 
 fn writePCI(cmd: ConfigCommand, reg_offset: u8, value: u32) void {

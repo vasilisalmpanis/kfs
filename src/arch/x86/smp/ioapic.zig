@@ -181,6 +181,20 @@ pub const Controller = struct {
             false
         );
     }
+
+    pub fn setPCIIRQ(
+        self: *Controller, gsi: u32, vector: u8, masked: bool
+    ) !void {
+        if (gsi < self.gsi_base or gsi - self.gsi_base >= self.redir_entr_count)
+            return krn.errors.PosixError.EINVAL;
+        self.setRoute(
+            gsi - self.gsi_base,
+            vector,
+            true,
+            true,
+            masked
+        );
+    }
 };
 
 pub fn init(ioapic_entry: *align(1) apic.IOAPIC) !void {

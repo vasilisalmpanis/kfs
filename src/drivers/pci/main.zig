@@ -6,3 +6,4 @@ pub const PCIDevice = device.PCIDevice;
 pub const PCIDriver = driver.PCIDriver;
 
 pub const ide = @import("./ide.zig");
+pub const e1000 = @import("../net/e1000.zig");

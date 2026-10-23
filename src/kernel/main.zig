@@ -44,6 +44,7 @@ pub const jiffies = @import("./time/jiffies.zig");
 pub const errors = @import("./syscalls/error-codes.zig");
 
 pub const socket = @import("./net/socket.zig");
+pub const net = @import("./net/main.zig");
 pub const limit = @import("./sched/rlimit.zig");
 pub const random = @import("./random.zig");
 
