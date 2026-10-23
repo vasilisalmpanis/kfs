@@ -209,7 +209,9 @@ qemu: $(NAME)
 		-serial stdio \
 		-serial pty \
 		-m 4G \
-		-smp $(CORES)
+		-smp $(CORES) \
+		-netdev user,id=net0\
+		-device e1000,netdev=net0
 
 
 test: $(TEST_DISK)

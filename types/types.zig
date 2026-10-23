@@ -730,8 +730,8 @@ pub const arch = struct {
             pub const Controller = struct {
                 io_apic_id : u8,
                 gsi_base : u32,
-                version : u32= 0,
-                redir_entr_count : u32= 0,
+                version : u32= 4157800448,
+                redir_entr_count : u32= 4157800448,
                 regs : [*]u32,
                 lock : kernel.Spinlock,
             };
@@ -1168,7 +1168,7 @@ pub const kernel = struct {
 
 
         pub const SigPending = struct {
-            set : std.bit_set.ArrayBitSet(usize, 64),
+            set : std.bit_set.Array(usize, 64),
         };
 
         pub const SigHand = struct {
@@ -1222,6 +1222,28 @@ pub const kernel = struct {
             accept_wait : kernel.wq.WaitQueueHead,
             rw_queue : kernel.wq.WaitQueueHead,
             pending_link : kernel.list.ListHead,
+        };
+
+    };
+
+    pub const net = struct {
+        pub const dev = struct {
+            pub const NetDeviceOps = struct {
+                xmit : *const fn(*kernel.net.dev.NetDevice, u32, u16) anyerror!void,
+            };
+
+            pub const NetDevice = struct {
+                name : [16]u8,
+                ifindex : u32= 0,
+                addr_len : u8= 6,
+                dev_addr : [6]u8,
+                broadcast : [6]u8,
+                ops : *const kernel.net.dev.NetDeviceOps,
+                priv : ?*anyopaque= null,
+                lock : kernel.Mutex,
+                list : kernel.list.ListHead,
+            };
+
         };
 
     };
@@ -1388,8 +1410,8 @@ pub const kernel = struct {
             };
 
             pub const TaskFiles = struct {
-                map : std.bit_set.DynamicBitSet,
-                closexec : std.bit_set.DynamicBitSet,
+                map : std.bit_set.DynamicManaged,
+                closexec : std.bit_set.DynamicManaged,
                 fds : std.hash_map.HashMap(usize, *kernel.fs.file.File, std.hash_map.AutoContext(usize), 80),
                 lock : kernel.Spinlock,
                 ref : kernel.RefCount,
@@ -2191,7 +2213,7 @@ pub const drivers = struct {
         pub const Driver = struct {
             name : []const u8,
             list : kernel.list.ListHead,
-            minor_set : std.bit_set.ArrayBitSet(usize, 256),
+            minor_set : std.bit_set.Array(usize, 256),
             minor_mutex : kernel.Mutex,
             major : u8= 0,
             fops : ?*kernel.fs.file.FileOps= null,
@@ -2369,6 +2391,26 @@ pub const drivers = struct {
 
 
         pub const ide = struct {
+        };
+
+        pub const e1000 = struct {
+            pub const E1000Device = struct {
+                pub extern fn intHandler(?*anyopaque)void;
+                mem : [*]u32,
+                mem_base : u32,
+                mem_size : u32,
+                io_base : u32,
+                int_line : u8,
+                eeprom_exists : bool= false,
+                mac : [6]u8,
+                rxtx_mem : ?std.net.e1000.DmaMemory= null,
+                rx_buffers : [32]?std.net.e1000.DmaMemory,
+                rx_descs : [*]std.net.e1000.E1000RxDesc,
+                tx_descs : [*]std.net.e1000.E1000TxDesc,
+                rx_curr : u8= 0,
+                tx_curr : u8= 0,
+            };
+
         };
 
     };

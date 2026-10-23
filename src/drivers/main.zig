@@ -70,5 +70,6 @@ pub fn init() void {
     platform.mouse.init();
 
     pci.ide.init();
+    pci.e1000.init();
     storage.ata.init();
 }
