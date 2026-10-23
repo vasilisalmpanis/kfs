@@ -15,12 +15,12 @@ const mm = @import("../mm/init.zig");
 const errors = @import("../syscalls/error-codes.zig").PosixError;
 const smp = arch.smp;
 
-var pid_bitset = std.bit_set.ArrayBitSet(
+var pid_bitset = std.bit_set.Array(
     usize,
     std.math.maxInt(u16) + 1
-).initEmpty();
+).empty;
 var pid_lock = krn.Spinlock.init();
-pub var pid_it: std.bit_set.ArrayBitSet(usize, std.math.maxInt(u16)).Iterator(.{
+pub var pid_it: std.bit_set.Array(usize, std.math.maxInt(u16)).Iterator(.{
     .direction = .forward,
     .kind = .unset,
 }) = undefined;
@@ -82,7 +82,7 @@ pub const Task = struct {
     name:           [16] u8,
     uid:            u16,
     gid:            u16,
-    groups:         [MAX_GROUPS]u16 = .{0} ** MAX_GROUPS,
+    groups:         [MAX_GROUPS]u16 = @splat(0),
     groups_count:   u8              = 0,
     pgid:           u16             = 1,
     sid:            u16             = 1,
@@ -149,7 +149,7 @@ pub const Task = struct {
             .pid = 0,
             .uid = uid,
             .gid = gid,
-            .groups = .{0} ** MAX_GROUPS,
+            .groups = @splat(0),
             .groups_count = 0,
             .pgid = pgid,
             .sid = pgid,
@@ -164,7 +164,7 @@ pub const Task = struct {
             .tls_selector = arch.idt.USER_DATA_SEGMENT,
             .tls_access = 0x72,
             .tls_gran = 0,
-            .name = .{0} ** 16,
+            .name = @splat(0),
             .should_stop = false,
             .utime = 0,
             .stime = 0,
@@ -218,7 +218,7 @@ pub const Task = struct {
 
     pub fn setName(self: *Task, name: []const u8) void {
         const len = if (name.len >= 15) 15 else name.len;
-        self.name = .{0} ** 16;
+        self.name = @splat(0);
         @memcpy(self.name[0..len], name[0..len]);
     }
 
@@ -543,11 +543,11 @@ pub const Task = struct {
         ) != 0;
     }
 
-    pub fn getRealPending(self: *Task) std.StaticBitSet(signal.NSIG) {
+    pub fn getRealPending(self: *Task) std.bit_set.Static(signal.NSIG) {
         const real_pending = (
             self.sigpending.getRaw() | self.thread_data.?.pending.getRaw()
         ) & (~self.sigmask.toU64());
-        return @bitCast(real_pending);
+        return .{ .masks = @bitCast(real_pending) };
     }
 
     pub fn removeThread(self: *Task) void {

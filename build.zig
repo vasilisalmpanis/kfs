@@ -10,7 +10,7 @@ const archs = [_]std.Target.Cpu.Arch{
 };
 
 pub fn build(b: *std.Build) !void {
-    b.release_mode = .fast;
+    b.graph.release_mode = .fast;
     const user_arch = b.option(
         []const u8,
         "arch",

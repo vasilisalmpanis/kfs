@@ -186,7 +186,7 @@ const ChannelType = enum {
 var current_channel: ChannelType = .PRIMARY_MASTER;
 
 pub const ATADrive = struct {
-    name: [41]u8 = .{0} ** 41,
+    name: [41]u8 = @splat(0),
     channel: ChannelType = .PRIMARY_MASTER,
 
     io_base: u16 = 0,
@@ -548,7 +548,7 @@ fn ata_probe_channel(
     ch_type: ChannelType,
     ide_device: *const pci.PCIDevice
 ) ?ATADrive {
-    var str: [41]u8 = .{0} ** 41;
+    var str: [41]u8 = @splat(0);
     if(ata_identify(ch_type) != 0)
     {
         for (0..20) |i| {
@@ -631,7 +631,7 @@ pub const ATAManager = struct {
 
 pub var ata_manager: ATAManager = undefined;
 
-pub var drive_names: std.bit_set.IntegerBitSet(26) = std.bit_set.IntegerBitSet(26).initEmpty();
+pub var drive_names: std.bit_set.IntegerBitSet(26) = std.bit_set.Integer(26).empty;
 var drive_names_lock = kernel.Mutex.init();
 
 fn getDriveName() ?[] const u8 {
@@ -694,9 +694,9 @@ pub fn ata_init(pci_device: *pci.PCIDevice) void {
             return;
         };
         pci_device.dev.data = @ptrCast(manager);
-        inline for (std.meta.fields(ChannelType)) |field| {
+        inline for (std.meta.tags(ChannelType)) |channel| {
             if (ata_probe_channel(
-                @enumFromInt(field.value),
+                channel,
                 pci_device,
             ))|drive| {
                 if (getDriveName()) |name| {

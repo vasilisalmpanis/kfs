@@ -271,7 +271,7 @@ pub const Multiboot = struct {
     addr: u32,
     header: *Header,
     curr_tag: ?*Tag = null,
-    tag_addresses: [22]u32 = .{0} ** 22,
+    tag_addresses: [22]u32 = @splat(0),
     
     pub fn init(addr: u32) Multiboot {
         var mtb = Multiboot{

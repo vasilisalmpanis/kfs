@@ -18,7 +18,7 @@ fn mountTreeHelper(mnt: *krn.fs.Mount, level: u32, last_child: bool) void {
         }
     }
     if (!last_child) {
-        var buff: [512:0]u8 = .{0} ** 512;
+        var buff: [512:0]u8 = @splat(0);
         _ = std.fmt.printInt(
             &buff,
             0,

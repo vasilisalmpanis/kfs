@@ -115,7 +115,7 @@ pub fn do_statx(inode: *fs.Inode, buf: *Statx) !u32 {
     buf.stx_dio_read_offset_align = 0;
     buf.stx_atomic_write_unix_max_opt = 0;
     buf.__spare1[0] = 0;
-    buf.__spare3 = [_]u64{0} ** 8;
+    buf.__spare3 = @splat(0);
     return 0;
 }
 

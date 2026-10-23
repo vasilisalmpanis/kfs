@@ -246,7 +246,7 @@ pub fn rt_sigtimedwait(
     while (true) {
         const task_raw = krn.task.current().sigpending.getRaw();
         const thread_raw = krn.task.current().thread_data.?.pending.getRaw();
-        const all_pending: std.StaticBitSet(signals.NSIG) = @bitCast(task_raw | thread_raw);
+        const all_pending: std.bit_set.Static(signals.NSIG) = .{ .masks = @bitCast(task_raw | thread_raw) };
         var iterator = all_pending.iterator(.{});
         while (iterator.next()) |sig| {
             const signal = signals.Signal.fromInt(sig);

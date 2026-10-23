@@ -190,7 +190,7 @@ pub const Iterator = struct {
 test "descendants iterator traverses depth first" {
     const testing = @import("std").testing;
 
-    var nodes: [6]TreeNode = .{TreeNode.init()} ** 6;
+    var nodes: [6]TreeNode = @splat(TreeNode.init());
     for (&nodes) |*node| {
         node.setup();
     }

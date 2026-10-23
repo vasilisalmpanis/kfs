@@ -16,7 +16,7 @@ const Statfs64 = extern struct {
 	f_namelen: u32,
 	f_frsize: u32,
 	f_flags: u32,
-	f_spare: [4]u32 = .{0} ** 4,
+	f_spare: [4]u32 = @splat(0),
 
     pub fn fromStatfs(stat: fs.Statfs) Statfs64 {
         return Statfs64{

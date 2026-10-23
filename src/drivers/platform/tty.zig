@@ -106,7 +106,7 @@ var tty_file_ops = krn.fs.FileOps{
 
 const MAX_VTS: usize = 10;
 
-var vt_ttys: [MAX_VTS]?*TTY = [_]?*TTY{null} ** MAX_VTS;
+var vt_ttys: [MAX_VTS]?*TTY = @splat(null);
 
 fn registerVT(vt_idx: u16, tty_dev: *TTY) void {
     if (vt_idx == 0 or vt_idx > MAX_VTS)
@@ -267,7 +267,7 @@ fn print_raw_input(msg: []const u8) void {
         if (std.ascii.isPrint(_ch)) {
             krn.serial.putchar(_ch);
         } else {
-            var buff: [5]u8 = .{0} ** 5;
+            var buff: [5]u8 = @splat(0);
             const buff_s: []u8 = buff[0..5];
             const res = std.fmt.bufPrint(
                 buff_s,

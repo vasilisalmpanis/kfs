@@ -21,7 +21,7 @@ const FBBitfield = extern struct {
 };
 
 const FBFixScreeninfo = extern struct{
-	id: [16]u8 = .{0} ** 16,	// identification string eg "TT Builtin"
+	id: [16]u8 = @splat(0),	// identification string eg "TT Builtin"
 	smem_start: u32 = 0,	        // Start of frame buffer mem
 					// (physical address)
 	smem_len: u32 = 0,		// Length of frame buffer mem
@@ -38,7 +38,7 @@ const FBFixScreeninfo = extern struct{
 	accel: u32 = 0,			// Indicate to driver which
 					//  specific chip/card we have
 	capabilities: u16 = 0,		// see FB_CAP_/
-	reserved: [2]u16 = .{0} ** 2,	// Reserved for future compatibility
+	reserved: [2]u16 = @splat(0),	// Reserved for future compatibility
 };
 
 const FBVarScreeninfo = extern struct {
@@ -78,7 +78,7 @@ const FBVarScreeninfo = extern struct {
 	vmode: u32 = 0,			// see FB_VMODE
 	rotate: u32 = 0,		// angle we rotate counter clockwise
 	colorspace: u32 = 0,		// colorspace for FOURCC-based modes
-	reserved: [4]u32 = .{0} ** 4,	// Reserved for future compatibility
+	reserved: [4]u32 = @splat(0),	// Reserved for future compatibility
 };
 
 var fb_driver = pdrv.PlatformDriver {

@@ -14,7 +14,7 @@ pub const Pipe = struct {
     lock: mutex.Mutex = mutex.Mutex.init(),
 
     pub fn setup(self: *Pipe) void {
-        self._buffer = .{0} ** BUFFER_SIZE;
+        self._buffer = @splat(0);
         self.readers = 1;
         self.writers = 1;
         self.rb = krn.ringbuf.RingBuf{

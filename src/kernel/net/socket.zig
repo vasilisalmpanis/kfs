@@ -39,7 +39,7 @@ pub const Socket = struct {
 
     sock_type: u16 = SOCK_STREAM,
     is_listening: bool = false,
-    bound_path: [MAX_UNIX_PATH]u8 = .{0} ** MAX_UNIX_PATH,
+    bound_path: [MAX_UNIX_PATH]u8 = @splat(0),
     bound_path_len: usize = 0,
 
     accept_queue: lst.ListHead = lst.ListHead.init(),
@@ -52,7 +52,7 @@ pub const Socket = struct {
     pending_link: lst.ListHead = lst.ListHead.init(),
 
     pub fn setup(self: *Socket) void {
-        self._buffer = .{0} ** SOCK_BUFFER_SIZE;
+        self._buffer = @splat(0);
         self.rb = krn.ringbuf.RingBuf._init(self._buffer[0..SOCK_BUFFER_SIZE]) catch {
             @panic("Make buffer size a power of two.");
         };
@@ -62,7 +62,7 @@ pub const Socket = struct {
         self.lock = krn.Spinlock.init();
         self.sock_type = SOCK_STREAM;
         self.is_listening = false;
-        self.bound_path = .{0} ** MAX_UNIX_PATH;
+        self.bound_path = @splat(0);
         self.bound_path_len = 0;
         self.accept_queue.setup();
         self.accept_count = 0;
@@ -113,7 +113,7 @@ pub const Socket = struct {
 };
 
 const MAX_BOUND_SOCKETS: usize = 32;
-var bound_sockets: [MAX_BOUND_SOCKETS]?*Socket = .{null} ** MAX_BOUND_SOCKETS;
+var bound_sockets: [MAX_BOUND_SOCKETS]?*Socket = @splat(null);
 
 fn registerBound(sock: *Socket) bool {
     for (&bound_sockets) |*slot| {
