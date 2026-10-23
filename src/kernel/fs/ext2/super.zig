@@ -96,7 +96,7 @@ pub const Ext2Super = struct {
             errdefer sb.base.inode_map.deinit();
 
             file.pos = 1024;
-            var super_buffer: [1024]u8 align(16) = .{0} ** 1024;
+            var super_buffer: [1024]u8 align(16) = @splat(0);
             _ = try file.ops.read(file, &super_buffer, 512);
             _ = try file.ops.read(file, @ptrCast(&super_buffer[512]), 512);
             const ext2_super_data: *Ext2SuperData = @ptrCast(&super_buffer);
@@ -196,7 +196,7 @@ pub const Ext2Super = struct {
             return kernel.errors.PosixError.EINVAL;
         }
         self.data.s_wtime = @intCast(kernel.cmos.toUnixSeconds(kernel.cmos));
-        var buff: [1024]u8 = .{0} ** 1024;
+        var buff: [1024]u8 = @splat(0);
         const src: [*]const u8 = @ptrCast(&self.data);
         const size = @sizeOf(Ext2SuperData);
         @memcpy(

@@ -15,7 +15,7 @@ pub const Sysinfo = extern struct {
     totalhigh:  u32 = 0,
     freehigh:   u32 = 0,
     mem_unit:   u32 = 1,
-    _padding:   [8]u8 = .{0} ** 8,
+    _padding:   [8]u8 = @splat(0),
 };
 
 fn countTasks() u16 {

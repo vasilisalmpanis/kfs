@@ -9,7 +9,7 @@ var visited_registry: std.StringHashMap([]const u8) = undefined;
 
 const LEVEL_0: u32 = 0;
 
-pub export const initial_page_dir: [1024]u32 = .{0} ** 1024;
+pub export const initial_page_dir: [1024]u32 = @splat(0);
 
 fn printIdentation(identation: u32, writer: *std.Io.Writer) !void {
     for (0..identation) |_| {
@@ -32,9 +32,9 @@ fn constructKey(typ: anytype) ![]const u8 {
     const ti = @typeInfo(typ);
     switch (ti) {
         .@"struct" => |_s| {
-            for (_s.decls) |decl| {
+            for (_s.decl_names) |decl_name| {
                 buf = res;
-                res = try std.fmt.allocPrint(allocator, "{s}.{s}", .{res, decl.name});
+                res = try std.fmt.allocPrint(allocator, "{s}.{s}", .{res, decl_name});
                 allocator.free(buf);
             }
         },
@@ -73,7 +73,7 @@ fn printStructLayout(struct_type: std.builtin.Type.Struct, struct_name: []const 
 fn findTypeStart(str: []const u8) usize {
     var idx = str.len - 1;
     while (idx >= 0) {
-        if (std.mem.containsAtLeastScalar(u8, " *?!", 1, str[idx]))
+        if (std.mem.containsAtLeastScalar(u8, " *?!", str[idx], 1))
             return idx + 1;
         if (idx == 0)
             break ;
@@ -133,7 +133,7 @@ fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
                 else => {
                 }
             }
-            if (ptr.is_const) {
+            if (ptr.attrs.@"const") {
                 try writer.print("const ", .{});
             }
             try cleanType(ptr.child, writer);
@@ -156,11 +156,11 @@ fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
         },
         .@"fn" => |_fn| {
             try writer.print("fn(", .{});
-            inline for (_fn.params, 1..) |param, idx| {
-                if (param.type) |_t| {
+            inline for (_fn.param_types, 1..) |param_type, idx| {
+                if (param_type) |_t| {
                     try cleanType(_t, writer);
                 }
-                if (idx < _fn.params.len)
+                if (idx < _fn.param_types.len)
                     try writer.print(", ", .{});
             }
             try writer.print(") ", .{});
@@ -212,10 +212,10 @@ fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
                     else => {},
                 }
                 try writer.print("union {{ ", .{});
-                inline for (_u.fields, 1..) |f, idx| {
-                    try writer.print("{s}: ", .{f.name});
-                    try cleanType(f.type, writer);
-                    if (idx < _u.fields.len)
+                inline for (_u.field_names, _u.field_types, 1..) |field_name, field_type, idx| {
+                    try writer.print("{s}: ", .{field_name});
+                    try cleanType(field_type, writer);
+                    if (idx < _u.field_names.len)
                         try writer.print(", ", .{});
                 }
                 try writer.print(" }}", .{});
@@ -268,14 +268,14 @@ fn cleanType(typ: type, writer: *std.Io.Writer) anyerror!void {
 }
 
 fn printExternFunction(function: std.builtin.Type.Fn, identation: u32, writer: *std.Io.Writer, decl_name: []const u8) anyerror!void {
-    if (function.calling_convention.eql(std.builtin.CallingConvention.c)) {
+    if (function.attrs.@"callconv".eql(std.builtin.CallingConvention.c)) {
         try printIdentation(identation + 4, writer);
         try writer.print("pub extern fn {s}(", .{decl_name});
-        inline for (function.params, 1..) |param, idx| {
-            if (param.type) |_t| {
+        inline for (function.param_types, 1..) |param_type, idx| {
+            if (param_type) |_t| {
                 try cleanType(_t, writer);
             }
-            if (idx < function.params.len)
+            if (idx < function.param_types.len)
                 try writer.print(", ", .{});
         }
         try writer.print(")", .{});
@@ -289,11 +289,11 @@ fn printExternFunction(function: std.builtin.Type.Fn, identation: u32, writer: *
 }
 
 fn printStructFields(identation: u32, writer: *std.Io.Writer, struct_type: std.builtin.Type.Struct) anyerror!void {
-    inline for (struct_type.fields) |field| {
+    inline for (struct_type.field_names, struct_type.field_types, struct_type.field_attrs) |field_name, field_type, field_attrs| {
         try printIdentation(identation + 4, writer);
-        try writer.print("{s} : ", .{field.name});
-        try cleanType(field.type, writer);
-        if (field.defaultValue()) |value| {
+        try writer.print("{s} : ", .{field_name});
+        try cleanType(field_type, writer);
+        if (field_attrs.defaultValue(field_type)) |value| {
             try printDefaultValue(value, writer);
         }
         try writer.print(",\n", .{});
@@ -303,11 +303,11 @@ fn printStructFields(identation: u32, writer: *std.Io.Writer, struct_type: std.b
 fn printEnum(identation: u32, writer: *std.Io.Writer, enum_name: []const u8, en: std.builtin.Type.Enum) anyerror!void {
     try printIdentation(identation, writer);
     try writer.print("pub const {s} = enum({s}) {{\n", .{enum_name, @typeName(en.tag_type)});
-    inline for (en.fields) |field| {
+    inline for (en.field_names, en.field_values) |field_name, field_value| {
         try printIdentation(identation + 4, writer);
-        try writer.print("{s} = {d},\n", .{field.name, field.value});
+        try writer.print("{s} = {d},\n", .{field_name, field_value});
     }
-    if (!en.is_exhaustive) {
+    if (en.mode == .nonexhaustive) {
         try printIdentation(identation + 4, writer);
         try writer.print("_,\n", .{});
     }
@@ -324,10 +324,10 @@ fn printUnion(identation: u32, writer: *std.Io.Writer, un: std.builtin.Type.Unio
     }
     try printIdentation(identation, writer);
     try writer.print("pub const {s} = {s}union {{\n", .{type_name, layout});
-    inline for (un.fields) |field| {
+    inline for (un.field_names, un.field_types) |field_name, field_type| {
         try printIdentation(identation + 4, writer);
-        try writer.print("{s} = ", .{field.name});
-        try cleanType(field.type, writer);
+        try writer.print("{s} = ", .{field_name});
+        try cleanType(field_type, writer);
         try writer.print(",\n", .{});
     }
     try printIdentation(identation, writer);
@@ -370,8 +370,7 @@ fn handleComplexType(
             if (!first_run) {
                 try printStructLayout(struct_type, type_name, writer, identation);
             }
-            inline for (struct_type.decls) |decl| {
-                const decl_name = decl.name;
+            inline for (struct_type.decl_names) |decl_name| {
                 const decl_val = @field(type_val, decl_name);
                 if (@TypeOf(decl_val) != type) {
                     const temp_ti = @typeInfo(@TypeOf(decl_val));
@@ -469,13 +468,13 @@ pub fn main(init: std.process.Init) anyerror!void {
     const output_path = args[1];
     const file = try std.Io.Dir.cwd().createFile(
         init.io,
-        output_path, std.Io.File.CreateFlags{
-            .read = true,
+        output_path, std.Io.Dir.CreateFileOptions{
+            .read = true
         }
     );
     defer file.close(init.io);
 
-    var buff: [4096]u8 = .{0} ** 4096;
+    var buff: [4096]u8 = @splat(0);
     var writer = file.writer(init.io, buff[0..4096]);
 
     try writer.interface.writeAll(
@@ -493,8 +492,7 @@ pub fn main(init: std.process.Init) anyerror!void {
 
     switch (@typeInfo(modules)) {
         .@"struct" => |_t| {
-            inline for (_t.decls) |decl| {
-                const field_name = decl.name;
+            inline for (_t.decl_names) |field_name| {
                 const field_val = @field(modules, field_name);
 
                 if (@TypeOf(field_val) != type)
@@ -514,8 +512,7 @@ pub fn main(init: std.process.Init) anyerror!void {
             }
             var visited = std.StringHashMap([]const u8).init(allocator);
             defer visited.deinit();
-            inline for (_t.decls) |decl| {
-                const field_name = decl.name;
+            inline for (_t.decl_names) |field_name| {
                 const field_val = @field(modules, field_name);
 
                 if (@TypeOf(field_val) != type)

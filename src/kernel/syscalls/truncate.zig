@@ -23,7 +23,7 @@ pub fn ftruncate64(fd: u32, length: u32, length_high: u32) !u32 {
         const old_pos = file.pos;
         defer file.pos = old_pos;
         file.pos = file.inode.size;
-        var buff: [256]u8 = .{0} ** 256;
+        var buff: [256]u8 = @splat(0);
         var written: usize = 0;
         while (written < to_write) {
             var single_write = to_write - written;

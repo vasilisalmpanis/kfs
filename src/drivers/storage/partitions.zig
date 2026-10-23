@@ -15,9 +15,9 @@ const GPT_Prot = 0xee;
 
 const MasterBootRecord = extern struct {
     boot: u8 = 0,
-    starting_CHS: [3]u8 = .{0} ** 3,
+    starting_CHS: [3]u8 = @splat(0),
     os_type: u8 = 0,
-    ending_CHS: [3]u8 = .{0} ** 3,
+    ending_CHS: [3]u8 = @splat(0),
     starting_LBA: u32 = 0,
     ening_LBA: u32 = 0,
 };
@@ -33,7 +33,7 @@ const GUID = extern struct {
             .a = 0,
             .b = 0,
             .c = 0,
-            .d = .{0} ** 8,
+            .d = @splat(0),
         };
     }
 
@@ -53,7 +53,7 @@ const GUID = extern struct {
 };
 
 const GPTTableHeader = extern struct {
-    signature: [8]u8 = .{0} ** 8,
+    signature: [8]u8 = @splat(0),
     gpt_revision: u32 = 0,
     header_size: u32 = 0,
     crc32_sum: u32 = 0,
@@ -86,7 +86,7 @@ const GPTEntry = extern struct {
 
 pub fn parsePartitionTable(drive: *ata.ATADrive) !void {
     try drive.readSectorsDMA(0, 1);
-    var mbr_buff: [16]u8 align(4) = .{0} ** 16;
+    var mbr_buff: [16]u8 align(4) = @splat(0);
     @memcpy(
         mbr_buff[0..16],
         @as([*]u8, @ptrFromInt(drive.dma_buff_virt + 0x1BE))

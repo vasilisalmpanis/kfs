@@ -18,7 +18,7 @@ pub const CMOS_DATA = 0x71;
 
 pub fn initCMOS() kfs.drivers.cmos.CMOS {
     var _cmos= kfs.drivers.cmos.CMOS{
-        .curr_time = .{0} ** 7,
+        .curr_time = @splat(0),
         .updateTime = updateTime,
         .incSec = incSec,
         .toUnixSeconds = toUnixSeconds,

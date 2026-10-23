@@ -605,7 +605,7 @@ pub const MM = struct {
         _ = self.cpus_cores.bitReset(@intCast(cpuid), .seq_cst);
     }
 
-    pub fn cpuMask(self: *MM) std.bit_set.IntegerBitSet(32) {
+    pub fn cpuMask(self: *MM) std.bit_set.Integer(32) {
         return .{ .mask = self.cpus_cores.load(.seq_cst) };
     }
 };

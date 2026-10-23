@@ -140,7 +140,7 @@ pub const sigset_t = extern struct {
 
     pub fn init() sigset_t {
         return sigset_t {
-            ._bits = .{0} ** 2,
+            ._bits = @splat(0),
         };
     }
 
@@ -294,11 +294,11 @@ const SigRes = struct {
 };
 
 pub const SigPending = struct {
-    set: std.StaticBitSet(NSIG) = std.StaticBitSet(NSIG).initEmpty(),
+    set: std.bit_set.Static(NSIG) = std.bit_set.Static(NSIG).empty,
 
     pub fn init() SigPending{
         return SigPending{
-            .set = std.StaticBitSet(NSIG).initEmpty(),
+            .set = std.bit_set.Static(NSIG).empty,
         };
     }
 
@@ -307,7 +307,7 @@ pub const SigPending = struct {
     }
 
     pub inline fn getRaw(self: *SigPending) u64 {
-        return @bitCast(self.set);
+        return @bitCast(self.set.masks);
     }
 };
 
@@ -352,7 +352,7 @@ pub const SigHand = struct {
         const lock_state = krn.task.current().thread_data.?.lock.lock_irq_disable();
         defer krn.task.current().thread_data.?.lock.unlock_irq_enable(lock_state);
 
-        const static_bit: std.StaticBitSet(NSIG) = krn.task.current().getRealPending();
+        const static_bit: std.bit_set.Static(NSIG) = krn.task.current().getRealPending();
         var iterator = static_bit.iterator(.{});
 
         while (iterator.next()) |i| {

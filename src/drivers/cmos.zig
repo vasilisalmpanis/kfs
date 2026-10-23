@@ -5,7 +5,7 @@ const std = @import("std");
 
 
 pub const CMOS = struct {
-    curr_time: [7]u8 = .{0} ** 7,
+    curr_time: [7]u8 = @splat(0),
     updateTime: *const fn (self: *CMOS) void,
     incSec: *const fn (self: *CMOS) void,
     toUnixSeconds: *const fn (self: *CMOS) u64,
@@ -15,7 +15,7 @@ pub const CMOS = struct {
 
     pub fn init() CMOS {
         var _cmos= CMOS{
-            .curr_time = .{0} ** 7,
+            .curr_time = @splat(0),
             .updateTime = CMOS._updateTime,
             .incSec = CMOS._incSec,
             .toUnixSeconds = CMOS._toUnixSeconds,

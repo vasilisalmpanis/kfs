@@ -8,7 +8,7 @@ pub fn runTests() void {
 
     printf("Tests are running...\n", .{});
     const size: u32 = 10000;
-    var arr: [size]?*u32 = .{null} ** size;
+    var arr: [size]?*u32 = @splat(null);
     printFreeList();
     while (i < 1) : (i += 1) {
         j = 0;

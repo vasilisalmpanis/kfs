@@ -7,8 +7,8 @@ pub const ISRHandler = anyopaque;
 /// fn (regs: *Regs) void;
 pub const ExceptionHandler = anyopaque;
 
-pub var handlers: [arch.IDT_MAX_DESCRIPTORS] ?* const ISRHandler = .{null} ** arch.IDT_MAX_DESCRIPTORS;
-pub var args: [arch.IDT_MAX_DESCRIPTORS] ?*anyopaque = .{null} ** arch.IDT_MAX_DESCRIPTORS;
+pub var handlers: [arch.IDT_MAX_DESCRIPTORS] ?* const ISRHandler = @splat(null);
+pub var args: [arch.IDT_MAX_DESCRIPTORS] ?*anyopaque = @splat(null);
 
 pub fn mapAll() void {
     if (arch.smp.ioapic.controller) |*cntr| {

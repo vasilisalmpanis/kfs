@@ -162,9 +162,9 @@ pub fn codeToError(code: u16) ?PosixError {
     }
     const err_name = @tagName(err_code);
 
-    inline for (@typeInfo(PosixError).error_set.?) |e| {
-        if (std.mem.eql(u8, e.name, err_name)) {
-            return @field(PosixError, e.name);
+    inline for (@typeInfo(PosixError).error_set.error_names.?) |name| {
+        if (std.mem.eql(u8, name, err_name)) {
+            return @field(PosixError, name);
         }
     }
     return null;

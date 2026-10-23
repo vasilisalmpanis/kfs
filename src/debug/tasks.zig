@@ -9,7 +9,7 @@ const lookupSymbol = @import("./symbols.zig").lookupSymbol;
 const std = @import("std");
 
 fn printTask(task: *tsk.Task) void {
-    var buffer: [10:0]u8 = .{'0', 'x' } ++ .{0} ** 8;
+    var buffer: [10:0]u8 = "0x".* ++ @as([8]u8, @splat(0));
         const name: []const u8 = if (task.threadfn) |f| if_lbl: {
         break :if_lbl if (lookupSymbol(@intFromPtr(f))) |s| s else "";
     } else else_lbl: {
@@ -59,7 +59,7 @@ fn psTreeHelper(task: *tsk.Task, level: u32, last_child: bool) void {
         }
     }
     if (!last_child) {
-        var buff: [20:0]u8 = .{0} ** 20;
+        var buff: [20:0]u8 = @splat(0);
         _ = std.fmt.printInt(
             &buff,
             0,

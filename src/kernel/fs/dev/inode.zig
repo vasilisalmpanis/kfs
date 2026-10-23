@@ -18,7 +18,7 @@ pub const DevInode = struct {
             inode.base.ops = &dev_inode_ops;
             inode.base.fops = &file.DevFileOps;
             inode.base.size = 50;
-            inode.buff = .{0} ** 50;
+            inode.buff = @splat(0);
             return &inode.base;
         }
         return error.OutOfMemory;
