@@ -38,7 +38,7 @@ pub const first_page_table: [*]PageEntry = @ptrFromInt(0xFFC00000);
 pub const tlb_ack = smp.PerCpu(std.atomic.Value(u32), std.atomic.Value(u32).init(0), opaque{});
 
 noinline fn flushTLBAllButSelf() void {
-    var cpu_cores = std.bit_set.IntegerBitSet(32).initEmpty();
+    var cpu_cores = std.bit_set.Integer(32).empty;
     cpu_cores.setRangeValue(
         .{
             .start = 0,
@@ -49,7 +49,7 @@ noinline fn flushTLBAllButSelf() void {
     flushTLB(cpu_cores);
 }
 
-fn flushTLB(cpus_cores: std.bit_set.IntegerBitSet(32)) void {
+fn flushTLB(cpus_cores: std.bit_set.Integer(32)) void {
     if (!smp.smp_enabled)
         return ;
     const _sendIPI = cpu.operations.sendIPI orelse

@@ -345,7 +345,7 @@ pub const Ext2Inode = struct {
                         }
                     },
                     .i_blocks = 0,
-                    .i_block = .{0} ** EXT2_N_BLOCKS,
+                    .i_block = @splat(0),
                 };
 
                 const new_inode = (try Ext2Inode.new(&sb.base)).getImpl(Ext2Inode, "base");

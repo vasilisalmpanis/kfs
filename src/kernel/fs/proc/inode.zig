@@ -20,7 +20,7 @@ pub const ProcInode = struct {
             inode.base.ops = &proc_inode_ops;
             inode.base.size = 50;
             inode.base.fops = &file.ProcFileOps;
-            inode.buff = .{0} ** 50;
+            inode.buff = @splat(0);
             return &inode.base;
         }
         return kernel.errors.PosixError.ENOMEM;

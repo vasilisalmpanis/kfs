@@ -34,7 +34,7 @@ pub const SourceOverride = struct {
     level_triggered: bool,
 };
 
-pub var overrides: [16]?SourceOverride = .{ null } ** 16;
+pub var overrides: [16]?SourceOverride = @splat(null);
 
 pub fn registerOverride(entry: *align(1) apic.IOAPICInterruptSourceOverride) void {
     if (entry.irq_source >= overrides.len)

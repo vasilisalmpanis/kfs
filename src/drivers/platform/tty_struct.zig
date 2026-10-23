@@ -713,7 +713,7 @@ pub const TTY = struct {
 
     // CSI parser state
     pstate: ParserState = .Normal,
-    csi_params: [8]u16 = [_]u16{0} ** 8,
+    csi_params: [8]u16 = @splat(0),
     csi_mask: u8 = 0,
     csi_n: u8 = 0,
     csi_priv: bool = false,
@@ -781,7 +781,7 @@ pub const TTY = struct {
                 .IEXTEN = true,
             },
             .c_line = 0,
-            .c_cc = [_]u8{0} ** t.NCCS
+            .c_cc = @splat(0)
         };
         termios.c_cc[t.VINTR] = 3;
         termios.c_cc[t.VQUIT] = 28;

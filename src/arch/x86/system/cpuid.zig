@@ -201,8 +201,8 @@ pub const Info = struct {
     supported:          bool = false,
     max_basic_leaf:     u32 = 0,
     max_extended_leaf:  u32 = 0,
-    vendor:             [12]u8 = .{0} ** 12,
-    brand:              [48]u8 = .{0} ** 48,
+    vendor:             [12]u8 = @splat(0),
+    brand:              [48]u8 = @splat(0),
     features:           Leaf1Features = Leaf1Features{},
     ext_features:       Leaf7Features = Leaf7Features{},
 };
@@ -329,11 +329,11 @@ pub fn query() Info {
 fn logLeaf(header: []const u8, features: anytype) void {
     krn.logger.WARN("{s}", .{header});
     const T = @TypeOf(features);
-    inline for (@typeInfo(T).@"struct".fields) |field| {
-        const val: bool = @field(features, field.name);
+    inline for (@typeInfo(T).@"struct".field_names) |field_name| {
+        const val: bool = @field(features, field_name);
         krn.logger.WARN("{s}{s:>16}: {any}{s}", .{
             if (val) dbg.log.GREEN else dbg.log.YELLOW,
-            field.name,
+            field_name,
             val,
             dbg.log.DEFAULT
         });

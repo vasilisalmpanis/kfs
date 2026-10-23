@@ -46,7 +46,7 @@ pub fn enable_apic() void {
 }
 
 pub fn sendIPIMaskButSelf(
-    set: std.bit_set.IntegerBitSet(32),
+    set: std.bit_set.Integer(32),
     vector: u8
 ) void {
     if (arch.cpu.operations.sendIPI) |_sendIPI| {

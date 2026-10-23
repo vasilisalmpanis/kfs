@@ -19,7 +19,7 @@ pub const ExampleInode = struct {
             inode.base.ops = &example_inode_ops;
             inode.base.size = 50;
             inode.base.fops = &file.ExampleFileOps;
-            inode.buff = .{0} ** 50;
+            inode.buff = @splat(0);
             return &inode.base;
         }
         return error.OutOfMemory;

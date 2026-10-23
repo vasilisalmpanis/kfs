@@ -48,10 +48,10 @@ const PacketBits = packed struct(u8) {
 };
 
 const Mouse = struct {
-    packet:         [4]u8 = .{0} ** 4,
+    packet:         [4]u8 = @splat(0),
     packet_cnt:     u8 = 0,
     packet_size:    u8 = 3,
-    buff:           [512]u8 = .{0} ** 512,
+    buff:           [512]u8 = @splat(0),
     rb:             krn.ringbuf.RingBuf = undefined,
     wait_queue:     krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
 

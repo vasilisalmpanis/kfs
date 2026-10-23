@@ -4,7 +4,7 @@ const bus = @import("./bus.zig");
 const std = @import("std");
 
 var dev_t_mutex = kern.Mutex.init();
-var major_bitmap = std.bit_set.StaticBitSet(256).initEmpty();
+var major_bitmap = std.bit_set.Static(256).empty;
 
 pub const dev_t = packed struct {
     major: u8,
@@ -26,7 +26,7 @@ pub const dev_t = packed struct {
         return kern.errors.PosixError.ENOENT;
     }
 
-    pub fn new(major: u8, bitset: *std.StaticBitSet(256)) !dev_t {
+    pub fn new(major: u8, bitset: *std.bit_set.Static(256)) !dev_t {
         var res = dev_t{
             .major = major,
             .minor = 0,
