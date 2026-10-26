@@ -47,6 +47,8 @@ pub fn virtToPhys(comptime T: type, addr: *T) *T {
     return @ptrFromInt(@intFromPtr(addr) - PAGE_OFFSET);
 }
 
+pub const lookupPhys = vmm.lookupPhys;
+
 pub fn physToVirt(comptime T: type, addr: *T) *T {
     return @ptrFromInt(@intFromPtr(addr) + PAGE_OFFSET);
 }
