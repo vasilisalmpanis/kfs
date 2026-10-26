@@ -51,6 +51,9 @@ fn formatPacket(raw: [*]u8, mymac: [6]u8, myip: [4]u8, target_ip: [4]u8) void {
 }
 
 pub fn init() void {
+    _ = kernel.mkdir("/proc/net", 0o444) catch {
+        @panic("unable to create net folder");
+    };
     // We want to initialize networking
     // and assign static IP to our guest
     // write to dma address

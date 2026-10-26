@@ -17,6 +17,7 @@ pub var root: *fs.DEntry = undefined;
 const fs_info = @import("fs_info.zig");
 const modules_info = @import("modules_info.zig");
 const system_info = @import("system_info.zig");
+const net_info = @import("net_info.zig");
 
 pub fn init() void {
     if (kernel.mm.kmalloc(ProcFileSystem)) |_fs| {
@@ -33,6 +34,9 @@ pub fn init() void {
     };
     system_info.init() catch {
         @panic("system_info init is broken\n");
+    };
+    net_info.init() catch {
+        @panic("net_info init is broken\n");
     };
     kernel.logger.INFO("proc fs initialized\n", .{});
 }
