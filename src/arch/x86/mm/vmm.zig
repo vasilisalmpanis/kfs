@@ -154,6 +154,20 @@ const PageEntry= packed struct {
     }
 };
 
+pub fn lookupPhys(virt: u32) ?u32 {
+    const pd_index = virt >> 22;
+    const pt_index = (virt >> 12) & 0x3FF;
+    const pde = current_page_dir[pd_index];
+    if (!pde.present)
+        return null;
+    if (pde.huge_page)
+        return (@as(u32, pde.address) << 12) | (virt & 0x3FFFFF);
+    const pt: [*]PageEntry = first_page_table + (0x400 * pd_index);
+    if (!pt[pt_index].present)
+        return null;
+    return (@as(u32, pt[pt_index].address) << 12) | (virt & 0xFFF);
+}
+
 pub const VMM = struct {
     pmm: *PMM,
 
