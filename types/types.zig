@@ -730,8 +730,8 @@ pub const arch = struct {
             pub const Controller = struct {
                 io_apic_id : u8,
                 gsi_base : u32,
-                version : u32= 4157800448,
-                redir_entr_count : u32= 4157800448,
+                version : u32= 3949789184,
+                redir_entr_count : u32= 3949789184,
                 regs : [*]u32,
                 lock : kernel.Spinlock,
             };

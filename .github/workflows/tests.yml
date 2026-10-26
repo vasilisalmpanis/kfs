@@ -22,6 +22,18 @@ jobs:
         with:
           version: 0.17.0
 
+      - name: Patch Zig compiler_rt
+        run: |
+          zig_dir=$(dirname "$(readlink -f "$(command -v zig)")")
+          patch_file="$RUNNER_TEMP/zig-d85c0ba.patch"
+          curl --fail --location --retry 3 \
+            https://codeberg.org/ziglang/zig/commit/d85c0ba08048d3e729d535a6df7d095fb72c6677.patch \
+            --output "$patch_file"
+          if ! patch --directory="$zig_dir" -p1 --force --reverse --dry-run --silent < "$patch_file"; then
+            patch --directory="$zig_dir" -p1 --batch --forward < "$patch_file"
+          fi
+          patch --directory="$zig_dir" -p1 --force --reverse --dry-run --silent < "$patch_file"
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -93,4 +105,3 @@ jobs:
           if [ "$failed" -ne 0 ]; then
             exit 1
           fi
-
