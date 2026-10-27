@@ -730,8 +730,8 @@ pub const arch = struct {
             pub const Controller = struct {
                 io_apic_id : u8,
                 gsi_base : u32,
-                version : u32= 3949789184,
-                redir_entr_count : u32= 3949789184,
+                version : u32= 4157472768,
+                redir_entr_count : u32= 4157472768,
                 regs : [*]u32,
                 lock : kernel.Spinlock,
             };
@@ -1196,6 +1196,10 @@ pub const kernel = struct {
     };
 
     pub const socket = struct {
+        pub const ProtocolFamily = struct {
+            create : *const fn(*kernel.socket.Socket) anyerror!void,
+        };
+
         pub const sockaddr_un = extern struct {
             sun_family : u16,
             sun_path : [108]u8,
@@ -1204,6 +1208,10 @@ pub const kernel = struct {
         pub const sockaddr = extern struct {
             sa_family : u16,
             sa_data : [14]u8,
+        };
+
+        pub const ProtocolOps = struct {
+            ioctl : *const fn(*kernel.socket.Socket, u32, u32) anyerror!u32,
         };
 
         pub const Socket = struct {
@@ -1222,11 +1230,34 @@ pub const kernel = struct {
             accept_wait : kernel.wq.WaitQueueHead,
             rw_queue : kernel.wq.WaitQueueHead,
             pending_link : kernel.list.ListHead,
+            ops : *const kernel.socket.ProtocolOps,
         };
 
     };
 
     pub const net = struct {
+        pub const intf = struct {
+            pub const Ifmap = extern struct {
+                mem_start : u32,
+                mem_end : u32,
+                base_addr : u16,
+                irq : u8,
+                dma : u8,
+                port : u8,
+            };
+
+            pub const Ifreq = extern struct {
+                ifr_name : [16]u8,
+                ifr_ifru : extern union { addr: kernel.socket.sockaddr, flags: i16, ivalue: i32, mtu: i32, map: kernel.net.intf.Ifmap, slave: [16]u8, newname: [16]u8, data: u32 },
+            };
+
+            pub const Ifconf = extern struct {
+                ifc_len : i32,
+                ifc_buf : u32,
+            };
+
+        };
+
         pub const dev = struct {
             pub const NetDeviceOps = struct {
                 xmit : *const fn(*kernel.net.dev.NetDevice, u32, u16) anyerror!void,

@@ -1,4 +1,6 @@
 const kernel = @import("../../main.zig");
+const uif = @import("../if.zig");
+const dev_ioctl = @import("../core/dev_ioctl.zig");
 
 const inet_family = kernel.socket.ProtocolFamily {
     .create = inet_create,
@@ -14,8 +16,16 @@ fn inet_ioctl(
     data: usize
 ) !u32 {
     _ = socket;
-    _ = op;
-    _ = data;
+    switch (op) {
+        // No interface has an IPv4 address yet
+        uif.SIOCGIFADDR,
+        uif.SIOCGIFDSTADDR,
+        uif.SIOCGIFBRDADDR,
+        uif.SIOCGIFNETMASK => return kernel.errors.PosixError.EADDRNOTAVAIL,
+        else => {},
+    }
+    if (dev_ioctl.isDevIoctl(op))
+        return dev_ioctl.devIoctl(op, data);
     return kernel.errors.PosixError.ENOTTY;
 }
 
