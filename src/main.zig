@@ -243,6 +243,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
 
     // Devices
+    krn.net.init();
     drv.init();
     krn.serial.print("[INIT]: Drivers and Devices done\n");
     modules.init() catch {

@@ -1,6 +1,7 @@
 const kernel = @import("../main.zig");
 const std = @import("std");
 const drivers = @import("drivers");
+const ipv4 = @import("./ipv4/main.zig");
 
 pub const dev = @import("./core/dev.zig");
 
@@ -51,28 +52,32 @@ fn formatPacket(raw: [*]u8, mymac: [6]u8, myip: [4]u8, target_ip: [4]u8) void {
 }
 
 pub fn init() void {
-    _ = kernel.mkdir("/proc/net", 0o444) catch {
-        @panic("unable to create net folder");
-    };
-    // We want to initialize networking
-    // and assign static IP to our guest
-    // write to dma address
-    // interrupt happens and they understand that packet is transmitted or not
-    const net_dev: *kernel.net.dev.NetDevice = kernel.net.dev.getByIndex(1) orelse
-        return;
-
-    const ethernet_packet = kernel.mm.kmallocArray(u8, ARP_FRAME_LEN) orelse
-        return;
-    const phys = kernel.mm.lookupPhys(@intFromPtr(ethernet_packet)) orelse
-        return;
-    formatPacket(
-        ethernet_packet,
-        net_dev.dev_addr,
-        .{10, 0, 2, 15},
-        .{10, 0, 2, 2},
-    );
-    net_dev.ops.xmit(net_dev,
-        phys,
-        ARP_FRAME_LEN
-    ) catch {};
+    ipv4.init();
 }
+
+// pub fn init() void {
+//     _ = kernel.mkdir("/proc/net", 0o444) catch {
+//         @panic("unable to create net folder");
+//     };
+//     // We want to initialize networking
+//     // and assign static IP to our guest
+//     // write to dma address
+//     // interrupt happens and they understand that packet is transmitted or not
+//     const net_dev: *kernel.net.dev.NetDevice = kernel.net.dev.getByIndex(1) orelse
+//         return;
+//
+//     const ethernet_packet = kernel.mm.kmallocArray(u8, ARP_FRAME_LEN) orelse
+//         return;
+//     const phys = kernel.mm.lookupPhys(@intFromPtr(ethernet_packet)) orelse
+//         return;
+//     formatPacket(
+//         ethernet_packet,
+//         net_dev.dev_addr,
+//         .{10, 0, 2, 15},
+//         .{10, 0, 2, 2},
+//     );
+//     net_dev.ops.xmit(net_dev,
+//         phys,
+//         ARP_FRAME_LEN
+//     ) catch {};
+// }
