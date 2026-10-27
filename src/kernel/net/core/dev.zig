@@ -1,7 +1,6 @@
 const kernel = @import("../../main.zig");
 const std = @import("std");
 
-pub const IFNAMSIZ = 16;
 pub const ETH_ALEN = 6;
 
 pub const NetDeviceOps = struct {
@@ -12,7 +11,7 @@ pub const NetDevice = struct {
     // TODO, drivers passes name like eth{d} (format)
     // and based on device index correct name is allocated
     // and we get eth0, eth1, eth2 etc.
-    name: [IFNAMSIZ]u8 = @splat(0),
+    name: [kernel.net.intf.IFNAMSIZ]u8 = @splat(0),
     ifindex: u32 = 0,
     addr_len: u8 = ETH_ALEN,
     dev_addr: [ETH_ALEN]u8 = @splat(0),
@@ -27,7 +26,7 @@ pub const NetDevice = struct {
         dev_addr: [ETH_ALEN]u8,
         ops: *const NetDeviceOps,
     ) ?*NetDevice {
-        if (name.len > IFNAMSIZ)
+        if (name.len > kernel.net.intf.IFNAMSIZ)
             return null;
         const new_dev = kernel.mm.kmalloc(NetDevice) orelse
             return null;
