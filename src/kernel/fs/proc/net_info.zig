@@ -10,7 +10,7 @@ const Slice = struct {
 
 fn dev_open(base: *kernel.fs.File, inode: *kernel.fs.Inode) anyerror!void {
     _ = inode;
-    const dev_header = 
+    const dev_header =
         \\Inter-|   Receive                                                |  Transmit
         \\ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
         \\
@@ -36,7 +36,7 @@ fn dev_open(base: *kernel.fs.File, inode: *kernel.fs.Inode) anyerror!void {
             size += std.fmt.count(
                 dev_format,
                 .{
-                    net_dev.name,
+                    std.mem.sliceTo(&net_dev.name, 0),
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
                  },
             );
@@ -55,7 +55,7 @@ fn dev_open(base: *kernel.fs.File, inode: *kernel.fs.Inode) anyerror!void {
             .{},
         );
         offset += header_written.len;
-    
+
         var it = head.list.iterator();
         while (it.next()) |node| {
             const net_dev = node.curr.entry(
@@ -66,7 +66,7 @@ fn dev_open(base: *kernel.fs.File, inode: *kernel.fs.Inode) anyerror!void {
                 buffer[offset..],
                 dev_format,
                 .{
-                    net_dev.name,
+                    std.mem.sliceTo(&net_dev.name, 0),
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
                  },
             );
