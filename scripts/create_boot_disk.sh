@@ -7,10 +7,13 @@ ROOT_IMG=${ROOT_IMG:-rootfs.img}
 GRUB_CFG=${GRUB_CFG:-boot/grub/grub.cfg}
 GRUB_THEME=${GRUB_THEME:-boot/grub/theme}
 
-BOOT_TREE=$(dirname "$(dirname "$GRUB_CFG")")
+BOOT_TMP_DIR=$(mktemp -d)
+mkdir -p                "$BOOT_TMP_DIR/grub"
+cp "$KERNEL"            "$BOOT_TMP_DIR/kfs.bin"
+cp "$GRUB_CFG"          "$BOOT_TMP_DIR/grub/grub.cfg"
+cp -rf "$GRUB_THEME"    "$BOOT_TMP_DIR/grub/"
 
-KERNEL_SIZE_K=`du -s "$KERNEL" | awk '{print $1}'`
-BOOT_DIR_SIZE_K=`du -s "$BOOT_TREE" | awk '{print $1}'`
+BOOT_DIR_SIZE_K=`du -s "$BOOT_TMP_DIR" | awk '{print $1}'`
 ROOT_SIZE_BYTES=$(
     stat -c %s "$ROOT_IMG" 2>/dev/null ||
         stat -f %z "$ROOT_IMG"
@@ -19,7 +22,7 @@ MIB=$((1024 * 1024))
 ROOT_SIZE_MB=$(( (ROOT_SIZE_BYTES + MIB - 1) / MIB ))
 
 CORE_SIZE_MB=1
-BOOT_SIZE_MB=$(( ($KERNEL_SIZE_K + $BOOT_DIR_SIZE_K) / 1024 + 2 ))
+BOOT_SIZE_MB=$(( $BOOT_DIR_SIZE_K / 1024 + 2 ))
 DISK_SIZE_MB=$(( $BOOT_SIZE_MB + $CORE_SIZE_MB + $ROOT_SIZE_MB + 2 ))
 
 BS=512
@@ -45,12 +48,6 @@ sgdisk -o "$DISK"
 sgdisk -n 1:$CORE_START:$(( BOOT_START - 1 )) -t 1:ef02 -c 1:bios_boot "$DISK"
 sgdisk -n 2:$BOOT_START:$(( ROOT_START - 1 )) -t 2:8300 -c 2:boot "$DISK"
 sgdisk -n 3:$ROOT_START:                      -t 3:8300 -c 3:root "$DISK"
-
-BOOT_TMP_DIR=$(mktemp -d)
-mkdir -p                "$BOOT_TMP_DIR/grub"
-cp "$KERNEL"            "$BOOT_TMP_DIR/kfs.bin"
-cp "$GRUB_CFG"          "$BOOT_TMP_DIR/grub/grub.cfg"
-cp -rf "$GRUB_THEME"    "$BOOT_TMP_DIR/grub/"
 
 BOOT_IMG=$(mktemp)
 yes | mke2fs -L '' -N 0 -O ^64bit -d "$BOOT_TMP_DIR" -m 5 -r 1 -t ext2 "$BOOT_IMG" $BOOT_SIZE_MB"M" -b 8192
