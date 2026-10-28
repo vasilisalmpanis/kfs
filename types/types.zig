@@ -730,8 +730,8 @@ pub const arch = struct {
             pub const Controller = struct {
                 io_apic_id : u8,
                 gsi_base : u32,
-                version : u32= 4157472768,
-                redir_entr_count : u32= 4157472768,
+                version : u32= 4157603840,
+                redir_entr_count : u32= 4157603840,
                 regs : [*]u32,
                 lock : kernel.Spinlock,
             };
@@ -1248,7 +1248,7 @@ pub const kernel = struct {
 
             pub const Ifreq = extern struct {
                 ifr_name : [16]u8,
-                ifr_ifru : extern union { addr: kernel.socket.sockaddr, flags: i16, ivalue: i32, mtu: i32, map: kernel.net.intf.Ifmap, slave: [16]u8, newname: [16]u8, data: u32 },
+                ifr_ifru : extern union { addr: kernel.socket.sockaddr, flags: u16, ivalue: i32, mtu: i32, map: kernel.net.intf.Ifmap, slave: [16]u8, newname: [16]u8, data: u32 },
             };
 
             pub const Ifconf = extern struct {
@@ -1260,12 +1260,14 @@ pub const kernel = struct {
 
         pub const dev = struct {
             pub const NetDeviceOps = struct {
+                up : *const fn(*kernel.net.dev.NetDevice) anyerror!void,
                 xmit : *const fn(*kernel.net.dev.NetDevice, u32, u16) anyerror!void,
             };
 
             pub const NetDevice = struct {
                 name : [16]u8,
                 ifindex : u32= 0,
+                flags : u32= 0,
                 addr_len : u8= 6,
                 dev_addr : [6]u8,
                 broadcast : [6]u8,

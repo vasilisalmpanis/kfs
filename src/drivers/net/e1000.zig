@@ -395,7 +395,7 @@ pub const E1000Device = struct {
         self.handleEvent();
     }
 
-    pub fn start(self: *E1000Device) !void {
+    pub fn init(self: *E1000Device) void {
         self.writeCommand(REG_IMC, 0xFFFF_FFFF);
         self.writeCommand(REG_RCTRL, 0);
         self.writeCommand(REG_TCTRL, 0);
@@ -410,6 +410,9 @@ pub const E1000Device = struct {
                 self.mac[3], self.mac[4], self.mac[5],
             }
         );
+    }
+
+    pub fn up(self: *E1000Device) !void {
         @memset(self.mem[0x5200 / 4 .. 0x5400 / 4], 0);
         self.rxtx_mem = try DmaMemory.alloc(1);
         self.rx_descs = @ptrFromInt(self.rxtx_mem.?.virt);
@@ -493,7 +496,7 @@ fn e1000_probe(device: *pci.PCIDevice) !void {
         device.int_line
     );
     errdefer dev.deinit();
-    try dev.start();
+    dev.init();
     device.dev.data = dev;
 
     const net_dev = kernel.net.dev.NetDevice.new(
@@ -506,6 +509,7 @@ fn e1000_probe(device: *pci.PCIDevice) !void {
     // TODO implement real deinit not just kfree
     errdefer kernel.mm.kfree(net_dev);
     net_dev.priv = dev;
+    net_dev.flags = kernel.net.intf.IFF_BROADCAST | kernel.net.intf.IFF_MULTICAST;
 
     try kernel.net.dev.register(net_dev);
 }
@@ -513,13 +517,21 @@ fn e1000_probe(device: *pci.PCIDevice) !void {
 fn e1000_remove(_: *pci.PCIDevice) !void {
 }
 
-pub fn e1000_xmit(net_dev: *kernel.net.dev.NetDevice, dma_addr: u32, len: u16) !void {
+/// Net Device Operations
+
+fn e1000_up(net_dev: *kernel.net.dev.NetDevice) !void {
+    const e1000: *E1000Device = @ptrCast(@alignCast(net_dev.priv));
+    try e1000.up();
+}
+
+fn e1000_xmit(net_dev: *kernel.net.dev.NetDevice, dma_addr: u32, len: u16) !void {
     const e1000: *E1000Device = @ptrCast(@alignCast(net_dev.priv));
     e1000.sendPacket(dma_addr, len);
 }
 
 const e1000_ops = kernel.net.dev.NetDeviceOps{
-    .xmit = e1000_xmit,
+    .up     = e1000_up,
+    .xmit   = e1000_xmit,
 };
 
 pub fn init() void {
