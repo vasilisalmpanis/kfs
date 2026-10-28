@@ -730,8 +730,8 @@ pub const arch = struct {
             pub const Controller = struct {
                 io_apic_id : u8,
                 gsi_base : u32,
-                version : u32= 4157603840,
-                redir_entr_count : u32= 4157603840,
+                version : u32= 0,
+                redir_entr_count : u32= 0,
                 regs : [*]u32,
                 lock : kernel.Spinlock,
             };
@@ -2440,6 +2440,8 @@ pub const drivers = struct {
                 rx_buffers : [32]?std.net.e1000.DmaMemory,
                 rx_descs : [*]std.net.e1000.E1000RxDesc,
                 tx_descs : [*]std.net.e1000.E1000TxDesc,
+                worker_thread : ?*kernel.task.Task= null,
+                wait_queue : kernel.wq.WaitQueueHead,
                 rx_curr : u8= 0,
                 tx_curr : u8= 0,
             };
