@@ -4,12 +4,23 @@ const dev = @import("./core/dev.zig");
 
 pub const IFNAMSIZ = 16;
 
-pub const IFF_UP: i16           = 1 << 0;
-pub const IFF_BROADCAST: i16    = 1 << 1;
-pub const IFF_LOOPBACK: i16     = 1 << 3;
-pub const IFF_RUNNING: i16      = 1 << 6;
-pub const IFF_PROMISC: i16      = 1 << 8;
-pub const IFF_MULTICAST: i16    = 1 << 12;
+/// Taken from /uapi/linux/if.h
+pub const IFF_UP            :u16 = 1<<0;
+pub const IFF_BROADCAST     :u16 = 1<<1;
+pub const IFF_DEBUG         :u16 = 1<<2;
+pub const IFF_LOOPBACK      :u16 = 1<<3;
+pub const IFF_POINTOPOINT   :u16 = 1<<4;
+pub const IFF_NOTRAILERS    :u16 = 1<<5;
+pub const IFF_RUNNING       :u16 = 1<<6;
+pub const IFF_NOARP         :u16 = 1<<7;
+pub const IFF_PROMISC       :u16 = 1<<8;
+pub const IFF_ALLMULTI      :u16 = 1<<9;
+pub const IFF_MASTER        :u16 = 1<<10;
+pub const IFF_SLAVE         :u16 = 1<<11;
+pub const IFF_MULTICAST     :u16 = 1<<12;
+pub const IFF_PORTSEL       :u16 = 1<<13;
+pub const IFF_AUTOMEDIA     :u16 = 1<<14;
+pub const IFF_DYNAMIC       :u16 = 1<<15;
 
 pub const ARPHRD_ETHER: u16     = 1;
 
@@ -51,7 +62,7 @@ pub const Ifreq = extern struct {
     ifr_name: [IFNAMSIZ]u8,
     ifr_ifru: extern union {
         addr: socket.sockaddr,
-        flags: i16,
+        flags: u16,
         ivalue: i32,
         mtu: i32,
         map: Ifmap,
