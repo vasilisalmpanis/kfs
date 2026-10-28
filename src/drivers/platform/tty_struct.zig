@@ -1155,7 +1155,7 @@ pub const TTY = struct {
                         .PGDN => self.pushSeq("\x1b[6~"),
                         .INSERT => self.pushSeq("\x1b[2~"),
                         .DELETE => self.pushSeq("\x1b[3~"),
-                        
+
                         else => {},
                     }
                 } else {
