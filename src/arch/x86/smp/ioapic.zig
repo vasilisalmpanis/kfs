@@ -49,8 +49,8 @@ pub fn registerOverride(entry: *align(1) apic.IOAPICInterruptSourceOverride) voi
 pub const Controller = struct {
     io_apic_id:         u8,
     gsi_base:           u32,
-    version:            u32 = undefined,
-    redir_entr_count:   u32 = undefined,
+    version:            u32 = 0,
+    redir_entr_count:   u32 = 0,
     regs:               [*] volatile u32,
     lock:               krn.Spinlock = krn.Spinlock.init(),
 

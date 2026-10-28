@@ -2,6 +2,7 @@ const drv = @import("../main.zig");
 const pci = drv.pci;
 const kernel = @import("kernel");
 const arch = @import("arch");
+const std = @import("std");
 
 const REG_CTRL: u16       =  0x0000;
 const REG_STATUS: u16     =  0x0008;
@@ -134,7 +135,7 @@ const DmaMemory = struct {
         const virt = try kernel.mm.mapPhys(phys, pages, .{});
         const bytes: [*]u8 = @ptrFromInt(virt);
         @memset(bytes[0..pages * kernel.mm.PAGE_SIZE], 0);
-        return .{ 
+        return .{
             .phys = phys,
             .virt = virt,
             .pages = pages
@@ -165,6 +166,8 @@ pub const E1000Device = struct {
     rx_buffers:     [E1000_NUM_RX_DESC]?DmaMemory = @splat(null),
     rx_descs:       [*]volatile E1000RxDesc,
     tx_descs:       [*]volatile E1000TxDesc,
+    worker_thread:  ?*kernel.task.Task = null,
+    wait_queue:     kernel.wq.WaitQueueHead = kernel.wq.WaitQueueHead.init(),
     rx_curr:        u8 = 0,
     tx_curr:        u8 = 0,
 
@@ -310,6 +313,7 @@ pub const E1000Device = struct {
             .rx_descs = undefined,
             .tx_descs = undefined,
         };
+        dev.wait_queue.setup();
         return dev;
     }
 
@@ -385,9 +389,8 @@ pub const E1000Device = struct {
         if (status & INT_RXO != 0) {
             kernel.logger.INFO("e1000 receive overrun", .{});
         }
-        if (status & (INT_RXDMT0 | INT_RXO | INT_RXT0) != 0) {
-            self.handleReceive();
-        }
+        if (status & (INT_RXDMT0 | INT_RXO | INT_RXT0) != 0)
+            self.wait_queue.wakeUpOne();
     }
 
     pub fn intHandler(arg: ?*anyopaque) callconv(.c) void {
@@ -511,10 +514,27 @@ fn e1000_probe(device: *pci.PCIDevice) !void {
     net_dev.priv = dev;
     net_dev.flags = kernel.net.intf.IFF_BROADCAST | kernel.net.intf.IFF_MULTICAST;
 
+    const worker_thread = try kernel.kthreadCreate(
+        &e1000_kthread,
+        dev,
+        @ptrCast(&net_dev.name),
+    );
+    dev.worker_thread = worker_thread;
     try kernel.net.dev.register(net_dev);
 }
 
 fn e1000_remove(_: *pci.PCIDevice) !void {
+}
+
+fn e1000_kthread(data: ?*const anyopaque) i32 {
+    kernel.logger.INFO("Hello from e1000 thread\n", .{});
+    const nic: *E1000Device = @ptrCast(@alignCast(@constCast(data.?)));
+
+    while (!kernel.task.current().should_stop) {
+        nic.wait_queue.wait(false, 0);
+        nic.handleReceive();
+    }
+    return 0;
 }
 
 /// Net Device Operations
