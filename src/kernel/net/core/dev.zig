@@ -3,8 +3,21 @@ const std = @import("std");
 
 pub const ETH_ALEN = 6;
 
+const uif = kernel.net.intf;
+
+// On SIOCSIFFLAGS userspace passes back every flag it got from SIOCGIFFLAGS,
+// including ones it cannot change, such as link state. These are the flags
+// that are stored as passed without any driver action. Flags that need an
+// action, like IFF_UP, are set only once that action succeeds.
+const IFF_PASSIVE: u32 = uif.IFF_DEBUG | uif.IFF_NOTRAILERS | uif.IFF_NOARP |
+    uif.IFF_DYNAMIC | uif.IFF_MULTICAST | uif.IFF_PORTSEL | uif.IFF_AUTOMEDIA;
+
+// Flags that we don't implement yet.
+const IFF_UNSUPPORTED: u32 = uif.IFF_PROMISC | uif.IFF_ALLMULTI;
+
 pub const NetDeviceOps = struct {
-    xmit: * const fn(*NetDevice, dma_addr: u32, len: u16) anyerror!void,
+    up:     * const fn(*NetDevice) anyerror!void,
+    xmit:   * const fn(*NetDevice, dma_addr: u32, len: u16) anyerror!void,
 };
 
 pub const NetDevice = struct {
@@ -13,6 +26,7 @@ pub const NetDevice = struct {
     // and we get eth0, eth1, eth2 etc.
     name: [kernel.net.intf.IFNAMSIZ]u8 = @splat(0),
     ifindex: u32 = 0,
+    flags: u32 = 0,
     addr_len: u8 = ETH_ALEN,
     dev_addr: [ETH_ALEN]u8 = @splat(0),
     broadcast: [ETH_ALEN]u8 = @splat(0xFF),
@@ -38,6 +52,30 @@ pub const NetDevice = struct {
         new_dev.list.setup();
         new_dev.priv = null;
         return new_dev;
+    }
+
+    pub fn open(self: *NetDevice) !void {
+        self.lock.lock();
+        defer self.lock.unlock();
+        if (self.flags & uif.IFF_UP != 0)
+            return;
+        try self.ops.up(self);
+        self.flags |= uif.IFF_UP | uif.IFF_RUNNING;
+    }
+
+    pub fn changeFlags(self: *NetDevice, flags: u16) !void {
+        self.lock.lock();
+        const changed = self.flags ^ flags;
+        // TODO: bring device down
+        const down = changed & uif.IFF_UP != 0 and flags & uif.IFF_UP == 0;
+        if (changed & IFF_UNSUPPORTED != 0 or down) {
+            self.lock.unlock();
+            return kernel.errors.PosixError.EOPNOTSUPP;
+        }
+        self.flags = (self.flags & ~IFF_PASSIVE) | (flags & IFF_PASSIVE);
+        self.lock.unlock();
+        if (changed & uif.IFF_UP != 0)
+            return self.open();
     }
 };
 

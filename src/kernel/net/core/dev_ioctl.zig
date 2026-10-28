@@ -10,6 +10,7 @@ pub fn isDevIoctl(op: u32) bool {
         uif.SIOCGIFNAME,
         uif.SIOCGIFCONF,
         uif.SIOCGIFFLAGS,
+        uif.SIOCSIFFLAGS,
         uif.SIOCGIFMETRIC,
         uif.SIOCGIFMTU,
         uif.SIOCGIFHWADDR,
@@ -52,11 +53,8 @@ pub fn devIoctl(op: u32, data: usize) !u32 {
         return kernel.errors.PosixError.ENODEV;
 
     switch (op) {
-        uif.SIOCGIFFLAGS => {
-            // TODO: NetDevice has no flags yet
-            ifr.ifr_ifru.flags = uif.IFF_UP | uif.IFF_BROADCAST |
-                uif.IFF_RUNNING | uif.IFF_MULTICAST;
-        },
+        uif.SIOCGIFFLAGS => ifr.ifr_ifru.flags = @truncate(net_dev.flags),
+        uif.SIOCSIFFLAGS => try net_dev.changeFlags(ifr.ifr_ifru.flags),
         uif.SIOCGIFMETRIC => ifr.ifr_ifru.ivalue = 0,
         // TODO: NetDevice has no MTU yet
         uif.SIOCGIFMTU => ifr.ifr_ifru.mtu = ETH_DATA_LEN,
