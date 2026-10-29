@@ -35,6 +35,8 @@ pub const vsize = @import("./vmalloc.zig").vsize;
 pub const deferredFreeOne = heap.deferredFreeOne;
 pub const deferredFreeReset = heap.deferredFreeReset;
 
+pub const Cache = @import("./mem-cache.zig").Cache;
+
 pub const PAGE_OFFSET: usize = 0xC0000000;
 pub const PAGE_SIZE: usize = arch.PAGE_SIZE;
 
@@ -121,6 +123,27 @@ pub fn mapPhys(phys: usize, num_pages: usize, flags: arch.vmm.PagingFlags) !usiz
         );
     }
     return virt_addr + offset;
+}
+
+pub fn allocKernelPage() ?usize {
+    const state = mem_lock.lock_irq_disable();
+    defer mem_lock.unlock_irq_enable(state);
+
+    const phys = virt_memory_manager.pmm.allocPage();
+    if (phys == 0)
+        return null;
+    const virt = mapPhys(phys, 1, .{}) catch {
+        virt_memory_manager.pmm.freePage(phys);
+        return null;
+    };
+    return virt;
+}
+
+pub fn freeKernelPage(virt: usize) void {
+    const state = mem_lock.lock_irq_disable();
+    defer mem_lock.unlock_irq_enable(state);
+
+    virt_memory_manager.unmapPage(virt, true);
 }
 
 // get the first availaanle address and put metadata there
