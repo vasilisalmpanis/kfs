@@ -131,6 +131,28 @@ const KmemCache = struct {
             self.partial.add(&pool.list);
         return obj;
     }
+
+    fn free(self: *KmemCache, _addr: ?*anyopaque) void {
+        const addr = _addr orelse
+            return;
+        const slab: *Pool = @ptrFromInt(@intFromPtr(addr) & ~(kernel.mm.PAGE_SIZE - 1));
+        if (slab.cache != self)
+            @panic("KmemCache: object freed to the wrong cache");
+        const state = self.lock.lock_irq_disable();
+        defer self.lock.unlock_irq_enable(state);
+        if (slab.inuse == 0)
+            @panic("KmemCache: double free");
+        slab.list.del();
+        const obj: *FreeObj = @ptrCast(@alignCast(addr));
+        obj.next = slab.free;
+        slab.free = obj;
+        slab.inuse -= 1;
+        if (slab.inuse == 0) {
+            self.empty.add(&slab.list);
+        } else {
+            self.partial.add(&slab.list);
+        }
+    }
 };
 
 // Public API
@@ -151,6 +173,10 @@ pub fn Cache(comptime T: type) type {
 
         pub fn alloc(self: *@This()) ?*T {
             return @ptrCast(@alignCast(self.inner.alloc()));
+        }
+
+        pub fn free(self: *@This(), obj: ?*T) void {
+            self.inner.free(obj);
         }
     };
 }
