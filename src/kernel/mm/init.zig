@@ -35,6 +35,8 @@ pub const vsize = @import("./vmalloc.zig").vsize;
 pub const deferredFreeOne = heap.deferredFreeOne;
 pub const deferredFreeReset = heap.deferredFreeReset;
 
+pub const Cache = @import("./mem-cache.zig").Cache;
+
 pub const PAGE_OFFSET: usize = 0xC0000000;
 pub const PAGE_SIZE: usize = arch.PAGE_SIZE;
 

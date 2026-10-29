@@ -83,3 +83,21 @@ const KmemCache = struct {
         self.full.setup();
     }
 };
+
+// Public API
+//
+// Example: var task_cache = Cache(krn.task.Task).init("task");
+
+pub fn Cache(comptime T: type) type {
+    return struct {
+        inner: KmemCache,
+
+        pub fn init(name: []const u8) @This() {
+            return .{ .inner = KmemCache.init(name, @sizeOf(T), @alignOf(T)) };
+        }
+
+        pub fn setup(self: *@This()) void {
+            self.inner.setup();
+        }
+    };
+}
