@@ -38,7 +38,7 @@ const FreeObj = struct {
 const Pool = struct {
     list: kernel.list.ListHead,
     cache: *KmemCache,
-    free: *FreeObj,
+    free: ?*FreeObj,
     inuse: u16,
 };
 
@@ -82,6 +82,55 @@ const KmemCache = struct {
         self.partial.setup();
         self.full.setup();
     }
+
+    fn grow(self: *KmemCache) ?*Pool {
+        const page = kernel.mm.allocKernelPage() orelse return null;
+        const pool: *Pool = @ptrFromInt(page);
+        pool.* = .{
+            .list = kernel.list.ListHead.init(),
+            .cache = self,
+            .free = null,
+            .inuse = 0,
+        };
+        var i: usize = self.per_pool;
+        // Lets assume that each page can fit 100 objects.
+        // We start from the end.
+        // obj-100: pool.free = null, obj-100.next = pool.free (null)
+        // obj-99: pool.free = obj-99, obj-99.next = pool.free (obj-100)
+        // ...
+        // obj-0: pool.free = obj-0, obj-0.next = pool.free (obj-1)
+        // So first free is the first object
+        while (i > 0) {
+            i -= 1;
+            const obj: *FreeObj = @ptrFromInt(page + self.obj_offset + i * self.obj_size);
+            obj.next = pool.free;
+            pool.free = obj;
+        }
+        return pool;
+    }
+
+    fn alloc(self: *KmemCache) ?*anyopaque {
+        const state = self.lock.lock_irq_disable();
+        defer self.lock.unlock_irq_enable(state);
+
+        const pool: *Pool = if (!self.partial.isEmpty())
+            self.partial.next.?.entry(Pool, "list")
+        else if (!self.empty.isEmpty())
+            self.empty.next.?.entry(Pool, "list")
+        else
+            self.grow() orelse return null;
+
+        const obj = pool.free.?;
+        pool.free = obj.next;
+        pool.inuse += 1;
+
+        pool.list.del();
+        if (pool.inuse == self.per_pool)
+            self.full.add(&pool.list)
+        else
+            self.partial.add(&pool.list);
+        return obj;
+    }
 };
 
 // Public API
@@ -98,6 +147,10 @@ pub fn Cache(comptime T: type) type {
 
         pub fn setup(self: *@This()) void {
             self.inner.setup();
+        }
+
+        pub fn alloc(self: *@This()) ?*T {
+            return @ptrCast(@alignCast(self.inner.alloc()));
         }
     };
 }
