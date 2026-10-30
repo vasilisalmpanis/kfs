@@ -1279,6 +1279,23 @@ pub const kernel = struct {
 
         };
 
+        pub const netbuf = struct {
+            pub const Netbuf = struct {
+                data : []u8,
+                lst : kernel.list.ListHead,
+                pos : u32= 0,
+                dev : *kernel.net.dev.NetDevice,
+            };
+
+        };
+
+
+        pub const EthernetHeader = extern struct {
+            dest_mac : [6]u8,
+            src_mac : [6]u8,
+            eth_type : u16,
+        };
+
     };
 
     pub const limit = struct {

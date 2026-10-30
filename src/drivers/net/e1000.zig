@@ -341,7 +341,10 @@ pub const E1000Device = struct {
         kernel.mm.kfree(self);
     }
 
-    fn handleReceive(self: *E1000Device) void {
+    fn handleReceive(
+        self: *E1000Device,
+        net_dev: *kernel.net.dev.NetDevice
+    ) void {
         while (self.rx_descs[self.rx_curr].status & 0x1 != 0) {
             const len: u16 = self.rx_descs[self.rx_curr].len;
             if (self.rx_descs[self.rx_curr].errors == 0 and
@@ -350,6 +353,14 @@ pub const E1000Device = struct {
                 const buf: [*]const u8 = @ptrFromInt(
                     self.rx_buffers[self.rx_curr].?.virt
                 );
+                const netbuf = kernel.net.Netbuf.new(net_dev) orelse
+                    continue ;
+                netbuf.data = kernel.mm.dupSlice(u8, buf[0..len]) orelse {
+                    kernel.mm.kfree(netbuf);
+                    continue ;
+                };
+                kernel.net.netbuf.enqueue(netbuf);
+
                 if (len < 6) {
                     kernel.logger.INFO("Got packet with len {d}", .{len});
                 } else {
@@ -516,7 +527,7 @@ fn e1000_probe(device: *pci.PCIDevice) !void {
 
     const worker_thread = try kernel.kthreadCreate(
         &e1000_kthread,
-        dev,
+        net_dev,
         @ptrCast(&net_dev.name),
     );
     dev.worker_thread = worker_thread;
@@ -528,11 +539,12 @@ fn e1000_remove(_: *pci.PCIDevice) !void {
 
 fn e1000_kthread(data: ?*const anyopaque) i32 {
     kernel.logger.INFO("Hello from e1000 thread\n", .{});
-    const nic: *E1000Device = @ptrCast(@alignCast(@constCast(data.?)));
+    const net_dev: *kernel.net.dev.NetDevice = @ptrCast(@alignCast(@constCast(data.?)));
+    const nic: *E1000Device = @ptrCast(@alignCast(net_dev.priv));
 
     while (!kernel.task.current().should_stop) {
         nic.wait_queue.wait(false, 0);
-        nic.handleReceive();
+        nic.handleReceive(net_dev);
     }
     return 0;
 }
