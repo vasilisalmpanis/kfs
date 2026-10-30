@@ -31,6 +31,14 @@ const std = @import("std");
 // Reject very large objects for now.
 const MAX_OBJ_SIZE: usize = kernel.mm.PAGE_SIZE / 8;
 
+// Free objects are filled with POISON_FREE after FreeObj.next and checked on
+// alloc to catch use after free. Allocated objects are filled with
+// POISON_INUSE so we can understand from panic that we read from unitialized
+// pointer inside an object allocated from a cache pool.
+const DEBUG_POISON = true;
+const POISON_FREE: u8 = 0x6b;
+const POISON_INUSE: u8 = 0x5a;
+
 const FreeObj = struct {
     next: ?*FreeObj,
 };
@@ -83,6 +91,40 @@ const KmemCache = struct {
         self.full.setup();
     }
 
+    fn poisonBytes(self: *KmemCache, obj: *FreeObj) []u8 {
+        const bytes: [*]u8 = @ptrCast(obj);
+        return bytes[@sizeOf(FreeObj)..self.obj_size];
+    }
+
+    fn poison(self: *KmemCache, obj: *FreeObj) void {
+        if (DEBUG_POISON)
+            @memset(self.poisonBytes(obj), POISON_FREE);
+    }
+
+    fn checkPoison(self: *KmemCache, pool: *Pool, obj: *FreeObj) void {
+        if (!DEBUG_POISON)
+            return;
+        for (self.poisonBytes(obj)) |b| {
+            if (b != POISON_FREE) {
+                kernel.logger.ERROR(
+                    "KmemCache {s}: object 0x{x} written after free",
+                    .{ self.name, @intFromPtr(obj) },
+                );
+                @panic("KmemCache: use after free");
+            }
+        }
+        // next is not poisoned, but it must stay inside the same page
+        if (obj.next) |next| {
+            if (@intFromPtr(next) & ~(kernel.mm.PAGE_SIZE - 1) != @intFromPtr(pool)) {
+                kernel.logger.ERROR(
+                    "KmemCache {s}: object 0x{x} has bad next 0x{x}",
+                    .{ self.name, @intFromPtr(obj), @intFromPtr(next) },
+                );
+                @panic("KmemCache: free list corrupted");
+            }
+        }
+    }
+
     fn grow(self: *KmemCache) ?*Pool {
         const page = kernel.mm.allocKernelPage() orelse return null;
         const pool: *Pool = @ptrFromInt(page);
@@ -105,6 +147,7 @@ const KmemCache = struct {
             const obj: *FreeObj = @ptrFromInt(page + self.obj_offset + i * self.obj_size);
             obj.next = pool.free;
             pool.free = obj;
+            self.poison(obj);
         }
         return pool;
     }
@@ -121,8 +164,13 @@ const KmemCache = struct {
             self.grow() orelse return null;
 
         const obj = pool.free.?;
+        self.checkPoison(pool, obj);
         pool.free = obj.next;
         pool.inuse += 1;
+        if (DEBUG_POISON) {
+            const bytes: [*]u8 = @ptrCast(obj);
+            @memset(bytes[0..self.obj_size], POISON_INUSE);
+        }
 
         pool.list.del();
         if (pool.inuse == self.per_pool)
@@ -146,6 +194,7 @@ const KmemCache = struct {
         const obj: *FreeObj = @ptrCast(@alignCast(addr));
         obj.next = slab.free;
         slab.free = obj;
+        self.poison(obj);
         slab.inuse -= 1;
         if (slab.inuse == 0) {
             self.empty.add(&slab.list);
