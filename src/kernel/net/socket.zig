@@ -86,6 +86,13 @@ pub const sockaddr = extern struct {
     sa_data: [14]u8,
 };
 
+pub const sockaddr_in = extern struct {
+    family: u16 = AF_INET,
+    port: u16,
+    addr: u32,
+    zero: [8]u8 = @splat(0),
+};
+
 pub const ProtocolOps = struct {
     ioctl: *const fn(*Socket, op: u32, data: usize) anyerror!u32,
 };
