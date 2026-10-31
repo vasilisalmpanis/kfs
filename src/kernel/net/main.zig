@@ -1,6 +1,7 @@
 const kernel = @import("../main.zig");
 const std = @import("std");
 const drivers = @import("drivers");
+const arp = @import("./ipv4/arp.zig");
 
 pub const ipv4 = @import("./ipv4/main.zig");
 pub const intf = @import("./if.zig");
@@ -27,6 +28,7 @@ pub const EthernetHeader = extern struct {
 
 pub fn init() void {
     ipv4.init();
+    arp.init();
     netbuf.init() catch |err| {
         kernel.logger.ERROR("netbuf cannot be initialized: {t}", .{err});
     };
