@@ -34,6 +34,7 @@ pub const NetDevice = struct {
     priv: ?*anyopaque = null,
     lock: kernel.Mutex = kernel.Mutex.init(),
     list: kernel.list.ListHead = kernel.list.ListHead.init(),
+    ip_list: ?*kernel.net.ipv4.IPv4Dev = null,
 
     pub fn new(
         name: []const u8,
@@ -51,7 +52,46 @@ pub const NetDevice = struct {
         new_dev.dev_addr = dev_addr;
         new_dev.list.setup();
         new_dev.priv = null;
+        new_dev.ip_list = null;
         return new_dev;
+    }
+
+    // ip_list helpers below expect self.lock held
+    pub fn lookupLabel(
+        self: *NetDevice,
+        label: []const u8
+    ) ?*kernel.net.ipv4.IPv4Dev {
+        const head = self.ip_list orelse
+            return null;
+        var it = head.list.iterator();
+        while (it.next()) |node| {
+            const ifa = node.curr.entry(kernel.net.ipv4.IPv4Dev, "list");
+            if (std.mem.eql(u8, ifa.getLabel(), label))
+                return ifa;
+        }
+        return null;
+    }
+
+    pub fn addIP(self: *NetDevice, ifa: *kernel.net.ipv4.IPv4Dev) void {
+        if (self.ip_list) |head| {
+            head.list.addTail(&ifa.list);
+        } else {
+            ifa.list.setup();
+            self.ip_list = ifa;
+        }
+    }
+
+    pub fn delIP(self: *NetDevice, ifa: *kernel.net.ipv4.IPv4Dev) void {
+        if (self.ip_list == ifa) {
+            if (ifa.list.isEmpty()) {
+                self.ip_list = null;
+            } else {
+                self.ip_list = ifa.list.next.?.entry(
+                    kernel.net.ipv4.IPv4Dev, "list"
+                );
+            }
+        }
+        ifa.list.del();
     }
 
     pub fn open(self: *NetDevice) !void {
