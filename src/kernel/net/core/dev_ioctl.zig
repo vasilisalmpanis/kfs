@@ -49,7 +49,7 @@ pub fn devIoctl(op: u32, data: usize) !u32 {
     }
 
     const ifr: *uif.Ifreq = @ptrFromInt(data);
-    const net_dev = dev.getByName(ifr.name()) orelse
+    const net_dev = dev.getByName(ifr.devName()) orelse
         return kernel.errors.PosixError.ENODEV;
 
     switch (op) {

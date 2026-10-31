@@ -74,6 +74,13 @@ pub const Ifreq = extern struct {
     pub fn name(self: *const Ifreq) []const u8 {
         return std.mem.sliceTo(self.ifr_name[0 .. IFNAMSIZ - 1], 0);
     }
+
+    // Alias can look like eth0:1, device name is eth0
+    pub fn devName(self: *const Ifreq) []const u8 {
+        const label = self.name();
+        const colon = std.mem.indexOfScalar(u8, label, ':') orelse label.len;
+        return label[0..colon];
+    }
 };
 
 pub const Ifconf = extern struct {

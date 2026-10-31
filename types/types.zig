@@ -1210,6 +1210,13 @@ pub const kernel = struct {
             sa_data : [14]u8,
         };
 
+        pub const sockaddr_in = extern struct {
+            family : u16= 2,
+            port : u16,
+            addr : u32,
+            zero : [8]u8,
+        };
+
         pub const ProtocolOps = struct {
             ioctl : *const fn(*kernel.socket.Socket, u32, u32) anyerror!u32,
         };
