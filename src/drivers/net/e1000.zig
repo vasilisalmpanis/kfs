@@ -249,7 +249,7 @@ pub const E1000Device = struct {
         self.writeCommand(REG_RXDESCTAIL, E1000_NUM_RX_DESC - 1);
         self.writeCommand(
             REG_RCTRL,
-            RCTL_UPE | RCTL_MPE |
+            // RCTL_UPE | RCTL_MPE |
             RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM | RCTL_SECRC |
             RCTL_BSIZE_8192
         );
