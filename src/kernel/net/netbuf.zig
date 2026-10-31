@@ -1,5 +1,6 @@
 const krn = @import("../main.zig");
 const std = @import("std");
+const arp = @import("ipv4/arp.zig");
 
 var lst: ?*Netbuf = null;
 var lock = krn.Spinlock.init();
@@ -46,6 +47,12 @@ pub const Netbuf = struct {
         netbuf.dev = net_dev;
         return netbuf;
     }
+
+    pub fn pull(self: *Netbuf, num_of_bytes: usize) !void {
+        if (self.pos + num_of_bytes > self.data.len)
+            return krn.errors.PosixError.E2BIG;
+        self.pos += num_of_bytes;
+    }
 };
 
 fn process(_: ?*const anyopaque) i32 {
@@ -54,8 +61,18 @@ fn process(_: ?*const anyopaque) i32 {
             const eth_header: *krn.net.EthernetHeader = @ptrCast(
                 @alignCast(netbuf.data.ptr)
             );
-            switch (eth_header.eth_type) {
-                krn.net.ETH_P_ARP => {},
+            // We don't operate in promiscuous mode so the NIC
+            // is supposed to filter out packets other than broadcast
+            // or with dst hardware address other than the NIC's
+
+            netbuf.pull(@sizeOf(krn.net.EthernetHeader)) catch {};
+            switch (
+                std.mem.bigToNative(u16, eth_header.eth_type)
+            ) {
+                krn.net.ETH_P_ARP => {
+                    arp.arpReceive(netbuf) catch {};
+                },
+                krn.net.ETH_P_IP => {},
                 else => {},
             }
             krn.logger.INFO("eth: {any}", .{eth_header});
