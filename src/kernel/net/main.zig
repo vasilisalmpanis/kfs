@@ -1,8 +1,8 @@
 const kernel = @import("../main.zig");
 const std = @import("std");
 const drivers = @import("drivers");
-const ipv4 = @import("./ipv4/main.zig");
 
+pub const ipv4 = @import("./ipv4/main.zig");
 pub const intf = @import("./if.zig");
 pub const dev = @import("./core/dev.zig");
 pub const netbuf = @import("./netbuf.zig");
