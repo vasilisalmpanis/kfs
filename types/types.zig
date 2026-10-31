@@ -1236,6 +1236,17 @@ pub const kernel = struct {
     };
 
     pub const net = struct {
+        pub const ipv4 = struct {
+            pub const IPv4Dev = struct {
+                list : kernel.list.ListHead,
+                label : [16]u8,
+                ip : [4]u8,
+                broadcast : [4]u8,
+                mask : u32,
+            };
+
+        };
+
         pub const intf = struct {
             pub const Ifmap = extern struct {
                 mem_start : u32,
@@ -1275,6 +1286,7 @@ pub const kernel = struct {
                 priv : ?*anyopaque= null,
                 lock : kernel.Mutex,
                 list : kernel.list.ListHead,
+                ip_list : ?*kernel.net.ipv4.IPv4Dev= null,
             };
 
         };

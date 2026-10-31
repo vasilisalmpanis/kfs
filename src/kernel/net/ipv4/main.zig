@@ -2,6 +2,8 @@ const kernel = @import("../../main.zig");
 const uif = @import("../if.zig");
 const dev_ioctl = @import("../core/dev_ioctl.zig");
 
+pub const IPv4Dev = @import("./dev.zig").IPv4Dev;
+
 const inet_family = kernel.socket.ProtocolFamily {
     .create = inet_create,
 };
