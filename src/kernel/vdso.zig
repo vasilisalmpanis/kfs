@@ -15,7 +15,7 @@ const vdso_image = @import("vdso_image").data;
 pub var vvar_phys: usize = 0;
 var vvar_data: *volatile VdsoData = undefined;
 
-var code_phys: [max_code_pages]usize = [_]usize{0} ** max_code_pages;
+var code_phys: [max_code_pages]usize = @splat(0);
 var code_page_count: usize = 0;
 const max_code_pages = 4; // This can be increase if needed
 

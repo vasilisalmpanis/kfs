@@ -3,9 +3,6 @@ const krn = @import("../main.zig");
 const lst = @import("../utils/list.zig");
 const mutex = @import("../sched/mutex.zig");
 
-pub const AF_UNIX: u16 = 1;
-pub const AF_LOCAL: u16 = AF_UNIX;
-
 pub const SOCK_STREAM: u16 = 1;
 pub const SOCK_DGRAM: u16 = 2;
 
@@ -13,11 +10,71 @@ pub const SOCK_TYPE_MASK: u32 = 0xf;
 pub const SOCK_NONBLOCK: u32 = krn.fs.file.O_NONBLOCK;
 pub const SOCK_CLOEXEC: u32 = krn.fs.file.O_CLOEXEC;
 
-pub const SOCK_SUPPORTED: u32 = SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
+pub const SOCK_SUPPORTED: u32 = SOCK_STREAM | SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
 
 pub const MAX_UNIX_PATH: usize = 108;
 pub const MAX_BACKLOG: usize = 16;
 const SOCK_BUFFER_SIZE = 4096;
+
+pub const AF_UNSPEC     :u32 = 0;
+pub const AF_UNIX       :u32 = 1;  // Unix domain sockets
+pub const AF_LOCAL      :u32 = AF_UNIX;  // POSIX name for AF_UNIX
+pub const AF_INET       :u32 = 2;  // Internet IP Protocol
+pub const AF_AX25       :u32 = 3;  // Amateur Radio AX.25
+pub const AF_IPX        :u32 = 4;  // Novell IPX
+pub const AF_APPLETALK  :u32 = 5;  // AppleTalk DDP
+pub const AF_NETROM     :u32 = 6;  // Amateur Radio NET/ROM
+pub const AF_BRIDGE     :u32 = 7;  // Multiprotocol bridge
+pub const AF_ATMPVC     :u32 = 8;  // ATM PVCs
+pub const AF_X25        :u32 = 9;  // Reserved for X.25 project
+pub const AF_INET6      :u32 = 10; // IP version 6
+pub const AF_ROSE       :u32 = 11; // Amateur Radio X.25 PLP
+pub const AF_DECnet     :u32 = 12; // Reserved for DECnet project
+pub const AF_NETBEUI    :u32 = 13; // Reserved for 802.2LLC project
+pub const AF_SECURITY   :u32 = 14; // Security callback pseudo AF
+pub const AF_KEY        :u32 = 15; // PF_KEY key management API
+pub const AF_NETLINK    :u32 = 16;
+pub const AF_ROUTE      :u32 = AF_NETLINK; // Alias to emulate 4.4BSD
+pub const AF_PACKET     :u32 = 17; // Packet family
+pub const AF_ASH        :u32 = 18; // Ash
+pub const AF_ECONET     :u32 = 19; // Acorn Econet
+pub const AF_ATMSVC     :u32 = 20; // ATM SVCs
+pub const AF_RDS        :u32 = 21; // RDS sockets
+pub const AF_SNA        :u32 = 22; // Linux SNA Project (nutters!)
+pub const AF_IRDA       :u32 = 23; // IRDA sockets
+pub const AF_PPPOX      :u32 = 24; // PPPoX sockets
+pub const AF_WANPIPE    :u32 = 25; // Wanpipe API Sockets
+pub const AF_LLC        :u32 = 26; // Linux LLC
+pub const AF_IB         :u32 = 27; // Native InfiniBand address
+pub const AF_MPLS       :u32 = 28; // MPLS
+pub const AF_CAN        :u32 = 29; // Controller Area Network
+pub const AF_TIPC       :u32 = 30; // TIPC sockets
+pub const AF_BLUETOOTH  :u32 = 31; // Bluetooth sockets
+pub const AF_IUCV       :u32 = 32; // IUCV sockets
+pub const AF_RXRPC      :u32 = 33; // RxRPC sockets
+pub const AF_ISDN       :u32 = 34; // mISDN sockets
+pub const AF_PHONET     :u32 = 35; // Phonet sockets
+pub const AF_IEEE802154 :u32 = 36; // IEEE802154 sockets
+pub const AF_CAIF       :u32 = 37; // CAIF sockets
+pub const AF_ALG        :u32 = 38; // Algorithm sockets
+pub const AF_NFC        :u32 = 39; // NFC sockets
+pub const AF_VSOCK      :u32 = 40; // vSockets
+pub const AF_KCM        :u32 = 41; // Kernel Connection Multiplexor
+pub const AF_QIPCRTR    :u32 = 42; // Qualcomm IPC Router
+pub const AF_SMC        :u32 = 43; // smc sockets: reserve number for
+                                   // PF_SMC protocol family that
+                                   // reuses AF_INET address family
+                                   //
+pub const AF_XDP        :u32 = 44; // XDP sockets
+pub const AF_MCTP       :u32 = 45; // Management component
+                                   // transport protocol
+pub const AF_MAX        :u32 = 46; // For now..
+
+
+pub const ProtocolFamily = struct {
+    create: * const fn (*Socket) anyerror!void
+};
+pub var net_families: [AF_MAX]?*const ProtocolFamily = @splat(null);
 
 pub const sockaddr_un = extern struct {
     sun_family: u16,
@@ -29,6 +86,16 @@ pub const sockaddr = extern struct {
     sa_data: [14]u8,
 };
 
+pub const sockaddr_in = extern struct {
+    family: u16 = AF_INET,
+    port: u16,
+    addr: u32,
+    zero: [8]u8 = @splat(0),
+};
+
+pub const ProtocolOps = struct {
+    ioctl: *const fn(*Socket, op: u32, data: usize) anyerror!u32,
+};
 
 pub const Socket = struct {
     _buffer: [SOCK_BUFFER_SIZE]u8,
@@ -39,7 +106,7 @@ pub const Socket = struct {
 
     sock_type: u16 = SOCK_STREAM,
     is_listening: bool = false,
-    bound_path: [MAX_UNIX_PATH]u8 = .{0} ** MAX_UNIX_PATH,
+    bound_path: [MAX_UNIX_PATH]u8 = @splat(0),
     bound_path_len: usize = 0,
 
     accept_queue: lst.ListHead = lst.ListHead.init(),
@@ -50,9 +117,10 @@ pub const Socket = struct {
     rw_queue: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
 
     pending_link: lst.ListHead = lst.ListHead.init(),
+    ops: * const ProtocolOps,
 
     pub fn setup(self: *Socket) void {
-        self._buffer = .{0} ** SOCK_BUFFER_SIZE;
+        self._buffer = @splat(0);
         self.rb = krn.ringbuf.RingBuf._init(self._buffer[0..SOCK_BUFFER_SIZE]) catch {
             @panic("Make buffer size a power of two.");
         };
@@ -62,7 +130,7 @@ pub const Socket = struct {
         self.lock = krn.Spinlock.init();
         self.sock_type = SOCK_STREAM;
         self.is_listening = false;
-        self.bound_path = .{0} ** MAX_UNIX_PATH;
+        self.bound_path = @splat(0);
         self.bound_path_len = 0;
         self.accept_queue.setup();
         self.accept_count = 0;
@@ -113,7 +181,7 @@ pub const Socket = struct {
 };
 
 const MAX_BOUND_SOCKETS: usize = 32;
-var bound_sockets: [MAX_BOUND_SOCKETS]?*Socket = .{null} ** MAX_BOUND_SOCKETS;
+var bound_sockets: [MAX_BOUND_SOCKETS]?*Socket = @splat(null);
 
 fn registerBound(sock: *Socket) bool {
     for (&bound_sockets) |*slot| {
@@ -165,9 +233,10 @@ pub fn findBoundSocket(path: []const u8) ?*Socket {
 
 pub fn do_socket(family: u32, sock_type: u32, protocol: u32) !u32 {
     _ = protocol;
-    if (family != AF_UNIX and family != AF_LOCAL) {
+    if (family >= AF_MAX)
         return krn.errors.PosixError.EAFNOSUPPORT;
-    }
+    const net_family = net_families[family] orelse
+        return krn.errors.PosixError.EAFNOSUPPORT;
 
     if (sock_type & ~SOCK_SUPPORTED != 0) {
         return krn.errors.PosixError.ESOCKTNOSUPPORT;
@@ -187,6 +256,8 @@ pub fn do_socket(family: u32, sock_type: u32, protocol: u32) !u32 {
     file.mode = krn.fs.UMode.socket();
     file.flags |= krn.fs.file.O_RDWR;
 
+
+    try net_family.create(sock);
 
     const fd = try krn.task.current().files.getNextFD();
     errdefer _ = krn.task.current().files.releaseFD(fd);
@@ -543,6 +614,11 @@ pub fn sock_poll(
     return ready;
 }
 
+fn sock_ioctl(base: *krn.fs.File, op: u32, data: usize) !u32 {
+    const sock = base.inode.data.sock orelse return 0;
+    return try sock.ops.ioctl(sock, op, data);
+}
+
 pub const SocketFileOps: krn.fs.FileOps = krn.fs.FileOps{
     .open = open,
     .close = close,
@@ -551,4 +627,5 @@ pub const SocketFileOps: krn.fs.FileOps = krn.fs.FileOps{
     .lseek = null,
     .readdir = null,
     .poll = sock_poll,
+    .ioctl = sock_ioctl
 };

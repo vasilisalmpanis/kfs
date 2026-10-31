@@ -176,7 +176,7 @@ pub fn setgroups(size: u32, list: ?[*]const u16) !u32 {
         return setgroups32(0, null);
     const user_list = list orelse
         return errors.EFAULT;
-    var groups32: [tsk.MAX_GROUPS]u32 = .{0} ** tsk.MAX_GROUPS;
+    var groups32: [tsk.MAX_GROUPS]u32 = @splat(0);
     const groups_size: usize = size;
     if (groups_size > tsk.MAX_GROUPS)
         return errors.EINVAL;

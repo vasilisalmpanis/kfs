@@ -19,7 +19,7 @@ const Backend = enum {
 };
 
 pub const FPUState = extern struct {
-    raw: [512 + 15]u8 = .{0} ** (512 + 15),
+    raw: [512 + 15]u8 = @splat(0),
 
     pub inline fn ptrAligned(self: *FPUState) *align(16) [512]u8 {
         const aligned = (@intFromPtr(&self.raw) + 15) & ~@as(usize, 15);

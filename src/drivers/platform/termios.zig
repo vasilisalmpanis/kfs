@@ -18,44 +18,44 @@ pub const Termios = struct {
             .c_cflag = 0,
             .c_lflag = LFlag.init(),
             .c_line = 0,
-            .c_cc = [_]u8{0} ** NCCS
+            .c_cc = @splat(0)
         };
     }
 
     pub fn printDiff(self: *const Termios, other: *const Termios) void {
         krn.logger.DEBUG("Termios diff:", .{});
         if (!self.c_iflag.eql(&other.c_iflag)) {
-            inline for (std.meta.fields(IFlag)) |field| {
-                const curr_val = @field(self.c_iflag, field.name);
-                const new_val = @field(other.c_iflag, field.name);
+            inline for (@typeInfo(IFlag).@"struct".field_names) |field_name| {
+                const curr_val = @field(self.c_iflag, field_name);
+                const new_val = @field(other.c_iflag, field_name);
                 if (curr_val != new_val) {
                     krn.logger.DEBUG(
                         "  iflag.{s:<8} {} => {}",
-                        .{field.name, curr_val, new_val}
+                        .{field_name, curr_val, new_val}
                     );
                 }
             }
         }
         if (!self.c_oflag.eql(&other.c_oflag)) {
-            inline for (std.meta.fields(OFlag)) |field| {
-                const curr_val = @field(self.c_oflag, field.name);
-                const new_val = @field(other.c_oflag, field.name);
+            inline for (@typeInfo(OFlag).@"struct".field_names) |field_name| {
+                const curr_val = @field(self.c_oflag, field_name);
+                const new_val = @field(other.c_oflag, field_name);
                 if (curr_val != new_val) {
                     krn.logger.DEBUG(
                         "  oflag.{s:<8} {} => {}",
-                        .{field.name, curr_val, new_val}
+                        .{field_name, curr_val, new_val}
                     );
                 }
             }
         }
         if (!self.c_lflag.eql(&other.c_lflag)) {
-            inline for (std.meta.fields(LFlag)) |field| {
-                const curr_val = @field(self.c_lflag, field.name);
-                const new_val = @field(other.c_lflag, field.name);
+            inline for (@typeInfo(LFlag).@"struct".field_names) |field_name| {
+                const curr_val = @field(self.c_lflag, field_name);
+                const new_val = @field(other.c_lflag, field_name);
                 if (curr_val != new_val) {
                     krn.logger.DEBUG(
                         "  lflag.{s:<8} {} => {}",
-                        .{field.name, curr_val, new_val}
+                        .{field_name, curr_val, new_val}
                     );
                 }
             }
@@ -200,7 +200,7 @@ pub const LFlag = packed struct {
     IEXTEN: bool = false,
     EXTPROC: bool = false,
     _padding_2: u15 = 0,
-    // _padding_2: [15]bool = .{false} ** 15,
+    // _padding_2: [15]bool = @splat(false),
 
     pub fn init() LFlag {
         return LFlag{};

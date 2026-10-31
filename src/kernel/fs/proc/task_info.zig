@@ -11,7 +11,7 @@ const kstack_max_frames: u32 = 64;
 
 // Create file for new task (used in doFork())
 pub fn newProcess(task: *kernel.task.Task) !void {
-    var buff: [5]u8 = .{0} ** 5;
+    var buff: [5]u8 = @splat(0);
     const slice = try std.fmt.bufPrint(buff[0..5], "{d}", .{task.pid});
     const parent = try kernel.fs.procfs.mkdir(kernel.fs.procfs.root, slice);
     const mode = kernel.fs.UMode.regular();
@@ -46,7 +46,7 @@ pub fn newProcess(task: *kernel.task.Task) !void {
 
 
 pub fn deleteProcess(task: *kernel.task.Task) void {
-    var buff: [5]u8 = .{0} ** 5;
+    var buff: [5]u8 = @splat(0);
     const slice = std.fmt.bufPrint(buff[0..5], "{d}", .{task.pid}) catch {
         return;
     };
@@ -91,7 +91,7 @@ fn stat_read(file: *kernel.fs.File, buff: [*]u8, size: usize) !usize {
     const proc_inode = file.inode.getImpl(inode.ProcInode, "base");
     const task = proc_inode.task orelse 
         return kernel.errors.PosixError.ESRCH;
-    var buffer: [512]u8 = .{0} ** 512;
+    var buffer: [512]u8 = @splat(0);
     kernel.logger.INFO("TASK name {s}\n", .{task.name[0..16]});
     const status: u8 = switch (task.state) {
         .RUNNING => 'R',

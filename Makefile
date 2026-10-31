@@ -209,7 +209,26 @@ qemu: $(NAME)
 		-serial stdio \
 		-serial pty \
 		-m 4G \
-		-smp $(CORES)
+		-smp $(CORES) \
+		-netdev user,id=net0\
+		-device e1000,netdev=net0
+
+# Can only be used when we have root access. It creates a tap device that we can use
+# directly from userspace with tools suchs as ping or arping
+qemu-tap: $(NAME)
+	if ! ip link show kfs-tap0 >/dev/null 2>&1; then \
+		sudo ip tuntap add dev kfs-tap0 mode tap user $$USER; \
+		sudo ip addr add 10.0.2.1/24 dev kfs-tap0; \
+		sudo ip link set kfs-tap0 up; \
+	fi
+	$(QEMU) $(KVM) \
+		-drive file=$(NAME),format=raw \
+		-serial stdio \
+		-serial pty \
+		-m 4G \
+		-smp $(CORES) \
+		-netdev tap,id=net0,ifname=kfs-tap0,script=no,downscript=no\
+		-device e1000,netdev=net0
 
 
 test: $(TEST_DISK)
@@ -350,4 +369,5 @@ install-tools:
 	check-tools \
 	tools-linux-apt tools-linux-dnf tools-linux-pacman \
 	tools-linux-apk tools-linux-root tools-user-brew \
-	install-tools-user install-tools-system install-tools
+	install-tools-user install-tools-system install-tools \
+	qemu-tap

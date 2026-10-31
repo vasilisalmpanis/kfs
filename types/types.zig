@@ -1168,7 +1168,7 @@ pub const kernel = struct {
 
 
         pub const SigPending = struct {
-            set : std.bit_set.ArrayBitSet(usize, 64),
+            set : std.bit_set.Array(usize, 64),
         };
 
         pub const SigHand = struct {
@@ -1196,6 +1196,10 @@ pub const kernel = struct {
     };
 
     pub const socket = struct {
+        pub const ProtocolFamily = struct {
+            create : *const fn(*kernel.socket.Socket) anyerror!void,
+        };
+
         pub const sockaddr_un = extern struct {
             sun_family : u16,
             sun_path : [108]u8,
@@ -1204,6 +1208,17 @@ pub const kernel = struct {
         pub const sockaddr = extern struct {
             sa_family : u16,
             sa_data : [14]u8,
+        };
+
+        pub const sockaddr_in = extern struct {
+            family : u16= 2,
+            port : u16,
+            addr : u32,
+            zero : [8]u8,
+        };
+
+        pub const ProtocolOps = struct {
+            ioctl : *const fn(*kernel.socket.Socket, u32, u32) anyerror!u32,
         };
 
         pub const Socket = struct {
@@ -1222,6 +1237,82 @@ pub const kernel = struct {
             accept_wait : kernel.wq.WaitQueueHead,
             rw_queue : kernel.wq.WaitQueueHead,
             pending_link : kernel.list.ListHead,
+            ops : *const kernel.socket.ProtocolOps,
+        };
+
+    };
+
+    pub const net = struct {
+        pub const ipv4 = struct {
+            pub const IPv4Dev = struct {
+                list : kernel.list.ListHead,
+                label : [16]u8,
+                ip : [4]u8,
+                broadcast : [4]u8,
+                mask : u32,
+            };
+
+        };
+
+        pub const intf = struct {
+            pub const Ifmap = extern struct {
+                mem_start : u32,
+                mem_end : u32,
+                base_addr : u16,
+                irq : u8,
+                dma : u8,
+                port : u8,
+            };
+
+            pub const Ifreq = extern struct {
+                ifr_name : [16]u8,
+                ifr_ifru : extern union { addr: kernel.socket.sockaddr, flags: u16, ivalue: i32, mtu: i32, map: kernel.net.intf.Ifmap, slave: [16]u8, newname: [16]u8, data: u32 },
+            };
+
+            pub const Ifconf = extern struct {
+                ifc_len : i32,
+                ifc_buf : u32,
+            };
+
+        };
+
+        pub const dev = struct {
+            pub const NetDeviceOps = struct {
+                up : *const fn(*kernel.net.dev.NetDevice) anyerror!void,
+                xmit : *const fn(*kernel.net.dev.NetDevice, u32, u16) anyerror!void,
+            };
+
+            pub const NetDevice = struct {
+                name : [16]u8,
+                ifindex : u32= 0,
+                flags : u32= 0,
+                addr_len : u8= 6,
+                dev_addr : [6]u8,
+                broadcast : [6]u8,
+                ops : *const kernel.net.dev.NetDeviceOps,
+                priv : ?*anyopaque= null,
+                lock : kernel.Mutex,
+                list : kernel.list.ListHead,
+                ip_list : ?*kernel.net.ipv4.IPv4Dev= null,
+            };
+
+        };
+
+        pub const netbuf = struct {
+            pub const Netbuf = struct {
+                data : []u8,
+                lst : kernel.list.ListHead,
+                pos : u32= 0,
+                dev : *kernel.net.dev.NetDevice,
+            };
+
+        };
+
+
+        pub const EthernetHeader = extern struct {
+            dest_mac : [6]u8,
+            src_mac : [6]u8,
+            eth_type : u16,
         };
 
     };
@@ -1388,8 +1479,8 @@ pub const kernel = struct {
             };
 
             pub const TaskFiles = struct {
-                map : std.bit_set.DynamicBitSet,
-                closexec : std.bit_set.DynamicBitSet,
+                map : std.bit_set.DynamicManaged,
+                closexec : std.bit_set.DynamicManaged,
                 fds : std.hash_map.HashMap(usize, *kernel.fs.file.File, std.hash_map.AutoContext(usize), 80),
                 lock : kernel.Spinlock,
                 ref : kernel.RefCount,
@@ -2191,7 +2282,7 @@ pub const drivers = struct {
         pub const Driver = struct {
             name : []const u8,
             list : kernel.list.ListHead,
-            minor_set : std.bit_set.ArrayBitSet(usize, 256),
+            minor_set : std.bit_set.Array(usize, 256),
             minor_mutex : kernel.Mutex,
             major : u8= 0,
             fops : ?*kernel.fs.file.FileOps= null,
@@ -2369,6 +2460,28 @@ pub const drivers = struct {
 
 
         pub const ide = struct {
+        };
+
+        pub const e1000 = struct {
+            pub const E1000Device = struct {
+                pub extern fn intHandler(?*anyopaque)void;
+                mem : [*]u32,
+                mem_base : u32,
+                mem_size : u32,
+                io_base : u32,
+                int_line : u8,
+                eeprom_exists : bool= false,
+                mac : [6]u8,
+                rxtx_mem : ?std.net.e1000.DmaMemory= null,
+                rx_buffers : [32]?std.net.e1000.DmaMemory,
+                rx_descs : [*]std.net.e1000.E1000RxDesc,
+                tx_descs : [*]std.net.e1000.E1000TxDesc,
+                worker_thread : ?*kernel.task.Task= null,
+                wait_queue : kernel.wq.WaitQueueHead,
+                rx_curr : u8= 0,
+                tx_curr : u8= 0,
+            };
+
         };
 
     };

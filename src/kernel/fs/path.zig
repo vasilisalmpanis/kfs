@@ -45,7 +45,7 @@ pub const Path = struct {
 
     pub fn followLink(self: *Path, prev_path: Path) anyerror!void {
         if (self.dentry.inode.ops.get_link) |getLink| {
-            var path: [1024]u8 = .{0} ** 1024;
+            var path: [1024]u8 = @splat(0);
             var path_slice: []u8 = path[0..1024];
             try getLink(self.dentry.inode, &path_slice);
             const new_path = try resolveFrom(path_slice, prev_path, true);

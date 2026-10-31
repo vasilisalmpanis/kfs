@@ -17,7 +17,7 @@ var kbd_driver = pdrv.PlatformDriver {
         .probe = undefined,
         .remove = undefined,
         .fops = &kbd_file_ops,
-        .minor_set = std.bit_set.ArrayBitSet(usize, 256).initEmpty(),
+        .minor_set = std.bit_set.Array(usize, 256).empty,
         .minor_mutex = krn.Mutex{
             .locked = std.atomic.Value(bool).init(false),
         },
@@ -107,7 +107,7 @@ export fn _init() linksection(".init") callconv(.c) u32 {
         if (kfs.mm.kmalloc(kfs.drivers.Keyboard)) |kbd_data| {
             kfs.dbg.printf("Loading keyboard module\n", .{});
             kbd_data.* = kfs.drivers.Keyboard{
-                .buffer = .{0} ** 256,
+                .buffer = @splat(0),
                 .keymap = kfs.dbg.keymap_us,
                 .shift = false,
                 .cntl = false,

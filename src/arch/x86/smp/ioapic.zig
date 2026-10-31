@@ -34,7 +34,7 @@ pub const SourceOverride = struct {
     level_triggered: bool,
 };
 
-pub var overrides: [16]?SourceOverride = .{ null } ** 16;
+pub var overrides: [16]?SourceOverride = @splat(null);
 
 pub fn registerOverride(entry: *align(1) apic.IOAPICInterruptSourceOverride) void {
     if (entry.irq_source >= overrides.len)
@@ -49,8 +49,8 @@ pub fn registerOverride(entry: *align(1) apic.IOAPICInterruptSourceOverride) voi
 pub const Controller = struct {
     io_apic_id:         u8,
     gsi_base:           u32,
-    version:            u32 = undefined,
-    redir_entr_count:   u32 = undefined,
+    version:            u32 = 0,
+    redir_entr_count:   u32 = 0,
     regs:               [*] volatile u32,
     lock:               krn.Spinlock = krn.Spinlock.init(),
 
@@ -179,6 +179,20 @@ pub const Controller = struct {
             res.active_low,
             res.level_triggered,
             false
+        );
+    }
+
+    pub fn setPCIIRQ(
+        self: *Controller, gsi: u32, vector: u8, masked: bool
+    ) !void {
+        if (gsi < self.gsi_base or gsi - self.gsi_base >= self.redir_entr_count)
+            return krn.errors.PosixError.EINVAL;
+        self.setRoute(
+            gsi - self.gsi_base,
+            vector,
+            true,
+            true,
+            masked
         );
     }
 };

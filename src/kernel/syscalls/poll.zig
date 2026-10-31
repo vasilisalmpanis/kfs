@@ -33,7 +33,7 @@ const PollTableEntry = struct{
 };
 
 pub const PollTable = struct {
-    wq_nodes_inline: [POLL_TABLE_INLINE_SIZE]?PollTableEntry = .{null} ** POLL_TABLE_INLINE_SIZE,
+    wq_nodes_inline: [POLL_TABLE_INLINE_SIZE]?PollTableEntry = @splat(null),
     wq_nodes_idx: usize = 0,
     wq_nodes: ?std.ArrayList(?PollTableEntry) = null,
 
@@ -328,9 +328,9 @@ fn doSelect(
 
     const start_time = krn.currentMs();
 
-    var result_read: FDSet = .{ .fds_bits = .{0} ** FD_WORDS };
-    var result_write: FDSet = .{ .fds_bits = .{0} ** FD_WORDS };
-    var result_except: FDSet = .{ .fds_bits = .{0} ** FD_WORDS };
+    var result_read: FDSet = .{ .fds_bits = @splat(0) };
+    var result_write: FDSet = .{ .fds_bits = @splat(0) };
+    var result_except: FDSet = .{ .fds_bits = @splat(0) };
 
     var poll_table = PollTable.init();
     defer poll_table.deinit();

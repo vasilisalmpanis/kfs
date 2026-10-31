@@ -9,7 +9,7 @@ const drv = @import("../driver.zig");
 const cdev = @import("../cdev.zig");
 
 pub const MAX_SERIAL_PORTS: usize = 4;
-var serial_ports: [MAX_SERIAL_PORTS]Serial = .{Serial{}} ** MAX_SERIAL_PORTS;
+var serial_ports: [MAX_SERIAL_PORTS]Serial = @splat(.{});
 
 pub const COM_PORTS: [4]u16 = .{
     0x3F8,

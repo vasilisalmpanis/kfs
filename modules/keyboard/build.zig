@@ -1,7 +1,7 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    b.release_mode = .fast;
+    b.graph.release_mode = .fast;
     var target = std.Target.Query{
         .cpu_arch = std.Target.Cpu.Arch.x86,
         .os_tag = .freestanding,

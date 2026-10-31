@@ -103,7 +103,7 @@ pub const Keyboard = struct {
 
     pub fn init(keymap: *const std.EnumMap(ScanCode, KeymapEntry)) Keyboard {
         return Keyboard{
-            .buffer = .{0} ** 256,
+            .buffer = @splat(0),
             .keymap = keymap,
             .shift = false,
             .cntl = false,

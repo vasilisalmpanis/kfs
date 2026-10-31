@@ -22,7 +22,7 @@ const filesystems_ops = kernel.fs.FileOps{
 
 //proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
 fn mounts_open(base: *kernel.fs.File, _: *kernel.fs.Inode) anyerror!void {
-    var path_buffer: [256]u8 = .{0} ** 256;
+    var path_buffer: [256]u8 = @splat(0);
     fs.mount.mnt_lock.lock();
     defer fs.mount.mnt_lock.unlock();
 

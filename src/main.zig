@@ -61,9 +61,9 @@ fn getRootDevice() []const u8 {
 
 fn getLoggerLevel() dbg.log.LogLevel {
     if (krn.cmdline.get("logger")) |arg_level| {
-        inline for (@typeInfo(dbg.log.LogLevel).@"enum".fields) |field| {
-            if (std.ascii.eqlIgnoreCase(field.name, arg_level))
-                return @field(dbg.log.LogLevel, field.name);
+        inline for (@typeInfo(dbg.log.LogLevel).@"enum".field_names) |field_name| {
+            if (std.ascii.eqlIgnoreCase(field_name, arg_level))
+                return @field(dbg.log.LogLevel, field_name);
         }
     }
     return .DEBUG;
@@ -243,6 +243,7 @@ export fn kernel_main(magic: u32, address: u32) noreturn {
 
 
     // Devices
+    krn.net.init();
     drv.init();
     krn.serial.print("[INIT]: Drivers and Devices done\n");
     modules.init() catch {
