@@ -17,7 +17,7 @@ const IFF_UNSUPPORTED: u32 = uif.IFF_PROMISC | uif.IFF_ALLMULTI;
 
 pub const NetDeviceOps = struct {
     up:     * const fn(*NetDevice) anyerror!void,
-    xmit:   * const fn(*NetDevice, dma_addr: u32, len: u16) anyerror!void,
+    xmit:   * const fn(packet: *kernel.net.Netbuf) anyerror!void,
 };
 
 pub const NetDevice = struct {
@@ -116,6 +116,24 @@ pub const NetDevice = struct {
         self.lock.unlock();
         if (changed & uif.IFF_UP != 0)
             return self.open();
+    }
+
+    pub fn lookupIP(self: *NetDevice, ip: [4]u8) ?*kernel.net.ipv4.IPv4Dev {
+        self.lock.lock();
+        defer self.lock.unlock();
+
+        if (self.ip_list) |head| {
+            var it = head.list.iterator();
+            while (it.next()) |i| {
+                const curr = i.curr.entry(
+                    kernel.net.ipv4.IPv4Dev, "list"
+                );
+                if (std.mem.eql(u8, curr.ip[0..4], ip[0..4])) {
+                    return curr;
+                }
+            }
+        }
+        return null;
     }
 };
 

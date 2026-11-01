@@ -1279,7 +1279,7 @@ pub const kernel = struct {
         pub const dev = struct {
             pub const NetDeviceOps = struct {
                 up : *const fn(*kernel.net.dev.NetDevice) anyerror!void,
-                xmit : *const fn(*kernel.net.dev.NetDevice, u32, u16) anyerror!void,
+                xmit : *const fn(*kernel.net.netbuf.Netbuf) anyerror!void,
             };
 
             pub const NetDevice = struct {

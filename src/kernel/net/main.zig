@@ -24,6 +24,14 @@ pub const EthernetHeader = extern struct {
     dest_mac: [ETH_ADDR_LEN]u8,
     src_mac: [ETH_ADDR_LEN]u8,
     eth_type: u16,
+
+    pub fn makeReply(
+        self: *EthernetHeader,
+        net_dev: *kernel.net.dev.NetDevice
+    ) void {
+        self.dest_mac = self.src_mac;
+        self.src_mac = net_dev.dev_addr;
+    }
 };
 
 pub fn init() void {

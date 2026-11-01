@@ -40,59 +40,77 @@ fn formatPacket(raw: [*]u8, mymac: [6]u8, myip: [4]u8, target_ip: [4]u8) void {
     @memcpy(arp.tpa[0..4], target_ip[0..4]);
 }
 
-pub fn arpReceive(netbuf: *krn.net.Netbuf) !void {
-    const arp_packet: *ArpPacket = @ptrCast(@alignCast(&netbuf.data[netbuf.pos]));
-    var arp_extension: *ArpExtension = undefined;
+pub fn reply(
+    req: *krn.net.Netbuf,
+    arp_packet: *ArpPacket,
+    arp_data: *ArpExtension
+) !bool {
+    const ip_to_check = arp_data.tpa;
+    _ = req.dev.lookupIP(ip_to_check) orelse
+        return false;
+
+    arp_packet.oper = std.mem.nativeToBig(u16, ARP_REPLY);
+    arp_data.tha = arp_data.sha;
+    arp_data.sha = req.dev.dev_addr;
+    arp_data.tpa = arp_data.spa;
+    arp_data.spa = ip_to_check;
+    return true;
+}
+
+pub fn arpReceive(netbuf: *krn.net.Netbuf) !bool {
+    const arp_pkt: *ArpPacket = @ptrCast(
+        @alignCast(&netbuf.data[netbuf.pos])
+    );
+    var arp_ext: *ArpExtension = undefined;
     var source_ip: [4]u8 = @splat(0);
     var target_ip: [4]u8 = @splat(0);
     var source_ha: [6]u8 = @splat(0);
     var target_ha: [6]u8 = @splat(0);
     try netbuf.pull(@sizeOf(ArpPacket));
 
-    if (arp_packet.hlen != netbuf.dev.addr_len or arp_packet.plen != 4)
-        return ; // Don't forget to free the dropped packets
+    if (arp_pkt.hlen != netbuf.dev.addr_len or arp_pkt.plen != 4)
+        return false;
 
     switch (
-        std.mem.bigToNative(u16, arp_packet.htype)
+        std.mem.bigToNative(u16, arp_pkt.htype)
     ) {
         ARPHRD_ETHER => {},
         ARPHRD_IEEE802 => @panic("Not implemented, please handle"),
-        else => return
+        else => return false
     }
 
     switch (
-        std.mem.bigToNative(u16, arp_packet.ptype)
+        std.mem.bigToNative(u16, arp_pkt.ptype)
     ) {
         krn.net.ETH_P_IP => {},
         else => {
             krn.logger.WARN("Received weird protocol type", .{});
-            return ;
+            return false;
         }
     }
 
-    arp_extension = @ptrCast(
+    arp_ext = @ptrCast(
         @alignCast(&netbuf.data[netbuf.pos])
     );
     try netbuf.pull(@sizeOf(ArpExtension));
-    source_ip = arp_extension.spa;
-    target_ip = arp_extension.tpa;
-    source_ha = arp_extension.sha;
-    target_ha = arp_extension.tha;
+    source_ip = arp_ext.spa;
+    target_ip = arp_ext.tpa;
+    source_ha = arp_ext.sha;
+    target_ha = arp_ext.tha;
 
     if (source_ha[0] & 1 != 0 or std.mem.allEqual(u8, &source_ha, 0))
-        return;
+        return false;
 
     if (!update(netbuf.dev, source_ip, source_ha))
         try put(netbuf.dev, source_ip, source_ha);
 
-    switch (
-        std.mem.bigToNative(u16, arp_packet.oper)
+    return switch (
+        std.mem.bigToNative(u16, arp_pkt.oper)
     ) {
-        ARP_REQUEST => {
-        },
-        ARP_REPLY => {},
-        else => return
-    }
+        ARP_REQUEST => try reply(netbuf, arp_pkt, arp_ext),
+        ARP_REPLY   => false,
+        else        => false
+    };
 }
 
 var lock = krn.Spinlock.init();
