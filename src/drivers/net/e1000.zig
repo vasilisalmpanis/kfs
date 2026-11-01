@@ -360,22 +360,6 @@ pub const E1000Device = struct {
                     continue ;
                 };
                 kernel.net.netbuf.enqueue(netbuf);
-
-                if (len < 6) {
-                    kernel.logger.INFO("Got packet with len {d}", .{len});
-                } else {
-                    kernel.logger.INFO(
-                        \\
-                        \\ Got ethernet packet
-                        \\   len: {d}
-                        \\   dest: {x}:{x}:{x}:{x}:{x}:{x}
-                        \\
-                        ,.{
-                            len,
-                            buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]
-                        }
-                    );
-                }
             }
 
             self.rx_descs[self.rx_curr].status = 0;
@@ -389,7 +373,6 @@ pub const E1000Device = struct {
         const status: u32 = self.readCommand(REG_ICR);
         if (status == 0)
             return;
-        kernel.logger.INFO("e1000 ICR: 0x{x}", .{status});
         if (status & INT_LSC != 0) {
             kernel.logger.INFO(
                 "e1000 link up: {any}",
@@ -556,9 +539,13 @@ fn e1000_up(net_dev: *kernel.net.dev.NetDevice) !void {
     try e1000.up();
 }
 
-fn e1000_xmit(net_dev: *kernel.net.dev.NetDevice, dma_addr: u32, len: u16) !void {
-    const e1000: *E1000Device = @ptrCast(@alignCast(net_dev.priv));
-    e1000.sendPacket(dma_addr, len);
+fn e1000_xmit(packet: *kernel.net.Netbuf) !void {
+    const e1000: *E1000Device = @ptrCast(@alignCast(packet.dev.priv));
+    const phys_addr = kernel.mm.lookupPhys(
+        @intFromPtr(packet.data.ptr)
+    ) orelse
+        return kernel.errors.PosixError.EBADMSG;
+    e1000.sendPacket(phys_addr, @intCast(packet.data.len));
 }
 
 const e1000_ops = kernel.net.dev.NetDeviceOps{

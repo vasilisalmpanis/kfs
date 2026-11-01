@@ -16,3 +16,7 @@ ext2_dir/bin/init
 ext2_dir
 filesystem.tar.gz
 rootfs*
+*.mac
+*.rom
+*.vars
+docker-compose.yaml
