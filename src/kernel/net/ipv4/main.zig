@@ -10,7 +10,16 @@ const inet_family = kernel.socket.ProtocolFamily {
 };
 
 const inet_protocol_ops = kernel.socket.ProtocolOps{
-    .ioctl = inet_ioctl,
+    .ioctl      = inet_ioctl,
+    .poll       = undefined,
+    .accept     = undefined,
+    .connect    = undefined,
+    .bind       = undefined,
+    .recvfrom   = undefined,
+    .sendto     = undefined,
+    .listen     = undefined,
+    .getName    = undefined,
+    .socketpair = undefined,
 };
 
 fn inet_ioctl(
@@ -30,9 +39,16 @@ fn inet_ioctl(
     return kernel.errors.PosixError.ENOTTY;
 }
 
-fn inet_create(socket: *kernel.socket.Socket) !void {
-    socket.ops = &inet_protocol_ops;
-    return;
+pub const IPv4Socket = struct {
+    sock: kernel.socket.Socket,
+};
+
+fn inet_create(socket_type: u16, protocol: u8) !*kernel.socket.Socket {
+    const socket = kernel.mm.kmalloc(IPv4Socket) orelse
+        return kernel.errors.PosixError.ENOMEM;
+    socket.sock.setup(kernel.socket.AF_INET, socket_type, protocol);
+    socket.sock.ops = &inet_protocol_ops;
+    return &socket.sock;
 }
 
 pub fn init() void {

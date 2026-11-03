@@ -6,7 +6,7 @@ const mutex = @import("../sched/mutex.zig");
 pub const SOCK_STREAM: u16 = 1;
 pub const SOCK_DGRAM: u16 = 2;
 
-pub const SOCK_TYPE_MASK: u32 = 0xf;
+pub const SOCK_TYPE_MASK: u16 = 0xf;
 pub const SOCK_NONBLOCK: u32 = krn.fs.file.O_NONBLOCK;
 pub const SOCK_CLOEXEC: u32 = krn.fs.file.O_CLOEXEC;
 
@@ -72,14 +72,9 @@ pub const AF_MAX        :u32 = 46; // For now..
 
 
 pub const ProtocolFamily = struct {
-    create: * const fn (*Socket) anyerror!void
+    create: * const fn (socket_type: u16, protocol: u8) anyerror!*Socket
 };
 pub var net_families: [AF_MAX]?*const ProtocolFamily = @splat(null);
-
-pub const sockaddr_un = extern struct {
-    sun_family: u16,
-    sun_path: [MAX_UNIX_PATH]u8,
-};
 
 pub const sockaddr = extern struct {
     sa_family: u16,
@@ -94,157 +89,59 @@ pub const sockaddr_in = extern struct {
 };
 
 pub const ProtocolOps = struct {
-    ioctl: *const fn(*Socket, op: u32, data: usize) anyerror!u32,
+    ioctl:      *const fn(*Socket, op: u32, data: usize) anyerror!usize,
+    getName:    *const fn(*Socket, addr: *sockaddr, peer: bool) anyerror!usize,
+    bind:       *const fn(*Socket, addr: *anyopaque, addrlen: u32) anyerror!void,
+    listen:     *const fn(*Socket, backlog: u32) anyerror!void,
+    connect:    *const fn(*Socket, addr_ptr: *anyopaque, addrlen: u32) anyerror!void,
+    accept:     *const fn(*Socket) anyerror!u32,
+    recvfrom:   *const fn(*Socket, buf: [*]u8, size: usize) anyerror!usize,
+    sendto:     *const fn(*Socket, buf: [*]const u8, size: usize) anyerror!usize,
+    poll:       *const fn(*Socket, pollfd: *krn.poll.PollFd, poll_table: ?*krn.poll.PollTable) anyerror!usize,
+    socketpair: *const fn(*Socket, *Socket) anyerror!void,
 };
 
 pub const Socket = struct {
-    _buffer: [SOCK_BUFFER_SIZE]u8,
-    rb: krn.ringbuf.RingBuf,
-    conn: ?*Socket,
+    socket_type: u16 = SOCK_STREAM,
+    protocol: u8 = 0, // IPPROTO_ICMP etc
+    family: u16 = 0, // AF_UNIX etc
     list: lst.ListHead,
     lock: krn.Spinlock = krn.Spinlock.init(),
-
-    sock_type: u16 = SOCK_STREAM,
-    is_listening: bool = false,
-    bound_path: [MAX_UNIX_PATH]u8 = @splat(0),
-    bound_path_len: usize = 0,
-
-    accept_queue: lst.ListHead = lst.ListHead.init(),
-    accept_count: usize = 0,
-    accept_backlog: usize = MAX_BACKLOG,
-    accept_wait: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
-
     rw_queue: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
-
-    pending_link: lst.ListHead = lst.ListHead.init(),
     ops: * const ProtocolOps,
 
-    pub fn setup(self: *Socket) void {
-        self._buffer = @splat(0);
-        self.rb = krn.ringbuf.RingBuf._init(self._buffer[0..SOCK_BUFFER_SIZE]) catch {
-            @panic("Make buffer size a power of two.");
-        };
-        self.conn = null;
-        self.list.next = &self.list;
-        self.list.prev = &self.list;
+    pub fn setup(
+        self: *Socket,
+        family: u16,
+        socket_type: u16,
+        protocol: u8
+    ) void {
+        self.socket_type = socket_type & SOCK_TYPE_MASK;
+        self.protocol = protocol;
+        self.family = family;
+        self.list.setup();
         self.lock = krn.Spinlock.init();
-        self.sock_type = SOCK_STREAM;
-        self.is_listening = false;
-        self.bound_path = @splat(0);
-        self.bound_path_len = 0;
-        self.accept_queue.setup();
-        self.accept_count = 0;
-        self.accept_backlog = MAX_BACKLOG;
-        self.accept_wait.setup();
-        self.pending_link.setup();
         self.rw_queue.setup();
     }
 
-    pub fn delete(self: *Socket) void {
-        self.lock.lock();
-        self.pending_link.del();
-        if (self.conn) |remote| {
-            remote.lock.lock();
-            remote.conn = null;
-            remote.lock.unlock();
-            remote.rw_queue.wakeUpOne();
-        }
-        if (self.is_listening) {
-            unregisterBound(self);
-        }
-        self.lock.unlock();
-        krn.mm.kfree(self);
-    }
-
-    pub fn newSocket() ?*Socket {
-        const sock: ?*Socket = krn.mm.kmalloc(Socket);
-        if (sock) |_sock| {
-            _sock.setup();
-        }
-        return sock;
-    }
-    
-    pub fn getName(self: *Socket, addr: *sockaddr, len: *i32) void {
-        addr.sa_family = AF_UNIX;
-        var addr_un = @as(*sockaddr_un, @ptrCast(addr));
-        if (self.bound_path_len > 0) {
-            @memcpy(
-                addr_un.sun_path[0..self.bound_path_len],
-                self.bound_path[0..self.bound_path_len]
-            );
-            len.* = @intCast(@sizeOf(u16) + self.bound_path_len + 1);
-        } else {
-            addr_un.sun_path[0] = 0;
-            len.* = @sizeOf(u16) + 1;
-        }
-    }
+    // pub fn delete(self: *Socket) void {
+    //     self.lock.lock();
+    //     self.pending_link.del();
+    //     if (self.conn) |remote| {
+    //         remote.lock.lock();
+    //         remote.conn = null;
+    //         remote.lock.unlock();
+    //         remote.rw_queue.wakeUpOne();
+    //     }
+    //     if (self.is_listening) {
+    //         unregisterBound(self);
+    //     }
+    //     self.lock.unlock();
+    //     // krn.mm.kfree(self);
+    // }
 };
 
-const MAX_BOUND_SOCKETS: usize = 32;
-var bound_sockets: [MAX_BOUND_SOCKETS]?*Socket = @splat(null);
-
-fn registerBound(sock: *Socket) bool {
-    for (&bound_sockets) |*slot| {
-        if (slot.* == null) {
-            slot.* = sock;
-            return true;
-        }
-    }
-    return false;
-}
-
-fn unregisterBound(sock: *Socket) void {
-    for (&bound_sockets) |*slot| {
-        if (slot.* == sock) {
-            slot.* = null;
-            return;
-        }
-    }
-}
-
-// Length of the AF_UNIX name inside sun_path. An abstract socket has
-// sun_path[0] == 0 and its name (including that leading NUL) runs for the
-// full addr_len, so it must NOT be treated as a C string. A pathname socket
-// is NUL-terminated. libxcb connects to the abstract name first, so getting
-// this right is what lets X clients reach the server.
-fn unixNameLen(sun_path: []const u8) usize {
-    if (sun_path.len == 0)
-        return 0;
-    if (sun_path[0] == 0)
-        return sun_path.len;
-    var n: usize = 0;
-    while (n < sun_path.len and sun_path[n] != 0) : (n += 1) {}
-    return n;
-}
-
-pub fn findBoundSocket(path: []const u8) ?*Socket {
-    for (bound_sockets) |slot| {
-        if (slot) |sock| {
-            if (sock.bound_path_len > 0 and
-                sock.bound_path_len == path.len and
-                std.mem.eql(u8, sock.bound_path[0..sock.bound_path_len], path))
-            {
-                return sock;
-            }
-        }
-    }
-    return null;
-}
-
-pub fn do_socket(family: u32, sock_type: u32, protocol: u32) !u32 {
-    _ = protocol;
-    if (family >= AF_MAX)
-        return krn.errors.PosixError.EAFNOSUPPORT;
-    const net_family = net_families[family] orelse
-        return krn.errors.PosixError.EAFNOSUPPORT;
-
-    if (sock_type & ~SOCK_SUPPORTED != 0) {
-        return krn.errors.PosixError.ESOCKTNOSUPPORT;
-    }
-    const sock = Socket.newSocket() orelse return krn.errors.PosixError.ENOMEM;
-    errdefer krn.mm.kfree(sock);
-    sock.sock_type = @intCast(sock_type & SOCK_TYPE_MASK);
-
+pub fn sockAllocFd(sock: *Socket, flags: u32) !u32 {
     const inode = try krn.fs.Inode.allocEmpty();
     errdefer krn.mm.kfree(inode);
     inode.fops = &SocketFileOps;
@@ -255,23 +152,64 @@ pub fn do_socket(family: u32, sock_type: u32, protocol: u32) !u32 {
 
     file.mode = krn.fs.UMode.socket();
     file.flags |= krn.fs.file.O_RDWR;
-
-
-    try net_family.create(sock);
-
-    const fd = try krn.task.current().files.getNextFD();
-    errdefer _ = krn.task.current().files.releaseFD(fd);
-
-    if (sock_type & SOCK_NONBLOCK != 0)
+    if (flags & SOCK_NONBLOCK != 0)
         file.flags |= SOCK_NONBLOCK;
-    if (sock_type & SOCK_CLOEXEC != 0) {
-        krn.task.current().files.closexec.set(fd);
-    }
-    errdefer krn.task.current().files.closexec.unset(fd);
 
-    try krn.task.current().files.setFD(fd, file);
-    krn.logger.INFO("socket() created fd {d}", .{fd});
+    const files = krn.task.current().files;
+    const fd = try files.getNextFD();
+    errdefer _ = files.releaseFD(fd);
+
+    if (flags & SOCK_CLOEXEC != 0)
+        files.closexec.set(fd);
+    errdefer files.closexec.unset(fd);
+
+    try files.setFD(fd, file);
     return @intCast(fd);
+}
+
+fn lookupFamily(family: u32, sock_type: u32) !*const ProtocolFamily {
+    if (family >= AF_MAX)
+        return krn.errors.PosixError.EAFNOSUPPORT;
+    const net_family = net_families[family] orelse
+        return krn.errors.PosixError.EAFNOSUPPORT;
+    if (sock_type & ~SOCK_SUPPORTED != 0)
+        return krn.errors.PosixError.ESOCKTNOSUPPORT;
+    return net_family;
+}
+
+pub fn do_socket(family: u16, sock_type: u16, protocol: u8) !u32 {
+    const net_family = try lookupFamily(family, sock_type);
+    const sock = try net_family.create(sock_type, protocol);
+    // TODO: add defered release in case of error
+
+    const fd = try sockAllocFd(sock, sock_type);
+    krn.logger.INFO("socket() created fd {d}", .{fd});
+    return fd;
+}
+
+pub fn do_socketpair(
+    family: u32,
+    sock_type: u32,
+    protocol: u8,
+    _usockvec: ?*[2]i32
+) !u32 {
+    const usockvec = _usockvec orelse
+        return krn.errors.PosixError.EFAULT;
+    const net_family = try lookupFamily(family, sock_type);
+    const base_type: u16 = @intCast(sock_type & SOCK_TYPE_MASK);
+
+    // TODO: release sockets on error once families have a release op
+    const sock_a = try net_family.create(base_type, protocol);
+    const sock_b = try net_family.create(base_type, protocol);
+    try sock_a.ops.socketpair(sock_a, sock_b);
+
+    const fd_a = try sockAllocFd(sock_a, sock_type);
+    errdefer _ = krn.task.current().files.releaseFD(fd_a);
+    const fd_b = try sockAllocFd(sock_b, sock_type);
+
+    usockvec[0] = @intCast(fd_a);
+    usockvec[1] = @intCast(fd_b);
+    return 0;
 }
 
 pub fn do_bind(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
@@ -290,33 +228,7 @@ pub fn do_bind(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
     if (generic_sockaddr.sa_family != AF_UNIX and generic_sockaddr.sa_family != AF_LOCAL) {
         return krn.errors.PosixError.EAFNOSUPPORT;
     }
-
-    if (addr_len < 3 or addr_len > @sizeOf(sockaddr_un)) {
-        return krn.errors.PosixError.EINVAL;
-    }
-
-    const addr: *const sockaddr_un = @ptrCast(@alignCast(addr_ptr));
-
-    const path_max = addr_len - @offsetOf(sockaddr_un, "sun_path");
-    const path_len = unixNameLen(addr.sun_path[0..path_max]);
-
-    if (findBoundSocket(addr.sun_path[0..path_len]) != null) {
-        return krn.errors.PosixError.EADDRINUSE;
-    }
-
-    sock.lock.lock();
-    @memcpy(sock.bound_path[0..path_len], addr.sun_path[0..path_len]);
-    sock.bound_path_len = path_len;
-    sock.lock.unlock();
-
-    if (!registerBound(sock)) {
-        sock.lock.lock();
-        sock.bound_path_len = 0;
-        sock.lock.unlock();
-        return krn.errors.PosixError.ENOMEM;
-    }
-
-    krn.logger.INFO("bind() fd {d} to path {s}", .{fd, addr.sun_path[0..path_len]});
+    try sock.ops.bind(sock, addr_ptr, addr_len);
     return 0;
 }
 
@@ -329,16 +241,8 @@ pub fn do_listen(fd: u32, backlog: u32) !u32 {
     const sock = file.inode.data.sock orelse
         return krn.errors.PosixError.ENOTSOCK;
 
-    if (sock.bound_path_len == 0) {
-        return krn.errors.PosixError.EINVAL;
-    }
+    try sock.ops.listen(sock, backlog);
 
-    sock.lock.lock();
-    sock.is_listening = true;
-    sock.accept_backlog = if (backlog > 0 and backlog <= MAX_BACKLOG) backlog else MAX_BACKLOG;
-    sock.lock.unlock();
-
-    krn.logger.INFO("listen() fd {d} backlog {d}", .{fd, sock.accept_backlog});
     return 0;
 }
 
@@ -355,55 +259,7 @@ pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
     const listener = file.inode.data.sock orelse
         return krn.errors.PosixError.ENOTSOCK;
 
-    if (!listener.is_listening) {
-        return krn.errors.PosixError.EINVAL;
-    }
-
-    while (true) {
-        listener.lock.lock();
-        if (!listener.accept_queue.isEmpty()) {
-            const pending_node = listener.accept_queue.next.?;
-            pending_node.del();
-            pending_node.setup();
-            listener.accept_count -|= 1;
-            listener.lock.unlock();
-
-            const client_sock = pending_node.entry(Socket, "pending_link");
-
-            const server_sock = Socket.newSocket() orelse
-                return krn.errors.PosixError.ENOMEM;
-            errdefer krn.mm.kfree(server_sock);
-
-            const new_inode = try krn.fs.Inode.allocEmpty();
-            errdefer krn.mm.kfree(new_inode);
-            new_inode.fops = &SocketFileOps;
-            new_inode.data.sock = server_sock;
-
-            const new_file = try krn.fs.File.pseudo(new_inode);
-            errdefer new_file.ref.put();
-
-            new_file.mode = krn.fs.UMode.socket();
-            new_file.flags |= krn.fs.file.O_RDWR;
-
-            const new_fd = try krn.task.current().files.getNextFD();
-            errdefer _ = krn.task.current().files.releaseFD(new_fd);
-
-            try krn.task.current().files.setFD(new_fd, new_file);
-            krn.logger.INFO("accept() fd {d} -> new fd {d}", .{fd, new_fd});
-
-            client_sock.conn = server_sock;
-            server_sock.conn = client_sock;
-
-            return @intCast(new_fd);
-        }
-        listener.lock.unlock();
-
-        if (file.flags & krn.fs.file.O_NONBLOCK != 0)
-            return krn.errors.PosixError.EAGAIN;
-        listener.accept_wait.wait(true, 0);
-        if (krn.task.current().hasPendingSignal())
-            return krn.errors.PosixError.ERESTARTSYS;
-    }
+    return try listener.ops.accept(listener);
 }
 
 pub fn do_connect(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
@@ -418,52 +274,7 @@ pub fn do_connect(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
     const sock = file.inode.data.sock orelse
         return krn.errors.PosixError.ENOTSOCK;
 
-    if (sock.conn != null) {
-        return krn.errors.PosixError.EISCONN;
-    }
-
-    const addr: *const sockaddr_un = @ptrCast(@alignCast(addr_ptr));
-    if (addr.sun_family != AF_UNIX and addr.sun_family != AF_LOCAL) {
-        return krn.errors.PosixError.EAFNOSUPPORT;
-    }
-
-    if (addr_len < 3 or addr_len > @sizeOf(sockaddr_un)) {
-        return krn.errors.PosixError.EINVAL;
-    }
-
-    const path_max = addr_len - @offsetOf(sockaddr_un, "sun_path");
-    const path_len = unixNameLen(addr.sun_path[0..path_max]);
-
-    const listener = findBoundSocket(addr.sun_path[0..path_len]) orelse
-        return krn.errors.PosixError.ECONNREFUSED;
-
-    if (!listener.is_listening) {
-        return krn.errors.PosixError.ECONNREFUSED;
-    }
-
-    listener.lock.lock();
-    if (listener.accept_count >= listener.accept_backlog) {
-        listener.lock.unlock();
-        return krn.errors.PosixError.ECONNREFUSED;
-    }
-    sock.pending_link.setup();
-    listener.accept_queue.addTail(&sock.pending_link);
-    listener.accept_count += 1;
-    listener.lock.unlock();
-
-    listener.accept_wait.wakeUpOne();
-
-    while (sock.conn == null) {
-        if (file.flags & krn.fs.file.O_NONBLOCK != 0)
-            return krn.errors.PosixError.EAGAIN;
-
-        krn.task.current().wakeup_time = krn.currentMs() + 10;
-        krn.task.current().state = .INTERRUPTIBLE_SLEEP;
-        krn.sched.reschedule();
-        if (krn.task.current().hasPendingSignal())
-            return krn.errors.PosixError.ERESTARTSYS;
-    }
-
+    try sock.ops.connect(sock, addr_ptr, addr_len);
     krn.logger.INFO("connect() fd {d} connected", .{fd});
     return 0;
 }
@@ -472,74 +283,15 @@ pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
     var sock: *Socket = undefined;
     if (base.inode.data.sock == null) return krn.errors.PosixError.EBADF;
     sock = base.inode.data.sock.?;
-    sock.lock.lock();
-    defer sock.lock.unlock();
 
-    while (sock.rb.isEmpty()) {
-        if (sock.conn == null) {
-            return krn.errors.PosixError.ENOTCONN;
-        }
-        if (base.flags & krn.fs.file.O_NONBLOCK != 0)
-            return krn.errors.PosixError.EAGAIN;
-
-        var wq_node = krn.wq.WaitQueueNode.init(krn.task.current());
-        wq_node.setup();
-
-        sock.rw_queue.addToQueue(&wq_node);
-        sock.lock.unlock();
-        sock.rw_queue.waitIfInQueue(&wq_node, true, 0);
-
-        if (krn.task.current().hasPendingSignal()) {
-            sock.lock.lock();
-            return krn.errors.PosixError.ERESTARTSYS;
-        }
-
-        sock.lock.lock();
-    }
-    const ret_size: usize = sock.rb.readInto(buf[0..size]);
-    if (sock.conn) |remote| {
-        remote.rw_queue.wakeUpOne();
-    }
-    return ret_size;
+    return try sock.ops.recvfrom(sock, buf, size);
 }
 
 pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
     var sock: *Socket = undefined;
-    if (base.inode.data.sock == null) return krn.errors.PosixError.EBADF;
-    sock = base.inode.data.sock.?;
-    var remote = sock.conn orelse
-        return krn.errors.PosixError.ENOTCONN;
-
-    remote.lock.lock();
-    defer remote.lock.unlock();
-    while (remote.rb.isFull()) {
-        if (base.flags & krn.fs.file.O_NONBLOCK != 0)
-            return krn.errors.PosixError.EAGAIN;
-
-        var wq_node = krn.wq.WaitQueueNode.init(krn.task.current());
-        wq_node.setup();
-
-        sock.rw_queue.addToQueue(&wq_node);
-        remote.lock.unlock();
-        sock.rw_queue.waitIfInQueue(&wq_node, true, 0);
-        if (krn.task.current().hasPendingSignal()) {
-            remote.lock.lock();
-            return krn.errors.PosixError.ERESTARTSYS;
-        }
-
-        if (sock.conn == null) {
-            remote.lock.lock();
-            return krn.errors.PosixError.ENOTCONN;
-        }
-
-        remote.lock.lock();
-    }
-    defer remote.rw_queue.wakeUpOne();
-    for (buf[0..size], 0..) |ch, idx| {
-        if (!remote.rb.push(ch))
-            return idx;
-    }
-    return size;
+    sock = base.inode.data.sock orelse
+        return krn.errors.PosixError.EBADF;
+    return try sock.ops.sendto(sock, buf, size);
 }
 
 pub fn open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
@@ -548,10 +300,11 @@ pub fn open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
 }
 
 pub fn close(base: *krn.fs.File) void {
-    if (base.inode.data.sock) |sock| {
-        base.inode.data.sock = null;
-        sock.delete();
-    }
+    _ = base;
+    // if (base.inode.data.sock) |sock| {
+    //     base.inode.data.sock = null;
+    //     // sock.delete();
+    // }
 }
 
 pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
@@ -568,50 +321,7 @@ pub fn sock_poll(
     poll_table: ?*krn.poll.PollTable,
 ) !u32 {
     const sock = base.inode.data.sock orelse return 0;
-    var ready: u32 = 0;
-
-    if (sock.is_listening) {
-        if (pollfd.events & krn.poll.POLLIN != 0) {
-            sock.lock.lock();
-            const has_pending = !sock.accept_queue.isEmpty();
-            sock.lock.unlock();
-            if (has_pending) {
-                pollfd.revents |= krn.poll.POLLIN;
-                ready = 1;
-            }
-        }
-        if (ready == 0 and pollfd.events & krn.poll.POLLIN != 0) {
-            if (poll_table) |pt|
-                try pt.addNode(&sock.accept_wait);
-        }
-        return ready;
-    }
-
-    if (pollfd.events & krn.poll.POLLIN != 0) {
-        sock.lock.lock();
-        const avail = sock.rb.available();
-        sock.lock.unlock();
-        if (avail > 0) {
-            pollfd.revents |= krn.poll.POLLIN;
-            ready = 1;
-        }
-    }
-    if (pollfd.events & krn.poll.POLLOUT != 0) {
-        if (sock.conn != null) {
-            if (!sock.conn.?.rb.isFull()) {
-                pollfd.revents |= krn.poll.POLLOUT;
-                ready = 1;
-            }
-        }
-    }
-    if (
-        ready == 0
-        and pollfd.events & (krn.poll.POLLIN | krn.poll.POLLOUT) != 0
-    ) {
-        if (poll_table) |pt|
-            try pt.addNode(&sock.rw_queue);
-    }
-    return ready;
+    return try sock.ops.poll(sock, pollfd, poll_table);
 }
 
 fn sock_ioctl(base: *krn.fs.File, op: u32, data: usize) !u32 {
