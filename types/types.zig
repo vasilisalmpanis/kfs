@@ -1223,6 +1223,7 @@ pub const kernel = struct {
             sendto : *const fn(*kernel.socket.Socket, [*]const u8, u32) anyerror!u32,
             poll : *const fn(*kernel.socket.Socket, *kernel.poll.PollFd, ?*kernel.poll.PollTable) anyerror!u32,
             socketpair : *const fn(*kernel.socket.Socket, *kernel.socket.Socket) anyerror!void,
+            release : *const fn(*kernel.socket.Socket) anyerror!void,
         };
 
         pub const Socket = struct {
@@ -1232,6 +1233,7 @@ pub const kernel = struct {
             list : kernel.list.ListHead,
             lock : kernel.Spinlock,
             rw_queue : kernel.wq.WaitQueueHead,
+            file : *kernel.fs.file.File,
             ops : *const kernel.socket.ProtocolOps,
         };
 
@@ -1239,16 +1241,19 @@ pub const kernel = struct {
 
     pub const net = struct {
         pub const ipv4 = struct {
-            pub const IPv4Dev = struct {
-                list : kernel.list.ListHead,
-                label : [16]u8,
-                ip : [4]u8,
-                broadcast : [4]u8,
-                mask : u32,
-            };
+            pub const af_inet = struct {
+                pub const IPv4Dev = struct {
+                    list : kernel.list.ListHead,
+                    label : [16]u8,
+                    ip : [4]u8,
+                    broadcast : [4]u8,
+                    mask : u32,
+                };
 
-            pub const IPv4Socket = struct {
-                sock : kernel.socket.Socket,
+                pub const IPv4Socket = struct {
+                    sock : kernel.socket.Socket,
+                };
+
             };
 
         };
@@ -1296,7 +1301,7 @@ pub const kernel = struct {
                 priv : ?*anyopaque= null,
                 lock : kernel.Mutex,
                 list : kernel.list.ListHead,
-                ip_list : ?*kernel.net.ipv4.IPv4Dev= null,
+                ip_list : ?*kernel.net.ipv4.af_inet.IPv4Dev= null,
             };
 
         };

@@ -3,14 +3,19 @@ const krn = @import("../main.zig");
 const lst = @import("../utils/list.zig");
 const mutex = @import("../sched/mutex.zig");
 
-pub const SOCK_STREAM: u16 = 1;
-pub const SOCK_DGRAM: u16 = 2;
+pub const SOCK_STREAM: u16      = 1;
+pub const SOCK_DGRAM: u16       = 2;
+pub const SOCK_RAW: u16 	    = 3;
+pub const SOCK_RDM: u16 	    = 4;
+pub const SOCK_SEQPACKET: u16   = 5;
+pub const SOCK_DCCP: u16    	= 6;
+pub const SOCK_PACKET: u16  	= 10;
 
 pub const SOCK_TYPE_MASK: u16 = 0xf;
 pub const SOCK_NONBLOCK: u32 = krn.fs.file.O_NONBLOCK;
 pub const SOCK_CLOEXEC: u32 = krn.fs.file.O_CLOEXEC;
 
-pub const SOCK_SUPPORTED: u32 = SOCK_STREAM | SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
+pub const SOCK_SUPPORTED: u32 = SOCK_STREAM | SOCK_DGRAM | SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK;
 
 pub const MAX_UNIX_PATH: usize = 108;
 pub const MAX_BACKLOG: usize = 16;
@@ -74,6 +79,7 @@ pub const AF_MAX        :u32 = 46; // For now..
 pub const ProtocolFamily = struct {
     create: * const fn (socket_type: u16, protocol: u8) anyerror!*Socket
 };
+
 pub var net_families: [AF_MAX]?*const ProtocolFamily = @splat(null);
 
 pub const sockaddr = extern struct {
@@ -99,6 +105,7 @@ pub const ProtocolOps = struct {
     sendto:     *const fn(*Socket, buf: [*]const u8, size: usize) anyerror!usize,
     poll:       *const fn(*Socket, pollfd: *krn.poll.PollFd, poll_table: ?*krn.poll.PollTable) anyerror!usize,
     socketpair: *const fn(*Socket, *Socket) anyerror!void,
+    release:    *const fn(*Socket) anyerror!void,
 };
 
 pub const Socket = struct {
@@ -108,6 +115,7 @@ pub const Socket = struct {
     list: lst.ListHead,
     lock: krn.Spinlock = krn.Spinlock.init(),
     rw_queue: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
+    file: *krn.fs.File,
     ops: * const ProtocolOps,
 
     pub fn setup(
@@ -123,22 +131,6 @@ pub const Socket = struct {
         self.lock = krn.Spinlock.init();
         self.rw_queue.setup();
     }
-
-    // pub fn delete(self: *Socket) void {
-    //     self.lock.lock();
-    //     self.pending_link.del();
-    //     if (self.conn) |remote| {
-    //         remote.lock.lock();
-    //         remote.conn = null;
-    //         remote.lock.unlock();
-    //         remote.rw_queue.wakeUpOne();
-    //     }
-    //     if (self.is_listening) {
-    //         unregisterBound(self);
-    //     }
-    //     self.lock.unlock();
-    //     // krn.mm.kfree(self);
-    // }
 };
 
 pub fn sockAllocFd(sock: *Socket, flags: u32) !u32 {
@@ -147,13 +139,13 @@ pub fn sockAllocFd(sock: *Socket, flags: u32) !u32 {
     inode.fops = &SocketFileOps;
     inode.data.sock = sock;
 
-    const file = try krn.fs.File.pseudo(inode);
-    errdefer file.ref.put();
+    sock.file = try krn.fs.File.pseudo(inode);
+    errdefer sock.file.ref.put();
 
-    file.mode = krn.fs.UMode.socket();
-    file.flags |= krn.fs.file.O_RDWR;
+    sock.file.mode = krn.fs.UMode.socket();
+    sock.file.flags |= krn.fs.file.O_RDWR;
     if (flags & SOCK_NONBLOCK != 0)
-        file.flags |= SOCK_NONBLOCK;
+        sock.file.flags |= SOCK_NONBLOCK;
 
     const files = krn.task.current().files;
     const fd = try files.getNextFD();
@@ -163,7 +155,7 @@ pub fn sockAllocFd(sock: *Socket, flags: u32) !u32 {
         files.closexec.set(fd);
     errdefer files.closexec.unset(fd);
 
-    try files.setFD(fd, file);
+    try files.setFD(fd, sock.file);
     return @intCast(fd);
 }
 
@@ -180,7 +172,7 @@ fn lookupFamily(family: u32, sock_type: u32) !*const ProtocolFamily {
 pub fn do_socket(family: u16, sock_type: u16, protocol: u8) !u32 {
     const net_family = try lookupFamily(family, sock_type);
     const sock = try net_family.create(sock_type, protocol);
-    // TODO: add defered release in case of error
+    errdefer sock.ops.release(sock) catch {};
 
     const fd = try sockAllocFd(sock, sock_type);
     krn.logger.INFO("socket() created fd {d}", .{fd});
@@ -198,9 +190,10 @@ pub fn do_socketpair(
     const net_family = try lookupFamily(family, sock_type);
     const base_type: u16 = @intCast(sock_type & SOCK_TYPE_MASK);
 
-    // TODO: release sockets on error once families have a release op
     const sock_a = try net_family.create(base_type, protocol);
+    errdefer sock_a.ops.release(sock_a) catch {};
     const sock_b = try net_family.create(base_type, protocol);
+    errdefer sock_b.ops.release(sock_b) catch {};
     try sock_a.ops.socketpair(sock_a, sock_b);
 
     const fd_a = try sockAllocFd(sock_a, sock_type);
@@ -300,11 +293,10 @@ pub fn open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
 }
 
 pub fn close(base: *krn.fs.File) void {
-    _ = base;
-    // if (base.inode.data.sock) |sock| {
-    //     base.inode.data.sock = null;
-    //     // sock.delete();
-    // }
+    if (base.inode.data.sock) |sock| {
+        base.inode.data.sock = null;
+        sock.ops.release(sock) catch {};
+    }
 }
 
 pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {

@@ -201,8 +201,7 @@ const UnixSocket = struct {
                     listener.sock.protocol
                 );
                 const un_server_sock: *UnixSocket = UnixSocket.parent(server_sock);
-                // TODO: do family.release
-                // errdefer kernel.mm.kfree(server_sock);
+                errdefer server_sock.ops.release(server_sock) catch {};
 
                 const new_fd = try kernel.socket.sockAllocFd(server_sock, 0);
 
@@ -213,9 +212,8 @@ const UnixSocket = struct {
             }
             base.lock.unlock();
 
-            // TODO: Make socket know that its nonblock or not (*to File)
-            // if (file.flags & kernel.fs.file.O_NONBLOCK != 0)
-            //     return kernel.errors.PosixError.EAGAIN;
+            if (listener.sock.file.flags & kernel.fs.file.O_NONBLOCK != 0)
+                return kernel.errors.PosixError.EAGAIN;
             listener.accept_wait.wait(true, 0);
             if (kernel.task.current().hasPendingSignal())
                 return kernel.errors.PosixError.ERESTARTSYS;
@@ -264,9 +262,8 @@ const UnixSocket = struct {
         listener.accept_wait.wakeUpOne();
 
         while (sock.conn == null) {
-            // TODO: NONBLOCK
-            // if (file.flags & kernel.fs.file.O_NONBLOCK != 0)
-            //     return kernel.errors.PosixError.EAGAIN;
+            if (base.file.flags & kernel.fs.file.O_NONBLOCK != 0)
+                return kernel.errors.PosixError.EAGAIN;
 
             kernel.task.current().wakeup_time = kernel.currentMs() + 10;
             kernel.task.current().state = .INTERRUPTIBLE_SLEEP;
@@ -289,9 +286,8 @@ const UnixSocket = struct {
             if (un_sock.conn == null) {
                 return kernel.errors.PosixError.ENOTCONN;
             }
-            // TODO: NONBLOCK
-            // if (base.flags & kernel.fs.file.O_NONBLOCK != 0)
-            //     return kernel.errors.PosixError.EAGAIN;
+            if (base.file.flags & kernel.fs.file.O_NONBLOCK != 0)
+                return kernel.errors.PosixError.EAGAIN;
 
             var wq_node = kernel.wq.WaitQueueNode.init(kernel.task.current());
             wq_node.setup();
@@ -327,9 +323,8 @@ const UnixSocket = struct {
         remote.lock.lock();
         defer remote.lock.unlock();
         while (un_remote.rb.isFull()) {
-            // TODO: NONBLOCK
-            // if (base.flags & kernel.fs.file.O_NONBLOCK != 0)
-            //     return kernel.errors.PosixError.EAGAIN;
+            if (base.file.flags & kernel.fs.file.O_NONBLOCK != 0)
+                return kernel.errors.PosixError.EAGAIN;
 
             var wq_node = kernel.wq.WaitQueueNode.init(kernel.task.current());
             wq_node.setup();
@@ -428,6 +423,24 @@ const UnixSocket = struct {
         _ = data;
         return kernel.errors.PosixError.ENOTTY;
     }
+
+    fn release(base: *kernel.socket.Socket) !void {
+        const self = UnixSocket.parent(base);
+        self.sock.lock.lock();
+        self.pending_link.del();
+        if (self.conn) |remote| {
+            const un_remote = UnixSocket.parent(remote);
+            remote.lock.lock();
+            un_remote.conn = null;
+            remote.lock.unlock();
+            remote.rw_queue.wakeUpOne();
+        }
+        if (self.is_listening) {
+            unregisterBound(self);
+        }
+        self.sock.lock.unlock();
+        kernel.mm.kfree(self);
+    }
 };
 
 const unix_family = kernel.socket.ProtocolFamily {
@@ -435,16 +448,17 @@ const unix_family = kernel.socket.ProtocolFamily {
 };
 
 const unix_protocol_ops = kernel.socket.ProtocolOps{
-    .ioctl      = UnixSocket.unix_ioctl,
-    .getName    = UnixSocket.getName,
-    .bind       = UnixSocket.bind,
-    .listen     = UnixSocket.listen,
-    .accept     = UnixSocket.accept,
-    .connect    = UnixSocket.connect,
-    .recvfrom   = UnixSocket.recvfrom,
-    .sendto     = UnixSocket.sendto,
-    .poll       = UnixSocket.poll,
-    .socketpair = UnixSocket.socketpair,
+    .ioctl          = UnixSocket.unix_ioctl,
+    .getName        = UnixSocket.getName,
+    .bind           = UnixSocket.bind,
+    .listen         = UnixSocket.listen,
+    .accept         = UnixSocket.accept,
+    .connect        = UnixSocket.connect,
+    .recvfrom       = UnixSocket.recvfrom,
+    .sendto         = UnixSocket.sendto,
+    .poll           = UnixSocket.poll,
+    .socketpair     = UnixSocket.socketpair,
+    .release        = UnixSocket.release,
 };
 
 pub const IPv4Socket = struct {
