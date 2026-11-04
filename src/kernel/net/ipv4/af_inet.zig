@@ -30,6 +30,11 @@ pub const IPv4Socket = struct {
         _ = size;
         return krn.errors.PosixError.ENOSYS;
     }
+
+    fn release(base: *krn.socket.Socket) !void {
+        const self: *IPv4Socket = @fieldParentPtr("sock", base);
+        krn.mm.kfree(self);
+    }
 };
 
 pub const inet_family = krn.socket.ProtocolFamily {
@@ -56,7 +61,7 @@ const inet_raw_ops = krn.socket.ProtocolOps{
     .listen     = undefined,
     .getName    = undefined,
     .socketpair = undefined,
-    .release    = undefined,
+    .release    = IPv4Socket.release,
 };
 
 fn inet_ioctl(
