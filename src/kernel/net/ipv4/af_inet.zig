@@ -20,14 +20,14 @@ pub const IPv4Socket = struct {
         return krn.errors.PosixError.ENOSYS;
     }
 
-    fn sendto(
+    fn sendmsg(
         base: *krn.socket.Socket,
-        buf: [*]const u8,
-        size: usize
+        msg: *krn.socket.MsgHdr,
+        flags: u32
     ) !usize {
         _ = base;
-        _ = buf;
-        _ = size;
+        _ = msg;
+        _ = flags;
         return krn.errors.PosixError.ENOSYS;
     }
 
@@ -56,8 +56,8 @@ const inet_raw_ops = krn.socket.ProtocolOps{
     .accept     = undefined,
     .connect    = IPv4Socket.connect,
     .bind       = undefined,
-    .recvfrom   = undefined,
-    .sendto     = IPv4Socket.sendto,
+    .recvmsg    = undefined,
+    .sendmsg    = IPv4Socket.sendmsg,
     .listen     = undefined,
     .getName    = undefined,
     .socketpair = undefined,

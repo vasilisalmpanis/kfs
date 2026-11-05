@@ -1196,6 +1196,11 @@ pub const kernel = struct {
     };
 
     pub const socket = struct {
+        pub const IoVec = extern struct {
+            base : ?[*]u8,
+            len : u32,
+        };
+
         pub const ProtocolFamily = struct {
             create : *const fn(u16, u8) anyerror!*kernel.socket.Socket,
         };
@@ -1212,6 +1217,16 @@ pub const kernel = struct {
             zero : [8]u8,
         };
 
+        pub const MsgHdr = extern struct {
+            name : ?*anyopaque= null,
+            namelen : u32= 0,
+            iov : ?[*]kernel.socket.IoVec= null,
+            iovlen : u32= 0,
+            control : ?*anyopaque= null,
+            controllen : u32= 0,
+            flags : u32= 0,
+        };
+
         pub const ProtocolOps = struct {
             ioctl : *const fn(*kernel.socket.Socket, u32, u32) anyerror!u32,
             getName : *const fn(*kernel.socket.Socket, *kernel.socket.sockaddr, bool) anyerror!u32,
@@ -1219,8 +1234,8 @@ pub const kernel = struct {
             listen : *const fn(*kernel.socket.Socket, u32) anyerror!void,
             connect : *const fn(*kernel.socket.Socket, *anyopaque, u32) anyerror!void,
             accept : *const fn(*kernel.socket.Socket) anyerror!u32,
-            recvfrom : *const fn(*kernel.socket.Socket, [*]u8, u32) anyerror!u32,
-            sendto : *const fn(*kernel.socket.Socket, [*]const u8, u32) anyerror!u32,
+            recvmsg : *const fn(*kernel.socket.Socket, *kernel.socket.MsgHdr, u32) anyerror!u32,
+            sendmsg : *const fn(*kernel.socket.Socket, *kernel.socket.MsgHdr, u32) anyerror!u32,
             poll : *const fn(*kernel.socket.Socket, *kernel.poll.PollFd, ?*kernel.poll.PollTable) anyerror!u32,
             socketpair : *const fn(*kernel.socket.Socket, *kernel.socket.Socket) anyerror!void,
             release : *const fn(*kernel.socket.Socket) anyerror!void,
@@ -1760,10 +1775,6 @@ pub const kernel = struct {
         };
 
         pub const read = struct {
-            pub const IoVec = extern struct {
-                base : ?[*]u8,
-                len : u32,
-            };
 
         };
 

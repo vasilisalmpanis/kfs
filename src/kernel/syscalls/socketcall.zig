@@ -3,7 +3,8 @@ const tsk = @import("../sched/task.zig");
 const errors = @import("./error-codes.zig").PosixError;
 const krn = @import("../main.zig");
 const arch = @import("arch");
-const IoVec = @import("./read.zig").IoVec;
+const IoVec = krn.socket.IoVec;
+const MsgHdr = krn.socket.MsgHdr;
 
 const CallType = enum(u8) {
     SYS_SOCKET = 1,	// 1   sys_socket(2)
@@ -64,22 +65,22 @@ pub fn socketcall(call: i32, args: [*]u32) !u32 {
             @ptrFromInt(args[1]),
             args[2],
             args[3],
-            args[4],
-            @bitCast(args[5]),
+            @ptrFromInt(args[4]),
+            @ptrFromInt(args[5]),
         ),
         .SYS_SENDTO => return try sendto(
             @bitCast(args[0]),
             @ptrFromInt(args[1]),
             args[2],
             args[3],
-            args[4],
-            @bitCast(args[5]),
+            @ptrFromInt(args[4]),
+            args[5],
         ),
         .SYS_ACCEPT4 => return try krn.socket.do_accept4(
             @bitCast(args[0]), args[1], args[2], args[3],
         ),
-        .SYS_RECVMSG => return try recvmsg(@bitCast(args[0]), @ptrFromInt(args[1]), @bitCast(args[2])),
-        .SYS_SENDMSG => return try sendmsg(@bitCast(args[0]), @ptrFromInt(args[1]), @bitCast(args[2])),
+        .SYS_RECVMSG => return try recvmsg(@bitCast(args[0]), @ptrFromInt(args[1]), args[2]),
+        .SYS_SENDMSG => return try sendmsg(@bitCast(args[0]), @ptrFromInt(args[1]), args[2]),
         else => {
             return errors.EINVAL;
         },
@@ -115,89 +116,71 @@ pub fn socketpair(family: u32, s_type: u32, protocol: u32, usockvec: ?*[2]i32) !
 
 pub fn recvfrom(
     fd: i32,
-    ubuff: ?*anyopaque,
+    _ubuff: ?[*]u8,
     size: u32,
     flags: u32,
-    addr: u32,
-    addr_len: i32
+    addr: ?*anyopaque,
+    addr_len: ?*u32,
 ) !u32 {
-    _ = addr;
-    _ = addr_len;
-    _ = flags;
-    if (ubuff == null) {
+    const ubuff = _ubuff orelse
         return errors.EFAULT;
+    var iov = IoVec{
+        .base = ubuff,
+        .len = size,
+    };
+    var msg = MsgHdr{ .iov = @ptrCast(&iov), .iovlen = 1 };
+    if (addr) |name| {
+        const len = addr_len orelse
+            return errors.EFAULT;
+        msg.name = name;
+        msg.namelen = len.*;
     }
+
     const sock = try krn.socket.sockfdLookup(fd);
     defer sock.file.ref.put();
-    return try krn.socket.do_recvfrom(sock.file, @ptrCast(ubuff), size);
+    const ret = try krn.socket.do_recvmsg(sock.file, &msg, flags);
+    if (addr != null)
+        addr_len.?.* = msg.namelen;
+    return ret;
 }
 
-pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, addr_len: i32) !u32 {
-    _ = flags;
-    _ = addr;
-    _ = addr_len;
-    if (buff == null) {
-        return errors.EFAULT;
+pub fn sendto(
+    fd: i32,
+    buff: ?[*]u8,
+    len: usize,
+    flags: u32,
+    addr: ?*anyopaque,
+    addr_len: u32,
+) !u32 {
+    var iov = IoVec{
+        .base = buff orelse return errors.EFAULT,
+        .len = len,
+    };
+    var msg = MsgHdr{ .iov = @ptrCast(&iov), .iovlen = 1 };
+    if (addr) |name| {
+        msg.name = name;
+        msg.namelen = addr_len;
     }
-    if (len > 128) {
-        return errors.EFAULT;
-    }
+
     const sock = try krn.socket.sockfdLookup(fd);
     defer sock.file.ref.put();
-    return try krn.socket.do_sendto(sock.file, @ptrCast(buff), len);
+    return try krn.socket.do_sendmsg(sock.file, &msg, flags);
 }
 
-const MsgHdr = struct {
-    name:       ?*krn.socket.sockaddr,
-    namelen:    i32,
-    iov:        ?[*]IoVec,
-    iovlen:     usize,
-    control:    ?*anyopaque,
-    controllen: usize,
-    flags:      u32,
-};
-
-pub fn sendmsg(sockfd: i32, _msg: ?*MsgHdr, flags: i32) !u32 {
-    _ = flags;
+pub fn sendmsg(sockfd: i32, _msg: ?*MsgHdr, flags: u32) !u32 {
     const msg = _msg orelse
-        return errors.EFAULT;
-    const iov = msg.iov orelse
         return errors.EFAULT;
     const sock = try krn.socket.sockfdLookup(sockfd);
     defer sock.file.ref.put();
-
-    var sent: usize = 0;
-    for (iov, 0..msg.iovlen) |*_v, _| {
-        sent += try krn.socket.do_sendto(
-            sock.file,
-            @ptrCast(_v.base),
-            _v.len
-        );
-    }
-    return sent;
+    return try krn.socket.do_sendmsg(sock.file, msg, flags);
 }
 
-pub fn recvmsg(sockfd: i32, _msg: ?*MsgHdr, flags: i32) !u32 {
-    _ = flags;
+pub fn recvmsg(sockfd: i32, _msg: ?*MsgHdr, flags: u32) !u32 {
     const msg = _msg orelse
-        return errors.EFAULT;
-    const iov = msg.iov orelse
         return errors.EFAULT;
     const sock = try krn.socket.sockfdLookup(sockfd);
     defer sock.file.ref.put();
-
-    var received: usize = 0;
-    for (iov, 0..msg.iovlen) |*_v, _| {
-        const recv_curr = try krn.socket.do_recvfrom(
-            sock.file,
-            @ptrCast(_v.base),
-            _v.len
-        );
-        received += recv_curr;
-        if (recv_curr < _v.len)
-            break ;
-    }
-    return received;
+    return try krn.socket.do_recvmsg(sock.file, msg, flags);
 }
 
 pub fn getpeername(

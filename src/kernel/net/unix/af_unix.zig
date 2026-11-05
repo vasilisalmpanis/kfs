@@ -273,11 +273,13 @@ const UnixSocket = struct {
         }
     }
 
-    fn recvfrom(
+    fn recvmsg(
         base: *kernel.socket.Socket,
-        buf: [*]u8,
-        size: usize
+        msg: *kernel.socket.MsgHdr,
+        flags: u32
     ) !usize {
+        _ = flags;
+        const iovecs = try msg.iovecs();
         const un_sock = UnixSocket.parent(base);
         base.lock.lock();
         defer base.lock.unlock();
@@ -303,14 +305,49 @@ const UnixSocket = struct {
 
             base.lock.lock();
         }
-        const ret_size: usize = un_sock.rb.readInto(buf[0..size]);
+        msg.namelen = 0;
+        var ret_size: usize = 0;
+        for (iovecs) |iov| {
+            if (iov.len == 0)
+                continue;
+            const buf = iov.base orelse
+                return if (ret_size > 0) ret_size else kernel.errors.PosixError.EFAULT;
+            const got = un_sock.rb.readInto(buf[0..iov.len]);
+            ret_size += got;
+            if (got < iov.len)
+                break;
+        }
         if (un_sock.conn) |remote| {
             remote.rw_queue.wakeUpOne();
         }
         return ret_size;
     }
 
-    fn sendto(
+    fn sendmsg(
+        base: *kernel.socket.Socket,
+        msg: *kernel.socket.MsgHdr,
+        flags: u32
+    ) !usize {
+        _ = flags;
+        var sent: usize = 0;
+        for (try msg.iovecs()) |iov| {
+            if (iov.len == 0)
+                continue;
+            const buf = iov.base orelse
+                return if (sent > 0) sent else kernel.errors.PosixError.EFAULT;
+            const ret = sendBuf(base, buf, iov.len) catch |err| {
+                if (sent > 0)
+                    return sent;
+                return err;
+            };
+            sent += ret;
+            if (ret < iov.len)
+                break;
+        }
+        return sent;
+    }
+
+    fn sendBuf(
         base: *kernel.socket.Socket,
         buf: [*]const u8,
         size: usize
@@ -454,8 +491,8 @@ const unix_protocol_ops = kernel.socket.ProtocolOps{
     .listen         = UnixSocket.listen,
     .accept         = UnixSocket.accept,
     .connect        = UnixSocket.connect,
-    .recvfrom       = UnixSocket.recvfrom,
-    .sendto         = UnixSocket.sendto,
+    .recvmsg        = UnixSocket.recvmsg,
+    .sendmsg        = UnixSocket.sendmsg,
     .poll           = UnixSocket.poll,
     .socketpair     = UnixSocket.socketpair,
     .release        = UnixSocket.release,

@@ -2,6 +2,7 @@ const std = @import("std");
 const krn = @import("../main.zig");
 const lst = @import("../utils/list.zig");
 const mutex = @import("../sched/mutex.zig");
+pub const IoVec = @import("../syscalls/read.zig").IoVec;
 
 pub const SOCK_STREAM: u16      = 1;
 pub const SOCK_DGRAM: u16       = 2;
@@ -94,6 +95,29 @@ pub const sockaddr_in = extern struct {
     zero: [8]u8 = @splat(0),
 };
 
+pub const UIO_MAXIOV: usize = 1024;
+
+// https://elixir.bootlin.com/linux/v7.3.1/source/include/linux/socket.h#L97
+pub const MsgHdr = extern struct {
+    name:       ?*anyopaque = null,
+    namelen:    u32 = 0,
+    iov:        ?[*]IoVec = null,
+    iovlen:     usize = 0,
+    control:    ?*anyopaque = null,
+    controllen: usize = 0,
+    flags:      u32 = 0,
+
+    pub fn iovecs(self: *const MsgHdr) ![]IoVec {
+        if (self.iovlen == 0)
+            return &.{};
+        if (self.iovlen > UIO_MAXIOV)
+            return krn.errors.PosixError.EMSGSIZE;
+        const iov = self.iov orelse
+            return krn.errors.PosixError.EFAULT;
+        return iov[0..self.iovlen];
+    }
+};
+
 pub const ProtocolOps = struct {
     ioctl:      *const fn(*Socket, op: u32, data: usize) anyerror!usize,
     getName:    *const fn(*Socket, addr: *sockaddr, peer: bool) anyerror!usize,
@@ -101,8 +125,8 @@ pub const ProtocolOps = struct {
     listen:     *const fn(*Socket, backlog: u32) anyerror!void,
     connect:    *const fn(*Socket, addr_ptr: *anyopaque, addrlen: u32) anyerror!void,
     accept:     *const fn(*Socket) anyerror!u32,
-    recvfrom:   *const fn(*Socket, buf: [*]u8, size: usize) anyerror!usize,
-    sendto:     *const fn(*Socket, buf: [*]const u8, size: usize) anyerror!usize,
+    recvmsg:    *const fn(*Socket, msg: *MsgHdr, flags: u32) anyerror!usize,
+    sendmsg:    *const fn(*Socket, msg: *MsgHdr, flags: u32) anyerror!usize,
     poll:       *const fn(*Socket, pollfd: *krn.poll.PollFd, poll_table: ?*krn.poll.PollTable) anyerror!usize,
     socketpair: *const fn(*Socket, *Socket) anyerror!void,
     release:    *const fn(*Socket) anyerror!void,
@@ -265,19 +289,20 @@ pub fn do_connect(fd: i32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
     return 0;
 }
 
-pub fn do_recvfrom(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
-    var sock: *Socket = undefined;
-    if (base.inode.data.sock == null) return krn.errors.PosixError.EBADF;
-    sock = base.inode.data.sock.?;
-
-    return try sock.ops.recvfrom(sock, buf, size);
+pub fn do_recvmsg(base: *krn.fs.File, msg: *MsgHdr, flags: u32) !usize {
+    const sock = base.inode.data.sock orelse
+        return krn.errors.PosixError.ENOTSOCK;
+    _ = try msg.iovecs();
+    return try sock.ops.recvmsg(sock, msg, flags);
 }
 
-pub fn do_sendto(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
-    var sock: *Socket = undefined;
-    sock = base.inode.data.sock orelse
-        return krn.errors.PosixError.EBADF;
-    return try sock.ops.sendto(sock, buf, size);
+pub fn do_sendmsg(base: *krn.fs.File, msg: *MsgHdr, flags: u32) !usize {
+    const sock = base.inode.data.sock orelse
+        return krn.errors.PosixError.ENOTSOCK;
+    if (msg.controllen > std.math.maxInt(i32))
+        return krn.errors.PosixError.ENOBUFS;
+    _ = try msg.iovecs();
+    return try sock.ops.sendmsg(sock, msg, flags);
 }
 
 pub fn open(base: *krn.fs.File, inode: *krn.fs.Inode) !void {
@@ -293,11 +318,15 @@ pub fn close(base: *krn.fs.File) void {
 }
 
 pub fn read(base: *krn.fs.File, buf: [*]u8, size: usize) !usize {
-    return try do_recvfrom(base, buf, size);
+    var iov = IoVec{ .base = buf, .len = size };
+    var msg = MsgHdr{ .iov = @ptrCast(&iov), .iovlen = 1 };
+    return try do_recvmsg(base, &msg, 0);
 }
 
 pub fn write(base: *krn.fs.File, buf: [*]const u8, size: usize) !usize {
-    return try do_sendto(base, buf, size);
+    var iov = IoVec{ .base = @constCast(buf), .len = size };
+    var msg = MsgHdr{ .iov = @ptrCast(&iov), .iovlen = 1 };
+    return try do_sendmsg(base, &msg, 0);
 }
 
 pub fn sock_poll(
