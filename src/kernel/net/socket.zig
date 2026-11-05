@@ -205,17 +205,25 @@ pub fn do_socketpair(
     return 0;
 }
 
-pub fn do_bind(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
+pub fn sockfdLookup(fd: i32) !*Socket {
+    if (fd < 0)
+        return krn.errors.PosixError.EBADF;
+    const file = krn.task.current().files.fds.get(@intCast(fd)) orelse
+        return krn.errors.PosixError.EBADF;
+    if (!file.mode.isSock())
+        return krn.errors.PosixError.ENOTSOCK;
+    const sock = file.inode.data.sock orelse
+        return krn.errors.PosixError.ENOTSOCK;
+    file.ref.get();
+    return sock;
+}
+
+pub fn do_bind(fd: i32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
     const addr_ptr = _addr_ptr orelse
         return krn.errors.PosixError.EINVAL;
 
-    const file = krn.task.current().files.fds.get(fd) orelse
-        return krn.errors.PosixError.EBADF;
-    file.ref.get();
-    defer file.ref.put();
-
-    const sock = file.inode.data.sock orelse
-        return krn.errors.PosixError.ENOTSOCK;
+    const sock = try sockfdLookup(fd);
+    defer sock.file.ref.put();
 
     const generic_sockaddr: *sockaddr = @ptrCast(@alignCast(addr_ptr));
     if (generic_sockaddr.sa_family != AF_UNIX and generic_sockaddr.sa_family != AF_LOCAL) {
@@ -225,47 +233,32 @@ pub fn do_bind(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
     return 0;
 }
 
-pub fn do_listen(fd: u32, backlog: u32) !u32 {
-    const file = krn.task.current().files.fds.get(fd) orelse
-        return krn.errors.PosixError.EBADF;
-    file.ref.get();
-    defer file.ref.put();
-
-    const sock = file.inode.data.sock orelse
-        return krn.errors.PosixError.ENOTSOCK;
+pub fn do_listen(fd: i32, backlog: u32) !u32 {
+    const sock = try sockfdLookup(fd);
+    defer sock.file.ref.put();
 
     try sock.ops.listen(sock, backlog);
 
     return 0;
 }
 
-pub fn do_accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
+pub fn do_accept4(fd: i32, addr: u32, addr_len: u32, flags: u32) !u32 {
     _ = addr;
     _ = addr_len;
     _ = flags;
 
-    const file = krn.task.current().files.fds.get(fd) orelse
-        return krn.errors.PosixError.EBADF;
-    file.ref.get();
-    defer file.ref.put();
-
-    const listener = file.inode.data.sock orelse
-        return krn.errors.PosixError.ENOTSOCK;
+    const listener = try sockfdLookup(fd);
+    defer listener.file.ref.put();
 
     return try listener.ops.accept(listener);
 }
 
-pub fn do_connect(fd: u32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
+pub fn do_connect(fd: i32, _addr_ptr: ?*anyopaque, addr_len: u32) !u32 {
     const addr_ptr = _addr_ptr orelse
         return krn.errors.PosixError.EINVAL;
 
-    const file = krn.task.current().files.fds.get(fd) orelse
-        return krn.errors.PosixError.EBADF;
-    file.ref.get();
-    defer file.ref.put();
-
-    const sock = file.inode.data.sock orelse
-        return krn.errors.PosixError.ENOTSOCK;
+    const sock = try sockfdLookup(fd);
+    defer sock.file.ref.put();
 
     try sock.ops.connect(sock, addr_ptr, addr_len);
     krn.logger.INFO("connect() fd {d} connected", .{fd});
