@@ -2,6 +2,7 @@ const krn = @import("../../main.zig");
 const uif = @import("../if.zig");
 const in = @import("./main.zig");
 const dev_ioctl = @import("../core/dev_ioctl.zig");
+const std = @import("std");
 
 const devinet = @import("./dev.zig");
 pub const IPv4Dev = devinet.IPv4Dev;
@@ -21,6 +22,49 @@ pub const IPv4Socket = struct {
     }
 
     fn sendmsg(
+        base: *krn.socket.Socket,
+        msg: *krn.socket.MsgHdr,
+        flags: u32
+    ) !usize {
+        _ = flags;
+        const iovecs = try msg.iovecs();
+        if (iovecs.len != 1)
+            krn.errors.PosixError.ENOSYS;
+        if (msg.namelen < @sizeOf(krn.socket.sockaddr_in))
+            krn.errors.PosixError.ENOSYS;
+        const daddr_in: *krn.socket.sockaddr_in = @ptrCast(msg.name);
+        if (daddr_in.family != krn.socket.AF_INET)
+            krn.errors.PosixError.ENOSYS;
+        const eth0 = krn.net.dev.getByIndex(0) orelse
+            return krn.errors.PosixError.EHOSTUNREACH;
+        const packet_size = krn.net.ETH_HEADER_LEN + krn.net.ipv4.IP_HEADER_LEN + iovecs[0].len;
+        const netbuf = krn.net.Netbuf.new(eth0, packet_size) orelse
+            return krn.errors.PosixError.ENOMEM;
+
+        // Write ICMP packet content
+        netbuf.pull(packet_size - iovecs[0].len);
+        netbuf.writeData(iovecs[0].base.?[0..iovecs[0].len]);
+
+        // Write the IP packet content
+        netbuf.push(krn.net.ipv4.IP_HEADER_LEN);
+        const ipheader = netbuf.getPtr(krn.net.ipv4.ip.IpHeader);
+        ipheader.ttl = 64;
+        ipheader.protocol = base.protocol;
+        ipheader.frag_off = 0;
+        ipheader.tos = 0;
+        ipheader.tot_len = std.mem.nativeToBig(u16, packet_size - krn.net.ETH_HEADER_LEN);
+        ipheader.id = 0;
+        ipheader.saddr = @bitCast(.{
+            10, 0, 2, 15
+        });
+        ipheader.daddr = daddr_in.addr;
+        ipheader.check = ipheader.csum();
+
+        // TODO: find neighbor and emit packet
+        return krn.errors.PosixError.ENOSYS;
+    }
+
+    fn recvmsg(
         base: *krn.socket.Socket,
         msg: *krn.socket.MsgHdr,
         flags: u32
@@ -56,7 +100,7 @@ const inet_raw_ops = krn.socket.ProtocolOps{
     .accept     = undefined,
     .connect    = IPv4Socket.connect,
     .bind       = undefined,
-    .recvmsg    = undefined,
+    .recvmsg    = IPv4Socket.recvmsg,
     .sendmsg    = IPv4Socket.sendmsg,
     .listen     = undefined,
     .getName    = undefined,

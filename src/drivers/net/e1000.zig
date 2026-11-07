@@ -353,7 +353,7 @@ pub const E1000Device = struct {
                 const buf: [*]const u8 = @ptrFromInt(
                     self.rx_buffers[self.rx_curr].?.virt
                 );
-                const netbuf = kernel.net.Netbuf.new(net_dev) orelse
+                const netbuf = kernel.net.Netbuf.new(net_dev, 0) orelse
                     continue ;
                 netbuf.data = kernel.mm.dupSlice(u8, buf[0..len]) orelse {
                     kernel.mm.kfree(netbuf);
