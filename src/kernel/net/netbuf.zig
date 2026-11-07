@@ -61,7 +61,7 @@ pub const Netbuf = struct {
 
     pub fn release(self: *Netbuf) void {
         krn.mm.kfreeSlice(self.data);
-        krn.mm.kfree(self);
+        netbuf_cache.free(self);
     }
 
     pub fn pull(self: *Netbuf, num_of_bytes: usize) !void {
