@@ -247,8 +247,9 @@ static int test_zombie_reaping_and_echild(void)
 {
     int handshake[2];
     pid_t pid;
-    pid_t got;
+    pid_t got = 0;
     int status = 0;
+    unsigned tick;
     char byte;
 
     if (pipe(handshake) != 0)
@@ -270,7 +271,12 @@ static int test_zombie_reaping_and_echild(void)
         return failf("child-exit handshake failed");
     }
     close(handshake[0]);
-    got = waitpid(pid, &status, WNOHANG);
+    for (tick = 0; tick < 500 && got == 0; tick++) {
+        usleep(10000);
+        got = waitpid(pid, &status, WNOHANG);
+        if (got < 0 && errno == EINTR)
+            got = 0;
+    }
     if (got != pid || !WIFEXITED(status) || WEXITSTATUS(status) != 9)
         return failf("zombie was not retained/reaped with status 9");
     errno = 0;

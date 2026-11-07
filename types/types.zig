@@ -1196,13 +1196,13 @@ pub const kernel = struct {
     };
 
     pub const socket = struct {
-        pub const ProtocolFamily = struct {
-            create : *const fn(*kernel.socket.Socket) anyerror!void,
+        pub const IoVec = extern struct {
+            base : ?[*]u8,
+            len : u32,
         };
 
-        pub const sockaddr_un = extern struct {
-            sun_family : u16,
-            sun_path : [108]u8,
+        pub const ProtocolFamily = struct {
+            create : *const fn(u16, u8) anyerror!*kernel.socket.Socket,
         };
 
         pub const sockaddr = extern struct {
@@ -1217,26 +1217,38 @@ pub const kernel = struct {
             zero : [8]u8,
         };
 
+        pub const MsgHdr = extern struct {
+            name : ?*anyopaque= null,
+            namelen : u32= 0,
+            iov : ?[*]kernel.socket.IoVec= null,
+            iovlen : u32= 0,
+            control : ?*anyopaque= null,
+            controllen : u32= 0,
+            flags : u32= 0,
+        };
+
         pub const ProtocolOps = struct {
             ioctl : *const fn(*kernel.socket.Socket, u32, u32) anyerror!u32,
+            getName : *const fn(*kernel.socket.Socket, *kernel.socket.sockaddr, bool) anyerror!u32,
+            bind : *const fn(*kernel.socket.Socket, *anyopaque, u32) anyerror!void,
+            listen : *const fn(*kernel.socket.Socket, u32) anyerror!void,
+            connect : *const fn(*kernel.socket.Socket, *anyopaque, u32) anyerror!void,
+            accept : *const fn(*kernel.socket.Socket) anyerror!u32,
+            recvmsg : *const fn(*kernel.socket.Socket, *kernel.socket.MsgHdr, u32) anyerror!u32,
+            sendmsg : *const fn(*kernel.socket.Socket, *kernel.socket.MsgHdr, u32) anyerror!u32,
+            poll : *const fn(*kernel.socket.Socket, *kernel.poll.PollFd, ?*kernel.poll.PollTable) anyerror!u32,
+            socketpair : *const fn(*kernel.socket.Socket, *kernel.socket.Socket) anyerror!void,
+            release : *const fn(*kernel.socket.Socket) anyerror!void,
         };
 
         pub const Socket = struct {
-            _buffer : [4096]u8,
-            rb : kernel.ringbuf.RingBuf,
-            conn : ?*kernel.socket.Socket,
+            socket_type : u16= 1,
+            protocol : u8= 0,
+            family : u16= 0,
             list : kernel.list.ListHead,
             lock : kernel.Spinlock,
-            sock_type : u16= 1,
-            is_listening : bool= false,
-            bound_path : [108]u8,
-            bound_path_len : u32= 0,
-            accept_queue : kernel.list.ListHead,
-            accept_count : u32= 0,
-            accept_backlog : u32= 16,
-            accept_wait : kernel.wq.WaitQueueHead,
             rw_queue : kernel.wq.WaitQueueHead,
-            pending_link : kernel.list.ListHead,
+            file : *kernel.fs.file.File,
             ops : *const kernel.socket.ProtocolOps,
         };
 
@@ -1244,13 +1256,24 @@ pub const kernel = struct {
 
     pub const net = struct {
         pub const ipv4 = struct {
-            pub const IPv4Dev = struct {
-                list : kernel.list.ListHead,
-                label : [16]u8,
-                ip : [4]u8,
-                broadcast : [4]u8,
-                mask : u32,
+            pub const af_inet = struct {
+                pub const IPv4Dev = struct {
+                    list : kernel.list.ListHead,
+                    label : [16]u8,
+                    ip : [4]u8,
+                    broadcast : [4]u8,
+                    mask : u32,
+                };
+
+                pub const IPv4Socket = struct {
+                    sock : kernel.socket.Socket,
+                };
+
             };
+
+        };
+
+        pub const unix = struct {
 
         };
 
@@ -1293,7 +1316,7 @@ pub const kernel = struct {
                 priv : ?*anyopaque= null,
                 lock : kernel.Mutex,
                 list : kernel.list.ListHead,
-                ip_list : ?*kernel.net.ipv4.IPv4Dev= null,
+                ip_list : ?*kernel.net.ipv4.af_inet.IPv4Dev= null,
             };
 
         };
@@ -1752,10 +1775,6 @@ pub const kernel = struct {
         };
 
         pub const read = struct {
-            pub const IoVec = extern struct {
-                base : ?[*]u8,
-                len : u32,
-            };
 
         };
 

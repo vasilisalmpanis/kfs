@@ -1,8 +1,10 @@
+const std = @import("std");
 const tsk = @import("../sched/task.zig");
 const errors = @import("./error-codes.zig").PosixError;
 const krn = @import("../main.zig");
 const arch = @import("arch");
-const IoVec = @import("./read.zig").IoVec;
+const IoVec = krn.socket.IoVec;
+const MsgHdr = krn.socket.MsgHdr;
 
 const CallType = enum(u8) {
     SYS_SOCKET = 1,	// 1   sys_socket(2)
@@ -36,19 +38,21 @@ pub fn socketcall(call: i32, args: [*]u32) !u32 {
     krn.logger.INFO("socketcall: {any} {any}", .{call_type, args});
     switch (call_type) {
         .SYS_SOCKET => return try krn.socket.do_socket(
-            args[0], args[1], args[2],
+            @intCast(args[0]),
+            @intCast(args[1]),
+            @intCast(args[2]),
         ),
         .SYS_BIND => return try krn.socket.do_bind(
-            args[0], @ptrFromInt(args[1]), args[2],
+            @bitCast(args[0]), @ptrFromInt(args[1]), args[2],
         ),
         .SYS_CONNECT => return try krn.socket.do_connect(
-            args[0], @ptrFromInt(args[1]), args[2],
+            @bitCast(args[0]), @ptrFromInt(args[1]), args[2],
         ),
         .SYS_LISTEN => return try krn.socket.do_listen(
-            args[0], args[1],
+            @bitCast(args[0]), args[1],
         ),
         .SYS_ACCEPT => return try krn.socket.do_accept4(
-            args[0], args[1], args[2], 0,
+            @bitCast(args[0]), args[1], args[2], 0,
         ),
         .SYS_SOCKETPAIR => return try socketpair(
             @intCast(args[0]),
@@ -61,22 +65,22 @@ pub fn socketcall(call: i32, args: [*]u32) !u32 {
             @ptrFromInt(args[1]),
             args[2],
             args[3],
-            args[4],
-            @bitCast(args[5]),
+            @ptrFromInt(args[4]),
+            @ptrFromInt(args[5]),
         ),
         .SYS_SENDTO => return try sendto(
             @bitCast(args[0]),
             @ptrFromInt(args[1]),
             args[2],
             args[3],
-            args[4],
-            @bitCast(args[5]),
+            @ptrFromInt(args[4]),
+            args[5],
         ),
         .SYS_ACCEPT4 => return try krn.socket.do_accept4(
-            args[0], args[1], args[2], args[3],
+            @bitCast(args[0]), args[1], args[2], args[3],
         ),
-        .SYS_RECVMSG => return try recvmsg(@bitCast(args[0]), @ptrFromInt(args[1]), @bitCast(args[2])),
-        .SYS_SENDMSG => return try sendmsg(@bitCast(args[0]), @ptrFromInt(args[1]), @bitCast(args[2])),
+        .SYS_RECVMSG => return try recvmsg(@bitCast(args[0]), @ptrFromInt(args[1]), args[2]),
+        .SYS_SENDMSG => return try sendmsg(@bitCast(args[0]), @ptrFromInt(args[1]), args[2]),
         else => {
             return errors.EINVAL;
         },
@@ -84,181 +88,99 @@ pub fn socketcall(call: i32, args: [*]u32) !u32 {
     return 0;
 }
 
-pub fn socket(family: u32, sock_type: u32, protocol: u32) !u32 {
+pub fn socket(family: u16, sock_type: u16, protocol: u8) !u32 {
     return try krn.socket.do_socket(family, sock_type, protocol);
 }
 
-pub fn bind(fd: u32, addr: u32, addr_len: u32) !u32 {
+pub fn bind(fd: i32, addr: u32, addr_len: u32) !u32 {
     return try krn.socket.do_bind(fd, @ptrFromInt(addr), addr_len);
 }
 
-pub fn connect(fd: u32, addr: u32, addr_len: u32) !u32 {
+pub fn connect(fd: i32, addr: u32, addr_len: u32) !u32 {
     return try krn.socket.do_connect(fd, @ptrFromInt(addr), addr_len);
 }
 
-pub fn listen(fd: u32, backlog: u32) !u32 {
+pub fn listen(fd: i32, backlog: u32) !u32 {
     return try krn.socket.do_listen(fd, backlog);
 }
 
-pub fn accept4(fd: u32, addr: u32, addr_len: u32, flags: u32) !u32 {
+pub fn accept4(fd: i32, addr: u32, addr_len: u32, flags: u32) !u32 {
     return try krn.socket.do_accept4(fd, addr, addr_len, flags);
 }
 
-pub fn socketpair(family: i32, s_type: i32, protocol: i32, usockvec: [*]i32) !u32 {
-    krn.logger.INFO("socketpair: {d} {d} {d} {any}", .{family, s_type, protocol, usockvec});
-    var file1: *krn.fs.File = undefined;
-    var file2: *krn.fs.File = undefined;
-    const fd1: u32 = try krn.task.current().files.getNextFD();
-    const fd2: u32 = try krn.task.current().files.getNextFD();
-    errdefer _ = krn.task.current().files.releaseFD(fd1);
-    errdefer _ = krn.task.current().files.releaseFD(fd2);
-    if (krn.socket.Socket.newSocket()) |sock_a| {
-        errdefer krn.mm.kfree(sock_a);
-        if (krn.socket.Socket.newSocket()) |sock_b| {
-            errdefer krn.mm.kfree(sock_b);
-            sock_a.conn = sock_b;
-            sock_b.conn = sock_a;
-            const inode1 = try krn.fs.Inode.allocEmpty();
-            errdefer krn.mm.kfree(inode1);
-            inode1.fops = &krn.socket.SocketFileOps;
-            inode1.data.sock = sock_a;
-            const inode2 = try krn.fs.Inode.allocEmpty();
-            errdefer krn.mm.kfree(inode2);
-            inode2.fops = &krn.socket.SocketFileOps;
-            inode2.data.sock = sock_b;
-            file1 = try krn.fs.File.pseudo(inode1);
-            errdefer file1.ref.put();
-            file1.mode = krn.fs.UMode.socket();
-            file1.flags = krn.fs.file.O_RDWR;
-            file2 = try krn.fs.File.pseudo(inode2);
-            errdefer file2.ref.put();
-            file2.mode = krn.fs.UMode.socket();
-            file2.flags = krn.fs.file.O_RDWR;
-            try krn.task.current().files.setFD(fd1, file1);
-            try krn.task.current().files.setFD(fd2, file2);
-            usockvec[0] = @intCast(fd1);
-            usockvec[1] = @intCast(fd2);
-        } else {
-            sock_a.delete();
-            return errors.ENOMEM;
-        }
-    } else {
-        return errors.ENOMEM;
-    }
-    return 0;
+pub fn socketpair(family: u32, s_type: u32, protocol: u32, usockvec: ?*[2]i32) !u32 {
+    if (protocol > std.math.maxInt(u8))
+        return errors.EPROTONOSUPPORT;
+    return try krn.socket.do_socketpair(family, s_type, @intCast(protocol), usockvec);
 }
 
 pub fn recvfrom(
     fd: i32,
-    ubuff: ?*anyopaque,
+    _ubuff: ?[*]u8,
     size: u32,
     flags: u32,
-    addr: u32,
-    addr_len: i32
+    addr: ?*anyopaque,
+    addr_len: ?*u32,
 ) !u32 {
-    _ = addr;
-    _ = addr_len;
-    _ = flags;
-    if (ubuff == null) {
+    const ubuff = _ubuff orelse
         return errors.EFAULT;
+    var iov = IoVec{
+        .base = ubuff,
+        .len = size,
+    };
+    var msg = MsgHdr{ .iov = @ptrCast(&iov), .iovlen = 1 };
+    if (addr) |name| {
+        const len = addr_len orelse
+            return errors.EFAULT;
+        msg.name = name;
+        msg.namelen = len.*;
     }
-    if (fd < 0)
-        return errors.EBADF;
-    if (krn.task.current().files.fds.get(@intCast(fd))) |file| {
-        file.ref.get();
-        defer file.ref.put();
-        return try krn.socket.do_recvfrom(file, @ptrCast(ubuff), size);
-    } else {
-        return errors.EBADF;
-    }
-    return 0;
+
+    const sock = try krn.socket.sockfdLookup(fd);
+    defer sock.file.ref.put();
+    const ret = try krn.socket.do_recvmsg(sock.file, &msg, flags);
+    if (addr != null)
+        addr_len.?.* = msg.namelen;
+    return ret;
 }
 
-pub fn sendto(fd: i32, buff: ?*anyopaque, len: usize, flags: u32, addr: u32, addr_len: i32) !u32 {
-    _ = flags;
-    _ = addr;
-    _ = addr_len;
-    if (buff == null) {
-        return errors.EFAULT;
+pub fn sendto(
+    fd: i32,
+    buff: ?[*]u8,
+    len: usize,
+    flags: u32,
+    addr: ?*anyopaque,
+    addr_len: u32,
+) !u32 {
+    var iov = IoVec{
+        .base = buff orelse return errors.EFAULT,
+        .len = len,
+    };
+    var msg = MsgHdr{ .iov = @ptrCast(&iov), .iovlen = 1 };
+    if (addr) |name| {
+        msg.name = name;
+        msg.namelen = addr_len;
     }
-    if (len > 128) {
-        return errors.EFAULT;
-    }
-    if (fd < 0)
-        return errors.EBADF;
-    if (krn.task.current().files.fds.get(@intCast(fd))) |file| {
-        file.ref.get();
-        defer file.ref.put();
-        return try krn.socket.do_sendto(file, @ptrCast(buff), len);
-    } else {
-        return errors.EBADF;
-    }
-    return 0;
+
+    const sock = try krn.socket.sockfdLookup(fd);
+    defer sock.file.ref.put();
+    return try krn.socket.do_sendmsg(sock.file, &msg, flags);
 }
 
-const MsgHdr = struct {
-    name:       ?*krn.socket.sockaddr,
-    namelen:    i32,
-    iov:        ?[*]IoVec,
-    iovlen:     usize,
-    control:    ?*anyopaque,
-    controllen: usize,
-    flags:      u32,
-};
-
-pub fn sendmsg(sockfd: i32, _msg: ?*MsgHdr, flags: i32) !u32 {
-    _ = flags;
+pub fn sendmsg(sockfd: i32, _msg: ?*MsgHdr, flags: u32) !u32 {
     const msg = _msg orelse
         return errors.EFAULT;
-    const iov = msg.iov orelse
-        return errors.EFAULT;
-    if (sockfd < 0)
-        return errors.EBADF;
-    if (krn.task.current().files.fds.get(@intCast(sockfd))) |file| {
-        if (!file.mode.isSock())
-            return errors.ENOTSOCK;
-        _ = file.inode.data.sock orelse
-            return errors.ENOTSOCK;
-        var sent: usize = 0;
-        for (iov, 0..msg.iovlen) |*_v, _| {
-            sent += try krn.socket.do_sendto(
-                file,
-                @ptrCast(_v.base),
-                _v.len
-            );
-        }
-        return sent;
-    }
-    return errors.EBADF;
+    const sock = try krn.socket.sockfdLookup(sockfd);
+    defer sock.file.ref.put();
+    return try krn.socket.do_sendmsg(sock.file, msg, flags);
 }
 
-pub fn recvmsg(sockfd: i32, _msg: ?*MsgHdr, flags: i32) !u32 {
-    _ = flags;
+pub fn recvmsg(sockfd: i32, _msg: ?*MsgHdr, flags: u32) !u32 {
     const msg = _msg orelse
         return errors.EFAULT;
-    const iov = msg.iov orelse
-        return errors.EFAULT;
-    if (sockfd < 0)
-        return errors.EBADF;
-    if (krn.task.current().files.fds.get(@intCast(sockfd))) |file| {
-        if (!file.mode.isSock())
-            return errors.ENOTSOCK;
-        _ = file.inode.data.sock orelse
-            return errors.ENOTSOCK;
-        var received: usize = 0;
-        for (iov, 0..msg.iovlen) |*_v, _| {
-            const recv_curr = try krn.socket.do_recvfrom(
-                file,
-                @ptrCast(_v.base),
-                _v.len
-            );
-            received += recv_curr;
-            if (recv_curr < _v.len)
-                break ;
-        }
-        return received;
-    }
-    return errors.EBADF;
+    const sock = try krn.socket.sockfdLookup(sockfd);
+    defer sock.file.ref.put();
+    return try krn.socket.do_recvmsg(sock.file, msg, flags);
 }
 
 pub fn getpeername(
@@ -266,28 +188,18 @@ pub fn getpeername(
     _addr: ?*krn.socket.sockaddr,
     _addrlen: ?*i32,
 ) !u32 {
-    if (sockfd < 0)
-        return errors.EBADF;
-    const addlen = _addrlen orelse
+    const sock = try krn.socket.sockfdLookup(sockfd);
+    defer sock.file.ref.put();
+
+    const addrlen = _addrlen orelse
         return errors.EINVAL;
     const addr = _addr orelse
         return errors.EINVAL;
-    if (addlen.* < 0)
+    if (addrlen.* < 0)
         return errors.EINVAL;
-    if (krn.task.current().files.fds.get(@intCast(sockfd))) |file| {
-        if (!file.mode.isSock())
-            return errors.ENOTSOCK;
-        const sock = file.inode.data.sock orelse
-            return errors.ENOTSOCK;
-        const peer = sock.conn orelse
-            return errors.ENOTCONN;
-        peer.lock.lock();
-        defer peer.lock.unlock();
-        
-        peer.getName(addr, addlen);
-        return 0;
-    }
-    return errors.EBADF;
+    const ret = try sock.ops.getName(sock, addr, true);
+    addrlen.* = @intCast(ret);
+    return 0;
 }
 
 pub fn getsockname(
@@ -295,26 +207,19 @@ pub fn getsockname(
     _addr: ?*krn.socket.sockaddr,
     _addrlen: ?*i32,
 ) !u32 {
-    if (sockfd < 0)
-        return errors.EBADF;
-    const addlen = _addrlen orelse
+    const sock = try krn.socket.sockfdLookup(sockfd);
+    defer sock.file.ref.put();
+
+    const addrlen = _addrlen orelse
         return errors.EINVAL;
     const addr = _addr orelse
         return errors.EINVAL;
-    if (addlen.* < 0)
+    if (addrlen.* < 0)
         return errors.EINVAL;
-    if (krn.task.current().files.fds.get(@intCast(sockfd))) |file| {
-        if (!file.mode.isSock())
-            return errors.ENOTSOCK;
-        const sock = file.inode.data.sock orelse
-            return errors.ENOTSOCK;
-        sock.lock.lock();
-        defer sock.lock.unlock();
 
-        sock.getName(addr, addlen);
-        return 0;
-    }
-    return errors.EBADF;
+    const ret = try sock.ops.getName(sock, addr, false);
+    addrlen.* = @intCast(ret);
+    return 0;
 }
 
 pub fn getsockopt(
@@ -329,16 +234,10 @@ pub fn getsockopt(
     _ = level;
     _ = optval orelse
         return errors.EFAULT;
-    if (sockfd < 0)
-        return errors.EBADF;
-    if (krn.task.current().files.fds.get(@intCast(sockfd))) |file| {
-        if (!file.mode.isSock())
-            return errors.ENOTSOCK;
-        _ = file.inode.data.sock orelse
-            return errors.ENOTSOCK;
-        return 0;
-    }
-    return errors.EBADF;
+    const sock = try krn.socket.sockfdLookup(sockfd);
+    defer sock.file.ref.put();
+
+    return 0;
 }
 
 const SOL_SOCKET: i32 = 1;
@@ -354,32 +253,19 @@ pub fn setsockopt(
     _ = optlen;
     _ = optval orelse
         return errors.EFAULT;
-    if (sockfd < 0)
-        return errors.EBADF;
-    if (krn.task.current().files.fds.get(@intCast(sockfd))) |file| {
-        if (!file.mode.isSock())
-            return errors.ENOTSOCK;
-        _ = file.inode.data.sock orelse
-            return errors.ENOTSOCK;
-        krn.logger.INFO("setsockopt\n",.{});
-        if (level != SOL_SOCKET)
-            return errors.EOPNOTSUPP;
-        return 0;
-    }
-    return errors.EBADF;
+    const sock = try krn.socket.sockfdLookup(sockfd);
+    defer sock.file.ref.put();
+
+    krn.logger.INFO("setsockopt\n",.{});
+    if (level != SOL_SOCKET)
+        return errors.EOPNOTSUPP;
+    return 0;
 }
 
 pub fn shutdown(sockfd: i32, how: i32) !u32 {
     _ = how;
-    if (sockfd < 0)
-        return errors.EBADF;
-    if (krn.task.current().files.fds.get(@intCast(sockfd))) |file| {
-        if (!file.mode.isSock())
-            return errors.ENOTSOCK;
-        _ = file.inode.data.sock orelse
-            return errors.ENOTSOCK;
-        return 0;
-    }
-    return errors.EBADF;
+    const sock = try krn.socket.sockfdLookup(sockfd);
+    defer sock.file.ref.put();
 
+    return 0;
 }

@@ -4,6 +4,7 @@ const drivers = @import("drivers");
 const arp = @import("./ipv4/arp.zig");
 
 pub const ipv4 = @import("./ipv4/main.zig");
+pub const unix = @import("./unix/af_unix.zig");
 pub const intf = @import("./if.zig");
 pub const dev = @import("./core/dev.zig");
 pub const netbuf = @import("./netbuf.zig");
@@ -36,6 +37,7 @@ pub const EthernetHeader = extern struct {
 
 pub fn init() void {
     ipv4.init();
+    unix.init();
     arp.init();
     netbuf.init() catch |err| {
         kernel.logger.ERROR("netbuf cannot be initialized: {t}", .{err});

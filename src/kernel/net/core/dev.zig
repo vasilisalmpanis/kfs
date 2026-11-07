@@ -34,7 +34,7 @@ pub const NetDevice = struct {
     priv: ?*anyopaque = null,
     lock: kernel.Mutex = kernel.Mutex.init(),
     list: kernel.list.ListHead = kernel.list.ListHead.init(),
-    ip_list: ?*kernel.net.ipv4.IPv4Dev = null,
+    ip_list: ?*kernel.net.ipv4.af_inet.IPv4Dev = null,
 
     pub fn new(
         name: []const u8,
@@ -60,19 +60,19 @@ pub const NetDevice = struct {
     pub fn lookupLabel(
         self: *NetDevice,
         label: []const u8
-    ) ?*kernel.net.ipv4.IPv4Dev {
+    ) ?*kernel.net.ipv4.af_inet.IPv4Dev {
         const head = self.ip_list orelse
             return null;
         var it = head.list.iterator();
         while (it.next()) |node| {
-            const ifa = node.curr.entry(kernel.net.ipv4.IPv4Dev, "list");
+            const ifa = node.curr.entry(kernel.net.ipv4.af_inet.IPv4Dev, "list");
             if (std.mem.eql(u8, ifa.getLabel(), label))
                 return ifa;
         }
         return null;
     }
 
-    pub fn addIP(self: *NetDevice, ifa: *kernel.net.ipv4.IPv4Dev) void {
+    pub fn addIP(self: *NetDevice, ifa: *kernel.net.ipv4.af_inet.IPv4Dev) void {
         if (self.ip_list) |head| {
             head.list.addTail(&ifa.list);
         } else {
@@ -81,13 +81,13 @@ pub const NetDevice = struct {
         }
     }
 
-    pub fn delIP(self: *NetDevice, ifa: *kernel.net.ipv4.IPv4Dev) void {
+    pub fn delIP(self: *NetDevice, ifa: *kernel.net.ipv4.af_inet.IPv4Dev) void {
         if (self.ip_list == ifa) {
             if (ifa.list.isEmpty()) {
                 self.ip_list = null;
             } else {
                 self.ip_list = ifa.list.next.?.entry(
-                    kernel.net.ipv4.IPv4Dev, "list"
+                    kernel.net.ipv4.af_inet.IPv4Dev, "list"
                 );
             }
         }
@@ -118,7 +118,7 @@ pub const NetDevice = struct {
             return self.open();
     }
 
-    pub fn lookupIP(self: *NetDevice, ip: [4]u8) ?*kernel.net.ipv4.IPv4Dev {
+    pub fn lookupIP(self: *NetDevice, ip: [4]u8) ?*kernel.net.ipv4.af_inet.IPv4Dev {
         self.lock.lock();
         defer self.lock.unlock();
 
@@ -126,7 +126,7 @@ pub const NetDevice = struct {
             var it = head.list.iterator();
             while (it.next()) |i| {
                 const curr = i.curr.entry(
-                    kernel.net.ipv4.IPv4Dev, "list"
+                    kernel.net.ipv4.af_inet.IPv4Dev, "list"
                 );
                 if (std.mem.eql(u8, curr.ip[0..4], ip[0..4])) {
                     return curr;
