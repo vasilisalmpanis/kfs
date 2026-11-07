@@ -1271,6 +1271,22 @@ pub const kernel = struct {
 
             };
 
+            pub const ip = struct {
+                pub const IpHeader = extern struct {
+                    vers_ihl : u8= 0,
+                    tos : u8= 0,
+                    tot_len : u16= 0,
+                    id : u16= 0,
+                    frag_off : u16= 0,
+                    ttl : u8= 0,
+                    protocol : u8= 0,
+                    check : u16= 0,
+                    saddr : u32= 0,
+                    daddr : u32= 0,
+                };
+
+            };
+
         };
 
         pub const unix = struct {

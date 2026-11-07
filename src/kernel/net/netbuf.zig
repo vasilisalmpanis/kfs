@@ -39,12 +39,22 @@ pub const Netbuf = struct {
     pos: usize = 0,
     dev: *krn.net.dev.NetDevice,
 
-    pub fn new(net_dev: *krn.net.dev.NetDevice) ?*Netbuf {
+    pub fn new(
+        net_dev: *krn.net.dev.NetDevice,
+        data_len: usize,
+    ) ?*Netbuf {
         var netbuf = netbuf_cache.alloc() orelse
             return null;
         netbuf.lst.setup();
         netbuf.pos = 0;
-        netbuf.data.len = 0;
+        netbuf.data.len = data_len;
+        if (data_len != 0) {
+            netbuf.data = krn.mm.kmallocSlice(u8, data_len) orelse {
+                netbuf_cache.free(netbuf);
+                return null;
+            };
+            @memset(netbuf.data[0..data_len], 0);
+        }
         netbuf.dev = net_dev;
         return netbuf;
     }
@@ -58,6 +68,35 @@ pub const Netbuf = struct {
         if (self.pos + num_of_bytes > self.data.len)
             return krn.errors.PosixError.E2BIG;
         self.pos += num_of_bytes;
+    }
+
+    pub fn push(self: *Netbuf, num_of_bytes: usize) !void {
+        if (num_of_bytes > self.pos)
+            return krn.errors.PosixError.EOVERFLOW;
+        self.pos -= num_of_bytes;
+    }
+
+    /// Writes the content of data buffer to the internal
+    /// buffer of the netbuf and performs checks around
+    /// data length.
+    pub fn writeData(self: *Netbuf, data: []const u8) !void {
+        if (self.pos + data.len > self.data.len)
+            return krn.errors.PosixError.E2BIG;
+        @memcpy(self.data[self.pos..][0..data.len], data);
+    }
+
+    pub fn getPtr(self: *Netbuf, comptime t: type) *t {
+        if (self.pos + @sizeOf(t) > self.data.len)
+            @panic("Out-Of-Bounds cast");
+        const addr = @intFromPtr(&self.data[self.pos]);
+        if (addr % @alignOf(t) != 0) {
+            krn.logger.ERROR("Ptr: 0x{x}, remainder: {d}", .{
+                addr,
+                addr % @alignOf(t)
+            });
+            @panic("Unaligned cast");
+        }
+        return @ptrFromInt(addr);
     }
 
     pub fn getEthernetHeader(self: *Netbuf) !*krn.net.EthernetHeader {

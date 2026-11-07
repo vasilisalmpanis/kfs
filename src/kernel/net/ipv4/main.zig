@@ -1,6 +1,8 @@
 const kernel = @import("../../main.zig");
 pub const af_inet = @import("./af_inet.zig");
 
+pub const ip = @import("./ip.zig");
+
 pub const IPPROTO_IP        : u16 = 0;		// Dummy protocol for TCP
 pub const IPPROTO_ICMP      : u16 = 1;		// Internet Control Message Protocol
 pub const IPPROTO_IGMP      : u16 = 2;		// Internet Group Management Protocol
@@ -31,6 +33,8 @@ pub const IPPROTO_AGGFRAG   : u16 = 144;	// AGGFRAG in ESP (RFC 9347)
 pub const IPPROTO_RAW       : u16 = 255;    // Raw IP packets
 pub const IPPROTO_SMC       : u16 = 256;    // Shared Memory Communications
 pub const IPPROTO_MPTCP     : u16 = 262;    // Multipath TCP connection
+
+pub const IP_HEADER_LEN: usize = @sizeOf(ip.IpHeader);
 
 pub fn init() void {
     kernel.socket.net_families[kernel.socket.AF_INET] = &af_inet.inet_family;

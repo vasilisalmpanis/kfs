@@ -2,6 +2,7 @@ const krn = @import("../../main.zig");
 const uif = @import("../if.zig");
 const in = @import("./main.zig");
 const dev_ioctl = @import("../core/dev_ioctl.zig");
+const std = @import("std");
 
 const devinet = @import("./dev.zig");
 pub const IPv4Dev = devinet.IPv4Dev;
@@ -21,6 +22,54 @@ pub const IPv4Socket = struct {
     }
 
     fn sendmsg(
+        base: *krn.socket.Socket,
+        msg: *krn.socket.MsgHdr,
+        flags: u32
+    ) !usize {
+        _ = flags;
+        const iovecs = try msg.iovecs();
+        if (iovecs.len != 1)
+            return krn.errors.PosixError.ENOSYS;
+        const payload = iovecs[0].base orelse
+            return krn.errors.PosixError.EFAULT;
+        const payload_len = iovecs[0].len;
+        const name = msg.name orelse
+            return krn.errors.PosixError.EDESTADDRREQ;
+        if (msg.namelen < @sizeOf(krn.socket.sockaddr_in))
+            return krn.errors.PosixError.EINVAL;
+        const daddr_in: *krn.socket.sockaddr_in = @ptrCast(@alignCast(name));
+        if (daddr_in.family != krn.socket.AF_INET)
+            return krn.errors.PosixError.EAFNOSUPPORT;
+        const eth0 = krn.net.dev.getByIndex(1) orelse
+            return krn.errors.PosixError.EHOSTUNREACH;
+        const ip_len = krn.net.ipv4.IP_HEADER_LEN + payload_len;
+        const packet_size = krn.net.ETH_HEADER_LEN + ip_len;
+        const netbuf = krn.net.Netbuf.new(eth0, packet_size) orelse
+            return krn.errors.PosixError.ENOMEM;
+        errdefer netbuf.release();
+
+        // Write ICMP packet content
+        try netbuf.pull(packet_size - payload_len);
+        try netbuf.writeData(payload[0..payload_len]);
+
+        // Write the IP packet content
+        try netbuf.push(krn.net.ipv4.IP_HEADER_LEN);
+        const ipheader = netbuf.getPtr(krn.net.ipv4.ip.IpHeader);
+        ipheader.vers_ihl = 0x45;
+        ipheader.ttl = 64;
+        ipheader.protocol = base.protocol;
+        ipheader.frag_off = std.mem.nativeToBig(u16, krn.net.ipv4.ip.IP_DF);
+        ipheader.tos = 0;
+        ipheader.tot_len = std.mem.nativeToBig(u16, @intCast(ip_len));
+        ipheader.id = 0;
+        ipheader.saddr = @bitCast([4]u8{ 10, 0, 2, 15 });
+        ipheader.daddr = daddr_in.addr;
+        ipheader.check = std.mem.nativeToBig(u16, ipheader.csum());
+
+        return payload_len;
+    }
+
+    fn recvmsg(
         base: *krn.socket.Socket,
         msg: *krn.socket.MsgHdr,
         flags: u32
@@ -56,7 +105,7 @@ const inet_raw_ops = krn.socket.ProtocolOps{
     .accept     = undefined,
     .connect    = IPv4Socket.connect,
     .bind       = undefined,
-    .recvmsg    = undefined,
+    .recvmsg    = IPv4Socket.recvmsg,
     .sendmsg    = IPv4Socket.sendmsg,
     .listen     = undefined,
     .getName    = undefined,
