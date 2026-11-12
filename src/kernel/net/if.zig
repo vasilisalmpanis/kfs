@@ -24,6 +24,8 @@ pub const IFF_DYNAMIC       :u16 = 1<<15;
 
 pub const ARPHRD_ETHER: u16     = 1;
 
+pub const SIOCADDRT: u32        = 0x890B;
+pub const SIOCDELRT: u32        = 0x890C;
 pub const SIOCGIFNAME: u32      = 0x8910;
 pub const SIOCGIFCONF: u32      = 0x8912;
 pub const SIOCGIFFLAGS: u32     = 0x8913;

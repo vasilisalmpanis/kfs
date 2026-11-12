@@ -2,6 +2,7 @@ const kernel = @import("../../main.zig");
 pub const af_inet = @import("./af_inet.zig");
 
 pub const ip = @import("./ip.zig");
+pub const route = @import("./route.zig");
 
 pub const IPPROTO_IP        : u16 = 0;		// Dummy protocol for TCP
 pub const IPPROTO_ICMP      : u16 = 1;		// Internet Control Message Protocol
