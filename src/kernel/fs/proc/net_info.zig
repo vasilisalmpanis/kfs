@@ -84,6 +84,64 @@ const dev_file_ops = kernel.fs.FileOps{
     .close = generic_ops.generic_close,
 };
 
+fn route_open(base: *kernel.fs.File, inode: *kernel.fs.Inode) anyerror!void {
+    _ = inode;
+    const route_header =
+        "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n";
+    const route_format = "{s}\t{X:0>8}\t{X:0>8}\t{X:0>4}\t0\t0\t0\t{X:0>8}\t0\t0\t0\n";
+
+    kernel.net.ipv4.route.routes_lock.lock();
+    defer kernel.net.ipv4.route.routes_lock.unlock();
+
+    const head_opt = kernel.net.ipv4.route.routes;
+
+    var size: usize = route_header.len;
+    if (head_opt) |head| {
+        var it = head.list.iterator();
+        while (it.next()) |node| {
+            const rt = node.curr.entry(kernel.net.ipv4.route.Route, "list");
+            size += std.fmt.count(
+                route_format,
+                .{
+                    std.mem.sliceTo(&rt.dev.name, 0),
+                    rt.dst, 0, rt.flags, rt.mask
+                },
+            );
+        }
+    }
+
+    const buffer = kernel.mm.kmallocSlice(u8, size) orelse
+        return kernel.errors.PosixError.ENOMEM;
+    errdefer kernel.mm.kfree(buffer.ptr);
+
+    var offset: usize = 0;
+    @memcpy(buffer[0..route_header.len], route_header);
+    offset += route_header.len;
+    if (head_opt) |head| {
+        var it = head.list.iterator();
+        while (it.next()) |node| {
+            const rt = node.curr.entry(kernel.net.ipv4.route.Route, "list");
+            const written = try std.fmt.bufPrint(
+                buffer[offset..],
+                route_format,
+                .{
+                    std.mem.sliceTo(&rt.dev.name, 0),
+                    rt.dst, 0, rt.flags, rt.mask
+                },
+            );
+            offset += written.len;
+        }
+    }
+
+    try generic_ops.assignSlice(base, buffer);
+}
+
+const route_file_ops = kernel.fs.FileOps{
+    .open = route_open,
+    .read = generic_ops.generic_read,
+    .write = generic_ops.generic_write,
+    .close = generic_ops.generic_close,
+};
 
 pub fn init() !void {
     const parent = try kernel.fs.procfs.mkdir(
@@ -94,6 +152,11 @@ pub fn init() !void {
     _ = try interface.createFile(parent,
         "dev",
         &dev_file_ops,
+        mode
+    );
+    _ = try interface.createFile(parent,
+        "route",
+        &route_file_ops,
         mode
     );
 }

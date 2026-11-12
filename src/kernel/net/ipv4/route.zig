@@ -62,8 +62,8 @@ pub const Route = struct {
     }
 };
 
-var routes: ?*Route = null;
-var routes_lock = krn.Mutex.init();
+pub var routes: ?*Route = null;
+pub var routes_lock = krn.Mutex.init();
 
 pub fn add(
     dev: *krn.net.dev.NetDevice,
