@@ -1287,6 +1287,33 @@ pub const kernel = struct {
 
             };
 
+            pub const route = struct {
+                pub const RtEntry = extern struct {
+                    pad1 : u32,
+                    dst : kernel.socket.sockaddr,
+                    gateway : kernel.socket.sockaddr,
+                    genmask : kernel.socket.sockaddr,
+                    flags : u16,
+                    pad2 : i16,
+                    pad3 : u32,
+                    pad4 : u32,
+                    metric : i16,
+                    dev : ?[*:0]const u8,
+                    mtu : u32,
+                    window : u32,
+                    irtt : u16,
+                };
+
+                pub const Route = struct {
+                    list : kernel.list.ListHead,
+                    dst : u32,
+                    mask : u32,
+                    flags : u16,
+                    dev : *kernel.net.dev.NetDevice,
+                };
+
+            };
+
         };
 
         pub const unix = struct {
