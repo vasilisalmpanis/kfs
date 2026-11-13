@@ -3,6 +3,8 @@ const uif = @import("../if.zig");
 const in = @import("./main.zig");
 const dev_ioctl = @import("../core/dev_ioctl.zig");
 const std = @import("std");
+const routing = @import("route.zig");
+const arp = @import("./arp.zig");
 
 const devinet = @import("./dev.zig");
 pub const IPv4Dev = devinet.IPv4Dev;
@@ -40,13 +42,13 @@ pub const IPv4Socket = struct {
         const daddr_in: *krn.socket.sockaddr_in = @ptrCast(@alignCast(name));
         if (daddr_in.family != krn.socket.AF_INET)
             return krn.errors.PosixError.EAFNOSUPPORT;
-        const eth0 = krn.net.dev.getByIndex(1) orelse
+        const out_if = routing.lookup(daddr_in.addr) orelse
             return krn.errors.PosixError.EHOSTUNREACH;
         const ip_len = krn.net.ipv4.IP_HEADER_LEN + payload_len;
         const packet_size = krn.net.ETH_HEADER_LEN + ip_len;
-        const netbuf = krn.net.Netbuf.new(eth0, packet_size) orelse
+        const netbuf = krn.net.Netbuf.new(out_if, packet_size) orelse
             return krn.errors.PosixError.ENOMEM;
-        errdefer netbuf.release();
+        defer netbuf.release();
 
         // Write ICMP packet content
         try netbuf.pull(packet_size - payload_len);
@@ -66,6 +68,12 @@ pub const IPv4Socket = struct {
         ipheader.daddr = daddr_in.addr;
         ipheader.check = std.mem.nativeToBig(u16, ipheader.csum());
 
+        // No queueing for now, if the neighbor is not known drop
+        // packet, next ping will find neighbor (they responded)
+        // and icmp can go out.
+        arp.output(netbuf, @bitCast(daddr_in.addr)) catch {
+            return krn.errors.PosixError.EHOSTUNREACH;
+        };
         return payload_len;
     }
 

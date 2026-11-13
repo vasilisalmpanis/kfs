@@ -22,22 +22,58 @@ const ArpExtension = extern struct {
 const ARP_REQUEST   : u16 = 1;
 const ARP_REPLY     : u16 = 2;
 
-fn formatPacket(raw: [*]u8, mymac: [6]u8, myip: [4]u8, target_ip: [4]u8) void {
-    @memset(raw[0..krn.net.ARP_FRAME_LEN], 0);
-    const eth_frame: *krn.net.EthernetHeader = @ptrCast(@alignCast(raw));
-    @memset(eth_frame.h_dest[0..6], 0xFF);
-    @memcpy(eth_frame.h_source[0..6], mymac[0..6]);
-    eth_frame.h_proto = std.mem.nativeToBig(u16, krn.net.ETH_P_ARP);
+fn sendRequest(
+    dev: *krn.net.dev.NetDevice,
+    sender_ip: [4]u8,
+    target_ip: [4]u8,
+) !void {
+    const netbuf = krn.net.Netbuf.new(
+        dev,
+        krn.net.ETH_HEADER_LEN + @sizeOf(ArpPacket) + @sizeOf(ArpExtension)
+    ) orelse
+        return krn.errors.PosixError.ENOMEM;
+    defer netbuf.release();
 
-    const arp: *ArpPacket = @ptrCast(@alignCast(&raw[krn.net.ETH_HEADER_LEN]));
-    arp.htype = std.mem.nativeToBig(u16, 1);          // Ethernet
-    arp.ptype = std.mem.nativeToBig(u16, krn.net.ETH_P_IP);
-    arp.hlen = 6;
-    arp.plen = 4;
-    arp.oper = std.mem.nativeToBig(u16, 1);           // ARP request
-    @memcpy(arp.sha[0..6], mymac[0..6]);
-    @memcpy(arp.spa[0..4], myip[0..4]);
-    @memcpy(arp.tpa[0..4], target_ip[0..4]);
+    const eth_h = netbuf.getPtr(krn.net.EthernetHeader);
+    eth_h.dest_mac = dev.broadcast;
+    eth_h.src_mac = dev.dev_addr;
+    eth_h.eth_type = std.mem.nativeToBig(u16, krn.net.ETH_P_ARP);
+    try netbuf.pull(krn.net.ETH_HEADER_LEN);
+
+    const arp_pkt = netbuf.getPtr(ArpPacket);
+    arp_pkt.htype = std.mem.nativeToBig(u16, ARPHRD_ETHER);
+    arp_pkt.ptype = std.mem.nativeToBig(u16, krn.net.ETH_P_IP);
+    arp_pkt.hlen = krn.net.ETH_ADDR_LEN;
+    arp_pkt.plen = 4;
+    arp_pkt.oper = std.mem.nativeToBig(u16, ARP_REQUEST);
+    try netbuf.pull(@sizeOf(ArpPacket));
+
+    const arp_ext = netbuf.getPtr(ArpExtension);
+    arp_ext.sha = dev.dev_addr;
+    arp_ext.spa = sender_ip;
+    arp_ext.tha = @splat(0);
+    arp_ext.tpa = target_ip;
+
+    try dev.ops.xmit(netbuf);
+}
+
+/// Sends the IP packet at netbuf.pos to target. If target is not
+/// resolved yet an ARP request is sent and PACKET_DROP is
+/// returned. The packet is not queued, this is TODO
+pub fn output(netbuf: *krn.net.Netbuf, target: [4]u8) !void {
+    const dev = netbuf.dev;
+    const dest_mac = lookup(dev, target) orelse {
+        const ip_h = netbuf.getPtr(krn.net.ipv4.ip.IpHeader);
+        try sendRequest(dev, @bitCast(ip_h.saddr), target);
+        return krn.errors.PosixError.PACKET_DROP;
+    };
+
+    try netbuf.push(krn.net.ETH_HEADER_LEN);
+    const eth_h = netbuf.getPtr(krn.net.EthernetHeader);
+    eth_h.dest_mac = dest_mac;
+    eth_h.src_mac = dev.dev_addr;
+    eth_h.eth_type = std.mem.nativeToBig(u16, krn.net.ETH_P_IP);
+    try dev.ops.xmit(netbuf);
 }
 
 pub fn reply(
