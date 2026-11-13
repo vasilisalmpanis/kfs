@@ -145,6 +145,8 @@ pub const PosixError = error{
     // From here on these errors belong only in kernel space
     ERESTARTSYS,     // 134 - KFS internal error for restarting syscalls
     ENOIOCTLCMD,     // 135 - KFS internal error for continuing ioctl
+    // Internal network related errors
+    PACKET_DROP,
 };
 
 
