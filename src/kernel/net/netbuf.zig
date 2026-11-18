@@ -110,6 +110,21 @@ pub const Netbuf = struct {
         return @ptrCast(@alignCast(self.data.ptr));
     }
 
+    pub fn clone(self: *Netbuf) ?*Netbuf {
+        const new_pkt = Netbuf.new(
+            self.dev,
+            self.data.len
+        ) orelse
+            return null;
+
+        new_pkt.writeData(self.data) catch {
+            new_pkt.release();
+            return null;
+        };
+        new_pkt.pos = self.pos;
+        return new_pkt;
+    }
+
     pub fn print(self: *Netbuf) void {
         const eth_h = self.getEthernetHeader() catch {
             krn.logger.INFO(

@@ -138,6 +138,7 @@ pub const Socket = struct {
     family: u16 = 0, // AF_UNIX etc
     list: lst.ListHead,
     lock: krn.Spinlock = krn.Spinlock.init(),
+    pkt_list: ?*krn.net.Netbuf,
     rw_queue: krn.wq.WaitQueueHead = krn.wq.WaitQueueHead.init(),
     file: *krn.fs.File,
     ops: * const ProtocolOps,
@@ -154,6 +155,45 @@ pub const Socket = struct {
         self.list.setup();
         self.lock = krn.Spinlock.init();
         self.rw_queue.setup();
+        self.pkt_list = null;
+    }
+
+    pub fn enqueue(self: *Socket, pkt: *krn.net.Netbuf) void {
+        self.lock.lock();
+        defer self.lock.unlock();
+
+        if (self.pkt_list) |head| {
+            head.lst.addTail(&pkt.lst);
+        } else {
+            self.pkt_list = pkt;
+        }
+        self.rw_queue.wakeUpOne();
+    }
+
+    pub fn dequeue(self: *Socket) ?*krn.net.Netbuf {
+        self.lock.lock();
+        defer self.lock.unlock();
+
+        return self.dequeueNoLock();
+    }
+
+    pub fn dequeueNoLock(self: *Socket) ?*krn.net.Netbuf {
+        if (!self.lock.isLocked())
+            @panic("dequeue packet without locking");
+        
+        if (self.pkt_list) |head| {
+            if (head.lst.isEmpty()) {
+                self.pkt_list = null;
+                return head;
+            }
+            const next_item = head.lst.next.?.entry(
+                krn.net.Netbuf, "lst"
+            );
+            self.pkt_list = next_item;
+            head.lst.del();
+            return head;
+        }
+        return null;
     }
 };
 

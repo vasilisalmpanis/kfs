@@ -1247,6 +1247,7 @@ pub const kernel = struct {
             family : u16= 0,
             list : kernel.list.ListHead,
             lock : kernel.Spinlock,
+            pkt_list : ?*kernel.net.netbuf.Netbuf,
             rw_queue : kernel.wq.WaitQueueHead,
             file : *kernel.fs.file.File,
             ops : *const kernel.socket.ProtocolOps,
@@ -1269,6 +1270,9 @@ pub const kernel = struct {
                     sock : kernel.socket.Socket,
                 };
 
+            };
+
+            pub const raw = struct {
             };
 
             pub const ip = struct {

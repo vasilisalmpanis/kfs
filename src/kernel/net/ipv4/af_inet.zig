@@ -82,14 +82,78 @@ pub const IPv4Socket = struct {
         msg: *krn.socket.MsgHdr,
         flags: u32
     ) !usize {
-        _ = base;
-        _ = msg;
         _ = flags;
-        return krn.errors.PosixError.ENOSYS;
+        const iovecs = try msg.iovecs();
+        base.lock.lock();
+
+        var new_pkt = base.dequeueNoLock();
+        while (new_pkt == null) {
+            if (base.file.flags & krn.fs.file.O_NONBLOCK != 0) {
+                base.lock.unlock();
+                return krn.errors.PosixError.EAGAIN;
+            }
+
+            var wq_node = krn.wq.WaitQueueNode.init(krn.task.current());
+            wq_node.setup();
+
+            base.rw_queue.addToQueue(&wq_node);
+            base.lock.unlock();
+            base.rw_queue.waitIfInQueue(&wq_node, true, 0);
+
+            if (krn.task.current().hasPendingSignal())
+                return krn.errors.PosixError.ERESTARTSYS;
+            base.lock.lock();
+            new_pkt = base.dequeueNoLock();
+        }
+        base.lock.unlock();
+
+        const pkt = new_pkt.?;
+        defer pkt.release();
+
+        msg.namelen = 0;
+        var ret_size: usize = 0;
+
+        const ip_start: usize = krn.net.ETH_HEADER_LEN;
+        if (pkt.data.len < ip_start + @sizeOf(krn.net.ipv4.ip.IpHeader))
+            return krn.errors.PosixError.EINVAL;
+
+        const ip_h: *align(1) const krn.net.ipv4.ip.IpHeader =
+            @ptrCast(pkt.data[ip_start..].ptr);
+        const ip_len: usize = std.mem.bigToNative(u16, ip_h.tot_len);
+
+        if (ip_len < @sizeOf(krn.net.ipv4.ip.IpHeader) or
+            ip_len > pkt.data.len - ip_start)
+            return krn.errors.PosixError.EINVAL;
+
+        const packet_data = pkt.data[ip_start..][0..ip_len];
+
+        for (iovecs) |iov| {
+            if (ret_size == packet_data.len)
+                break;
+            if (iov.len == 0)
+                continue;
+            const buf = iov.base orelse
+                return if (ret_size > 0)
+                    ret_size
+                else
+                    krn.errors.PosixError.EFAULT;
+            const got = @min(iov.len, packet_data.len - ret_size);
+            @memcpy(buf[0..got], packet_data[ret_size..][0..got]);
+            ret_size += got;
+            if (got < iov.len)
+                break;
+        }
+        return ret_size;
     }
 
     fn release(base: *krn.socket.Socket) !void {
         const self: *IPv4Socket = @fieldParentPtr("sock", base);
+        switch (self.sock.socket_type) {
+            krn.socket.SOCK_RAW => krn.net.ipv4.raw.del(&self.sock),
+            else => {
+                // TODO: other types;
+            },
+        }
         krn.mm.kfree(self);
     }
 };
@@ -104,6 +168,12 @@ fn inet_create(socket_type: u16, protocol: u8) !*krn.socket.Socket {
         return krn.errors.PosixError.ENOMEM;
     socket.sock.setup(krn.socket.AF_INET, socket_type, protocol);
     socket.sock.ops = &inet_raw_ops;
+    switch (socket.sock.socket_type) {
+        krn.socket.SOCK_RAW => krn.net.ipv4.raw.add(&socket.sock),
+        else => {
+            // TODO: other types
+        },
+    }
     return &socket.sock;
 }
 

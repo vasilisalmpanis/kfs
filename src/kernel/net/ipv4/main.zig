@@ -1,5 +1,6 @@
 const kernel = @import("../../main.zig");
 pub const af_inet = @import("./af_inet.zig");
+pub const raw = @import("raw.zig");
 
 pub const ip = @import("./ip.zig");
 pub const route = @import("./route.zig");

@@ -60,4 +60,8 @@ pub const Spinlock = struct {
         if (lock_state)
             arch.cpu.enableInterrupts();
     }
+
+    pub inline fn isLocked(self: *Spinlock) bool {
+        return self.locked.load(.monotonic);
+    }
 };
