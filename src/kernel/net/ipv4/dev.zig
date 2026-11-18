@@ -38,6 +38,31 @@ fn calcBroadcast(ip: [4]u8, mask: u32) [4]u8 {
     return @bitCast(@as(u32, @bitCast(ip)) | ~mask);
 }
 
+fn subnet(ifa: *const IPv4Dev) u32 {
+    return @as(u32, @bitCast(ifa.ip)) & ifa.mask;
+}
+
+fn addRoute(net_dev: *kernel.net.dev.NetDevice, ifa: *const IPv4Dev) !void {
+    // Another address on the same subnet may have added it already
+    kernel.net.ipv4.route.add(net_dev, subnet(ifa), ifa.mask) catch |err| {
+        if (err != kernel.errors.PosixError.EEXIST)
+            return err;
+    };
+}
+
+// Expects ifa to be already removed from net_dev.ip_list
+fn delRoute(net_dev: *kernel.net.dev.NetDevice, ifa: *const IPv4Dev) void {
+    if (net_dev.ip_list) |head| {
+        var it = head.list.iterator();
+        while (it.next()) |node| {
+            const curr = node.curr.entry(IPv4Dev, "list");
+            if (curr.mask == ifa.mask and subnet(curr) == subnet(ifa))
+                return;
+        }
+    }
+    _ = kernel.net.ipv4.route.del(net_dev, subnet(ifa), ifa.mask);
+}
+
 fn setAddr(
     net_dev: *kernel.net.dev.NetDevice,
     ifa: ?*IPv4Dev,
@@ -48,6 +73,7 @@ fn setAddr(
         if (std.mem.eql(u8, &old.ip, &ip))
             return;
         net_dev.delIP(old);
+        delRoute(net_dev, old);
         break :blk old;
     } else IPv4Dev.new(label, ip, 0) orelse
         return kernel.errors.PosixError.ENOBUFS;
@@ -58,6 +84,11 @@ fn setAddr(
     if (net_dev.flags & uif.IFF_BROADCAST != 0)
         new_ifa.broadcast = calcBroadcast(ip, new_ifa.mask);
     net_dev.addIP(new_ifa);
+    addRoute(net_dev, new_ifa) catch |err| {
+        net_dev.delIP(new_ifa);
+        kernel.mm.kfree(new_ifa);
+        return err;
+    };
 }
 
 fn putAddr(sin: *kernel.socket.sockaddr_in, ip: [4]u8) void {

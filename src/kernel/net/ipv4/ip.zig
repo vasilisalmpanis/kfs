@@ -1,24 +1,21 @@
 const std = @import("std");
+const in = @import("main.zig");
 const krn = @import("../../main.zig");
 const icmp = @import("icmp.zig");
 
-pub const  IPPROTO_IP:      u8 = 0;	    // Dummy protocol for TCP
-pub const  IPPROTO_ICMP:    u8 = 1;	    // Internet Control Message Protocol
-pub const  IPPROTO_IGMP:    u8 = 2;	    // Internet Group Management Protocol
-pub const  IPPROTO_TCP:     u8 = 6;	    // Transmission Control Protocol
-pub const  IPPROTO_UDP:     u8 = 17;	// User Datagram Protocol
+pub const IP_DF: u16 = 0x4000; // Don't fragment
 
 pub const IpHeader = extern struct {
     vers_ihl:   u8 = 0,
-	tos:        u8 = 0,
-	tot_len:    u16 = 0,
-	id:         u16 = 0,
-	frag_off:   u16 = 0,
-	ttl:        u8 = 0,
-	protocol:   u8 = 0,
-	check:      u16 = 0,
-	saddr:      u32 = 0,
-	daddr:      u32 = 0,
+    tos:        u8 = 0,
+    tot_len:    u16 = 0,
+    id:         u16 = 0,
+    frag_off:   u16 = 0,
+    ttl:        u8 = 0,
+    protocol:   u8 = 0,
+    check:      u16 = 0,
+    saddr:      u32 = 0,
+    daddr:      u32 = 0,
 
     pub fn csum(self: *IpHeader) u16 {
         var sum: u32 = 0;
@@ -108,8 +105,8 @@ pub fn receive(pkt: *krn.net.Netbuf) !bool {
     }
 
     if (switch (ip_h.protocol) {
-        IPPROTO_ICMP    => try icmp.receive(pkt, ip_h),
-        else            => blk: {
+        in.IPPROTO_ICMP    => try icmp.receive(pkt, ip_h),
+        else               => blk: {
             krn.logger.INFO(
                 "ip.receive(): TODO: implement ip protocol {d}",
                 .{ip_h.protocol}

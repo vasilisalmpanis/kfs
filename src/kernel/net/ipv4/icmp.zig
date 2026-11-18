@@ -56,6 +56,23 @@ pub const IcmpEchoHeader = extern struct {
         }
         return @truncate(~sum);
     }
+
+    pub fn handleReply(
+        self: *IcmpEchoHeader,
+        msg_len: usize,
+        pkt: *krn.net.Netbuf
+    ) bool {
+        _ = self;
+        _ = msg_len;
+        krn.net.ipv4.raw.map(
+            krn.net.ipv4.IPPROTO_ICMP,
+            @ptrCast(&krn.net.ipv4.raw.raw_input),
+            @ptrCast(pkt)
+        ) catch |err| {
+            krn.logger.WARN("err in icmp handleReply(): {t}", .{err});
+        };
+        return false;
+    }
 };
 
 pub fn receive(pkt: *krn.net.Netbuf, header: *ip.IpHeader) !bool {
@@ -79,5 +96,15 @@ pub fn receive(pkt: *krn.net.Netbuf, header: *ip.IpHeader) !bool {
     const icmp_h: *IcmpEchoHeader = @ptrCast(
         @alignCast(&pkt.data[icmp_start])
     );
-    return icmp_h.makeReply(icmp_len);
+    return switch (icmp_h.message_type) {
+        ICMP_ECHOREPLY => icmp_h.handleReply(icmp_len, pkt),
+        ICMP_ECHO => icmp_h.makeReply(icmp_len),
+        else => {
+            krn.logger.WARN(
+                "Got unknown ICMP packet type {any}",
+                .{icmp_h}
+            );
+            @panic("unknown ICMP packet");
+        },
+    };
 }

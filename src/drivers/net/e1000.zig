@@ -353,13 +353,10 @@ pub const E1000Device = struct {
                 const buf: [*]const u8 = @ptrFromInt(
                     self.rx_buffers[self.rx_curr].?.virt
                 );
-                const netbuf = kernel.net.Netbuf.new(net_dev) orelse
-                    continue ;
-                netbuf.data = kernel.mm.dupSlice(u8, buf[0..len]) orelse {
-                    kernel.mm.kfree(netbuf);
-                    continue ;
-                };
-                kernel.net.netbuf.enqueue(netbuf);
+                if (kernel.net.Netbuf.new(net_dev, len)) |netbuf| {
+                    @memcpy(netbuf.data, buf[0..len]);
+                    kernel.net.netbuf.enqueue(netbuf);
+                }
             }
 
             self.rx_descs[self.rx_curr].status = 0;
